@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { Bell, RefreshCw, Menu } from "lucide-react";
+import { Bell, RefreshCw, Menu, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTopbarControls } from "@/components/layout/topbar-context";
 import { MONTHS_AR } from "@/lib/utils/constants";
@@ -65,6 +65,19 @@ export function Topbar({ activeFilter, onFilterChange, activeMonth, onMonthChang
 
   const showPeriodBadge = activeFilter !== "الكل" || activeMonth !== null;
 
+  /* Live clock */
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const clockStr = new Intl.DateTimeFormat("ar-EG", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  }).format(now);
+
   return (
     <div className="sticky top-0 z-40 px-3 sm:px-6 pt-3 space-y-2">
       <div className="glass-surface flex items-center justify-between rounded-[20px] sm:rounded-[26px] px-3 sm:px-5 py-3 sm:py-4 gap-3">
@@ -97,7 +110,7 @@ export function Topbar({ activeFilter, onFilterChange, activeMonth, onMonthChang
         </div>
 
         {/* Right side: controls */}
-        <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           {showRefresh && (
             <div className="hidden md:flex items-center gap-2 rounded-2xl border border-white/6 bg-white/[0.03] px-3 py-2">
               {formattedLastUpdated && (
@@ -127,10 +140,10 @@ export function Topbar({ activeFilter, onFilterChange, activeMonth, onMonthChang
                   onFilterChange(filter);
                   if (filter !== "الكل") onMonthChange(null);
                 }}
-                className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-[10px] sm:text-xs transition-colors ${
+                className={`px-3 sm:px-4 py-1.5 rounded-xl text-[10px] sm:text-xs transition-all ${
                   activeFilter === filter && !activeMonth
-                    ? "bg-white/[0.08] text-foreground font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "bg-cyan/15 text-cyan font-medium border border-cyan/30 shadow-[0_0_10px_rgba(0,212,255,0.15)]"
+                    : "text-muted-foreground hover:text-foreground border border-transparent"
                 }`}
               >
                 {filter}
@@ -138,11 +151,21 @@ export function Topbar({ activeFilter, onFilterChange, activeMonth, onMonthChang
             ))}
           </div>
 
+          {/* Clock + Calendar */}
+          <div className="hidden sm:flex items-center gap-2">
+            <span className="rounded-xl border border-white/6 bg-white/[0.03] px-3 py-1.5 text-xs text-muted-foreground font-mono" dir="ltr">
+              {clockStr}
+            </span>
+            <Button variant="ghost" size="icon" className="rounded-xl bg-white/[0.03] hover:bg-white/[0.06]">
+              <CalendarDays className="w-4 h-4 text-muted-foreground" />
+            </Button>
+          </div>
+
           {/* Notifications */}
           <Button variant="ghost" size="icon" className="relative rounded-xl sm:rounded-2xl bg-white/[0.03] hover:bg-white/[0.06]" onClick={onBellClick}>
-            <Bell className="w-4 h-4 text-muted-foreground" />
+            <Bell className="w-4 h-4 text-amber" />
             {unreadCount > 0 && (
-              <span className="absolute -top-0.5 -left-0.5 w-4 h-4 bg-cc-red rounded-full text-[9px] text-white flex items-center justify-center font-bold">
+              <span className="absolute -top-0.5 -left-0.5 w-5 h-5 bg-cc-red rounded-full text-[9px] text-white flex items-center justify-center font-bold">
                 {unreadCount}
               </span>
             )}
@@ -159,10 +182,10 @@ export function Topbar({ activeFilter, onFilterChange, activeMonth, onMonthChang
               onFilterChange(filter);
               if (filter !== "الكل") onMonthChange(null);
             }}
-            className={`px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition-colors shrink-0 ${
+            className={`px-3 py-1.5 rounded-xl text-xs whitespace-nowrap transition-all shrink-0 ${
               activeFilter === filter && !activeMonth
-                ? "bg-white/[0.08] text-foreground font-medium"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-cyan/15 text-cyan font-medium border border-cyan/30"
+                : "text-muted-foreground hover:text-foreground border border-transparent"
             }`}
           >
             {filter}

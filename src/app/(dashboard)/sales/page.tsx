@@ -288,17 +288,20 @@ export default function SalesPage() {
       {/* ─── Financial Summary Row ─── */}
       {!loading && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-card rounded-xl border border-border p-4 text-center">
-            <p className="text-2xl font-extrabold text-cyan">{formatMoney(totalValue)}</p>
-            <p className="text-xs text-muted-foreground mt-1">إجمالي قيمة الصفقات</p>
+          <div className="relative overflow-hidden rounded-2xl p-5 text-center" style={{ background: "linear-gradient(135deg, rgba(0,212,255,0.08) 0%, rgba(17,24,39,0.95) 100%)", border: "1px solid rgba(0,212,255,0.3)", boxShadow: "0 0 15px rgba(0,212,255,0.1)" }}>
+            <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full bg-cyan/10 blur-2xl" />
+            <p className="text-2xl font-extrabold text-cyan relative z-10">{formatMoney(totalValue)}</p>
+            <p className="text-xs text-muted-foreground mt-1 relative z-10">إجمالي قيمة الصفقات</p>
           </div>
-          <div className="bg-card rounded-xl border border-border p-4 text-center">
-            <p className="text-2xl font-extrabold text-cc-green">{totalDeals}</p>
-            <p className="text-xs text-muted-foreground mt-1">عدد الصفقات</p>
+          <div className="relative overflow-hidden rounded-2xl p-5 text-center" style={{ background: "linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(17,24,39,0.95) 100%)", border: "1px solid rgba(16,185,129,0.3)", boxShadow: "0 0 15px rgba(16,185,129,0.1)" }}>
+            <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full bg-cc-green/10 blur-2xl" />
+            <p className="text-2xl font-extrabold text-cc-green relative z-10">{totalDeals}</p>
+            <p className="text-xs text-muted-foreground mt-1 relative z-10">عدد الصفقات</p>
           </div>
-          <div className="bg-card rounded-xl border border-border p-4 text-center">
-            <p className="text-2xl font-extrabold text-cc-purple">{formatMoney(avgDealValue)}</p>
-            <p className="text-xs text-muted-foreground mt-1">متوسط قيمة الصفقة</p>
+          <div className="relative overflow-hidden rounded-2xl p-5 text-center" style={{ background: "linear-gradient(135deg, rgba(139,92,246,0.08) 0%, rgba(17,24,39,0.95) 100%)", border: "1px solid rgba(139,92,246,0.3)", boxShadow: "0 0 15px rgba(139,92,246,0.1)" }}>
+            <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full bg-cc-purple/10 blur-2xl" />
+            <p className="text-2xl font-extrabold text-cc-purple relative z-10">{formatMoney(avgDealValue)}</p>
+            <p className="text-xs text-muted-foreground mt-1 relative z-10">متوسط قيمة الصفقة</p>
           </div>
         </div>
       )}
@@ -313,7 +316,7 @@ export default function SalesPage() {
               const rawColor = SOURCE_COLORS[src] || "cyan";
               const cssVar = rawColor.replace("cc-", "");
               return (
-                <div key={src} className="bg-card rounded-xl border border-border p-4 border-t-2" style={{ borderTopColor: `var(--${cssVar})` }}>
+                <div key={src} className="bg-card rounded-2xl border border-border p-4 border-t-2" style={{ borderTopColor: `var(--${cssVar})` }}>
                   <p className="text-xl font-bold text-foreground">{count}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">{src}</p>
                   <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
@@ -326,7 +329,7 @@ export default function SalesPage() {
       </div>
 
       {/* ─── Deals Table ─── */}
-      <div className="bg-card rounded-xl border border-border overflow-x-auto">
+      <div className="bg-card rounded-2xl border border-border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -482,27 +485,42 @@ export default function SalesPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Sales Funnel */}
-            <div className="bg-card rounded-xl border border-border p-5">
-              <h3 className="text-sm font-bold text-foreground mb-4">قمع المبيعات</h3>
-              <div className="space-y-3">
+            {/* Sales Funnel (Pipeline) */}
+            <div className="bg-card rounded-2xl border border-border p-5">
+              <h3 className="text-sm font-bold text-foreground mb-5">قمع المبيعات (Sales Pipeline)</h3>
+              <div className="space-y-4">
                 {funnelData.map((f, i) => {
-                  const maxCount = Math.max(...funnelData.map((x) => x.count), 1);
-                  const widthPct = Math.max((f.count / maxCount) * 100, 8);
-                  const colors = ["bg-cc-green", "bg-cc-purple", "bg-cyan", "bg-amber", "bg-cc-green"];
+                  const maxValue = Math.max(...funnelData.map((x) => x.value), 1);
+                  const widthPct = Math.max((f.value / maxValue) * 100, 15);
+                  const barColors = ["bg-cyan", "bg-amber", "bg-cc-purple", "bg-amber", "bg-cc-green"];
+                  const badgeColors = ["bg-cyan", "bg-amber/80", "bg-cc-purple", "bg-amber", "bg-cc-green"];
+                  const prevValue = i > 0 ? (funnelData[i - 1]?.value || 0) : 0;
+                  const changePct = prevValue > 0 ? Math.round(((f.value - prevValue) / prevValue) * 100) : null;
                   return (
-                    <div key={f.stage} className="space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">{f.stage}</span>
-                        <span className="text-foreground font-medium">{f.count} صفقات — {formatMoney(f.value)}</span>
-                      </div>
-                      <div className="h-6 bg-muted/30 rounded-lg overflow-hidden">
+                    <div key={f.stage} className="flex items-center gap-3">
+                      {/* Stage label */}
+                      <span className="text-xs text-muted-foreground w-20 text-right shrink-0">{f.stage}</span>
+                      {/* Change percentage */}
+                      {changePct !== null ? (
+                        <span className="text-[10px] text-muted-foreground w-10 text-left shrink-0" dir="ltr">
+                          {changePct > 0 ? `${changePct}%↑` : `${Math.abs(changePct)}%↓`}
+                        </span>
+                      ) : (
+                        <span className="w-10 shrink-0" />
+                      )}
+                      {/* Value */}
+                      <span className="text-xs text-muted-foreground w-12 text-left shrink-0">{formatMoney(f.value)}</span>
+                      {/* Bar with badge */}
+                      <div className="flex-1 h-9 bg-muted/15 rounded-lg overflow-visible relative flex items-center">
                         <div
-                          className={`h-full rounded-lg ${colors[i]} transition-all flex items-center justify-center`}
+                          className={`h-full rounded-lg ${barColors[i]} transition-all`}
                           style={{ width: `${widthPct}%` }}
-                        >
-                          {f.count > 0 && <span className="text-[10px] font-bold text-white">{f.count}</span>}
-                        </div>
+                        />
+                        {f.count > 0 && (
+                          <span className={`mr-2 ${badgeColors[i]} text-white text-[11px] font-bold px-3 py-1 rounded-full shrink-0 whitespace-nowrap`}>
+                            {f.count} عميل
+                          </span>
+                        )}
                       </div>
                     </div>
                   );
@@ -511,34 +529,54 @@ export default function SalesPage() {
             </div>
 
             {/* Lost Deals Analysis */}
-            <div className="bg-card rounded-xl border border-border p-5">
-              <h3 className="text-sm font-bold text-foreground mb-1">تحليل الصفقات الخاسرة</h3>
-              <p className="text-xs text-muted-foreground mb-4">
-                {DEMO_LOST_DEALS.length} صفقات — {formatMoney(totalLostValue)}
-              </p>
-              <div className="space-y-3">
-                {Object.entries(lostReasons)
-                  .sort((a, b) => b[1].count - a[1].count)
-                  .map(([reason, data]) => {
-                    const pct = Math.round((data.count / DEMO_LOST_DEALS.length) * 100);
-                    return (
-                      <div key={reason} className="space-y-1">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">{reason}</span>
-                          <span className="text-foreground font-medium">{data.count} ({pct}%) — {formatMoney(data.value)}</span>
+            <div className="bg-card rounded-2xl border border-border p-5">
+              <div className="flex items-center gap-2 mb-5">
+                <span className="text-lg">🔍</span>
+                <h3 className="text-sm font-bold text-foreground">تحليل الصفقات الخاسرة</h3>
+              </div>
+              <div className="space-y-5">
+                {(() => {
+                  const reasonColors: Record<string, { bar: string; dot: string }> = {
+                    "سعر": { bar: "bg-cc-red", dot: "bg-cc-red" },
+                    "منافس": { bar: "bg-amber", dot: "bg-amber" },
+                    "ميزة ناقصة": { bar: "bg-cc-purple", dot: "bg-cc-purple" },
+                    "توقيت": { bar: "bg-cc-blue", dot: "bg-cc-blue" },
+                    "أخرى": { bar: "bg-muted-foreground", dot: "bg-muted-foreground" },
+                  };
+                  const defaultColor = { bar: "bg-cyan", dot: "bg-cyan" };
+                  return Object.entries(lostReasons)
+                    .sort((a, b) => b[1].count - a[1].count)
+                    .map(([reason, data]) => {
+                      const pct = Math.round((data.count / DEMO_LOST_DEALS.length) * 100);
+                      const colors = reasonColors[reason] || defaultColor;
+                      return (
+                        <div key={reason} className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className={`w-3 h-3 rounded-sm ${colors.dot}`} />
+                              <span className="text-xs text-muted-foreground">{reason}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-cc-red text-xs font-bold">{data.count} صفقة</span>
+                              <span className="text-muted-foreground text-xs">{pct}%</span>
+                            </div>
+                          </div>
+                          <div className="h-2.5 bg-muted/20 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${colors.bar} transition-all`} style={{ width: `${pct}%` }} />
+                          </div>
                         </div>
-                        <div className="h-2 bg-muted rounded-full overflow-hidden">
-                          <div className="h-full rounded-full bg-cc-red transition-all" style={{ width: `${pct}%` }} />
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    });
+                })()}
+              </div>
+              <div className="mt-5 pt-4 border-t border-border">
+                <p className="text-xs text-muted-foreground">آخر الصفقات الخاسرة</p>
               </div>
             </div>
           </div>
 
           {/* Source ROI */}
-          <div className="bg-card rounded-xl border border-border p-5">
+          <div className="bg-card rounded-2xl border border-border p-5">
             <h3 className="text-sm font-bold text-foreground mb-4">أداء المصادر</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -579,7 +617,7 @@ export default function SalesPage() {
 
         {/* Tab 2: Renewals link */}
         <TabsContent value="renewals" className="space-y-6">
-          <div className="bg-card rounded-xl border border-border p-8 text-center space-y-4">
+          <div className="bg-card rounded-2xl border border-border p-8 text-center space-y-4">
             <div className="w-16 h-16 rounded-2xl bg-cyan-dim mx-auto flex items-center justify-center">
               <RefreshCw className="w-8 h-8 text-cyan" />
             </div>
@@ -598,7 +636,7 @@ export default function SalesPage() {
 
         {/* Tab 3: Satisfaction link */}
         <TabsContent value="satisfaction" className="space-y-6">
-          <div className="bg-card rounded-xl border border-border p-8 text-center space-y-4">
+          <div className="bg-card rounded-2xl border border-border p-8 text-center space-y-4">
             <div className="w-16 h-16 rounded-2xl bg-green-dim mx-auto flex items-center justify-center">
               <Heart className="w-8 h-8 text-cc-green" />
             </div>

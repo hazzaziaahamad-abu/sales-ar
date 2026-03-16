@@ -10,68 +10,65 @@ interface KPICardProps {
   icon?: React.ReactNode;
 }
 
-const STATUS_GRADIENT: Record<string, string> = {
-  excellent: "linear-gradient(to bottom, rgba(16,185,129,0.10), rgba(16,185,129,0.02))",
-  improving: "linear-gradient(to bottom, rgba(245,158,11,0.10), rgba(245,158,11,0.02))",
-  behind: "linear-gradient(to bottom, rgba(239,68,68,0.10), rgba(239,68,68,0.02))",
+const STATUS_COLORS: Record<string, { border: string; glow: string; orb: string; text: string }> = {
+  excellent: {
+    border: "rgba(16, 185, 129, 0.5)",
+    glow: "0 0 20px rgba(16, 185, 129, 0.15), inset 0 1px 0 rgba(16, 185, 129, 0.1)",
+    orb: "radial-gradient(circle, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0.08) 40%, transparent 70%)",
+    text: "text-cc-green",
+  },
+  improving: {
+    border: "rgba(245, 158, 11, 0.5)",
+    glow: "0 0 20px rgba(245, 158, 11, 0.15), inset 0 1px 0 rgba(245, 158, 11, 0.1)",
+    orb: "radial-gradient(circle, rgba(245, 158, 11, 0.25) 0%, rgba(245, 158, 11, 0.08) 40%, transparent 70%)",
+    text: "text-amber",
+  },
+  behind: {
+    border: "rgba(239, 68, 68, 0.5)",
+    glow: "0 0 20px rgba(239, 68, 68, 0.15), inset 0 1px 0 rgba(239, 68, 68, 0.1)",
+    orb: "radial-gradient(circle, rgba(239, 68, 68, 0.25) 0%, rgba(239, 68, 68, 0.08) 40%, transparent 70%)",
+    text: "text-cc-red",
+  },
 };
 
-const STATUS_BORDER_COLOR: Record<string, string> = {
-  excellent: "#10B981",
-  improving: "#F59E0B",
-  behind: "#EF4444",
-};
-
-const STATUS_VALUE_COLOR: Record<string, string> = {
-  excellent: "text-cc-green",
-  improving: "text-amber",
-  behind: "text-cc-red",
-};
-
-const STATUS_ICON_BG: Record<string, string> = {
-  excellent: "bg-cc-green/15",
-  improving: "bg-amber/15",
-  behind: "bg-cc-red/15",
+const STATUS_BG: Record<string, string> = {
+  excellent: "linear-gradient(135deg, rgba(16,185,129,0.12) 0%, rgba(16,185,129,0.03) 60%, rgba(17,24,39,0.9) 100%)",
+  improving: "linear-gradient(135deg, rgba(245,158,11,0.12) 0%, rgba(245,158,11,0.03) 60%, rgba(17,24,39,0.9) 100%)",
+  behind: "linear-gradient(135deg, rgba(239,68,68,0.12) 0%, rgba(239,68,68,0.03) 60%, rgba(17,24,39,0.9) 100%)",
 };
 
 export function KPICard({ label, value, target, status, icon }: KPICardProps) {
   const styles = KPI_STATUS_STYLES[status];
+  const colors = STATUS_COLORS[status];
   const StatusIcon = status === "behind" ? X : Check;
 
   return (
     <div
-      className="relative overflow-hidden rounded-xl border border-border border-t-2 p-4"
+      className="relative overflow-hidden rounded-2xl p-5 min-h-[160px] flex flex-col justify-between"
       style={{
-        background: STATUS_GRADIENT[status],
-        borderTopColor: STATUS_BORDER_COLOR[status],
+        background: STATUS_BG[status],
+        border: `1px solid ${colors.border}`,
+        boxShadow: colors.glow,
       }}
     >
-      <div className="flex items-center justify-between mb-3">
-        {icon && (
-          <span className={STATUS_VALUE_COLOR[status]}>{icon}</span>
-        )}
-        <div className={cn(
-          "w-7 h-7 rounded-full flex items-center justify-center",
-          STATUS_ICON_BG[status]
-        )}>
-          <StatusIcon className={cn("w-4 h-4", STATUS_VALUE_COLOR[status])} />
-        </div>
-      </div>
+      {/* Large orb decoration */}
+      <div
+        className="absolute -left-6 top-1/2 -translate-y-1/2 w-36 h-36 rounded-full pointer-events-none"
+        style={{ background: colors.orb }}
+      />
 
-      <p className={cn("text-2xl font-extrabold", STATUS_VALUE_COLOR[status])}>
+      {/* Top: Label */}
+      <p className="text-xs text-muted-foreground relative z-10">{label}</p>
+
+      {/* Center: Value */}
+      <p className={cn("text-3xl font-extrabold relative z-10 my-2", colors.text)}>
         {value}
       </p>
 
-      <p className="text-xs text-muted-foreground mt-1">{label}</p>
-
-      <div className="flex items-center gap-2 mt-3">
-        <span className={cn(
-          "text-[10px] px-1.5 py-0.5 rounded-full font-medium",
-          styles.bg, styles.text
-        )}>
-          {styles.label}
-        </span>
-        <span className="text-[10px] text-muted-foreground">
+      {/* Bottom: Status + Target */}
+      <div className="flex items-center justify-between relative z-10">
+        <StatusIcon className={cn("w-5 h-5", colors.text)} />
+        <span className="text-[11px] text-muted-foreground">
           الهدف: {target}
         </span>
       </div>
