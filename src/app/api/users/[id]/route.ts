@@ -45,7 +45,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       .single();
 
     if (profile) {
-      const role = profile.roles as { is_system: boolean } | null;
+      const role = profile.roles as unknown as { is_system: boolean } | null;
       if (role && !role.is_system) {
         // Update existing non-system role
         await supabaseAdmin
@@ -108,7 +108,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
   // Clean up non-system role if no other users reference it
   if (profile) {
-    const role = profile.roles as { is_system: boolean } | null;
+    const role = profile.roles as unknown as { is_system: boolean } | null;
     if (role && !role.is_system) {
       const { count } = await supabaseAdmin
         .from("user_profiles")
