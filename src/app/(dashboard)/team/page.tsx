@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { fetchEmployees, createEmployee, updateEmployee, deleteEmployee } from "@/lib/supabase/db";
+import { useAuth } from "@/lib/auth-context";
 import { EMPLOYEE_STATUSES } from "@/lib/utils/constants";
 import { StatCard } from "@/components/ui/stat-card";
 import { ColorBadge } from "@/components/ui/color-badge";
@@ -51,6 +52,7 @@ function workloadTextColor(pct: number): string {
 /* ---------- page ---------- */
 
 export default function TeamPage() {
+  const { activeOrgId: orgId } = useAuth();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -69,11 +71,12 @@ export default function TeamPage() {
   const [formStatus, setFormStatus] = useState<string>("نشط");
 
   useEffect(() => {
+    setLoading(true);
     fetchEmployees()
       .then(setEmployees)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [orgId]);
 
   const openAddModal = () => {
     setEditingEmployee(null);
@@ -220,7 +223,7 @@ export default function TeamPage() {
             return (
               <div
                 key={emp.id}
-                className="bg-card rounded-xl border border-border p-5 space-y-4"
+                className="cc-card rounded-xl p-5 space-y-4"
               >
                 {/* Top: avatar + info */}
                 <div className="flex items-start gap-3">
@@ -392,7 +395,7 @@ export default function TeamPage() {
 
 function TeamStatSkeleton() {
   return (
-    <div className="bg-card rounded-xl border border-border p-4 border-t-2 border-t-muted">
+    <div className="cc-card rounded-xl p-4 border-t-2 border-t-muted">
       <div className="flex items-start justify-between">
         <div className="space-y-2">
           <Skeleton className="h-7 w-10" />
@@ -406,7 +409,7 @@ function TeamStatSkeleton() {
 
 function TeamCardSkeleton() {
   return (
-    <div className="bg-card rounded-xl border border-border p-5 space-y-4">
+    <div className="cc-card rounded-xl p-5 space-y-4">
       <div className="flex items-start gap-3">
         <Skeleton className="w-11 h-11 rounded-full shrink-0" />
         <div className="flex-1 space-y-2">

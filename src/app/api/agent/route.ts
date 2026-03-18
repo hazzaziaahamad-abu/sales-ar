@@ -89,7 +89,8 @@ export async function POST(req: Request) {
     const modelMessages = await convertToModelMessages(messages);
 
     const supabase = await createServerSupabaseClient();
-    const ORG_ID = "00000000-0000-0000-0000-000000000001";
+    const { getOrgId } = await import("@/lib/supabase/db");
+    const ORG_ID = getOrgId();
 
     const queryDbParams = z.object({
       table: z.enum([

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { useAuth } from "@/lib/auth-context";
 import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -146,17 +147,19 @@ export default function UploadPage() {
   const [state, setState] = useState<UploadState>({
     status: "idle", file: null, sheets: [], aiMappings: null, error: null, importResults: null,
   });
+  const { activeOrgId: orgId } = useAuth();
   const [dragActive, setDragActive] = useState(false);
   const [history, setHistory] = useState<UploadRecord[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
 
-  // Load upload history from Supabase on mount
+  // Load upload history from Supabase on mount / org change
   useEffect(() => {
+    setHistoryLoading(true);
     fetchUploadHistory()
       .then(setHistory)
       .catch(console.error)
       .finally(() => setHistoryLoading(false));
-  }, []);
+  }, [orgId]);
 
   /* ─── Parse + AI map ─── */
   const handleFile = useCallback(async (file: File) => {
@@ -527,7 +530,7 @@ export default function UploadPage() {
       )}
 
       {/* Upload History (from Supabase) */}
-      <div className="bg-card rounded-xl border border-border p-5">
+      <div className="cc-card rounded-xl p-5">
         <h3 className="text-sm font-bold text-foreground mb-4">سجل الرفع</h3>
         {historyLoading ? (
           <div className="text-center py-6 text-muted-foreground text-sm">جاري التحميل...</div>

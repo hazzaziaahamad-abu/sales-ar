@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import {
   fetchPartnerships, createPartnership, updatePartnership, deletePartnership,
 } from "@/lib/supabase/db";
+import { useAuth } from "@/lib/auth-context";
 import { PARTNERSHIP_TYPES, PARTNERSHIP_STATUSES } from "@/lib/utils/constants";
 import { formatMoney } from "@/lib/utils/format";
 import { StatCard } from "@/components/ui/stat-card";
@@ -64,6 +65,7 @@ const TYPE_CHART_COLORS: Record<string, string> = {
 /* ---------- page ---------- */
 
 export default function PartnershipsPage() {
+  const { activeOrgId: orgId } = useAuth();
   const [partnerships, setPartnerships] = useState<Partnership[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -83,11 +85,12 @@ export default function PartnershipsPage() {
   const [formDescription, setFormDescription] = useState("");
 
   useEffect(() => {
+    setLoading(true);
     fetchPartnerships()
       .then(setPartnerships)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [orgId]);
 
   /* KPIs */
   const totalPartnerships = partnerships.length;
@@ -249,11 +252,11 @@ export default function PartnershipsPage() {
       {loading ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="space-y-4">
-            <div className="bg-card rounded-xl border border-border p-5">
+            <div className="cc-card rounded-xl p-5">
               <Skeleton className="h-4 w-32 mb-4" />
               <Skeleton className="mx-auto h-40 w-40 rounded-full" />
             </div>
-            <div className="bg-card rounded-xl border border-border p-5 space-y-3">
+            <div className="cc-card rounded-xl p-5 space-y-3">
               <Skeleton className="h-4 w-36" />
               {Array.from({ length: 5 }).map((_, index) => (
                 <div key={index} className="space-y-1">
@@ -266,7 +269,7 @@ export default function PartnershipsPage() {
               ))}
             </div>
           </div>
-          <div className="bg-card rounded-xl border border-border p-5 space-y-3">
+          <div className="cc-card rounded-xl p-5 space-y-3">
             <Skeleton className="h-4 w-28 mb-4" />
             {Array.from({ length: 5 }).map((_, index) => (
               <PartnershipCardSkeleton key={index} />
@@ -279,7 +282,7 @@ export default function PartnershipsPage() {
           {/* LEFT column: charts */}
           <div className="space-y-4">
             {/* Donut chart - types distribution */}
-            <div className="bg-card rounded-xl border border-border p-5">
+            <div className="cc-card rounded-xl p-5">
               <h3 className="text-sm font-bold text-foreground mb-4">
                 توزيع أنواع الشراكات
               </h3>
@@ -291,7 +294,7 @@ export default function PartnershipsPage() {
             </div>
 
             {/* Horizontal bar chart - top partnerships by value */}
-            <div className="bg-card rounded-xl border border-border p-5">
+            <div className="cc-card rounded-xl p-5">
               <h3 className="text-sm font-bold text-foreground mb-4">
                 أعلى الشراكات قيمة
               </h3>
@@ -325,7 +328,7 @@ export default function PartnershipsPage() {
           </div>
 
           {/* RIGHT column: partnership cards list */}
-          <div className="bg-card rounded-xl border border-border p-5">
+          <div className="cc-card rounded-xl p-5">
             <h3 className="text-sm font-bold text-foreground mb-4">
               قائمة الشراكات
             </h3>
@@ -514,7 +517,7 @@ export default function PartnershipsPage() {
 
 function PartnershipStatSkeleton() {
   return (
-    <div className="bg-card rounded-xl border border-border p-4 border-t-2 border-t-muted">
+    <div className="cc-card rounded-xl p-4 border-t-2 border-t-muted">
       <div className="flex items-start justify-between">
         <div className="space-y-2">
           <Skeleton className="h-7 w-16" />

@@ -1,7 +1,12 @@
 import { createClient } from "./client";
 import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal } from "@/types";
 
-export const ORG_ID = "00000000-0000-0000-0000-000000000001";
+const DEFAULT_ORG = "00000000-0000-0000-0000-000000000001";
+
+export function getOrgId(): string {
+  if (typeof window === "undefined") return DEFAULT_ORG;
+  return localStorage.getItem("cc_org_id") || DEFAULT_ORG;
+}
 
 // ─── DEALS ───────────────────────────────────────────────────────────────────
 
@@ -10,7 +15,7 @@ export async function fetchDeals(): Promise<Deal[]> {
   const { data, error } = await supabase
     .from("deals")
     .select("*")
-    .eq("org_id", ORG_ID)
+    .eq("org_id", getOrgId())
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as Deal[];
@@ -22,7 +27,7 @@ export async function createDeal(
   const supabase = createClient();
   const { data, error } = await supabase
     .from("deals")
-    .insert({ ...deal, org_id: ORG_ID })
+    .insert({ ...deal, org_id: getOrgId() })
     .select()
     .single();
   if (error) throw error;
@@ -38,7 +43,7 @@ export async function updateDeal(
     .from("deals")
     .update({ ...deal, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("org_id", ORG_ID)
+    .eq("org_id", getOrgId())
     .select()
     .single();
   if (error) throw error;
@@ -51,7 +56,7 @@ export async function deleteDeal(id: string): Promise<void> {
     .from("deals")
     .delete()
     .eq("id", id)
-    .eq("org_id", ORG_ID);
+    .eq("org_id", getOrgId());
   if (error) throw error;
 }
 
@@ -62,7 +67,7 @@ export async function fetchTickets(): Promise<Ticket[]> {
   const { data, error } = await supabase
     .from("tickets")
     .select("*")
-    .eq("org_id", ORG_ID)
+    .eq("org_id", getOrgId())
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as Ticket[];
@@ -74,7 +79,7 @@ export async function createTicket(
   const supabase = createClient();
   const { data, error } = await supabase
     .from("tickets")
-    .insert({ ...ticket, org_id: ORG_ID })
+    .insert({ ...ticket, org_id: getOrgId() })
     .select()
     .single();
   if (error) throw error;
@@ -90,7 +95,7 @@ export async function updateTicket(
     .from("tickets")
     .update({ ...ticket, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("org_id", ORG_ID)
+    .eq("org_id", getOrgId())
     .select()
     .single();
   if (error) throw error;
@@ -103,7 +108,7 @@ export async function deleteTicket(id: string): Promise<void> {
     .from("tickets")
     .delete()
     .eq("id", id)
-    .eq("org_id", ORG_ID);
+    .eq("org_id", getOrgId());
   if (error) throw error;
 }
 
@@ -114,7 +119,7 @@ export async function fetchEmployees(): Promise<Employee[]> {
   const { data, error } = await supabase
     .from("employees")
     .select("*")
-    .eq("org_id", ORG_ID)
+    .eq("org_id", getOrgId())
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as Employee[];
@@ -126,7 +131,7 @@ export async function createEmployee(
   const supabase = createClient();
   const { data, error } = await supabase
     .from("employees")
-    .insert({ ...emp, org_id: ORG_ID })
+    .insert({ ...emp, org_id: getOrgId() })
     .select()
     .single();
   if (error) throw error;
@@ -142,7 +147,7 @@ export async function updateEmployee(
     .from("employees")
     .update(emp)
     .eq("id", id)
-    .eq("org_id", ORG_ID)
+    .eq("org_id", getOrgId())
     .select()
     .single();
   if (error) throw error;
@@ -155,7 +160,7 @@ export async function deleteEmployee(id: string): Promise<void> {
     .from("employees")
     .delete()
     .eq("id", id)
-    .eq("org_id", ORG_ID);
+    .eq("org_id", getOrgId());
   if (error) throw error;
 }
 
@@ -166,7 +171,7 @@ export async function fetchProjects(): Promise<Project[]> {
   const { data, error } = await supabase
     .from("projects")
     .select("*")
-    .eq("org_id", ORG_ID)
+    .eq("org_id", getOrgId())
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as Project[];
@@ -178,7 +183,7 @@ export async function createProject(
   const supabase = createClient();
   const { data, error } = await supabase
     .from("projects")
-    .insert({ ...proj, org_id: ORG_ID })
+    .insert({ ...proj, org_id: getOrgId() })
     .select()
     .single();
   if (error) throw error;
@@ -194,7 +199,7 @@ export async function updateProject(
     .from("projects")
     .update({ ...proj, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("org_id", ORG_ID)
+    .eq("org_id", getOrgId())
     .select()
     .single();
   if (error) throw error;
@@ -208,7 +213,7 @@ export async function fetchPartnerships(): Promise<Partnership[]> {
   const { data, error } = await supabase
     .from("partnerships")
     .select("*")
-    .eq("org_id", ORG_ID)
+    .eq("org_id", getOrgId())
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as Partnership[];
@@ -220,7 +225,7 @@ export async function createPartnership(
   const supabase = createClient();
   const { data, error } = await supabase
     .from("partnerships")
-    .insert({ ...p, org_id: ORG_ID })
+    .insert({ ...p, org_id: getOrgId() })
     .select()
     .single();
   if (error) throw error;
@@ -236,7 +241,7 @@ export async function updatePartnership(
     .from("partnerships")
     .update({ ...p, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("org_id", ORG_ID)
+    .eq("org_id", getOrgId())
     .select()
     .single();
   if (error) throw error;
@@ -249,7 +254,7 @@ export async function deletePartnership(id: string): Promise<void> {
     .from("partnerships")
     .delete()
     .eq("id", id)
-    .eq("org_id", ORG_ID);
+    .eq("org_id", getOrgId());
   if (error) throw error;
 }
 
@@ -260,7 +265,7 @@ export async function fetchReviews(): Promise<Review[]> {
   const { data, error } = await supabase
     .from("reviews")
     .select("*")
-    .eq("org_id", ORG_ID)
+    .eq("org_id", getOrgId())
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as Review[];
@@ -272,7 +277,7 @@ export async function createReview(
   const supabase = createClient();
   const { data, error } = await supabase
     .from("reviews")
-    .insert({ ...review, org_id: ORG_ID })
+    .insert({ ...review, org_id: getOrgId() })
     .select()
     .single();
   if (error) throw error;
@@ -288,7 +293,7 @@ export async function updateReview(
     .from("reviews")
     .update({ ...review, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("org_id", ORG_ID)
+    .eq("org_id", getOrgId())
     .select()
     .single();
   if (error) throw error;
@@ -301,7 +306,7 @@ export async function deleteReview(id: string): Promise<void> {
     .from("reviews")
     .delete()
     .eq("id", id)
-    .eq("org_id", ORG_ID);
+    .eq("org_id", getOrgId());
   if (error) throw error;
 }
 
@@ -312,7 +317,7 @@ export async function fetchRenewals(): Promise<Renewal[]> {
   const { data, error } = await supabase
     .from("renewals")
     .select("*")
-    .eq("org_id", ORG_ID)
+    .eq("org_id", getOrgId())
     .order("renewal_date", { ascending: true });
   if (error) throw error;
   return (data ?? []) as Renewal[];
@@ -324,7 +329,7 @@ export async function createRenewal(
   const supabase = createClient();
   const { data, error } = await supabase
     .from("renewals")
-    .insert({ ...renewal, org_id: ORG_ID })
+    .insert({ ...renewal, org_id: getOrgId() })
     .select()
     .single();
   if (error) throw error;
@@ -340,7 +345,7 @@ export async function updateRenewal(
     .from("renewals")
     .update({ ...renewal, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("org_id", ORG_ID)
+    .eq("org_id", getOrgId())
     .select()
     .single();
   if (error) throw error;
@@ -353,7 +358,7 @@ export async function deleteRenewal(id: string): Promise<void> {
     .from("renewals")
     .delete()
     .eq("id", id)
-    .eq("org_id", ORG_ID);
+    .eq("org_id", getOrgId());
   if (error) throw error;
 }
 
@@ -366,7 +371,7 @@ export async function insertManyDeals(
   const supabase = createClient();
   const { data, error } = await supabase
     .from("deals")
-    .insert(deals.map((d) => ({ ...d, org_id: ORG_ID })))
+    .insert(deals.map((d) => ({ ...d, org_id: getOrgId() })))
     .select("id");
   if (error) throw error;
   return data?.length ?? 0;
@@ -379,7 +384,7 @@ export async function insertManyTickets(
   const supabase = createClient();
   const { data, error } = await supabase
     .from("tickets")
-    .insert(tickets.map((t) => ({ ...t, org_id: ORG_ID })))
+    .insert(tickets.map((t) => ({ ...t, org_id: getOrgId() })))
     .select("id");
   if (error) throw error;
   return data?.length ?? 0;
@@ -406,7 +411,7 @@ export async function saveUploadRecord(record: {
   const supabase = createClient();
   await supabase
     .from("excel_uploads")
-    .insert({ ...record, org_id: ORG_ID });
+    .insert({ ...record, org_id: getOrgId() });
 }
 
 export async function fetchUploadHistory(): Promise<UploadRecord[]> {
@@ -414,7 +419,7 @@ export async function fetchUploadHistory(): Promise<UploadRecord[]> {
   const { data } = await supabase
     .from("excel_uploads")
     .select("id, filename, deals_imported, tickets_imported, status, created_at")
-    .eq("org_id", ORG_ID)
+    .eq("org_id", getOrgId())
     .order("created_at", { ascending: false })
     .limit(20);
   return (data ?? []) as UploadRecord[];
@@ -427,7 +432,7 @@ export async function fetchKpiSnapshots(): Promise<KPISnapshot[]> {
   const { data, error } = await supabase
     .from("kpi_snapshots")
     .select("*")
-    .eq("org_id", ORG_ID)
+    .eq("org_id", getOrgId())
     .order("year", { ascending: true })
     .order("month", { ascending: true });
   if (error) throw error;

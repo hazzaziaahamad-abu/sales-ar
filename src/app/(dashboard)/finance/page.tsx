@@ -76,7 +76,7 @@ export default function FinancePage() {
       {/* Two charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Revenue vs Expenses bar chart */}
-        <div className="bg-card rounded-xl border border-border p-5">
+        <div className="cc-card rounded-xl p-5">
           <h3 className="text-sm font-bold text-foreground mb-4">
             الإيرادات والمصروفات (مليون ر.س)
           </h3>
@@ -102,7 +102,7 @@ export default function FinancePage() {
         </div>
 
         {/* Cost distribution donut */}
-        <div className="bg-card rounded-xl border border-border p-5">
+        <div className="cc-card rounded-xl p-5">
           <h3 className="text-sm font-bold text-foreground mb-4">
             توزيع التكاليف
           </h3>

@@ -1,7 +1,7 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot } from "@/types";
 
-const ORG_ID = "00000000-0000-0000-0000-000000000001";
+import { getOrgId } from "@/lib/supabase/db";
 
 /**
  * Builds a knowledge context string from REAL Supabase data.
@@ -20,12 +20,12 @@ export async function buildKnowledgeContext(): Promise<string> {
     { data: partnerships },
     { data: kpiSnapshots },
   ] = await Promise.all([
-    supabase.from("deals").select("*").eq("org_id", ORG_ID).order("created_at", { ascending: false }),
-    supabase.from("tickets").select("*").eq("org_id", ORG_ID).order("created_at", { ascending: false }),
-    supabase.from("employees").select("*").eq("org_id", ORG_ID),
-    supabase.from("projects").select("*").eq("org_id", ORG_ID),
-    supabase.from("partnerships").select("*").eq("org_id", ORG_ID),
-    supabase.from("kpi_snapshots").select("*").eq("org_id", ORG_ID).order("year").order("month"),
+    supabase.from("deals").select("*").eq("org_id", getOrgId()).order("created_at", { ascending: false }),
+    supabase.from("tickets").select("*").eq("org_id", getOrgId()).order("created_at", { ascending: false }),
+    supabase.from("employees").select("*").eq("org_id", getOrgId()),
+    supabase.from("projects").select("*").eq("org_id", getOrgId()),
+    supabase.from("partnerships").select("*").eq("org_id", getOrgId()),
+    supabase.from("kpi_snapshots").select("*").eq("org_id", getOrgId()).order("year").order("month"),
   ]);
 
   const allDeals = (deals ?? []) as Deal[];

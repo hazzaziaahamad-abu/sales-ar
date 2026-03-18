@@ -5,6 +5,7 @@ import {
   fetchTickets, createTicket, updateTicket, deleteTicket,
   fetchEmployees,
 } from "@/lib/supabase/db";
+import { useAuth } from "@/lib/auth-context";
 import { PRIORITIES, TICKET_STATUSES } from "@/lib/utils/constants";
 import { PRIORITY_COLORS, TICKET_STATUS_COLORS } from "@/lib/utils/constants";
 import { formatDate, formatPhone } from "@/lib/utils/format";
@@ -80,6 +81,7 @@ const EMPTY_FORM: TicketForm = {
 /*  Page Component                                                     */
 /* ------------------------------------------------------------------ */
 export default function SupportPage() {
+  const { activeOrgId: orgId } = useAuth();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,13 +97,14 @@ export default function SupportPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
+    setLoading(true);
     Promise.all([
       fetchTickets().then(setTickets),
       fetchEmployees().then(setEmployees),
     ])
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [orgId]);
 
   /* ---------- derived counts ---------- */
   const countOpen = tickets.filter((t) => t.status === "مفتوح").length;
@@ -288,7 +291,7 @@ export default function SupportPage() {
       </div>
 
       {/* -------- Tickets Table -------- */}
-      <div className="bg-card rounded-xl border border-border overflow-x-auto">
+      <div className="cc-card rounded-xl overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -575,7 +578,7 @@ export default function SupportPage() {
 
 function SupportStatSkeleton() {
   return (
-    <div className="bg-card rounded-xl border border-border p-4 border-t-2 border-t-muted">
+    <div className="cc-card rounded-xl p-4 border-t-2 border-t-muted">
       <div className="flex items-start justify-between">
         <div className="space-y-2">
           <Skeleton className="h-7 w-10" />

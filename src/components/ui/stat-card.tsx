@@ -16,73 +16,57 @@ const COLOR_MAP: Record<string, {
   text: string;
   bg: string;
   bar: string;
-  gradient: string;
   border: string;
   glow: string;
-  orb: string;
 }> = {
   cyan: {
     text: "text-cyan",
     bg: "bg-cyan-dim",
     bar: "bg-cyan",
-    gradient: "linear-gradient(135deg, rgba(0,212,255,0.12) 0%, rgba(0,212,255,0.03) 50%, rgba(17,24,39,0.95) 100%)",
     border: "rgba(0,212,255,0.35)",
     glow: "0 0 18px rgba(0,212,255,0.12)",
-    orb: "radial-gradient(circle, rgba(0,212,255,0.22) 0%, rgba(0,212,255,0.06) 50%, transparent 70%)",
   },
   green: {
     text: "text-cc-green",
     bg: "bg-green-dim",
     bar: "bg-cc-green",
-    gradient: "linear-gradient(135deg, rgba(16,185,129,0.12) 0%, rgba(16,185,129,0.03) 50%, rgba(17,24,39,0.95) 100%)",
     border: "rgba(16,185,129,0.35)",
     glow: "0 0 18px rgba(16,185,129,0.12)",
-    orb: "radial-gradient(circle, rgba(16,185,129,0.22) 0%, rgba(16,185,129,0.06) 50%, transparent 70%)",
   },
   amber: {
     text: "text-amber",
     bg: "bg-amber-dim",
     bar: "bg-amber",
-    gradient: "linear-gradient(135deg, rgba(245,158,11,0.12) 0%, rgba(245,158,11,0.03) 50%, rgba(17,24,39,0.95) 100%)",
     border: "rgba(245,158,11,0.35)",
     glow: "0 0 18px rgba(245,158,11,0.12)",
-    orb: "radial-gradient(circle, rgba(245,158,11,0.22) 0%, rgba(245,158,11,0.06) 50%, transparent 70%)",
   },
   red: {
     text: "text-cc-red",
     bg: "bg-red-dim",
     bar: "bg-cc-red",
-    gradient: "linear-gradient(135deg, rgba(239,68,68,0.12) 0%, rgba(239,68,68,0.03) 50%, rgba(17,24,39,0.95) 100%)",
     border: "rgba(239,68,68,0.35)",
     glow: "0 0 18px rgba(239,68,68,0.12)",
-    orb: "radial-gradient(circle, rgba(239,68,68,0.22) 0%, rgba(239,68,68,0.06) 50%, transparent 70%)",
   },
   purple: {
     text: "text-cc-purple",
     bg: "bg-purple-dim",
     bar: "bg-cc-purple",
-    gradient: "linear-gradient(135deg, rgba(139,92,246,0.12) 0%, rgba(139,92,246,0.03) 50%, rgba(17,24,39,0.95) 100%)",
     border: "rgba(139,92,246,0.35)",
     glow: "0 0 18px rgba(139,92,246,0.12)",
-    orb: "radial-gradient(circle, rgba(139,92,246,0.22) 0%, rgba(139,92,246,0.06) 50%, transparent 70%)",
   },
   blue: {
     text: "text-cc-blue",
     bg: "bg-blue-dim",
     bar: "bg-cc-blue",
-    gradient: "linear-gradient(135deg, rgba(125,166,255,0.12) 0%, rgba(125,166,255,0.03) 50%, rgba(17,24,39,0.95) 100%)",
     border: "rgba(125,166,255,0.35)",
     glow: "0 0 18px rgba(125,166,255,0.12)",
-    orb: "radial-gradient(circle, rgba(125,166,255,0.22) 0%, rgba(125,166,255,0.06) 50%, transparent 70%)",
   },
   pink: {
     text: "text-pink",
     bg: "bg-pink/15",
     bar: "bg-pink",
-    gradient: "linear-gradient(135deg, rgba(236,72,153,0.12) 0%, rgba(236,72,153,0.03) 50%, rgba(17,24,39,0.95) 100%)",
     border: "rgba(236,72,153,0.35)",
     glow: "0 0 18px rgba(236,72,153,0.12)",
-    orb: "radial-gradient(circle, rgba(236,72,153,0.22) 0%, rgba(236,72,153,0.06) 50%, transparent 70%)",
   },
 };
 
@@ -95,17 +79,11 @@ export function StatCard({ value, label, color, progress, icon, subtext, muted, 
         muted && "opacity-60"
       )}
       style={{
-        background: c.gradient,
+        backgroundColor: "#111827",
         border: `1px solid ${c.border}`,
         boxShadow: c.glow,
       }}
     >
-      {/* Large orb decoration */}
-      <div
-        className="absolute -left-6 top-[-10%] w-28 h-28 rounded-full pointer-events-none"
-        style={{ background: c.orb }}
-      />
-
       <div className="flex items-start justify-between relative z-10">
         <div>
           <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{label}</p>

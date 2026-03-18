@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { fetchProjects, createProject, updateProject } from "@/lib/supabase/db";
+import { useAuth } from "@/lib/auth-context";
 import { PROJECT_STATUSES } from "@/lib/utils/constants";
 import { formatDate, formatPercent } from "@/lib/utils/format";
 import { StatCard } from "@/components/ui/stat-card";
@@ -64,6 +65,7 @@ function progressBarColor(pct: number): string {
 /* ---------- page ---------- */
 
 export default function DevelopmentPage() {
+  const { activeOrgId: orgId } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -79,11 +81,12 @@ export default function DevelopmentPage() {
   const [formStatus, setFormStatus] = useState<string>("في الموعد");
 
   useEffect(() => {
+    setLoading(true);
     fetchProjects()
       .then(setProjects)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [orgId]);
 
   /* status counts */
   const overdueCount = projects.filter((p) => p.status_tag === "متأخر").length;
@@ -226,7 +229,7 @@ export default function DevelopmentPage() {
             return (
               <div
                 key={proj.id}
-                className={`bg-card rounded-xl border border-border border-t-2 ${borderColor} p-5 space-y-4`}
+                className={`cc-card rounded-xl border-t-2 ${borderColor} p-5 space-y-4`}
               >
                 {/* Name + status */}
                 <div className="flex items-start justify-between gap-2">
@@ -404,7 +407,7 @@ export default function DevelopmentPage() {
 
 function ProjectStatSkeleton() {
   return (
-    <div className="bg-card rounded-xl border border-border p-4 border-t-2 border-t-muted">
+    <div className="cc-card rounded-xl p-4 border-t-2 border-t-muted">
       <div className="flex items-start justify-between">
         <div className="space-y-2">
           <Skeleton className="h-7 w-10" />
@@ -418,7 +421,7 @@ function ProjectStatSkeleton() {
 
 function ProjectCardSkeleton() {
   return (
-    <div className="bg-card rounded-xl border border-border border-t-2 border-t-muted p-5 space-y-4">
+    <div className="cc-card rounded-xl border-t-2 border-t-muted p-5 space-y-4">
       <div className="flex items-start justify-between gap-2">
         <Skeleton className="h-4 w-32" />
         <Skeleton className="h-5 w-16 rounded-full" />

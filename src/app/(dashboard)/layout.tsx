@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
@@ -8,8 +8,64 @@ import { TopbarProvider } from "@/components/layout/topbar-context";
 import { NotificationPanel } from "@/components/layout/notification-panel";
 import { AIChatFAB } from "@/components/ai/ai-chat-fab";
 import { AIAlertsBanner } from "@/components/ai/ai-alerts-banner";
+import { AuthProvider, useAuth } from "@/lib/auth-context";
+import { Skeleton } from "@/components/ui/skeleton";
 import { DEMO_TICKETS, DEMO_PROJECTS, DEMO_PARTNERSHIPS } from "@/lib/demo-data";
 import type { AppNotification } from "@/types";
+
+const PAGE_SLUG_MAP: Record<string, string> = {
+  "/dashboard": "dashboard",
+  "/sales": "sales",
+  "/renewals": "renewals",
+  "/satisfaction": "satisfaction",
+  "/support": "support",
+  "/development": "development",
+  "/partnerships": "partnerships",
+  "/team": "team",
+  "/finance": "finance",
+  "/upload": "upload",
+  "/agent": "agent",
+  "/users": "users",
+};
+
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  const pathname = usePathname();
+  const router = useRouter();
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace("/login");
+    }
+  }, [loading, user, router]);
+
+  // Redirect if user doesn't have access to current page
+  useEffect(() => {
+    if (!loading && user && !user.isSuperAdmin) {
+      const slug = PAGE_SLUG_MAP[pathname] || pathname.split("/")[1];
+      if (slug && !user.allowedPages.includes(slug)) {
+        const firstAllowed = user.allowedPages[0] || "dashboard";
+        router.replace(`/${firstAllowed}`);
+      }
+    }
+  }, [loading, user, pathname, router]);
+
+  if (loading || !user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="space-y-4 w-full max-w-md px-6">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
 
 function generateNotifications(): AppNotification[] {
   const now = new Date().toISOString();
@@ -88,6 +144,7 @@ export default function DashboardLayout({
   const isAgentPage = pathname === "/agent";
 
   return (
+    <AuthProvider>
     <TopbarProvider>
       <div className="min-h-screen bg-background panel-grid">
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -104,8 +161,10 @@ export default function DashboardLayout({
             onMenuClick={() => setSidebarOpen(true)}
           />
           <main className="px-4 sm:px-6 pb-8 pt-5">
-            <AIAlertsBanner />
-            {children}
+            <AuthGate>
+              <AIAlertsBanner />
+              {children}
+            </AuthGate>
           </main>
         </div>
 
@@ -130,5 +189,6 @@ export default function DashboardLayout({
         )}
       </div>
     </TopbarProvider>
+    </AuthProvider>
   );
 }

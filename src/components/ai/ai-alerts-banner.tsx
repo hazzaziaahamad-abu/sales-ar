@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { AlertTriangle, TrendingUp, ChevronDown, ChevronUp, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { ORG_ID } from "@/lib/supabase/db";
+import { getOrgId } from "@/lib/supabase/db";
 
 interface AlertItem {
   id: string;
@@ -27,7 +27,7 @@ export function AIAlertsBanner() {
     supabase
       .from("alerts")
       .select("id, type, message")
-      .eq("org_id", ORG_ID)
+      .eq("org_id", getOrgId())
       .eq("is_dismissed", false)
       .order("created_at", { ascending: false })
       .limit(5)

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { fetchDeals, fetchTickets, fetchProjects, fetchKpiSnapshots } from "@/lib/supabase/db";
+import { useAuth } from "@/lib/auth-context";
 import type { Deal, Ticket, Project, KPISnapshot } from "@/types";
 import { StatCard } from "@/components/ui/stat-card";
 import { DonutChart } from "@/components/ui/donut-chart";
@@ -45,6 +46,7 @@ export default function DashboardPage() {
     projects: null,
     kpis: null,
   });
+  const { activeOrgId: orgId } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
@@ -94,7 +96,7 @@ export default function DashboardPage() {
 
     setIsLoading(false);
     setIsRefreshing(false);
-  }, []);
+  }, [orgId]);
 
   useEffect(() => {
     queueMicrotask(() => {

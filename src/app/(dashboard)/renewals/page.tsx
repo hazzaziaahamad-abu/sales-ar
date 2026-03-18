@@ -8,6 +8,7 @@ import {
   updateRenewal,
   deleteRenewal,
 } from "@/lib/supabase/db";
+import { useAuth } from "@/lib/auth-context";
 import {
   RENEWAL_STATUSES,
   RENEWAL_STATUS_COLORS,
@@ -100,6 +101,7 @@ function getDaysRemainingStyle(days: number) {
 }
 
 export default function RenewalsPage() {
+  const { activeOrgId: orgId } = useAuth();
   const [renewals, setRenewals] = useState<Renewal[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -114,11 +116,12 @@ export default function RenewalsPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
+    setLoading(true);
     fetchRenewals()
       .then(setRenewals)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [orgId]);
 
   /* ─── Computed analytics ─── */
   const analytics = useMemo(() => {
@@ -349,7 +352,7 @@ export default function RenewalsPage() {
             status={churnStatus}
             inverted
           />
-          <div className="bg-card rounded-xl border border-border p-5">
+          <div className="cc-card rounded-xl p-5">
             <div className="flex items-center gap-3 mb-2">
               <TrendingDown className="w-5 h-5 text-cc-red" />
               <p className="text-xs text-muted-foreground">خسارة الإيرادات</p>
@@ -365,7 +368,7 @@ export default function RenewalsPage() {
       )}
 
       {/* ─── Renewals Table ─── */}
-      <div className="bg-card rounded-xl border border-border overflow-x-auto">
+      <div className="cc-card rounded-xl overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -470,7 +473,7 @@ export default function RenewalsPage() {
       {!loading && analytics.total > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Donut chart */}
-          <div className="bg-card rounded-xl border border-border p-5">
+          <div className="cc-card rounded-xl p-5">
             <h3 className="text-sm font-bold text-foreground mb-4">
               توزيع حالات التجديد
             </h3>
@@ -512,13 +515,13 @@ export default function RenewalsPage() {
           <div className="space-y-4">
             {/* Revenue cards */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-card rounded-xl border border-border p-4 text-center">
+              <div className="cc-card rounded-xl p-4 text-center">
                 <p className="text-2xl font-extrabold text-cc-green">
                   {formatMoneyFull(analytics.totalRevenue)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">إيرادات التجديد</p>
               </div>
-              <div className="bg-card rounded-xl border border-border p-4 text-center">
+              <div className="cc-card rounded-xl p-4 text-center">
                 <p className="text-2xl font-extrabold text-cc-red">
                   {formatMoneyFull(analytics.revenueLoss)}
                 </p>
@@ -527,7 +530,7 @@ export default function RenewalsPage() {
             </div>
 
             {/* Rejection reasons */}
-            <div className="bg-card rounded-xl border border-border p-5">
+            <div className="cc-card rounded-xl p-5">
               <h3 className="text-sm font-bold text-foreground mb-4">
                 أسباب الإلغاء
               </h3>
@@ -560,7 +563,7 @@ export default function RenewalsPage() {
 
       {/* ─── 6-Month Trend ─── */}
       {!loading && analytics.total > 0 && (
-        <div className="bg-card rounded-xl border border-border p-5">
+        <div className="cc-card rounded-xl p-5">
           <div className="mb-4">
             <h3 className="text-sm font-bold text-foreground">اتجاه التجديد والإلغاء</h3>
             <p className="text-xs text-muted-foreground mt-1">
@@ -789,7 +792,7 @@ function TargetCard({
   const targetDisplay = formatValue ? formatValue(target) : `${inverted ? "<" : ""}${target}${unit}`;
 
   return (
-    <div className={`bg-card rounded-xl border border-border p-5 ${styles.bg}`}>
+    <div className={`cc-card rounded-xl p-5 ${styles.bg}`}>
       <p className="text-xs text-muted-foreground mb-2">{label}</p>
       <div className="flex items-center gap-2">
         <span className={`w-2 h-2 rounded-full ${styles.dot}`} />
@@ -807,7 +810,7 @@ function TargetCard({
 /* ─── Loading Skeleton ─── */
 function StatCardSkeleton() {
   return (
-    <div className="bg-card rounded-xl border border-border p-4 border-t-2 border-t-muted">
+    <div className="cc-card rounded-xl p-4 border-t-2 border-t-muted">
       <div className="flex items-start justify-between">
         <div className="space-y-2">
           <Skeleton className="h-7 w-10" />

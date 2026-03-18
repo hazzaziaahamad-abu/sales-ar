@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -13,19 +14,24 @@ import {
   Users,
   Banknote,
   X,
+  Shield,
+  LogOut,
+  ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth-context";
 
 const NAV_ITEMS = [
-  { label: "نظرة عامة", href: "/dashboard", icon: LayoutDashboard },
-  { label: "المبيعات", href: "/sales", icon: TrendingUp },
-  { label: "التجديدات", href: "/renewals", icon: RefreshCw },
-  { label: "رضا العملاء", href: "/satisfaction", icon: Heart },
-  { label: "الدعم", href: "/support", icon: Headphones },
-  { label: "التطويرات", href: "/development", icon: Code },
-  { label: "الشراكات", href: "/partnerships", icon: Handshake },
-  { label: "الفريق", href: "/team", icon: Users },
-  { label: "المالية", href: "/finance", icon: Banknote },
+  { label: "نظرة عامة", href: "/dashboard", slug: "dashboard", icon: LayoutDashboard },
+  { label: "المبيعات", href: "/sales", slug: "sales", icon: TrendingUp },
+  { label: "التجديدات", href: "/renewals", slug: "renewals", icon: RefreshCw },
+  { label: "رضا العملاء", href: "/satisfaction", slug: "satisfaction", icon: Heart },
+  { label: "الدعم", href: "/support", slug: "support", icon: Headphones },
+  { label: "التطويرات", href: "/development", slug: "development", icon: Code },
+  { label: "الشراكات", href: "/partnerships", slug: "partnerships", icon: Handshake },
+  { label: "الفريق", href: "/team", slug: "team", icon: Users },
+  { label: "المالية", href: "/finance", slug: "finance", icon: Banknote },
+  { label: "إدارة المستخدمين", href: "/users", slug: "users", icon: Shield },
 ];
 
 interface SidebarProps {
@@ -35,6 +41,19 @@ interface SidebarProps {
 
 export function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname();
+  const { user, loading, signOut, activeOrgId, switchOrg, orgs } = useAuth();
+  const [orgMenuOpen, setOrgMenuOpen] = useState(false);
+
+  const isSuperAdmin = user?.isSuperAdmin ?? false;
+
+  // Filter nav items by user permissions
+  const visibleItems = NAV_ITEMS.filter((item) => {
+    if (isSuperAdmin) return true;
+    return user?.allowedPages.includes(item.slug);
+  });
+
+  // Find active org info
+  const activeOrg = orgs.find((o) => o.id === activeOrgId);
 
   return (
     <>
@@ -49,9 +68,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
       <aside
         className={cn(
           "fixed top-3 right-3 bottom-3 z-50 w-[244px] overflow-hidden rounded-[28px] glass-surface border-l-0 flex flex-col transition-transform duration-300 ease-in-out",
-          // On lg+: always visible
           "lg:translate-x-0",
-          // On <lg: slide in/out from right (RTL)
           open ? "translate-x-0" : "translate-x-[260px] lg:translate-x-0"
         )}
       >
@@ -74,11 +91,77 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               <X className="w-4 h-4" />
             </button>
           </div>
+
+          {/* Org switcher — super admin only */}
+          {isSuperAdmin && orgs.length > 0 ? (
+            <div className="mt-3 relative">
+              <button
+                onClick={() => setOrgMenuOpen((v) => !v)}
+                className="w-full flex items-center gap-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.07] border border-white/6 px-3 py-2 transition-colors"
+              >
+                <div className="w-7 h-7 rounded-lg bg-cyan-dim flex items-center justify-center text-cyan text-xs font-bold ring-1 ring-cyan/20 shrink-0">
+                  {activeOrg?.nameAr?.[0] || "O"}
+                </div>
+                <div className="flex-1 text-right min-w-0">
+                  <p className="text-xs font-semibold text-foreground truncate">{activeOrg?.nameAr || "المنظمة"}</p>
+                  <p className="text-[10px] text-muted-foreground">{activeOrg?.name || ""}</p>
+                </div>
+                <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground transition-transform", orgMenuOpen && "rotate-180")} />
+              </button>
+
+              {orgMenuOpen && (
+                <div className="absolute top-full left-0 right-0 mt-1 rounded-xl bg-[#111827] border border-white/10 shadow-lg overflow-hidden z-50">
+                  {orgs.map((o) => (
+                    <button
+                      key={o.id}
+                      onClick={() => {
+                        switchOrg(o.id);
+                        setOrgMenuOpen(false);
+                      }}
+                      className={cn(
+                        "w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-white/[0.06] transition-colors",
+                        o.id === activeOrgId && "bg-white/[0.04]"
+                      )}
+                    >
+                      <div className={cn(
+                        "w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ring-1 shrink-0",
+                        o.id === activeOrgId
+                          ? "bg-cyan-dim text-cyan ring-cyan/20"
+                          : "bg-white/[0.06] text-muted-foreground ring-white/10"
+                      )}>
+                        {o.nameAr?.[0] || "O"}
+                      </div>
+                      <div className="flex-1 text-right min-w-0">
+                        <p className={cn("text-xs font-semibold truncate", o.id === activeOrgId ? "text-foreground" : "text-muted-foreground")}>{o.nameAr}</p>
+                        <p className="text-[10px] text-muted-foreground">{o.name}</p>
+                      </div>
+                      {o.id === activeOrgId && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-cyan shrink-0" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Static org badge for non-super-admin */
+            !loading && user && (
+              <div className="mt-3 flex items-center gap-2.5 rounded-xl bg-white/[0.04] border border-white/6 px-3 py-2">
+                <div className="w-7 h-7 rounded-lg bg-cyan-dim flex items-center justify-center text-cyan text-xs font-bold ring-1 ring-cyan/20 shrink-0">
+                  {activeOrg?.nameAr?.[0] || "O"}
+                </div>
+                <div className="flex-1 text-right min-w-0">
+                  <p className="text-xs font-semibold text-foreground truncate">{activeOrg?.nameAr || "المنظمة"}</p>
+                  <p className="text-[10px] text-muted-foreground">{activeOrg?.name || ""}</p>
+                </div>
+              </div>
+            )
+          )}
         </div>
 
         {/* Navigation */}
         <nav className="flex-1 py-4 px-3 space-y-1.5 overflow-y-auto">
-          {NAV_ITEMS.map((item) => {
+          {visibleItems.map((item) => {
             const isActive =
               pathname === item.href ||
               (item.href !== "/dashboard" && pathname.startsWith(item.href));
@@ -121,12 +204,19 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           </div>
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-2xl bg-cyan-dim flex items-center justify-center text-cyan text-xs font-bold ring-1 ring-cyan/20">
-              م
+              {user?.name?.[0] || "م"}
             </div>
-            <div>
-              <p className="text-sm font-semibold text-foreground">المدير العام</p>
-              <p className="text-[11px] text-muted-foreground">متصل ويتابع المؤشرات</p>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-foreground truncate">{user?.name || "..."}</p>
+              <p className="text-[11px] text-muted-foreground truncate">{user?.roleName || ""}</p>
             </div>
+            <button
+              onClick={signOut}
+              className="flex items-center justify-center w-8 h-8 rounded-xl bg-white/[0.04] hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors shrink-0"
+              title="تسجيل الخروج"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </aside>

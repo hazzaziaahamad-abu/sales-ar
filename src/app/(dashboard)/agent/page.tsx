@@ -190,7 +190,7 @@ export default function AgentPage() {
   return (
     <div className="flex gap-4 relative" style={{ height: "calc(100vh - 7rem)" }}>
       {/* Conversations Sidebar */}
-      <div className="w-[240px] flex-shrink-0 bg-card rounded-xl border border-border flex flex-col overflow-hidden">
+      <div className="w-[240px] flex-shrink-0 cc-card rounded-xl flex flex-col overflow-hidden">
         <div className="p-3 border-b border-border">
           <Button
             onClick={handleNewChat}
@@ -237,7 +237,7 @@ export default function AgentPage() {
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col bg-card rounded-xl border border-border overflow-hidden min-h-0">
+      <div className="flex-1 flex flex-col cc-card rounded-xl overflow-hidden min-h-0">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-border">
           <div className="flex items-center gap-3">

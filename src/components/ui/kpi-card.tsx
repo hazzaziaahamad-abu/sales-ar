@@ -31,11 +31,7 @@ const STATUS_COLORS: Record<string, { border: string; glow: string; orb: string;
   },
 };
 
-const STATUS_BG: Record<string, string> = {
-  excellent: "linear-gradient(135deg, rgba(16,185,129,0.12) 0%, rgba(16,185,129,0.03) 60%, rgba(17,24,39,0.9) 100%)",
-  improving: "linear-gradient(135deg, rgba(245,158,11,0.12) 0%, rgba(245,158,11,0.03) 60%, rgba(17,24,39,0.9) 100%)",
-  behind: "linear-gradient(135deg, rgba(239,68,68,0.12) 0%, rgba(239,68,68,0.03) 60%, rgba(17,24,39,0.9) 100%)",
-};
+const STATUS_BG = "#111827";
 
 export function KPICard({ label, value, target, status, icon }: KPICardProps) {
   const styles = KPI_STATUS_STYLES[status];
@@ -46,16 +42,11 @@ export function KPICard({ label, value, target, status, icon }: KPICardProps) {
     <div
       className="relative overflow-hidden rounded-2xl p-5 min-h-[160px] flex flex-col justify-between"
       style={{
-        background: STATUS_BG[status],
+        backgroundColor: STATUS_BG,
         border: `1px solid ${colors.border}`,
         boxShadow: colors.glow,
       }}
     >
-      {/* Large orb decoration */}
-      <div
-        className="absolute -left-6 top-1/2 -translate-y-1/2 w-36 h-36 rounded-full pointer-events-none"
-        style={{ background: colors.orb }}
-      />
 
       {/* Top: Label */}
       <p className="text-xs text-muted-foreground relative z-10">{label}</p>

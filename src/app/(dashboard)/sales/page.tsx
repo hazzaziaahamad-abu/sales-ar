@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import type { Deal } from "@/types";
 import { fetchDeals, createDeal, updateDeal, deleteDeal } from "@/lib/supabase/db";
+import { useAuth } from "@/lib/auth-context";
 import { STAGES, SOURCES, SOURCE_COLORS } from "@/lib/utils/constants";
 import { DEMO_LOST_DEALS } from "@/lib/demo-data";
 import { formatMoney, formatMoneyFull, formatDate, formatPhone, formatPercent } from "@/lib/utils/format";
@@ -87,6 +88,7 @@ const EMPTY_FORM = {
 };
 
 export default function SalesPage() {
+  const { activeOrgId: orgId } = useAuth();
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -101,11 +103,12 @@ export default function SalesPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
+    setLoading(true);
     fetchDeals()
       .then(setDeals)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [orgId]);
 
   /* ─── Computed values ─── */
   const totalDeals = deals.length;
@@ -129,6 +132,29 @@ export default function SalesPage() {
   const winRate = totalDeals > 0 ? Math.round((closedDeals / totalDeals) * 100) : 0;
   const avgCycleDays = totalDeals > 0 ? Math.round(deals.reduce((s, d) => s + d.cycle_days, 0) / totalDeals) : 0;
   const pipelineValue = deals.filter((d) => d.stage !== "مكتملة").reduce((s, d) => s + d.deal_value, 0);
+
+  /* Rep performance */
+  const repPerformance = (() => {
+    const repMap: Record<string, { deals: number; closed: number; value: number; cycleDays: number }> = {};
+    deals.forEach((d) => {
+      const rep = d.assigned_rep_name || "غير محدد";
+      if (!repMap[rep]) repMap[rep] = { deals: 0, closed: 0, value: 0, cycleDays: 0 };
+      repMap[rep].deals++;
+      repMap[rep].value += d.deal_value;
+      repMap[rep].cycleDays += d.cycle_days;
+      if (d.stage === "مكتملة") repMap[rep].closed++;
+    });
+    return Object.entries(repMap)
+      .map(([name, data]) => ({
+        name,
+        deals: data.deals,
+        closed: data.closed,
+        value: data.value,
+        winRate: data.deals > 0 ? Math.round((data.closed / data.deals) * 100) : 0,
+        avgCycle: data.deals > 0 ? Math.round(data.cycleDays / data.deals) : 0,
+      }))
+      .sort((a, b) => b.value - a.value);
+  })();
 
   /* Lost deals analysis */
   const lostReasons = DEMO_LOST_DEALS.reduce<Record<string, { count: number; value: number }>>((acc, d) => {
@@ -288,20 +314,17 @@ export default function SalesPage() {
       {/* ─── Financial Summary Row ─── */}
       {!loading && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="relative overflow-hidden rounded-2xl p-5 text-center" style={{ background: "linear-gradient(135deg, rgba(0,212,255,0.08) 0%, rgba(17,24,39,0.95) 100%)", border: "1px solid rgba(0,212,255,0.3)", boxShadow: "0 0 15px rgba(0,212,255,0.1)" }}>
-            <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full bg-cyan/10 blur-2xl" />
-            <p className="text-2xl font-extrabold text-cyan relative z-10">{formatMoney(totalValue)}</p>
-            <p className="text-xs text-muted-foreground mt-1 relative z-10">إجمالي قيمة الصفقات</p>
+          <div className="cc-card rounded-2xl p-5 text-center" style={{ borderColor: "rgba(0,212,255,0.3)" }}>
+            <p className="text-2xl font-extrabold text-cyan">{formatMoney(totalValue)}</p>
+            <p className="text-xs text-muted-foreground mt-1">إجمالي قيمة الصفقات</p>
           </div>
-          <div className="relative overflow-hidden rounded-2xl p-5 text-center" style={{ background: "linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(17,24,39,0.95) 100%)", border: "1px solid rgba(16,185,129,0.3)", boxShadow: "0 0 15px rgba(16,185,129,0.1)" }}>
-            <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full bg-cc-green/10 blur-2xl" />
-            <p className="text-2xl font-extrabold text-cc-green relative z-10">{totalDeals}</p>
-            <p className="text-xs text-muted-foreground mt-1 relative z-10">عدد الصفقات</p>
+          <div className="cc-card rounded-2xl p-5 text-center" style={{ borderColor: "rgba(16,185,129,0.3)" }}>
+            <p className="text-2xl font-extrabold text-cc-green">{totalDeals}</p>
+            <p className="text-xs text-muted-foreground mt-1">عدد الصفقات</p>
           </div>
-          <div className="relative overflow-hidden rounded-2xl p-5 text-center" style={{ background: "linear-gradient(135deg, rgba(139,92,246,0.08) 0%, rgba(17,24,39,0.95) 100%)", border: "1px solid rgba(139,92,246,0.3)", boxShadow: "0 0 15px rgba(139,92,246,0.1)" }}>
-            <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full bg-cc-purple/10 blur-2xl" />
-            <p className="text-2xl font-extrabold text-cc-purple relative z-10">{formatMoney(avgDealValue)}</p>
-            <p className="text-xs text-muted-foreground mt-1 relative z-10">متوسط قيمة الصفقة</p>
+          <div className="cc-card rounded-2xl p-5 text-center" style={{ borderColor: "rgba(139,92,246,0.3)" }}>
+            <p className="text-2xl font-extrabold text-cc-purple">{formatMoney(avgDealValue)}</p>
+            <p className="text-xs text-muted-foreground mt-1">متوسط قيمة الصفقة</p>
           </div>
         </div>
       )}
@@ -316,7 +339,7 @@ export default function SalesPage() {
               const rawColor = SOURCE_COLORS[src] || "cyan";
               const cssVar = rawColor.replace("cc-", "");
               return (
-                <div key={src} className="bg-card rounded-2xl border border-border p-4 border-t-2" style={{ borderTopColor: `var(--${cssVar})` }}>
+                <div key={src} className="cc-card rounded-2xl p-4 border-t-2" style={{ borderTopColor: `var(--${cssVar})` }}>
                   <p className="text-xl font-bold text-foreground">{count}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">{src}</p>
                   <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
@@ -329,7 +352,7 @@ export default function SalesPage() {
       </div>
 
       {/* ─── Deals Table ─── */}
-      <div className="bg-card rounded-2xl border border-border overflow-x-auto">
+      <div className="cc-card rounded-2xl overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -442,6 +465,76 @@ export default function SalesPage() {
         </Table>
       </div>
 
+      {/* ─── Sales Team Performance ─── */}
+      {!loading && repPerformance.length > 0 && (
+        <div className="cc-card rounded-2xl overflow-hidden">
+          <div className="p-5 pb-0">
+            <h3 className="text-sm font-bold text-foreground">أداء فريق المبيعات</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-border text-muted-foreground">
+                  <th className="py-3 px-5 text-right font-medium">المندوب</th>
+                  <th className="py-3 px-4 text-center font-medium">الصفقات</th>
+                  <th className="py-3 px-4 text-center font-medium">مُغلق</th>
+                  <th className="py-3 px-4 text-right font-medium min-w-[140px]">معدل الإغلاق</th>
+                  <th className="py-3 px-4 text-center font-medium">متوسط الدورة</th>
+                  <th className="py-3 px-4 text-right font-medium">إجمالي القيمة</th>
+                  <th className="py-3 px-4 text-center font-medium">الترتيب</th>
+                </tr>
+              </thead>
+              <tbody>
+                {repPerformance.map((rep, idx) => {
+                  const initial = rep.name.charAt(0);
+                  const avatarColors = [
+                    "bg-cyan/20 text-cyan",
+                    "bg-cc-green/20 text-cc-green",
+                    "bg-amber/20 text-amber",
+                    "bg-cc-purple/20 text-cc-purple",
+                    "bg-cc-blue/20 text-cc-blue",
+                    "bg-pink/20 text-pink",
+                  ];
+                  const avatarColor = avatarColors[idx % avatarColors.length];
+                  const medal = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : "—";
+                  const rateColor = rep.winRate >= 30 ? "bg-amber" : rep.winRate > 0 ? "bg-cc-red" : "bg-muted-foreground/30";
+
+                  return (
+                    <tr key={rep.name} className="border-b border-border/50 hover:bg-white/[0.02] transition-colors">
+                      <td className="py-3.5 px-5">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ring-1 ring-white/10 ${avatarColor}`}>
+                            {initial}
+                          </div>
+                          <span className="font-medium text-foreground text-sm">{rep.name}</span>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4 text-center text-muted-foreground">{rep.deals}</td>
+                      <td className="py-3.5 px-4 text-center text-muted-foreground">{rep.closed}</td>
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-sm font-bold ${rep.winRate >= 30 ? "text-amber" : rep.winRate > 0 ? "text-cc-red" : "text-muted-foreground"}`}>
+                            {rep.winRate}%
+                          </span>
+                          <div className="flex-1 h-1.5 bg-muted/20 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${rateColor} transition-all`} style={{ width: `${rep.winRate}%` }} />
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4 text-center text-muted-foreground">
+                        <span dir="ltr">+{rep.avgCycle}</span> ي
+                      </td>
+                      <td className="py-3.5 px-4 text-right font-bold text-cyan">{formatMoney(rep.value)}</td>
+                      <td className="py-3.5 px-4 text-center text-lg">{medal}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* ─── KPI Sub-tabs Section ─── */}
       <Tabs defaultValue="kpis" className="space-y-6">
         <TabsList className="bg-card border border-border">
@@ -486,7 +579,7 @@ export default function SalesPage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Sales Funnel (Pipeline) */}
-            <div className="bg-card rounded-2xl border border-border p-5">
+            <div className="cc-card rounded-2xl p-5">
               <h3 className="text-sm font-bold text-foreground mb-5">قمع المبيعات (Sales Pipeline)</h3>
               <div className="space-y-4">
                 {funnelData.map((f, i) => {
@@ -529,7 +622,7 @@ export default function SalesPage() {
             </div>
 
             {/* Lost Deals Analysis */}
-            <div className="bg-card rounded-2xl border border-border p-5">
+            <div className="cc-card rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-5">
                 <span className="text-lg">🔍</span>
                 <h3 className="text-sm font-bold text-foreground">تحليل الصفقات الخاسرة</h3>
@@ -576,7 +669,7 @@ export default function SalesPage() {
           </div>
 
           {/* Source ROI */}
-          <div className="bg-card rounded-2xl border border-border p-5">
+          <div className="cc-card rounded-2xl p-5">
             <h3 className="text-sm font-bold text-foreground mb-4">أداء المصادر</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -617,7 +710,7 @@ export default function SalesPage() {
 
         {/* Tab 2: Renewals link */}
         <TabsContent value="renewals" className="space-y-6">
-          <div className="bg-card rounded-2xl border border-border p-8 text-center space-y-4">
+          <div className="cc-card rounded-2xl p-8 text-center space-y-4">
             <div className="w-16 h-16 rounded-2xl bg-cyan-dim mx-auto flex items-center justify-center">
               <RefreshCw className="w-8 h-8 text-cyan" />
             </div>
@@ -636,7 +729,7 @@ export default function SalesPage() {
 
         {/* Tab 3: Satisfaction link */}
         <TabsContent value="satisfaction" className="space-y-6">
-          <div className="bg-card rounded-2xl border border-border p-8 text-center space-y-4">
+          <div className="cc-card rounded-2xl p-8 text-center space-y-4">
             <div className="w-16 h-16 rounded-2xl bg-green-dim mx-auto flex items-center justify-center">
               <Heart className="w-8 h-8 text-cc-green" />
             </div>
@@ -833,7 +926,7 @@ export default function SalesPage() {
 
 function StatCardSkeleton() {
   return (
-    <div className="bg-card rounded-xl border border-border p-4 border-t-2 border-t-muted">
+    <div className="cc-card rounded-xl p-4 border-t-2 border-t-muted">
       <div className="flex items-start justify-between">
         <div className="space-y-2">
           <Skeleton className="h-7 w-10" />
