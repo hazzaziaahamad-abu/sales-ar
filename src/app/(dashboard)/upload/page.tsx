@@ -177,7 +177,7 @@ function toDateStr(val: unknown): string | undefined {
   const s = String(val).trim();
   if (!s) return undefined;
   const d = new Date(s);
-  return isNaN(d.getTime()) ? s : d.toISOString().slice(0, 10);
+  return isNaN(d.getTime()) ? undefined : d.toISOString().slice(0, 10);
 }
 
 function normProb(val: unknown): number {
@@ -229,9 +229,15 @@ export default function UploadPage() {
             : 0;
 
         const headers = ((json[headerRowIdx] ?? []) as unknown[]).map(String);
-        const rows = json
-          .slice(headerRowIdx + 1)
-          .filter((r) => (r as unknown[]).some((c) => c !== "" && c != null));
+
+        // Take rows until first fully-empty row (summary sections follow after a blank row)
+        const rawRows = json.slice(headerRowIdx + 1);
+        const rows: unknown[][] = [];
+        for (const r of rawRows) {
+          const cells = r as unknown[];
+          if (!cells.some((c) => c !== "" && c != null)) break; // stop at empty row
+          rows.push(cells);
+        }
 
         // Detect type: sheet name first, then headers as fallback
         const type: SheetType = detectTypeFromName(name) ?? detectTypeFromHeaders(headers);
