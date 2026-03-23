@@ -94,9 +94,13 @@ export default function PartnershipsPage() {
 
   /* card filter */
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  const filteredPartnerships = statusFilter
+  const [clientSearch, setClientSearch] = useState("");
+  const statusFilteredPartnerships = statusFilter
     ? partnerships.filter((p) => p.status === statusFilter)
     : partnerships;
+  const filteredPartnerships = clientSearch
+    ? statusFilteredPartnerships.filter((p) => p.name.toLowerCase().includes(clientSearch.toLowerCase()))
+    : statusFilteredPartnerships;
 
   /* KPIs */
   const totalPartnerships = partnerships.length;
@@ -344,6 +348,14 @@ export default function PartnershipsPage() {
             <h3 className="text-sm font-bold text-foreground mb-4">
               قائمة الشراكات
             </h3>
+            <div className="mb-4">
+              <Input
+                value={clientSearch}
+                onChange={(e) => setClientSearch(e.target.value)}
+                placeholder="ابحث باسم الشريك..."
+                className="max-w-xs"
+              />
+            </div>
             <div className="space-y-3">
               {filteredPartnerships.map((p) => {
                 const initial = p.name.charAt(0);

@@ -24,6 +24,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { useOrg } from "@/lib/org-context";
 
 interface Conversation {
   id: string;
@@ -77,8 +78,9 @@ const SUGGESTED_PROMPTS = [
 ];
 
 export default function AgentPage() {
+  const { orgId } = useOrg();
   const { messages, sendMessage, status, setMessages } = useChat({
-    transport: new DefaultChatTransport({ api: "/api/agent" }),
+    transport: new DefaultChatTransport({ api: "/api/agent", body: { orgId } }),
   });
 
   const isLoading = status === "streaming" || status === "submitted";

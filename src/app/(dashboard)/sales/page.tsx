@@ -111,6 +111,7 @@ export default function SalesPage() {
 
   /* card filter */
   const [stageFilter, setStageFilter] = useState<string | null>(null);
+  const [clientSearch, setClientSearch] = useState("");
   const { activeMonthIndex, filterCutoff } = useTopbarControls();
 
   /* time/month-filtered deals (used for all analytics + table) */
@@ -119,7 +120,10 @@ export default function SalesPage() {
     : activeMonthIndex
       ? deals.filter((d) => d.month === activeMonthIndex.month && d.year === activeMonthIndex.year)
       : deals;
-  const filteredDeals = stageFilter ? monthDeals.filter((d) => d.stage === stageFilter) : monthDeals;
+  const stageFilteredDeals = stageFilter ? monthDeals.filter((d) => d.stage === stageFilter) : monthDeals;
+  const filteredDeals = clientSearch
+    ? stageFilteredDeals.filter((d) => d.client_name.toLowerCase().includes(clientSearch.toLowerCase()))
+    : stageFilteredDeals;
 
   useEffect(() => {
     setLoading(true);
@@ -377,6 +381,14 @@ export default function SalesPage() {
 
       {/* ─── Deals Table ─── */}
       <div className="cc-card rounded-2xl overflow-x-auto">
+        <div className="p-4 pb-0">
+          <Input
+            value={clientSearch}
+            onChange={(e) => setClientSearch(e.target.value)}
+            placeholder="ابحث باسم العميل..."
+            className="max-w-xs"
+          />
+        </div>
         <Table>
           <TableHeader>
             <TableRow>

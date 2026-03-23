@@ -155,9 +155,13 @@ export default function TeamPage() {
 
   /* card filter */
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  const filteredEmployees = statusFilter
+  const [nameSearch, setNameSearch] = useState("");
+  const statusFilteredEmployees = statusFilter
     ? employees.filter((e) => e.status === statusFilter)
     : employees;
+  const filteredEmployees = nameSearch
+    ? statusFilteredEmployees.filter((e) => e.name.toLowerCase().includes(nameSearch.toLowerCase()))
+    : statusFilteredEmployees;
 
   return (
     <div className="space-y-6">
@@ -220,6 +224,14 @@ export default function TeamPage() {
           </>
         )}
       </div>
+
+      {/* Search */}
+      <Input
+        value={nameSearch}
+        onChange={(e) => setNameSearch(e.target.value)}
+        placeholder="ابحث باسم العضو..."
+        className="max-w-xs"
+      />
 
       {/* Team Grid */}
       {loading ? (
