@@ -119,10 +119,16 @@ export default function SatisfactionPage() {
         })
       : reviews;
 
+  /* client search */
+  const [clientSearch, setClientSearch] = useState("");
+
   /* filter reviews */
-  const filteredReviews = feedbackFilter === "all"
+  const typeFilteredReviews = feedbackFilter === "all"
     ? monthReviews
     : monthReviews.filter((r) => r.type === feedbackFilter);
+  const filteredReviews = clientSearch
+    ? typeFilteredReviews.filter((r) => r.customer_name.toLowerCase().includes(clientSearch.toLowerCase()))
+    : typeFilteredReviews;
 
   /* chart data */
   const trendData = d.monthlyTrend.map((m) => ({
@@ -386,7 +392,15 @@ export default function SatisfactionPage() {
 
         {/* ─── Tab 3: Customer Feedback (CRUD) ─── */}
         <TabsContent value="feedback" className="space-y-6">
-          {/* Header row: filters + add button */}
+          {/* Search + Header row: filters + add button */}
+          <div className="mb-2">
+            <Input
+              value={clientSearch}
+              onChange={(e) => setClientSearch(e.target.value)}
+              placeholder="ابحث باسم العميل..."
+              className="max-w-xs"
+            />
+          </div>
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 flex-wrap">
               {(["all", "very_satisfied", "satisfied", "neutral", "needs_improvement", "unsatisfied"] as const).map((filter) => {

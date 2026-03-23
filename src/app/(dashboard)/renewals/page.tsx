@@ -131,12 +131,16 @@ export default function RenewalsPage() {
 
   /* card filter */
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [clientSearch, setClientSearch] = useState("");
   const PENDING_STATUSES = new Set(["مجدول", "جاري المتابعة", "انتظار الدفع"]);
-  const filteredRenewals = statusFilter
+  const statusFilteredRenewals = statusFilter
     ? statusFilter === "pending"
       ? monthRenewals.filter((r) => PENDING_STATUSES.has(r.status))
       : monthRenewals.filter((r) => r.status === statusFilter)
     : monthRenewals;
+  const filteredRenewals = clientSearch
+    ? statusFilteredRenewals.filter((r) => r.customer_name.toLowerCase().includes(clientSearch.toLowerCase()))
+    : statusFilteredRenewals;
 
   useEffect(() => {
     setLoading(true);
@@ -404,6 +408,14 @@ export default function RenewalsPage() {
 
       {/* ─── Renewals Table ─── */}
       <div className="cc-card rounded-xl overflow-x-auto">
+        <div className="p-4 pb-0">
+          <Input
+            value={clientSearch}
+            onChange={(e) => setClientSearch(e.target.value)}
+            placeholder="ابحث باسم العميل..."
+            className="max-w-xs"
+          />
+        </div>
         <Table>
           <TableHeader>
             <TableRow>

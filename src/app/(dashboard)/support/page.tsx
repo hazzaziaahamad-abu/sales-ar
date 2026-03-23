@@ -107,11 +107,15 @@ export default function SupportPage() {
 
   // Card filter: "مفتوح" | "قيد الحل" | "محلول" | "عاجل" | null
   const [cardFilter, setCardFilter] = useState<string | null>(null);
-  const filteredTickets = cardFilter
+  const [clientSearch, setClientSearch] = useState("");
+  const cardFilteredTickets = cardFilter
     ? cardFilter === "عاجل"
       ? monthTickets.filter((t) => t.priority === "عاجل")
       : monthTickets.filter((t) => t.status === cardFilter)
     : monthTickets;
+  const filteredTickets = clientSearch
+    ? cardFilteredTickets.filter((t) => t.client_name.toLowerCase().includes(clientSearch.toLowerCase()))
+    : cardFilteredTickets;
 
   useEffect(() => {
     setLoading(true);
@@ -317,6 +321,14 @@ export default function SupportPage() {
 
       {/* -------- Tickets Table -------- */}
       <div className="cc-card rounded-xl overflow-x-auto">
+        <div className="p-4 pb-0">
+          <Input
+            value={clientSearch}
+            onChange={(e) => setClientSearch(e.target.value)}
+            placeholder="ابحث باسم العميل..."
+            className="max-w-xs"
+          />
+        </div>
         <Table>
           <TableHeader>
             <TableRow>
