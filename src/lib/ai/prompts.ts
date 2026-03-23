@@ -45,7 +45,6 @@ export const COLUMN_MAPPING_PROMPT = `أنت محلل بيانات متخصص ف
 - customer_phone: رقم الجوال
 - plan_name: اسم الخطة/الباقة
 - plan_price: سعر الخطة (رقم — القيمة قبل الضريبة)
-- start_date: تاريخ البدء/الاشتراك
 - renewal_date: تاريخ التجديد
 - status: الحالة
 - cancel_reason: سبب الإلغاء

@@ -161,7 +161,6 @@ export interface Renewal {
   customer_phone?: string;
   plan_name: string;
   plan_price: number;
-  start_date: string;
   renewal_date: string;
   status: string;
   cancel_reason?: string;

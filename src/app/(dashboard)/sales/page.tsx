@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useTopbarControls } from "@/components/layout/topbar-context";
 import { STAGES, SOURCES, SOURCE_COLORS, PLANS } from "@/lib/utils/constants";
 import { DEMO_LOST_DEALS } from "@/lib/demo-data";
+import SalesKPIsView from "@/components/SalesKPIsView";
 import { formatMoney, formatMoneyFull, formatDate, formatPhone, formatPercent } from "@/lib/utils/format";
 import { getKpiStatus, KPI_STATUS_STYLES, KPI_TARGETS } from "@/lib/utils/constants";
 import { StatCard } from "@/components/ui/stat-card";
@@ -562,6 +563,7 @@ export default function SalesPage() {
       <Tabs defaultValue="kpis" className="space-y-6">
         <TabsList className="bg-card border border-border">
           <TabsTrigger value="kpis">مؤشرات المبيعات</TabsTrigger>
+          <TabsTrigger value="kpis-full">مؤشرات الأداء KPIs</TabsTrigger>
           <TabsTrigger value="renewals">التجديدات</TabsTrigger>
           <TabsTrigger value="satisfaction">رضا العملاء</TabsTrigger>
         </TabsList>
@@ -729,6 +731,11 @@ export default function SalesPage() {
               </table>
             </div>
           </div>
+        </TabsContent>
+
+        {/* Tab: Full KPIs Dashboard */}
+        <TabsContent value="kpis-full" className="space-y-6">
+          <SalesKPIsView deals={monthDeals} lostDeals={DEMO_LOST_DEALS} />
         </TabsContent>
 
         {/* Tab 2: Renewals link */}

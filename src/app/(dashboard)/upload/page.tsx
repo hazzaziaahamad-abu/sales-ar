@@ -127,7 +127,6 @@ const RENEWAL_COL_PATTERNS: Record<string, string[]> = {
   customer_phone: ["جوال", "الجوال", "رقم الجوال", "phone", "هاتف"],
   plan_name:      ["اسم الخطة", "الخطة", "الباقة", "plan_name", "plan"],
   plan_price:     ["سعر الخطة", "سعر الخطة قبل الضريبة", "القيمة", "plan_price", "price", "المبلغ"],
-  start_date:     ["تاريخ البدء", "start_date", "تاريخ الاشتراك"],
   renewal_date:   ["تاريخ التجديد", "renewal_date", "موعد التجديد"],
   status:         ["الحالة", "status", "حالة"],
   cancel_reason:  ["سبب الإلغاء", "cancel_reason"],
@@ -417,8 +416,6 @@ export default function UploadPage() {
               customer_phone: cellStr(row, col("customer_phone")) || undefined,
               plan_name: cellStr(row, col("plan_name")) || "الاساسية",
               plan_price: toNum(col("plan_price") >= 0 ? row[col("plan_price")] : 0),
-              start_date: toDateStr(col("start_date") >= 0 ? row[col("start_date")] : undefined)
-                ?? new Date().toISOString().slice(0, 10),
               renewal_date: toDateStr(col("renewal_date") >= 0 ? row[col("renewal_date")] : undefined)
                 ?? new Date().toISOString().slice(0, 10),
               status,

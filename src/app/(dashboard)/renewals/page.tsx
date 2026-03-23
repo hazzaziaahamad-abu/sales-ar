@@ -79,7 +79,6 @@ const EMPTY_FORM = {
   customer_phone: "",
   plan_name: "",
   plan_price: 0,
-  start_date: new Date().toISOString().slice(0, 10),
   renewal_date: "",
   status: "مجدول",
   cancel_reason: "",
@@ -243,7 +242,6 @@ export default function RenewalsPage() {
       customer_phone: renewal.customer_phone || "",
       plan_name: renewal.plan_name,
       plan_price: renewal.plan_price,
-      start_date: renewal.start_date,
       renewal_date: renewal.renewal_date,
       status: renewal.status,
       cancel_reason: renewal.cancel_reason || "",
@@ -262,7 +260,6 @@ export default function RenewalsPage() {
         customer_phone: form.customer_phone || undefined,
         plan_name: form.plan_name,
         plan_price: form.plan_price,
-        start_date: form.start_date,
         renewal_date: form.renewal_date,
         status: form.status,
         cancel_reason: form.status === "ملغي بسبب" ? form.cancel_reason || undefined : undefined,
@@ -414,7 +411,6 @@ export default function RenewalsPage() {
               <TableHead>الجوال</TableHead>
               <TableHead>الخطة</TableHead>
               <TableHead>السعر</TableHead>
-              <TableHead>تاريخ البدء</TableHead>
               <TableHead>تاريخ التجديد</TableHead>
               <TableHead>الأيام المتبقية</TableHead>
               <TableHead>الحالة</TableHead>
@@ -426,14 +422,14 @@ export default function RenewalsPage() {
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i}>
-                  {Array.from({ length: 10 }).map((_, j) => (
+                  {Array.from({ length: 9 }).map((_, j) => (
                     <TableCell key={j}><Skeleton className="h-4 w-20" /></TableCell>
                   ))}
                 </TableRow>
               ))
             ) : filteredRenewals.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                   {statusFilter ? "لا توجد تجديدات مطابقة" : "لا توجد تجديدات بعد. اضغط \"إضافة تجديد\" لإضافة أول تجديد."}
                 </TableCell>
               </TableRow>
@@ -456,9 +452,6 @@ export default function RenewalsPage() {
                     </TableCell>
                     <TableCell className="font-bold text-cyan text-xs">
                       {formatMoneyFull(renewal.plan_price)}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {formatDate(renewal.start_date)}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-xs">
                       {formatDate(renewal.renewal_date)}
@@ -691,30 +684,17 @@ export default function RenewalsPage() {
               </div>
             </div>
 
-            {/* Start date + Renewal date */}
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <div className="grid gap-1.5">
-                <Label htmlFor="start_date">تاريخ البدء</Label>
-                <Input
-                  id="start_date"
-                  type="date"
-                  value={form.start_date}
-                  onChange={(e) => setForm({ ...form, start_date: e.target.value })}
-                  dir="ltr"
-                  className="text-right"
-                />
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="renewal_date">تاريخ التجديد</Label>
-                <Input
-                  id="renewal_date"
-                  type="date"
-                  value={form.renewal_date}
-                  onChange={(e) => setForm({ ...form, renewal_date: e.target.value })}
-                  dir="ltr"
-                  className="text-right"
-                />
-              </div>
+            {/* Renewal date */}
+            <div className="grid gap-1.5">
+              <Label htmlFor="renewal_date">تاريخ التجديد</Label>
+              <Input
+                id="renewal_date"
+                type="date"
+                value={form.renewal_date}
+                onChange={(e) => setForm({ ...form, renewal_date: e.target.value })}
+                dir="ltr"
+                className="text-right"
+              />
             </div>
 
             {/* Status */}

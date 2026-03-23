@@ -173,7 +173,6 @@ CREATE TABLE renewals (
   customer_phone text,
   plan_name text NOT NULL,
   plan_price numeric DEFAULT 0,
-  start_date date NOT NULL,
   renewal_date date NOT NULL,
   status text NOT NULL DEFAULT 'مجدول',
   cancel_reason text,

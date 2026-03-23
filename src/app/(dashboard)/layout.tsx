@@ -26,6 +26,7 @@ const PAGE_SLUG_MAP: Record<string, string> = {
   "/upload": "upload",
   "/agent": "agent",
   "/users": "users",
+  "/weekly": "weekly",
 };
 
 function AuthGate({ children }: { children: React.ReactNode }) {
