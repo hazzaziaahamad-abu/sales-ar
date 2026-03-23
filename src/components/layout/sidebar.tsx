@@ -18,6 +18,7 @@ import {
   LogOut,
   ChevronDown,
   Upload,
+  ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
@@ -25,6 +26,7 @@ import { useAuth } from "@/lib/auth-context";
 const NAV_ITEMS = [
   { label: "نظرة عامة", href: "/dashboard", slug: "dashboard", icon: LayoutDashboard },
   { label: "المبيعات", href: "/sales", slug: "sales", icon: TrendingUp },
+  { label: "الاجتماع الأسبوعي", href: "/weekly", slug: "weekly", icon: ClipboardList },
   { label: "التجديدات", href: "/renewals", slug: "renewals", icon: RefreshCw },
   { label: "رضا العملاء", href: "/satisfaction", slug: "satisfaction", icon: Heart },
   { label: "الدعم", href: "/support", slug: "support", icon: Headphones },
