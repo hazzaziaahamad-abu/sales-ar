@@ -96,9 +96,63 @@ export const KPI_STATUS_STYLES = {
   behind: { bg: "bg-cc-red/15", text: "text-cc-red", dot: "bg-cc-red", label: "متأخر" },
 } as const;
 
+// ─── Sales Performance Guide Constants ──────────────────────────────────────
+
+export const ACTIVITY_TYPES = [
+  { value: "call", label: "مكالمة هاتفية", icon: "📞" },
+  { value: "demo", label: "Demo", icon: "🖥" },
+  { value: "followup", label: "متابعة", icon: "🔁" },
+  { value: "meeting", label: "اجتماع", icon: "🤝" },
+  { value: "quote", label: "عرض سعر", icon: "📄" },
+  { value: "whatsapp", label: "واتساب", icon: "💬" },
+] as const;
+
+export const ACTIVITY_RESULTS = [
+  { value: "positive", label: "إيجابي", color: "cc-green" },
+  { value: "pending", label: "معلق", color: "amber" },
+  { value: "no_answer", label: "لا رد", color: "cc-blue" },
+  { value: "negative", label: "سلبي", color: "cc-red" },
+] as const;
+
+export const SCORE_LEVELS = [
+  { value: "excellent", label: "ممتاز", emoji: "🏆", minPoints: 250, color: "cc-green" },
+  { value: "advanced", label: "متقدم", emoji: "🥇", minPoints: 180, color: "cyan" },
+  { value: "good", label: "جيد", emoji: "🥈", minPoints: 120, color: "amber" },
+  { value: "needs_improvement", label: "يحتاج تحسين", emoji: "🥉", minPoints: 60, color: "cc-purple" },
+  { value: "danger", label: "خطر", emoji: "🔴", minPoints: 0, color: "cc-red" },
+] as const;
+
+export const ACTIVITY_POINTS: Record<string, number> = {
+  call: 10,
+  followup: 10,
+  whatsapp: 10,
+  meeting: 10,
+  demo: 20,
+  quote: 10,
+  deal_closed: 50,
+  stale_deal: -10,
+  slow_response: -5,
+};
+
+export const PIP_STATUSES = [
+  { value: "active", label: "نشط", color: "amber" },
+  { value: "completed", label: "مكتمل", color: "cc-green" },
+  { value: "failed", label: "فشل", color: "cc-red" },
+  { value: "cancelled", label: "ملغي", color: "cc-blue" },
+] as const;
+
+export const PIPELINE_STAGES_GUIDE = [
+  { stage: "Lead جديد", probability: 0, color: "cc-blue" },
+  { stage: "تواصل أولي", probability: 15, color: "cyan" },
+  { stage: "عرض سعر", probability: 40, color: "amber" },
+  { stage: "تفاوض", probability: 70, color: "cc-purple" },
+  { stage: "إغلاق", probability: 90, color: "cc-green" },
+] as const;
+
 export const NAV_ITEMS = [
   { label: "نظرة عامة", href: "/dashboard", icon: "LayoutDashboard" },
   { label: "المبيعات", href: "/sales", icon: "TrendingUp" },
+  { label: "دليل المبيعات", href: "/sales-guide", icon: "BookOpen" },
   { label: "التجديدات", href: "/renewals", icon: "RefreshCw" },
   { label: "رضا العملاء", href: "/satisfaction", icon: "Heart" },
   { label: "الدعم", href: "/support", icon: "Headphones" },

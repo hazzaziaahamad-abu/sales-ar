@@ -1,0 +1,819 @@
+"use client";
+
+import { useState, useEffect, useMemo } from "react";
+import type { SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, Employee } from "@/types";
+import {
+  fetchSalesActivities,
+  createSalesActivity,
+  deleteSalesActivity,
+  fetchSalesTargets,
+  upsertSalesTarget,
+  fetchRepWeeklyScores,
+  createRepWeeklyScore,
+  fetchPipPlans,
+  createPipPlan,
+  updatePipPlan,
+  fetchEmployees,
+} from "@/lib/supabase/db";
+import { useAuth } from "@/lib/auth-context";
+import {
+  ACTIVITY_TYPES,
+  ACTIVITY_RESULTS,
+  SCORE_LEVELS,
+  ACTIVITY_POINTS,
+  PIP_STATUSES,
+  PIPELINE_STAGES_GUIDE,
+} from "@/lib/utils/constants";
+import { formatMoneyFull, formatDate } from "@/lib/utils/format";
+import { StatCard } from "@/components/ui/stat-card";
+import { ColorBadge } from "@/components/ui/color-badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Phone,
+  Plus,
+  Trash2,
+  Trophy,
+  Target,
+  AlertTriangle,
+  TrendingUp,
+  Calendar,
+  Activity,
+  Users,
+  ArrowUpDown,
+} from "lucide-react";
+
+/* ─── Color helpers ─── */
+const LEVEL_BADGE: Record<string, { color: "green" | "cyan" | "amber" | "purple" | "red"; label: string }> = {
+  excellent: { color: "green", label: "ممتاز" },
+  advanced: { color: "cyan", label: "متقدم" },
+  good: { color: "amber", label: "جيد" },
+  needs_improvement: { color: "purple", label: "يحتاج تحسين" },
+  danger: { color: "red", label: "خطر" },
+};
+
+const RESULT_BADGE: Record<string, { color: "green" | "amber" | "blue" | "red"; label: string }> = {
+  positive: { color: "green", label: "إيجابي" },
+  pending: { color: "amber", label: "معلق" },
+  no_answer: { color: "blue", label: "لا رد" },
+  negative: { color: "red", label: "سلبي" },
+};
+
+const PIP_BADGE: Record<string, { color: "green" | "amber" | "red" | "blue"; label: string }> = {
+  active: { color: "amber", label: "نشط" },
+  completed: { color: "green", label: "مكتمل" },
+  failed: { color: "red", label: "فشل" },
+  cancelled: { color: "blue", label: "ملغي" },
+};
+
+/* ─── Empty forms ─── */
+const EMPTY_ACTIVITY = {
+  activity_date: new Date().toISOString().split("T")[0],
+  activity_type: "" as string,
+  result: "" as string,
+  employee_name: "",
+  client_name: "",
+  notes: "",
+};
+
+const EMPTY_PIP = {
+  employee_name: "",
+  start_date: new Date().toISOString().split("T")[0],
+  end_date: "",
+  reason: "",
+  target_percentage: 100,
+};
+
+export default function SalesGuidePage() {
+  const { user } = useAuth();
+
+  /* ─── State ─── */
+  const [activities, setActivities] = useState<SalesActivity[]>([]);
+  const [targets, setTargets] = useState<SalesTarget[]>([]);
+  const [scores, setScores] = useState<RepWeeklyScore[]>([]);
+  const [pipPlans, setPipPlans] = useState<PipPlan[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const [activityDialog, setActivityDialog] = useState(false);
+  const [activityForm, setActivityForm] = useState(EMPTY_ACTIVITY);
+  const [pipDialog, setPipDialog] = useState(false);
+  const [pipForm, setPipForm] = useState(EMPTY_PIP);
+  const [saving, setSaving] = useState(false);
+
+  /* ─── Load data ─── */
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function load() {
+    setLoading(true);
+    const [a, t, s, p, e] = await Promise.allSettled([
+      fetchSalesActivities(),
+      fetchSalesTargets(),
+      fetchRepWeeklyScores(),
+      fetchPipPlans(),
+      fetchEmployees(),
+    ]);
+    if (a.status === "fulfilled") setActivities(a.value);
+    if (t.status === "fulfilled") setTargets(t.value);
+    if (s.status === "fulfilled") setScores(s.value);
+    if (p.status === "fulfilled") setPipPlans(p.value);
+    if (e.status === "fulfilled") setEmployees(e.value);
+    setLoading(false);
+  }
+
+  /* ─── Stats ─── */
+  const todayStr = new Date().toISOString().split("T")[0];
+  const todayActivities = activities.filter((a) => a.activity_date === todayStr);
+  const weekActivities = useMemo(() => {
+    const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    const start = startOfWeek.toISOString().split("T")[0];
+    return activities.filter((a) => a.activity_date >= start);
+  }, [activities]);
+
+  const activePips = pipPlans.filter((p) => p.status === "active");
+
+  /* ─── Handlers ─── */
+  async function handleCreateActivity() {
+    if (!activityForm.activity_type) return;
+    setSaving(true);
+    try {
+      const created = await createSalesActivity({
+        activity_date: activityForm.activity_date,
+        activity_type: activityForm.activity_type as SalesActivity["activity_type"],
+        result: (activityForm.result || undefined) as SalesActivity["result"],
+        employee_name: activityForm.employee_name || undefined,
+        client_name: activityForm.client_name || undefined,
+        notes: activityForm.notes || undefined,
+      });
+      setActivities((prev) => [created, ...prev]);
+      setActivityDialog(false);
+      setActivityForm(EMPTY_ACTIVITY);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDeleteActivity(id: string) {
+    await deleteSalesActivity(id);
+    setActivities((prev) => prev.filter((a) => a.id !== id));
+  }
+
+  async function handleCreatePip() {
+    if (!pipForm.employee_name || !pipForm.end_date) return;
+    setSaving(true);
+    try {
+      const created = await createPipPlan({
+        employee_name: pipForm.employee_name,
+        start_date: pipForm.start_date,
+        end_date: pipForm.end_date,
+        status: "active",
+        current_week: 1,
+        target_percentage: pipForm.target_percentage,
+        actual_percentage: 0,
+        reason: pipForm.reason || undefined,
+      });
+      setPipPlans((prev) => [created, ...prev]);
+      setPipDialog(false);
+      setPipForm(EMPTY_PIP);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleUpdatePipStatus(id: string, status: PipPlan["status"]) {
+    const updated = await updatePipPlan(id, { status });
+    setPipPlans((prev) => prev.map((p) => (p.id === id ? updated : p)));
+  }
+
+  /* ─── Loading skeleton ─── */
+  if (loading) {
+    return (
+      <div className="space-y-6 p-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-32 rounded-2xl" />
+          ))}
+        </div>
+        <Skeleton className="h-96 rounded-2xl" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 p-4 sm:p-6">
+      {/* ─── Top KPIs ─── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          value={todayActivities.length.toString()}
+          label="نشاط اليوم"
+          color="cyan"
+          icon={<Activity className="w-5 h-5 text-cyan" />}
+          subtext={`من أصل ${targets.find((t) => t.target_key === "calls")?.target_value ?? 15} مكالمة مطلوبة`}
+        />
+        <StatCard
+          value={weekActivities.length.toString()}
+          label="نشاط الأسبوع"
+          color="green"
+          icon={<TrendingUp className="w-5 h-5 text-cc-green" />}
+        />
+        <StatCard
+          value={scores.length > 0 ? scores[0].total_points.toString() : "0"}
+          label="أعلى نقاط أسبوعية"
+          color="purple"
+          icon={<Trophy className="w-5 h-5 text-cc-purple" />}
+          subtext={scores.length > 0 ? scores[0].employee_name || "" : ""}
+        />
+        <StatCard
+          value={activePips.length.toString()}
+          label="خطط تحسين نشطة"
+          color={activePips.length > 0 ? "amber" : "green"}
+          icon={<AlertTriangle className="w-5 h-5 text-amber" />}
+        />
+      </div>
+
+      {/* ─── Main Tabs ─── */}
+      <Tabs defaultValue="activities" dir="rtl">
+        <TabsList className="glass-surface rounded-2xl p-1.5 gap-1 flex-wrap">
+          <TabsTrigger value="activities" className="rounded-xl text-xs px-4 py-2">سجل النشاطات</TabsTrigger>
+          <TabsTrigger value="leaderboard" className="rounded-xl text-xs px-4 py-2">لوحة المتصدرين</TabsTrigger>
+          <TabsTrigger value="targets" className="rounded-xl text-xs px-4 py-2">الأهداف</TabsTrigger>
+          <TabsTrigger value="pip" className="rounded-xl text-xs px-4 py-2">خطط التحسين</TabsTrigger>
+          <TabsTrigger value="pipeline" className="rounded-xl text-xs px-4 py-2">دليل المراحل</TabsTrigger>
+        </TabsList>
+
+        {/* ── Activities Tab ── */}
+        <TabsContent value="activities" className="mt-4">
+          <div className="glass-surface rounded-2xl p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold">سجل النشاطات اليومية</h3>
+              <Button size="sm" onClick={() => setActivityDialog(true)} className="gap-1.5">
+                <Plus className="w-4 h-4" /> إضافة نشاط
+              </Button>
+            </div>
+
+            {activities.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Activity className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p>لا توجد نشاطات مسجلة بعد</p>
+                <p className="text-sm mt-1">ابدأ بتسجيل نشاطاتك اليومية</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>التاريخ</TableHead>
+                      <TableHead>النوع</TableHead>
+                      <TableHead>الموظف</TableHead>
+                      <TableHead>العميل</TableHead>
+                      <TableHead>النتيجة</TableHead>
+                      <TableHead>ملاحظات</TableHead>
+                      <TableHead>النقاط</TableHead>
+                      <TableHead></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {activities.slice(0, 50).map((a) => {
+                      const typeInfo = ACTIVITY_TYPES.find((t) => t.value === a.activity_type);
+                      const resultInfo = a.result ? RESULT_BADGE[a.result] : null;
+                      const points = ACTIVITY_POINTS[a.activity_type] ?? 0;
+                      return (
+                        <TableRow key={a.id}>
+                          <TableCell className="text-xs">{formatDate(a.activity_date)}</TableCell>
+                          <TableCell>
+                            <span className="text-sm">
+                              {typeInfo?.icon} {typeInfo?.label}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-xs">{a.employee_name || "—"}</TableCell>
+                          <TableCell className="text-xs">{a.client_name || "—"}</TableCell>
+                          <TableCell>
+                            {resultInfo ? (
+                              <ColorBadge text={resultInfo.label} color={resultInfo.color} />
+                            ) : (
+                              "—"
+                            )}
+                          </TableCell>
+                          <TableCell className="text-xs max-w-[200px] truncate">{a.notes || "—"}</TableCell>
+                          <TableCell>
+                            <span className={`text-sm font-bold ${points > 0 ? "text-cc-green" : "text-cc-red"}`}>
+                              {points > 0 ? `+${points}` : points}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteActivity(a.id)}
+                              className="text-muted-foreground hover:text-cc-red"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* ── Leaderboard Tab ── */}
+        <TabsContent value="leaderboard" className="mt-4">
+          <div className="glass-surface rounded-2xl p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold">لوحة المتصدرين الأسبوعية</h3>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Trophy className="w-4 h-4 text-amber" />
+                ترتيب حسب النقاط
+              </div>
+            </div>
+
+            {scores.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Trophy className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p>لا توجد نتائج أسبوعية بعد</p>
+                <p className="text-sm mt-1">سيتم حساب النقاط تلقائيا من النشاطات</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {scores.map((s, idx) => {
+                  const levelInfo = s.level ? LEVEL_BADGE[s.level] : null;
+                  const emoji = SCORE_LEVELS.find((l) => l.value === s.level)?.emoji || "";
+                  return (
+                    <div
+                      key={s.id}
+                      className="flex items-center gap-4 rounded-2xl p-4 border border-white/6 bg-white/[0.02] hover:bg-white/[0.04] transition-colors"
+                    >
+                      <div className="text-2xl font-extrabold text-muted-foreground w-8 text-center">
+                        {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `#${idx + 1}`}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-foreground">{s.employee_name || "غير محدد"}</p>
+                          {levelInfo && <ColorBadge text={`${emoji} ${levelInfo.label}`} color={levelInfo.color} />}
+                        </div>
+                        <div className="flex gap-4 mt-1.5 text-xs text-muted-foreground">
+                          <span>مكالمات: {s.calls_count}</span>
+                          <span>عروض: {s.demos_count}</span>
+                          <span>متابعات: {s.followups_count}</span>
+                          <span>صفقات: {s.deals_closed}</span>
+                          <span>إيراد: {formatMoneyFull(s.revenue)}</span>
+                        </div>
+                      </div>
+                      <div className="text-left">
+                        <p className="text-2xl font-extrabold text-cyan">{s.total_points}</p>
+                        <p className="text-[10px] text-muted-foreground">نقطة</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* ── Targets Tab ── */}
+        <TabsContent value="targets" className="mt-4">
+          <div className="glass-surface rounded-2xl p-4 sm:p-6">
+            <h3 className="text-lg font-bold mb-4">الأهداف والحد الأدنى</h3>
+
+            {targets.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Target className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p>لم يتم تحديد أهداف بعد</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {targets.map((t) => {
+                  const periodLabels: Record<string, string> = {
+                    daily: "يومي",
+                    weekly: "أسبوعي",
+                    monthly: "شهري",
+                  };
+                  return (
+                    <div
+                      key={t.id}
+                      className="rounded-2xl p-4 border border-white/6 bg-white/[0.02]"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-bold text-foreground">{t.label_ar || t.target_key}</span>
+                        <ColorBadge
+                          text={periodLabels[t.period_type] || t.period_type}
+                          color={t.period_type === "daily" ? "cyan" : t.period_type === "weekly" ? "amber" : "purple"}
+                        />
+                      </div>
+                      <div className="flex items-end gap-3 mt-3">
+                        <div>
+                          <p className="text-[10px] text-muted-foreground">الهدف</p>
+                          <p className="text-xl font-extrabold text-cc-green">{t.target_value.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-muted-foreground">الحد الأدنى</p>
+                          <p className="text-xl font-extrabold text-amber">{t.min_value.toLocaleString()}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* ── PIP Plans Tab ── */}
+        <TabsContent value="pip" className="mt-4">
+          <div className="glass-surface rounded-2xl p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold">خطط تحسين الأداء (PIP)</h3>
+              <Button size="sm" onClick={() => setPipDialog(true)} className="gap-1.5">
+                <Plus className="w-4 h-4" /> إنشاء خطة
+              </Button>
+            </div>
+
+            {pipPlans.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <AlertTriangle className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p>لا توجد خطط تحسين أداء</p>
+                <p className="text-sm mt-1">أنشئ خطة لمتابعة أداء الموظفين الذين يحتاجون تحسين</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {pipPlans.map((p) => {
+                  const statusInfo = PIP_BADGE[p.status];
+                  const progress = p.target_percentage > 0
+                    ? Math.round((p.actual_percentage / p.target_percentage) * 100)
+                    : 0;
+                  return (
+                    <div
+                      key={p.id}
+                      className="rounded-2xl p-4 border border-white/6 bg-white/[0.02]"
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-foreground">{p.employee_name}</p>
+                          <ColorBadge text={statusInfo.label} color={statusInfo.color} />
+                        </div>
+                        {p.status === "active" && (
+                          <div className="flex gap-1.5">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleUpdatePipStatus(p.id, "completed")}
+                              className="text-cc-green text-xs"
+                            >
+                              اكتمل
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleUpdatePipStatus(p.id, "failed")}
+                              className="text-cc-red text-xs"
+                            >
+                              فشل
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-muted-foreground">
+                        <div>
+                          <span className="block text-[10px]">تاريخ البدء</span>
+                          <span className="text-foreground">{formatDate(p.start_date)}</span>
+                        </div>
+                        <div>
+                          <span className="block text-[10px]">تاريخ الانتهاء</span>
+                          <span className="text-foreground">{formatDate(p.end_date)}</span>
+                        </div>
+                        <div>
+                          <span className="block text-[10px]">الأسبوع الحالي</span>
+                          <span className="text-foreground">{p.current_week}/4</span>
+                        </div>
+                        <div>
+                          <span className="block text-[10px]">التقدم</span>
+                          <span className="text-foreground">{progress}%</span>
+                        </div>
+                      </div>
+                      {p.reason && (
+                        <p className="mt-2 text-xs text-muted-foreground border-t border-white/6 pt-2">
+                          السبب: {p.reason}
+                        </p>
+                      )}
+                      {/* Progress bar */}
+                      <div className="mt-3 w-full h-1.5 bg-white/[0.05] rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${
+                            progress >= 80 ? "bg-cc-green" : progress >= 50 ? "bg-amber" : "bg-cc-red"
+                          }`}
+                          style={{ width: `${Math.min(100, progress)}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* ── Pipeline Guide Tab ── */}
+        <TabsContent value="pipeline" className="mt-4">
+          <div className="glass-surface rounded-2xl p-4 sm:p-6">
+            <h3 className="text-lg font-bold mb-6">دليل مراحل البيع</h3>
+
+            <div className="space-y-4">
+              {PIPELINE_STAGES_GUIDE.map((stage, idx) => (
+                <div
+                  key={stage.stage}
+                  className="flex items-center gap-4 rounded-2xl p-4 border border-white/6 bg-white/[0.02] hover:bg-white/[0.04] transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-2xl bg-white/[0.05] flex items-center justify-center text-lg font-bold text-muted-foreground">
+                    {idx + 1}
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-bold text-foreground">{stage.stage}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      احتمالية الإغلاق: {stage.probability}%
+                    </p>
+                  </div>
+                  <div className="w-24">
+                    <div className="w-full h-2 bg-white/[0.05] rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${
+                          stage.probability >= 70
+                            ? "bg-cc-green"
+                            : stage.probability >= 40
+                            ? "bg-amber"
+                            : "bg-cc-blue"
+                        }`}
+                        style={{ width: `${Math.max(5, stage.probability)}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Scoring rules */}
+            <div className="mt-8">
+              <h4 className="text-md font-bold mb-4">نظام النقاط</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {Object.entries(ACTIVITY_POINTS).map(([key, points]) => {
+                  const typeInfo = ACTIVITY_TYPES.find((t) => t.value === key);
+                  const labels: Record<string, string> = {
+                    call: "مكالمة",
+                    followup: "متابعة",
+                    whatsapp: "واتساب",
+                    meeting: "اجتماع",
+                    demo: "عرض Demo",
+                    quote: "عرض سعر",
+                    deal_closed: "إغلاق صفقة",
+                    stale_deal: "صفقة راكدة",
+                    slow_response: "رد بطيء",
+                  };
+                  return (
+                    <div
+                      key={key}
+                      className="flex items-center justify-between rounded-xl p-3 border border-white/6 bg-white/[0.02]"
+                    >
+                      <span className="text-sm">
+                        {typeInfo?.icon || ""} {labels[key] || key}
+                      </span>
+                      <span
+                        className={`text-sm font-bold ${
+                          points > 0 ? "text-cc-green" : "text-cc-red"
+                        }`}
+                      >
+                        {points > 0 ? `+${points}` : points}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Score levels */}
+            <div className="mt-8">
+              <h4 className="text-md font-bold mb-4">مستويات الأداء</h4>
+              <div className="flex flex-wrap gap-3">
+                {SCORE_LEVELS.map((level) => {
+                  const badge = LEVEL_BADGE[level.value];
+                  return (
+                    <div
+                      key={level.value}
+                      className="flex items-center gap-2 rounded-xl p-3 border border-white/6 bg-white/[0.02]"
+                    >
+                      <span className="text-lg">{level.emoji}</span>
+                      <div>
+                        <p className="text-sm font-bold">{level.label}</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {level.minPoints}+ نقطة
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* ─── Add Activity Dialog ─── */}
+      <Dialog open={activityDialog} onOpenChange={setActivityDialog}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>تسجيل نشاط جديد</DialogTitle>
+            <DialogDescription>سجّل نشاطك اليومي لكسب النقاط</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>التاريخ</Label>
+                <Input
+                  type="date"
+                  value={activityForm.activity_date}
+                  onChange={(e) => setActivityForm({ ...activityForm, activity_date: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>نوع النشاط</Label>
+                <Select
+                  value={activityForm.activity_type}
+                  onValueChange={(v) => setActivityForm({ ...activityForm, activity_type: v ?? "" })}
+                >
+                  <SelectTrigger><SelectValue placeholder="اختر..." /></SelectTrigger>
+                  <SelectContent>
+                    {ACTIVITY_TYPES.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>
+                        {t.icon} {t.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>الموظف</Label>
+                <Select
+                  value={activityForm.employee_name}
+                  onValueChange={(v) => setActivityForm({ ...activityForm, employee_name: v ?? "" })}
+                >
+                  <SelectTrigger><SelectValue placeholder="اختر..." /></SelectTrigger>
+                  <SelectContent>
+                    {employees.map((e) => (
+                      <SelectItem key={e.id} value={e.name}>
+                        {e.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>النتيجة</Label>
+                <Select
+                  value={activityForm.result}
+                  onValueChange={(v) => setActivityForm({ ...activityForm, result: v ?? "" })}
+                >
+                  <SelectTrigger><SelectValue placeholder="اختر..." /></SelectTrigger>
+                  <SelectContent>
+                    {ACTIVITY_RESULTS.map((r) => (
+                      <SelectItem key={r.value} value={r.value}>
+                        {r.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label>اسم العميل</Label>
+              <Input
+                value={activityForm.client_name}
+                onChange={(e) => setActivityForm({ ...activityForm, client_name: e.target.value })}
+                placeholder="اسم العميل (اختياري)"
+              />
+            </div>
+            <div>
+              <Label>ملاحظات</Label>
+              <Textarea
+                value={activityForm.notes}
+                onChange={(e) => setActivityForm({ ...activityForm, notes: e.target.value })}
+                placeholder="ملاحظات..."
+                rows={2}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setActivityDialog(false)}>إلغاء</Button>
+            <Button onClick={handleCreateActivity} disabled={saving || !activityForm.activity_type}>
+              {saving ? "جارٍ الحفظ..." : "حفظ"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Add PIP Dialog ─── */}
+      <Dialog open={pipDialog} onOpenChange={setPipDialog}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>إنشاء خطة تحسين أداء</DialogTitle>
+            <DialogDescription>خطة مدتها 4 أسابيع لتحسين أداء الموظف</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>الموظف</Label>
+              <Select
+                value={pipForm.employee_name}
+                onValueChange={(v) => setPipForm({ ...pipForm, employee_name: v ?? "" })}
+              >
+                <SelectTrigger><SelectValue placeholder="اختر الموظف..." /></SelectTrigger>
+                <SelectContent>
+                  {employees.map((e) => (
+                    <SelectItem key={e.id} value={e.name}>
+                      {e.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>تاريخ البدء</Label>
+                <Input
+                  type="date"
+                  value={pipForm.start_date}
+                  onChange={(e) => setPipForm({ ...pipForm, start_date: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>تاريخ الانتهاء</Label>
+                <Input
+                  type="date"
+                  value={pipForm.end_date}
+                  onChange={(e) => setPipForm({ ...pipForm, end_date: e.target.value })}
+                />
+              </div>
+            </div>
+            <div>
+              <Label>النسبة المستهدفة %</Label>
+              <Input
+                type="number"
+                value={pipForm.target_percentage}
+                onChange={(e) => setPipForm({ ...pipForm, target_percentage: Number(e.target.value) })}
+              />
+            </div>
+            <div>
+              <Label>سبب الخطة</Label>
+              <Textarea
+                value={pipForm.reason}
+                onChange={(e) => setPipForm({ ...pipForm, reason: e.target.value })}
+                placeholder="سبب إنشاء خطة التحسين..."
+                rows={2}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPipDialog(false)}>إلغاء</Button>
+            <Button onClick={handleCreatePip} disabled={saving || !pipForm.employee_name || !pipForm.end_date}>
+              {saving ? "جارٍ الحفظ..." : "إنشاء الخطة"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

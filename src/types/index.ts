@@ -208,6 +208,72 @@ export interface ExcelUpload {
   created_at: string;
 }
 
+// ─── Sales Performance Guide Types ─────────────────────────────────────────
+
+export interface SalesActivity {
+  id: string;
+  org_id: string;
+  employee_id?: string;
+  employee_name?: string;
+  activity_date: string;
+  activity_type: "call" | "demo" | "followup" | "meeting" | "quote" | "whatsapp";
+  result?: "positive" | "pending" | "no_answer" | "negative";
+  deal_id?: string;
+  client_name?: string;
+  notes?: string;
+  created_at: string;
+}
+
+export interface SalesTarget {
+  id: string;
+  org_id: string;
+  period_type: "daily" | "weekly" | "monthly";
+  target_key: string;
+  target_value: number;
+  min_value: number;
+  label_ar?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RepWeeklyScore {
+  id: string;
+  org_id: string;
+  employee_id?: string;
+  employee_name?: string;
+  week_start: string;
+  week_end: string;
+  total_points: number;
+  level?: "excellent" | "advanced" | "good" | "needs_improvement" | "danger";
+  calls_count: number;
+  demos_count: number;
+  followups_count: number;
+  quotes_sent: number;
+  deals_closed: number;
+  revenue: number;
+  created_at: string;
+}
+
+export interface PipPlan {
+  id: string;
+  org_id: string;
+  employee_id?: string;
+  employee_name?: string;
+  start_date: string;
+  end_date: string;
+  status: "active" | "completed" | "failed" | "cancelled";
+  current_week: number;
+  week1_notes?: string;
+  week2_notes?: string;
+  week3_notes?: string;
+  week4_notes?: string;
+  target_percentage: number;
+  actual_percentage: number;
+  reason?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface AppNotification {
   id: string;
   type: "urgent_ticket" | "overdue_project" | "high_workload" | "near_complete" | "negotiating" | "crud_action";
