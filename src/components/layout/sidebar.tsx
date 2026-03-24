@@ -19,6 +19,7 @@ import {
   ChevronDown,
   Upload,
   ClipboardList,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
@@ -34,6 +35,7 @@ const NAV_ITEMS = [
   { label: "الشراكات", href: "/partnerships", slug: "partnerships", icon: Handshake },
   { label: "الفريق", href: "/team", slug: "team", icon: Users },
   { label: "المالية", href: "/finance", slug: "finance", icon: Banknote },
+  { label: "دليل المبيعات", href: "/sales-guide", slug: "sales-guide", icon: BookOpen },
   { label: "رفع الملفات", href: "/upload", slug: "upload", icon: Upload },
   { label: "إدارة المستخدمين", href: "/users", slug: "users", icon: Shield },
 ];

@@ -1,5 +1,5 @@
 import { createClient } from "./client";
-import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal } from "@/types";
+import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan } from "@/types";
 
 const DEFAULT_ORG = "00000000-0000-0000-0000-000000000001";
 
@@ -452,4 +452,142 @@ export async function fetchKpiSnapshots(): Promise<KPISnapshot[]> {
     .order("month", { ascending: true });
   if (error) throw error;
   return (data ?? []) as KPISnapshot[];
+}
+
+// ─── SALES ACTIVITIES ─────────────────────────────────────────────────────────
+
+export async function fetchSalesActivities(dateFrom?: string, dateTo?: string): Promise<SalesActivity[]> {
+  const supabase = createClient();
+  let query = supabase
+    .from("sales_activities")
+    .select("*")
+    .eq("org_id", getOrgId())
+    .order("created_at", { ascending: false });
+  if (dateFrom) query = query.gte("activity_date", dateFrom);
+  if (dateTo) query = query.lte("activity_date", dateTo);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []) as SalesActivity[];
+}
+
+export async function createSalesActivity(
+  activity: Omit<SalesActivity, "id" | "org_id" | "created_at">
+): Promise<SalesActivity> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("sales_activities")
+    .insert({ ...activity, org_id: getOrgId() })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as SalesActivity;
+}
+
+export async function deleteSalesActivity(id: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("sales_activities")
+    .delete()
+    .eq("id", id)
+    .eq("org_id", getOrgId());
+  if (error) throw error;
+}
+
+// ─── SALES TARGETS ──────────────────────────────────────────────────────────
+
+export async function fetchSalesTargets(): Promise<SalesTarget[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("sales_targets")
+    .select("*")
+    .eq("org_id", getOrgId())
+    .order("period_type");
+  if (error) throw error;
+  return (data ?? []) as SalesTarget[];
+}
+
+export async function upsertSalesTarget(
+  target: Omit<SalesTarget, "id" | "org_id" | "created_at" | "updated_at">
+): Promise<SalesTarget> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("sales_targets")
+    .upsert(
+      { ...target, org_id: getOrgId(), updated_at: new Date().toISOString() },
+      { onConflict: "org_id,period_type,target_key" }
+    )
+    .select()
+    .single();
+  if (error) throw error;
+  return data as SalesTarget;
+}
+
+// ─── REP WEEKLY SCORES ──────────────────────────────────────────────────────
+
+export async function fetchRepWeeklyScores(weekStart?: string): Promise<RepWeeklyScore[]> {
+  const supabase = createClient();
+  let query = supabase
+    .from("rep_weekly_scores")
+    .select("*")
+    .eq("org_id", getOrgId())
+    .order("total_points", { ascending: false });
+  if (weekStart) query = query.eq("week_start", weekStart);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []) as RepWeeklyScore[];
+}
+
+export async function createRepWeeklyScore(
+  score: Omit<RepWeeklyScore, "id" | "org_id" | "created_at">
+): Promise<RepWeeklyScore> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("rep_weekly_scores")
+    .insert({ ...score, org_id: getOrgId() })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as RepWeeklyScore;
+}
+
+// ─── PIP PLANS ──────────────────────────────────────────────────────────────
+
+export async function fetchPipPlans(): Promise<PipPlan[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("pip_plans")
+    .select("*")
+    .eq("org_id", getOrgId())
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as PipPlan[];
+}
+
+export async function createPipPlan(
+  plan: Omit<PipPlan, "id" | "org_id" | "created_at" | "updated_at">
+): Promise<PipPlan> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("pip_plans")
+    .insert({ ...plan, org_id: getOrgId() })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as PipPlan;
+}
+
+export async function updatePipPlan(
+  id: string,
+  plan: Partial<Omit<PipPlan, "id" | "org_id">>
+): Promise<PipPlan> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("pip_plans")
+    .update({ ...plan, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("org_id", getOrgId())
+    .select()
+    .single();
+  if (error) throw error;
+  return data as PipPlan;
 }
