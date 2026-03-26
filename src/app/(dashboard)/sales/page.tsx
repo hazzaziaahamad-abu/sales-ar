@@ -7,7 +7,7 @@ import { fetchDeals, createDeal, updateDeal, deleteDeal } from "@/lib/supabase/d
 import { useAuth } from "@/lib/auth-context";
 import { useTopbarControls } from "@/components/layout/topbar-context";
 import { STAGES, SOURCES, SOURCE_COLORS, PLANS } from "@/lib/utils/constants";
-import { DEMO_LOST_DEALS } from "@/lib/demo-data";
+
 import SalesKPIsView from "@/components/SalesKPIsView";
 import { formatMoney, formatMoneyFull, formatDate, formatPhone, formatPercent } from "@/lib/utils/format";
 import { getKpiStatus, KPI_STATUS_STYLES, KPI_TARGETS } from "@/lib/utils/constants";
@@ -184,15 +184,16 @@ export default function SalesPage() {
       .sort((a, b) => b.value - a.value);
   })();
 
-  /* Lost deals analysis */
-  const lostReasons = DEMO_LOST_DEALS.reduce<Record<string, { count: number; value: number }>>((acc, d) => {
+  /* Lost deals analysis — from real deals with stage "مرفوض مع سبب" */
+  const lostDeals = monthDeals.filter((d) => d.stage === "مرفوض مع سبب");
+  const lostReasons = lostDeals.reduce<Record<string, { count: number; value: number }>>((acc, d) => {
     const reason = d.loss_reason || "أخرى";
     if (!acc[reason]) acc[reason] = { count: 0, value: 0 };
     acc[reason].count++;
     acc[reason].value += d.deal_value;
     return acc;
   }, {});
-  const totalLostValue = DEMO_LOST_DEALS.reduce((s, d) => s + d.deal_value, 0);
+  const totalLostValue = lostDeals.reduce((s, d) => s + d.deal_value, 0);
 
   /* Source ROI data */
   const sourceData = SOURCES.map((src) => {
@@ -690,7 +691,7 @@ export default function SalesPage() {
                   return Object.entries(lostReasons)
                     .sort((a, b) => b[1].count - a[1].count)
                     .map(([reason, data]) => {
-                      const pct = Math.round((data.count / DEMO_LOST_DEALS.length) * 100);
+                      const pct = Math.round((data.count / lostDeals.length) * 100);
                       const colors = reasonColors[reason] || defaultColor;
                       return (
                         <div key={reason} className="space-y-2">
@@ -712,8 +713,24 @@ export default function SalesPage() {
                     });
                 })()}
               </div>
-              <div className="mt-5 pt-4 border-t border-border">
+              <div className="mt-5 pt-4 border-t border-border space-y-3">
                 <p className="text-xs text-muted-foreground">آخر المبيعات الخاسرة</p>
+                {lostDeals.length === 0 ? (
+                  <p className="text-xs text-muted-foreground/60 text-center py-2">لا توجد صفقات خاسرة</p>
+                ) : (
+                  lostDeals.slice(0, 3).map((d) => (
+                    <div key={d.id} className="flex items-center justify-between bg-white/[0.02] rounded-xl p-3 border border-cc-red/10">
+                      <div>
+                        <p className="text-xs font-bold text-foreground">{d.client_name}</p>
+                        <p className="text-[10px] text-muted-foreground truncate max-w-[180px]">{d.notes || d.loss_reason || ""}</p>
+                        {d.loss_reason && (
+                          <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-cc-red/10 text-cc-red">{d.loss_reason}</span>
+                        )}
+                      </div>
+                      <span className="text-xs font-bold text-cc-red whitespace-nowrap">{formatMoney(d.deal_value)}-</span>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -760,7 +777,7 @@ export default function SalesPage() {
 
         {/* Tab: Full KPIs Dashboard */}
         <TabsContent value="kpis-full" className="space-y-6">
-          <SalesKPIsView deals={monthDeals} lostDeals={DEMO_LOST_DEALS} />
+          <SalesKPIsView deals={monthDeals} lostDeals={lostDeals} />
         </TabsContent>
 
         {/* Tab 2: Renewals link */}
