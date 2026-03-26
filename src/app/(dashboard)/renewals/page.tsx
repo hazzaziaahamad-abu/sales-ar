@@ -71,6 +71,12 @@ const STATUS_BADGE: Record<string, { text: string; color: string; bg: string }> 
   "انتظار الدفع": { text: "انتظار الدفع", color: "text-cc-purple", bg: "bg-purple-dim" },
   "مكتمل": { text: "مكتمل", color: "text-cc-green", bg: "bg-green-dim" },
   "ملغي بسبب": { text: "ملغي بسبب", color: "text-cc-red", bg: "bg-red-dim" },
+  "إيقاف مؤقت": { text: "إيقاف مؤقت", color: "text-amber", bg: "bg-amber-dim" },
+  "الرقم غلط": { text: "الرقم غلط", color: "text-cc-red", bg: "bg-red-dim" },
+  "مافي تجاوب": { text: "مافي تجاوب", color: "text-cc-red", bg: "bg-red-dim" },
+  "مؤجل مؤقتاً": { text: "مؤجل مؤقتاً", color: "text-cc-blue", bg: "bg-blue-dim" },
+  "تواصل وقت آخر": { text: "تواصل وقت آخر", color: "text-cc-purple", bg: "bg-purple-dim" },
+  "متردد": { text: "متردد", color: "text-amber", bg: "bg-amber-dim" },
 };
 
 /* ─── Empty form shape ─── */
