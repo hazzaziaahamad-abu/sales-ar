@@ -274,6 +274,35 @@ export interface PipPlan {
   updated_at: string;
 }
 
+export interface SalesGuideSetting {
+  id: string;
+  org_id: string;
+  setting_key: "pipeline_stages" | "activity_points" | "score_levels";
+  setting_value: PipelineStageItem[] | ActivityPointItem[] | ScoreLevelItem[];
+  updated_at: string;
+}
+
+export interface PipelineStageItem {
+  stage: string;
+  probability: number;
+  color: string;
+}
+
+export interface ActivityPointItem {
+  key: string;
+  label: string;
+  icon: string;
+  points: number;
+}
+
+export interface ScoreLevelItem {
+  value: string;
+  label: string;
+  emoji: string;
+  minPoints: number;
+  color: string;
+}
+
 export interface AppNotification {
   id: string;
   type: "urgent_ticket" | "overdue_project" | "high_workload" | "near_complete" | "negotiating" | "crud_action";

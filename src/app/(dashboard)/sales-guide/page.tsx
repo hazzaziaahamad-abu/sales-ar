@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect, useMemo } from "react";
-import type { SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, Employee } from "@/types";
+import type { SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, Employee, PipelineStageItem, ActivityPointItem, ScoreLevelItem } from "@/types";
 import {
   fetchSalesActivities,
   createSalesActivity,
@@ -15,15 +15,17 @@ import {
   createPipPlan,
   updatePipPlan,
   fetchEmployees,
+  fetchSalesGuideSettings,
+  upsertSalesGuideSetting,
 } from "@/lib/supabase/db";
 import { useAuth } from "@/lib/auth-context";
 import {
   ACTIVITY_TYPES,
   ACTIVITY_RESULTS,
-  SCORE_LEVELS,
-  ACTIVITY_POINTS,
+  SCORE_LEVELS as DEFAULT_SCORE_LEVELS,
+  ACTIVITY_POINTS as DEFAULT_ACTIVITY_POINTS,
   PIP_STATUSES,
-  PIPELINE_STAGES_GUIDE,
+  PIPELINE_STAGES_GUIDE as DEFAULT_PIPELINE_STAGES,
 } from "@/lib/utils/constants";
 import { formatMoneyFull, formatDate } from "@/lib/utils/format";
 import { StatCard } from "@/components/ui/stat-card";
@@ -125,6 +127,16 @@ export default function SalesGuidePage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
 
+  /* Guide settings from DB */
+  const [pipelineStages, setPipelineStages] = useState<PipelineStageItem[]>([...DEFAULT_PIPELINE_STAGES]);
+  const [activityPoints, setActivityPoints] = useState<ActivityPointItem[]>(
+    Object.entries(DEFAULT_ACTIVITY_POINTS).map(([key, points]) => {
+      const t = ACTIVITY_TYPES.find((at) => at.value === key);
+      return { key, label: t?.label || key, icon: t?.icon || "", points };
+    })
+  );
+  const [scoreLevels, setScoreLevels] = useState<ScoreLevelItem[]>([...DEFAULT_SCORE_LEVELS]);
+
   const [activityDialog, setActivityDialog] = useState(false);
   const [activityForm, setActivityForm] = useState(EMPTY_ACTIVITY);
   const [pipDialog, setPipDialog] = useState(false);
@@ -132,6 +144,22 @@ export default function SalesGuidePage() {
   const [targetDialog, setTargetDialog] = useState(false);
   const [editingTarget, setEditingTarget] = useState<SalesTarget | null>(null);
   const [targetForm, setTargetForm] = useState({ target_value: 0, min_value: 0 });
+
+  /* Pipeline edit state */
+  const [editingStageIdx, setEditingStageIdx] = useState<number | null>(null);
+  const [stageForm, setStageForm] = useState({ stage: "", probability: 0 });
+  const [stageDialog, setStageDialog] = useState(false);
+
+  /* Activity points edit state */
+  const [editingPointIdx, setEditingPointIdx] = useState<number | null>(null);
+  const [pointForm, setPointForm] = useState({ label: "", points: 0 });
+  const [pointDialog, setPointDialog] = useState(false);
+
+  /* Score level edit state */
+  const [editingLevelIdx, setEditingLevelIdx] = useState<number | null>(null);
+  const [levelForm, setLevelForm] = useState({ label: "", minPoints: 0 });
+  const [levelDialog, setLevelDialog] = useState(false);
+
   const [saving, setSaving] = useState(false);
 
   /* ─── Load data ─── */
@@ -141,18 +169,26 @@ export default function SalesGuidePage() {
 
   async function load() {
     setLoading(true);
-    const [a, t, s, p, e] = await Promise.allSettled([
+    const [a, t, s, p, e, gs] = await Promise.allSettled([
       fetchSalesActivities(),
       fetchSalesTargets(),
       fetchRepWeeklyScores(),
       fetchPipPlans(),
       fetchEmployees(),
+      fetchSalesGuideSettings(),
     ]);
     if (a.status === "fulfilled") setActivities(a.value);
     if (t.status === "fulfilled") setTargets(t.value);
     if (s.status === "fulfilled") setScores(s.value);
     if (p.status === "fulfilled") setPipPlans(p.value);
     if (e.status === "fulfilled") setEmployees(e.value);
+    if (gs.status === "fulfilled") {
+      for (const setting of gs.value) {
+        if (setting.setting_key === "pipeline_stages") setPipelineStages(setting.setting_value as PipelineStageItem[]);
+        if (setting.setting_key === "activity_points") setActivityPoints(setting.setting_value as ActivityPointItem[]);
+        if (setting.setting_key === "score_levels") setScoreLevels(setting.setting_value as ScoreLevelItem[]);
+      }
+    }
     setLoading(false);
   }
 
@@ -242,6 +278,75 @@ export default function SalesGuidePage() {
       setTargets((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
       setTargetDialog(false);
       setEditingTarget(null);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /* ─── Pipeline stage edit handlers ─── */
+  function openEditStage(idx: number) {
+    const s = pipelineStages[idx];
+    setEditingStageIdx(idx);
+    setStageForm({ stage: s.stage, probability: s.probability });
+    setStageDialog(true);
+  }
+
+  async function handleUpdateStage() {
+    if (editingStageIdx === null) return;
+    setSaving(true);
+    try {
+      const updated = pipelineStages.map((s, i) =>
+        i === editingStageIdx ? { ...s, stage: stageForm.stage, probability: stageForm.probability } : s
+      );
+      await upsertSalesGuideSetting("pipeline_stages", updated);
+      setPipelineStages(updated);
+      setStageDialog(false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /* ─── Activity points edit handlers ─── */
+  function openEditPoint(idx: number) {
+    const p = activityPoints[idx];
+    setEditingPointIdx(idx);
+    setPointForm({ label: p.label, points: p.points });
+    setPointDialog(true);
+  }
+
+  async function handleUpdatePoint() {
+    if (editingPointIdx === null) return;
+    setSaving(true);
+    try {
+      const updated = activityPoints.map((p, i) =>
+        i === editingPointIdx ? { ...p, label: pointForm.label, points: pointForm.points } : p
+      );
+      await upsertSalesGuideSetting("activity_points", updated);
+      setActivityPoints(updated);
+      setPointDialog(false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /* ─── Score level edit handlers ─── */
+  function openEditLevel(idx: number) {
+    const l = scoreLevels[idx];
+    setEditingLevelIdx(idx);
+    setLevelForm({ label: l.label, minPoints: l.minPoints });
+    setLevelDialog(true);
+  }
+
+  async function handleUpdateLevel() {
+    if (editingLevelIdx === null) return;
+    setSaving(true);
+    try {
+      const updated = scoreLevels.map((l, i) =>
+        i === editingLevelIdx ? { ...l, label: levelForm.label, minPoints: levelForm.minPoints } : l
+      );
+      await upsertSalesGuideSetting("score_levels", updated);
+      setScoreLevels(updated);
+      setLevelDialog(false);
     } finally {
       setSaving(false);
     }
@@ -614,9 +719,9 @@ export default function SalesGuidePage() {
             <h3 className="text-lg font-bold mb-6">دليل مراحل البيع</h3>
 
             <div className="space-y-4">
-              {PIPELINE_STAGES_GUIDE.map((stage, idx) => (
+              {pipelineStages.map((stage, idx) => (
                 <div
-                  key={stage.stage}
+                  key={idx}
                   className="flex items-center gap-4 rounded-2xl p-4 border border-white/6 bg-white/[0.02] hover:bg-white/[0.04] transition-colors"
                 >
                   <div className="w-10 h-10 rounded-2xl bg-white/[0.05] flex items-center justify-center text-lg font-bold text-muted-foreground">
@@ -642,6 +747,14 @@ export default function SalesGuidePage() {
                       />
                     </div>
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => openEditStage(idx)}
+                    className="w-7 h-7 p-0 text-muted-foreground hover:text-cyan"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </Button>
                 </div>
               ))}
             </div>
@@ -650,37 +763,33 @@ export default function SalesGuidePage() {
             <div className="mt-8">
               <h4 className="text-md font-bold mb-4">نظام النقاط</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {Object.entries(ACTIVITY_POINTS).map(([key, points]) => {
-                  const typeInfo = ACTIVITY_TYPES.find((t) => t.value === key);
-                  const labels: Record<string, string> = {
-                    call: "مكالمة",
-                    followup: "متابعة",
-                    whatsapp: "واتساب",
-                    meeting: "اجتماع",
-                    demo: "عرض Demo",
-                    quote: "عرض سعر",
-                    deal_closed: "إغلاق صفقة",
-                    stale_deal: "صفقة راكدة",
-                    slow_response: "رد بطيء",
-                  };
-                  return (
-                    <div
-                      key={key}
-                      className="flex items-center justify-between rounded-xl p-3 border border-white/6 bg-white/[0.02]"
-                    >
-                      <span className="text-sm">
-                        {typeInfo?.icon || ""} {labels[key] || key}
-                      </span>
+                {activityPoints.map((ap, idx) => (
+                  <div
+                    key={ap.key}
+                    className="flex items-center justify-between rounded-xl p-3 border border-white/6 bg-white/[0.02] hover:bg-white/[0.04] transition-colors"
+                  >
+                    <span className="text-sm">
+                      {ap.icon} {ap.label}
+                    </span>
+                    <div className="flex items-center gap-2">
                       <span
                         className={`text-sm font-bold ${
-                          points > 0 ? "text-cc-green" : "text-cc-red"
+                          ap.points > 0 ? "text-cc-green" : "text-cc-red"
                         }`}
                       >
-                        {points > 0 ? `+${points}` : points}
+                        {ap.points > 0 ? `+${ap.points}` : ap.points}
                       </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openEditPoint(idx)}
+                        className="w-7 h-7 p-0 text-muted-foreground hover:text-cyan"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
                     </div>
-                  );
-                })}
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -688,23 +797,28 @@ export default function SalesGuidePage() {
             <div className="mt-8">
               <h4 className="text-md font-bold mb-4">مستويات الأداء</h4>
               <div className="flex flex-wrap gap-3">
-                {SCORE_LEVELS.map((level) => {
-                  const badge = LEVEL_BADGE[level.value];
-                  return (
-                    <div
-                      key={level.value}
-                      className="flex items-center gap-2 rounded-xl p-3 border border-white/6 bg-white/[0.02]"
-                    >
-                      <span className="text-lg">{level.emoji}</span>
-                      <div>
-                        <p className="text-sm font-bold">{level.label}</p>
-                        <p className="text-[10px] text-muted-foreground">
-                          {level.minPoints}+ نقطة
-                        </p>
-                      </div>
+                {scoreLevels.map((level, idx) => (
+                  <div
+                    key={level.value}
+                    className="flex items-center gap-2 rounded-xl p-3 border border-white/6 bg-white/[0.02] hover:bg-white/[0.04] transition-colors"
+                  >
+                    <span className="text-lg">{level.emoji}</span>
+                    <div>
+                      <p className="text-sm font-bold">{level.label}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {level.minPoints}+ نقطة
+                      </p>
                     </div>
-                  );
-                })}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => openEditLevel(idx)}
+                      className="w-7 h-7 p-0 text-muted-foreground hover:text-cyan mr-1"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -909,6 +1023,115 @@ export default function SalesGuidePage() {
           <DialogFooter>
             <Button variant="ghost" onClick={() => setTargetDialog(false)}>إلغاء</Button>
             <Button onClick={handleUpdateTarget} disabled={saving}>
+              {saving ? "جارٍ الحفظ..." : "حفظ التعديلات"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Edit Pipeline Stage Dialog ─── */}
+      <Dialog open={stageDialog} onOpenChange={setStageDialog}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>تعديل مرحلة البيع</DialogTitle>
+            <DialogDescription>تعديل اسم المرحلة واحتمالية الإغلاق</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>اسم المرحلة</Label>
+              <Input
+                value={stageForm.stage}
+                onChange={(e) => setStageForm({ ...stageForm, stage: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>احتمالية الإغلاق %</Label>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                value={stageForm.probability}
+                onChange={(e) => setStageForm({ ...stageForm, probability: Number(e.target.value) || 0 })}
+                dir="ltr"
+                className="text-right"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setStageDialog(false)}>إلغاء</Button>
+            <Button onClick={handleUpdateStage} disabled={saving}>
+              {saving ? "جارٍ الحفظ..." : "حفظ التعديلات"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Edit Activity Points Dialog ─── */}
+      <Dialog open={pointDialog} onOpenChange={setPointDialog}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>تعديل النقاط</DialogTitle>
+            <DialogDescription>تعديل اسم النشاط وعدد النقاط</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>اسم النشاط</Label>
+              <Input
+                value={pointForm.label}
+                onChange={(e) => setPointForm({ ...pointForm, label: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>النقاط</Label>
+              <Input
+                type="number"
+                value={pointForm.points}
+                onChange={(e) => setPointForm({ ...pointForm, points: Number(e.target.value) })}
+                dir="ltr"
+                className="text-right"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">استخدم قيمة سالبة للخصم (مثل: -10)</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPointDialog(false)}>إلغاء</Button>
+            <Button onClick={handleUpdatePoint} disabled={saving}>
+              {saving ? "جارٍ الحفظ..." : "حفظ التعديلات"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Edit Score Level Dialog ─── */}
+      <Dialog open={levelDialog} onOpenChange={setLevelDialog}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>تعديل مستوى الأداء</DialogTitle>
+            <DialogDescription>تعديل اسم المستوى والحد الأدنى من النقاط</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>اسم المستوى</Label>
+              <Input
+                value={levelForm.label}
+                onChange={(e) => setLevelForm({ ...levelForm, label: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>الحد الأدنى من النقاط</Label>
+              <Input
+                type="number"
+                min={0}
+                value={levelForm.minPoints}
+                onChange={(e) => setLevelForm({ ...levelForm, minPoints: Number(e.target.value) || 0 })}
+                dir="ltr"
+                className="text-right"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setLevelDialog(false)}>إلغاء</Button>
+            <Button onClick={handleUpdateLevel} disabled={saving}>
               {saving ? "جارٍ الحفظ..." : "حفظ التعديلات"}
             </Button>
           </DialogFooter>

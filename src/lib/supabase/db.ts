@@ -1,5 +1,5 @@
 import { createClient } from "./client";
-import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan } from "@/types";
+import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting } from "@/types";
 
 const DEFAULT_ORG = "00000000-0000-0000-0000-000000000001";
 
@@ -590,4 +590,33 @@ export async function updatePipPlan(
     .single();
   if (error) throw error;
   return data as PipPlan;
+}
+
+// ─── SALES GUIDE SETTINGS ──────────────────────────────────────────────────
+
+export async function fetchSalesGuideSettings(): Promise<SalesGuideSetting[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("sales_guide_settings")
+    .select("*")
+    .eq("org_id", getOrgId());
+  if (error) throw error;
+  return (data ?? []) as SalesGuideSetting[];
+}
+
+export async function upsertSalesGuideSetting(
+  setting_key: string,
+  setting_value: unknown
+): Promise<SalesGuideSetting> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("sales_guide_settings")
+    .upsert(
+      { setting_key, setting_value, org_id: getOrgId(), updated_at: new Date().toISOString() },
+      { onConflict: "org_id,setting_key" }
+    )
+    .select()
+    .single();
+  if (error) throw error;
+  return data as SalesGuideSetting;
 }
