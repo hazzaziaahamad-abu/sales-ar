@@ -677,6 +677,34 @@ export default function SalesGuidePage() {
                     weekly: "أسبوعي",
                     monthly: "شهري",
                   };
+
+                  // Calculate actual achieved value
+                  const actual = (() => {
+                    const keyToTypes: Record<string, string[]> = {
+                      calls: ["call", "whatsapp"],
+                      followups: ["followup"],
+                      demos: ["demo"],
+                      quotes: ["quote"],
+                    };
+                    const types = keyToTypes[t.target_key];
+                    if (!types) return 0;
+
+                    if (t.period_type === "daily") {
+                      return todayActivities.filter((a) => types.includes(a.activity_type)).length;
+                    } else if (t.period_type === "weekly") {
+                      return weekActivities.filter((a) => types.includes(a.activity_type)).length;
+                    } else {
+                      // monthly
+                      const now = new Date();
+                      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
+                      return activities.filter((a) => a.activity_date >= monthStart && types.includes(a.activity_type)).length;
+                    }
+                  })();
+
+                  const pct = t.target_value > 0 ? Math.min(Math.round((actual / t.target_value) * 100), 100) : 0;
+                  const isAboveMin = actual >= t.min_value;
+                  const isAboveTarget = actual >= t.target_value;
+
                   return (
                     <div
                       key={t.id}
@@ -699,7 +727,9 @@ export default function SalesGuidePage() {
                           </Button>
                         </div>
                       </div>
-                      <div className="flex items-end gap-3 mt-3">
+
+                      {/* Values row */}
+                      <div className="flex items-end gap-4 mt-3">
                         <div>
                           <p className="text-[10px] text-muted-foreground">الهدف</p>
                           <p className="text-xl font-extrabold text-cc-green">{t.target_value.toLocaleString()}</p>
@@ -708,6 +738,27 @@ export default function SalesGuidePage() {
                           <p className="text-[10px] text-muted-foreground">الحد الأدنى</p>
                           <p className="text-xl font-extrabold text-amber">{t.min_value.toLocaleString()}</p>
                         </div>
+                        <div>
+                          <p className="text-[10px] text-muted-foreground">المتحقق</p>
+                          <p className={`text-xl font-extrabold ${isAboveTarget ? "text-cc-green" : isAboveMin ? "text-cyan" : "text-cc-red"}`}>
+                            {actual.toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="mr-auto">
+                          <span className={`text-lg font-extrabold ${isAboveTarget ? "text-cc-green" : isAboveMin ? "text-cyan" : "text-cc-red"}`}>
+                            {pct}%
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Progress bar */}
+                      <div className="mt-3 w-full h-2 bg-white/[0.05] rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${
+                            isAboveTarget ? "bg-cc-green" : isAboveMin ? "bg-cyan" : "bg-cc-red"
+                          }`}
+                          style={{ width: `${pct}%` }}
+                        />
                       </div>
                     </div>
                   );
