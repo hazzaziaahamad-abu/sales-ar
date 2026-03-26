@@ -186,6 +186,19 @@ export interface Referral {
   updated_at: string;
 }
 
+export interface MonthlyExpense {
+  id: string;
+  org_id: string;
+  category: string;
+  amount: number;
+  description?: string;
+  expense_date: string;
+  month: number;
+  year: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Alert {
   id: string;
   org_id: string;

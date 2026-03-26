@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { Deal, Renewal } from "@/types";
-import { fetchDeals, fetchRenewals } from "@/lib/supabase/db";
+import type { Deal, Renewal, MonthlyExpense } from "@/types";
+import { fetchDeals, fetchRenewals, fetchMonthlyExpenses, createExpense, deleteExpense } from "@/lib/supabase/db";
 import { useAuth } from "@/lib/auth-context";
 import { MONTHS_AR, SOURCE_COLORS } from "@/lib/utils/constants";
 import { formatMoney, formatMoneyFull } from "@/lib/utils/format";
@@ -10,11 +10,25 @@ import { StatCard } from "@/components/ui/stat-card";
 import { DonutChart } from "@/components/ui/donut-chart";
 import { BarChart } from "@/components/ui/bar-chart";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import {
   Banknote,
   TrendingUp,
   Target,
   BarChart3,
+  Plus,
+  Trash2,
+  Receipt,
 } from "lucide-react";
 
 /* CSS variable color → hex for donut chart */
@@ -32,18 +46,53 @@ export default function FinancePage() {
   const { activeOrgId: orgId } = useAuth();
   const [deals, setDeals] = useState<Deal[]>([]);
   const [renewals, setRenewals] = useState<Renewal[]>([]);
+  const [expenses, setExpenses] = useState<MonthlyExpense[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expenseDialog, setExpenseDialog] = useState(false);
+  const [expenseForm, setExpenseForm] = useState({ category: "", amount: "", description: "" });
+  const [savingExpense, setSavingExpense] = useState(false);
+
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([fetchDeals(), fetchRenewals()])
-      .then(([d, r]) => {
+    Promise.all([fetchDeals(), fetchRenewals(), fetchMonthlyExpenses(currentMonth, currentYear)])
+      .then(([d, r, e]) => {
         setDeals(d);
         setRenewals(r);
+        setExpenses(e);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [orgId]);
+
+  async function handleAddExpense() {
+    if (!expenseForm.category.trim() || !expenseForm.amount) return;
+    setSavingExpense(true);
+    try {
+      const created = await createExpense({
+        category: expenseForm.category.trim(),
+        amount: parseFloat(expenseForm.amount),
+        description: expenseForm.description.trim() || undefined,
+        expense_date: now.toISOString().split("T")[0],
+        month: currentMonth,
+        year: currentYear,
+      });
+      setExpenses((prev) => [created, ...prev].sort((a, b) => b.amount - a.amount));
+      setExpenseForm({ category: "", amount: "", description: "" });
+      setExpenseDialog(false);
+    } catch (err) {
+      console.error(err);
+    }
+    setSavingExpense(false);
+  }
+
+  async function handleDeleteExpense(id: string) {
+    await deleteExpense(id);
+    setExpenses((prev) => prev.filter((e) => e.id !== id));
+  }
 
   /* ─── Computed Metrics ─── */
   const closedDeals = deals.filter((d) => d.stage === "مكتملة");
@@ -52,9 +101,6 @@ export default function FinancePage() {
   const avgDealValue = closedDeals.length > 0 ? Math.round(totalRevenue / closedDeals.length) : 0;
 
   /* MRR: current month closed deals + active renewals plan_price */
-  const now = new Date();
-  const currentMonth = now.getMonth() + 1;
-  const currentYear = now.getFullYear();
 
   const currentMonthRevenue = closedDeals
     .filter((d) => d.month === currentMonth && d.year === currentYear)
@@ -257,6 +303,176 @@ export default function FinancePage() {
           )}
         </div>
       </div>
+
+      {/* ─── Monthly Expenses Section ─── */}
+      <div className="cc-card rounded-xl p-5">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <Receipt className="w-5 h-5 text-cc-red" />
+            <h3 className="text-sm font-bold text-foreground">المصاريف الشهرية — {MONTHS_AR[currentMonth - 1]} {currentYear}</h3>
+          </div>
+          <Button size="sm" onClick={() => setExpenseDialog(true)} className="gap-1.5">
+            <Plus className="w-4 h-4" /> إضافة مصروف
+          </Button>
+        </div>
+
+        {loading ? (
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-lg" />)}
+          </div>
+        ) : expenses.length === 0 ? (
+          <div className="text-center py-10 text-muted-foreground">
+            <Receipt className="w-12 h-12 mx-auto mb-3 opacity-30" />
+            <p>لا توجد مصاريف مسجلة لهذا الشهر</p>
+            <p className="text-sm mt-1">أضف أول مصروف لتتبع النفقات</p>
+          </div>
+        ) : (
+          <>
+            {/* Summary cards */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-5">
+              <div className="p-3 rounded-lg bg-cc-red/10 border border-cc-red/20 text-center">
+                <p className="text-xl font-bold text-cc-red">{formatMoney(expenses.reduce((s, e) => s + e.amount, 0))}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">إجمالي المصاريف</p>
+              </div>
+              <div className="p-3 rounded-lg bg-amber/10 border border-amber/20 text-center">
+                <p className="text-xl font-bold text-amber">{expenses.length}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">عدد الأصناف</p>
+              </div>
+              <div className="p-3 rounded-lg bg-cyan/10 border border-cyan/20 text-center">
+                <p className="text-xl font-bold text-cyan">
+                  {formatMoney(totalRevenue > 0 ? totalRevenue - expenses.reduce((s, e) => s + e.amount, 0) : 0)}
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">صافي الربح</p>
+              </div>
+            </div>
+
+            {/* Expense items sorted by amount (highest first) */}
+            <div className="space-y-2">
+              {(() => {
+                const maxAmount = Math.max(...expenses.map((e) => e.amount), 1);
+                const sorted = [...expenses].sort((a, b) => b.amount - a.amount);
+                return sorted.map((exp, idx) => {
+                  const pct = Math.round((exp.amount / maxAmount) * 100);
+                  // Color gradient: top items red → middle amber → bottom green
+                  const ratio = sorted.length > 1 ? idx / (sorted.length - 1) : 0;
+                  let barColor = "bg-cc-red";
+                  let textColor = "text-cc-red";
+                  if (ratio > 0.6) {
+                    barColor = "bg-cc-green";
+                    textColor = "text-cc-green";
+                  } else if (ratio > 0.3) {
+                    barColor = "bg-amber";
+                    textColor = "text-amber";
+                  }
+
+                  const totalExp = expenses.reduce((s, e) => s + e.amount, 0);
+                  const expPct = totalExp > 0 ? Math.round((exp.amount / totalExp) * 100) : 0;
+
+                  return (
+                    <div key={exp.id} className="group relative bg-white/[0.02] rounded-xl p-3 border border-white/[0.06] hover:border-white/[0.1] transition-colors">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <span className={`text-xs font-bold ${textColor} w-8 shrink-0`}>#{idx + 1}</span>
+                          <span className="text-sm font-semibold text-foreground truncate">{exp.category}</span>
+                          {exp.description && (
+                            <span className="text-[10px] text-muted-foreground truncate hidden sm:inline">— {exp.description}</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className={`text-sm font-bold ${textColor}`}>{formatMoney(exp.amount)}</span>
+                          <span className="text-[10px] text-muted-foreground">{expPct}%</span>
+                          <button
+                            onClick={() => handleDeleteExpense(exp.id)}
+                            className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-cc-red/10 text-muted-foreground hover:text-cc-red transition-all"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="h-2 bg-white/[0.04] rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full ${barColor} transition-all`} style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+
+            {/* Category breakdown donut */}
+            {expenses.length >= 2 && (
+              <div className="mt-5 pt-5 border-t border-border">
+                <h4 className="text-xs font-bold text-muted-foreground mb-3">توزيع المصاريف حسب الصنف</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                  {(() => {
+                    const catMap: Record<string, number> = {};
+                    expenses.forEach((e) => { catMap[e.category] = (catMap[e.category] || 0) + e.amount; });
+                    const totalExp = expenses.reduce((s, e) => s + e.amount, 0);
+                    const cats = Object.entries(catMap).sort((a, b) => b[1] - a[1]);
+                    const catColors = ["#EF4444", "#F59E0B", "#8B5CF6", "#00D4FF", "#10B981", "#EC4899", "#3B82F6"];
+                    return cats.map(([cat, val], i) => {
+                      const pct = totalExp > 0 ? Math.round((val / totalExp) * 100) : 0;
+                      const color = catColors[i % catColors.length];
+                      return (
+                        <div key={cat} className="p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.06] text-center">
+                          <div className="w-3 h-3 rounded-full mx-auto mb-1.5" style={{ backgroundColor: color }} />
+                          <p className="text-[11px] font-semibold text-foreground truncate">{cat}</p>
+                          <p className="text-xs font-bold mt-0.5" style={{ color }}>{formatMoney(val)}</p>
+                          <p className="text-[10px] text-muted-foreground">{pct}%</p>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* ─── Add Expense Dialog ─── */}
+      <Dialog open={expenseDialog} onOpenChange={setExpenseDialog}>
+        <DialogContent className="max-w-md" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>إضافة مصروف</DialogTitle>
+            <DialogDescription>سجل مصروف جديد للشهر الحالي</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-3">
+            <div className="grid gap-1.5">
+              <Label>الصنف / الفئة</Label>
+              <Input
+                value={expenseForm.category}
+                onChange={(e) => setExpenseForm({ ...expenseForm, category: e.target.value })}
+                placeholder="مثال: رواتب، إيجار، تسويق..."
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>المبلغ (ر.س)</Label>
+              <Input
+                type="number"
+                value={expenseForm.amount}
+                onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
+                placeholder="0"
+                dir="ltr"
+                className="text-right"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>وصف (اختياري)</Label>
+              <Input
+                value={expenseForm.description}
+                onChange={(e) => setExpenseForm({ ...expenseForm, description: e.target.value })}
+                placeholder="تفاصيل إضافية..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExpenseDialog(false)}>إلغاء</Button>
+            <Button onClick={handleAddExpense} disabled={savingExpense || !expenseForm.category.trim() || !expenseForm.amount}>
+              {savingExpense ? "جاري الحفظ..." : "إضافة"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

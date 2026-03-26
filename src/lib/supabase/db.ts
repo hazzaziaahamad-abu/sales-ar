@@ -1,5 +1,5 @@
 import { createClient } from "./client";
-import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating } from "@/types";
+import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating } from "@/types";
 
 const DEFAULT_ORG = "00000000-0000-0000-0000-000000000001";
 
@@ -877,4 +877,55 @@ export async function fetchWeeklyReferralStats(): Promise<{
   const convRate = refs.length > 0 ? Math.round((convertedCount / refs.length) * 100) : 0;
 
   return { active, newRefs, converted: convertedCount, rewards, convRate };
+}
+
+// ─── Monthly Expenses ──────────────────────────────────────────────────────
+
+export async function fetchMonthlyExpenses(month?: number, year?: number): Promise<MonthlyExpense[]> {
+  const supabase = createClient();
+  let query = supabase
+    .from("monthly_expenses")
+    .select("*")
+    .eq("org_id", getOrgId())
+    .order("amount", { ascending: false });
+
+  if (month !== undefined && year !== undefined) {
+    query = query.eq("month", month).eq("year", year);
+  }
+
+  const { data } = await query;
+  return (data || []) as MonthlyExpense[];
+}
+
+export async function createExpense(
+  expense: Omit<MonthlyExpense, "id" | "org_id" | "created_at" | "updated_at">
+): Promise<MonthlyExpense> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("monthly_expenses")
+    .insert({ ...expense, org_id: getOrgId() })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as MonthlyExpense;
+}
+
+export async function updateExpense(
+  id: string,
+  expense: Partial<Omit<MonthlyExpense, "id" | "org_id">>
+): Promise<MonthlyExpense> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("monthly_expenses")
+    .update({ ...expense, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as MonthlyExpense;
+}
+
+export async function deleteExpense(id: string): Promise<void> {
+  const supabase = createClient();
+  await supabase.from("monthly_expenses").delete().eq("id", id);
 }
