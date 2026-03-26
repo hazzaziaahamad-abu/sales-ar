@@ -70,6 +70,7 @@ import {
   Users,
   ArrowUpDown,
   ArrowRight,
+  Pencil,
 } from "lucide-react";
 
 /* ─── Color helpers ─── */
@@ -128,6 +129,9 @@ export default function SalesGuidePage() {
   const [activityForm, setActivityForm] = useState(EMPTY_ACTIVITY);
   const [pipDialog, setPipDialog] = useState(false);
   const [pipForm, setPipForm] = useState(EMPTY_PIP);
+  const [targetDialog, setTargetDialog] = useState(false);
+  const [editingTarget, setEditingTarget] = useState<SalesTarget | null>(null);
+  const [targetForm, setTargetForm] = useState({ target_value: 0, min_value: 0 });
   const [saving, setSaving] = useState(false);
 
   /* ─── Load data ─── */
@@ -216,6 +220,31 @@ export default function SalesGuidePage() {
   async function handleUpdatePipStatus(id: string, status: PipPlan["status"]) {
     const updated = await updatePipPlan(id, { status });
     setPipPlans((prev) => prev.map((p) => (p.id === id ? updated : p)));
+  }
+
+  function openEditTarget(target: SalesTarget) {
+    setEditingTarget(target);
+    setTargetForm({ target_value: target.target_value, min_value: target.min_value });
+    setTargetDialog(true);
+  }
+
+  async function handleUpdateTarget() {
+    if (!editingTarget) return;
+    setSaving(true);
+    try {
+      const updated = await upsertSalesTarget({
+        period_type: editingTarget.period_type,
+        target_key: editingTarget.target_key,
+        target_value: targetForm.target_value,
+        min_value: targetForm.min_value,
+        label_ar: editingTarget.label_ar,
+      });
+      setTargets((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      setTargetDialog(false);
+      setEditingTarget(null);
+    } finally {
+      setSaving(false);
+    }
   }
 
   /* ─── Loading skeleton ─── */
@@ -448,14 +477,24 @@ export default function SalesGuidePage() {
                   return (
                     <div
                       key={t.id}
-                      className="rounded-2xl p-4 border border-white/6 bg-white/[0.02]"
+                      className="rounded-2xl p-4 border border-white/6 bg-white/[0.02] hover:bg-white/[0.04] transition-colors"
                     >
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-bold text-foreground">{t.label_ar || t.target_key}</span>
-                        <ColorBadge
-                          text={periodLabels[t.period_type] || t.period_type}
-                          color={t.period_type === "daily" ? "cyan" : t.period_type === "weekly" ? "amber" : "purple"}
-                        />
+                        <div className="flex items-center gap-2">
+                          <ColorBadge
+                            text={periodLabels[t.period_type] || t.period_type}
+                            color={t.period_type === "daily" ? "cyan" : t.period_type === "weekly" ? "amber" : "purple"}
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openEditTarget(t)}
+                            className="w-7 h-7 p-0 text-muted-foreground hover:text-cyan"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
                       </div>
                       <div className="flex items-end gap-3 mt-3">
                         <div>
@@ -831,6 +870,46 @@ export default function SalesGuidePage() {
             <Button variant="ghost" onClick={() => setPipDialog(false)}>إلغاء</Button>
             <Button onClick={handleCreatePip} disabled={saving || !pipForm.employee_name || !pipForm.end_date}>
               {saving ? "جارٍ الحفظ..." : "إنشاء الخطة"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Edit Target Dialog ─── */}
+      <Dialog open={targetDialog} onOpenChange={setTargetDialog}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>تعديل الهدف</DialogTitle>
+            <DialogDescription>
+              {editingTarget?.label_ar || editingTarget?.target_key}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>الهدف</Label>
+              <Input
+                type="number"
+                value={targetForm.target_value || ""}
+                onChange={(e) => setTargetForm({ ...targetForm, target_value: Number(e.target.value) || 0 })}
+                dir="ltr"
+                className="text-right"
+              />
+            </div>
+            <div>
+              <Label>الحد الأدنى</Label>
+              <Input
+                type="number"
+                value={targetForm.min_value || ""}
+                onChange={(e) => setTargetForm({ ...targetForm, min_value: Number(e.target.value) || 0 })}
+                dir="ltr"
+                className="text-right"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setTargetDialog(false)}>إلغاء</Button>
+            <Button onClick={handleUpdateTarget} disabled={saving}>
+              {saving ? "جارٍ الحفظ..." : "حفظ التعديلات"}
             </Button>
           </DialogFooter>
         </DialogContent>
