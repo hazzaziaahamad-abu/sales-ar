@@ -462,7 +462,8 @@ export default function SalesGuidePage() {
                     {activities.slice(0, 50).map((a) => {
                       const typeInfo = ACTIVITY_TYPES.find((t) => t.value === a.activity_type);
                       const resultInfo = a.result ? RESULT_BADGE[a.result] : null;
-                      const points = ACTIVITY_POINTS[a.activity_type] ?? 0;
+                      const ap = activityPoints.find((p) => p.key === a.activity_type);
+                      const points = ap?.points ?? 0;
                       return (
                         <TableRow key={a.id}>
                           <TableCell className="text-xs">{formatDate(a.activity_date)}</TableCell>
@@ -527,7 +528,7 @@ export default function SalesGuidePage() {
               <div className="space-y-3">
                 {scores.map((s, idx) => {
                   const levelInfo = s.level ? LEVEL_BADGE[s.level] : null;
-                  const emoji = SCORE_LEVELS.find((l) => l.value === s.level)?.emoji || "";
+                  const emoji = scoreLevels.find((l) => l.value === s.level)?.emoji || "";
                   return (
                     <div
                       key={s.id}
