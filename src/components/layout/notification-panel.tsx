@@ -28,6 +28,7 @@ const SECTION_PATH: Record<string, string> = {
   development: "/development",
   team: "/team",
   sales: "/sales",
+  "sales-guide": "/sales-guide",
   partnerships: "/partnerships",
   renewals: "/renewals",
   satisfaction: "/satisfaction",

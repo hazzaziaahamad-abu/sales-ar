@@ -12,6 +12,7 @@ import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { OrgProvider } from "@/lib/org-context";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DEMO_TICKETS, DEMO_PROJECTS, DEMO_PARTNERSHIPS } from "@/lib/demo-data";
+import { fetchDeals, fetchSalesTargets, fetchSalesActivities, fetchTickets } from "@/lib/supabase/db";
 import type { AppNotification } from "@/types";
 
 const PAGE_SLUG_MAP: Record<string, string> = {
@@ -69,11 +70,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function generateNotifications(): AppNotification[] {
+function generateDemoNotifications(): AppNotification[] {
   const now = new Date().toISOString();
   const notifications: AppNotification[] = [];
 
-  // Urgent tickets
+  // Urgent tickets (demo)
   DEMO_TICKETS.filter((t) => t.priority === "عاجل" && t.status !== "محلول").forEach((t) => {
     notifications.push({
       id: `notif-ticket-${t.id}`,
@@ -128,6 +129,124 @@ function generateNotifications(): AppNotification[] {
   return notifications;
 }
 
+async function generateLiveNotifications(): Promise<AppNotification[]> {
+  const now = new Date().toISOString();
+  const notifications: AppNotification[] = [];
+
+  try {
+    const [deals, targets, activities, tickets] = await Promise.allSettled([
+      fetchDeals(),
+      fetchSalesTargets(),
+      fetchSalesActivities(),
+      fetchTickets(),
+    ]);
+
+    // Unsolved urgent tickets from DB
+    if (tickets.status === "fulfilled") {
+      tickets.value
+        .filter((t) => t.priority === "عاجل" && t.status !== "محلول")
+        .forEach((t) => {
+          notifications.push({
+            id: `live-ticket-${t.id}`,
+            type: "urgent_ticket",
+            icon: "🚨",
+            message: `تذكرة عاجلة لم تُغلق: "${t.issue}" من ${t.client_name}`,
+            section: "support",
+            timestamp: now,
+            isRead: false,
+          });
+        });
+
+      // Open tickets older than 3 days
+      tickets.value
+        .filter((t) => {
+          if (t.status === "محلول") return false;
+          const created = new Date(t.created_at);
+          const diffDays = (Date.now() - created.getTime()) / (1000 * 60 * 60 * 24);
+          return diffDays > 3;
+        })
+        .forEach((t) => {
+          notifications.push({
+            id: `live-old-ticket-${t.id}`,
+            type: "urgent_ticket",
+            icon: "⚠️",
+            message: `تذكرة مفتوحة منذ أكثر من 3 أيام: "${t.issue}"`,
+            section: "support",
+            timestamp: now,
+            isRead: false,
+          });
+        });
+    }
+
+    // Stale deals (stuck in pipeline > 14 days)
+    if (deals.status === "fulfilled") {
+      deals.value
+        .filter((d) => {
+          if (d.stage === "مكتملة" || d.stage === "مرفوض مع سبب") return false;
+          return d.cycle_days > 14;
+        })
+        .slice(0, 5)
+        .forEach((d) => {
+          notifications.push({
+            id: `live-stale-deal-${d.id}`,
+            type: "urgent_ticket",
+            icon: "⏳",
+            message: `صفقة راكدة: "${d.client_name}" — ${d.cycle_days} يوم في مرحلة ${d.stage}`,
+            section: "sales",
+            timestamp: now,
+            isRead: false,
+          });
+        });
+
+      // High-value deals awaiting payment
+      deals.value
+        .filter((d) => d.stage === "انتظار الدفع" && d.deal_value >= 30000)
+        .forEach((d) => {
+          notifications.push({
+            id: `live-payment-${d.id}`,
+            type: "urgent_ticket",
+            icon: "💰",
+            message: `صفقة بانتظار الدفع: "${d.client_name}" — ${d.deal_value.toLocaleString()} ر.س`,
+            section: "sales",
+            timestamp: now,
+            isRead: false,
+          });
+        });
+    }
+
+    // Unmet daily targets
+    if (targets.status === "fulfilled" && activities.status === "fulfilled") {
+      const todayStr = new Date().toISOString().split("T")[0];
+      const todayActivities = activities.value.filter((a) => a.activity_date === todayStr);
+
+      const dailyTargets = targets.value.filter((t) => t.period_type === "daily");
+      dailyTargets.forEach((t) => {
+        let actual = 0;
+        if (t.target_key === "calls") {
+          actual = todayActivities.filter((a) => a.activity_type === "call").length;
+        } else if (t.target_key === "followups") {
+          actual = todayActivities.filter((a) => a.activity_type === "followup").length;
+        }
+        if (actual < t.min_value && t.min_value > 0) {
+          notifications.push({
+            id: `live-target-${t.id}`,
+            type: "urgent_ticket",
+            icon: "🎯",
+            message: `هدف لم يتحقق: ${t.label_ar || t.target_key} — ${actual}/${t.min_value} (الحد الأدنى)`,
+            section: "sales-guide",
+            timestamp: now,
+            isRead: false,
+          });
+        }
+      });
+    }
+  } catch {
+    // Silently fail — demo notifications will still show
+  }
+
+  return notifications;
+}
+
 export default function DashboardLayout({
   children,
 }: {
@@ -137,7 +256,20 @@ export default function DashboardLayout({
   const router = useRouter();
   const [notifOpen, setNotifOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [notifications, setNotifications] = useState<AppNotification[]>(() => generateNotifications());
+  const [notifications, setNotifications] = useState<AppNotification[]>(() => generateDemoNotifications());
+
+  // Load live notifications from DB
+  useEffect(() => {
+    generateLiveNotifications().then((live) => {
+      if (live.length > 0) {
+        setNotifications((prev) => {
+          const existingIds = new Set(prev.map((n) => n.id));
+          const newOnes = live.filter((n) => !existingIds.has(n.id));
+          return [...newOnes, ...prev];
+        });
+      }
+    });
+  }, []);
 
   const unreadCount = useMemo(() => notifications.filter((n) => !n.isRead).length, [notifications]);
 
