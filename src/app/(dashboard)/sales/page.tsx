@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import type { Deal, Marketer } from "@/types";
-import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers } from "@/lib/supabase/db";
+import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createFollowUpNote } from "@/lib/supabase/db";
 import { useAuth } from "@/lib/auth-context";
 import { useTopbarControls } from "@/components/layout/topbar-context";
 import { STAGES, SOURCES, SOURCE_COLORS, PLANS } from "@/lib/utils/constants";
@@ -105,7 +105,7 @@ const EMPTY_FORM = {
 };
 
 export default function SalesPage() {
-  const { activeOrgId: orgId } = useAuth();
+  const { activeOrgId: orgId, user: authUser } = useAuth();
   const [deals, setDeals] = useState<Deal[]>([]);
   const [marketers, setMarketers] = useState<Marketer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -430,6 +430,7 @@ export default function SalesPage() {
       const marketerName = form.source === "تسويق بالعمولة" ? form.marketer_name : undefined;
 
       if (editingId) {
+        const oldDeal = deals.find((d) => d.id === editingId);
         const updated = await updateDeal(editingId, {
           client_name: form.client_name,
           client_phone: form.client_phone,
@@ -445,6 +446,21 @@ export default function SalesPage() {
           year,
         });
         setDeals((prev) => prev.map((d) => (d.id === editingId ? updated : d)));
+
+        /* Auto-track changes */
+        if (oldDeal) {
+          const author = authUser?.name || "النظام";
+          const changes: string[] = [];
+          if (oldDeal.stage !== form.stage) changes.push(`المرحلة: ${oldDeal.stage} ← ${form.stage}`);
+          if (oldDeal.deal_value !== form.deal_value) changes.push(`القيمة: ${oldDeal.deal_value} ← ${form.deal_value} ر.س`);
+          if (oldDeal.probability !== form.probability) changes.push(`الاحتمالية: ${oldDeal.probability}% ← ${form.probability}%`);
+          if ((oldDeal.assigned_rep_name || "") !== form.assigned_rep_name) changes.push(`المسؤول: ${oldDeal.assigned_rep_name || "—"} ← ${form.assigned_rep_name || "—"}`);
+          if ((oldDeal.plan || "") !== (form.plan || "")) changes.push(`الباقة: ${oldDeal.plan || "—"} ← ${form.plan || "—"}`);
+          if ((oldDeal.source || "") !== form.source) changes.push(`المصدر: ${oldDeal.source || "—"} ← ${form.source}`);
+          if (changes.length > 0) {
+            createFollowUpNote("deal", editingId, `📝 تحديث تلقائي:\n${changes.join("\n")}`, author).catch(console.error);
+          }
+        }
       } else {
         const created = await createDeal({
           client_name: form.client_name,
