@@ -13,6 +13,7 @@ export interface Deal {
   deal_date?: string;
   close_date?: string;
   plan?: string;
+  marketer_name?: string;
   loss_reason?: string;
   notes?: string;
   month?: number;
@@ -195,6 +196,18 @@ export interface MonthlyExpense {
   expense_date: string;
   month: number;
   year: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Marketer {
+  id: string;
+  org_id: string;
+  name: string;
+  phone?: string;
+  commission_rate: number;
+  is_active: boolean;
+  notes?: string;
   created_at: string;
   updated_at: string;
 }

@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import type { Deal } from "@/types";
-import { fetchDeals, createDeal, updateDeal, deleteDeal } from "@/lib/supabase/db";
+import type { Deal, Marketer } from "@/types";
+import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers } from "@/lib/supabase/db";
 import { useAuth } from "@/lib/auth-context";
 import { useTopbarControls } from "@/components/layout/topbar-context";
 import { STAGES, SOURCES, SOURCE_COLORS, PLANS } from "@/lib/utils/constants";
@@ -97,11 +97,13 @@ const EMPTY_FORM = {
   plan: "",
   deal_date: new Date().toISOString().slice(0, 10),
   probability: 50,
+  marketer_name: "",
 };
 
 export default function SalesPage() {
   const { activeOrgId: orgId } = useAuth();
   const [deals, setDeals] = useState<Deal[]>([]);
+  const [marketers, setMarketers] = useState<Marketer[]>([]);
   const [loading, setLoading] = useState(true);
 
   /* modal state */
@@ -132,8 +134,10 @@ export default function SalesPage() {
 
   useEffect(() => {
     setLoading(true);
-    fetchDeals()
-      .then(setDeals)
+    Promise.all([
+      fetchDeals().then(setDeals),
+      fetchMarketers().then(setMarketers),
+    ])
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [orgId]);
@@ -235,6 +239,7 @@ export default function SalesPage() {
       plan: deal.plan || "",
       deal_date: deal.deal_date || new Date().toISOString().slice(0, 10),
       probability: deal.probability,
+      marketer_name: deal.marketer_name || "",
     });
     setModalOpen(true);
   }
@@ -247,6 +252,8 @@ export default function SalesPage() {
       const month = new Date(dealDate).getMonth() + 1;
       const year = new Date(dealDate).getFullYear();
 
+      const marketerName = form.source === "تسويق بالعمولة" ? form.marketer_name : undefined;
+
       if (editingId) {
         const updated = await updateDeal(editingId, {
           client_name: form.client_name,
@@ -258,6 +265,7 @@ export default function SalesPage() {
           plan: form.plan || undefined,
           deal_date: form.deal_date,
           probability: form.probability,
+          marketer_name: marketerName || undefined,
         });
         setDeals((prev) => prev.map((d) => (d.id === editingId ? updated : d)));
       } else {
@@ -271,6 +279,7 @@ export default function SalesPage() {
           plan: form.plan || undefined,
           deal_date: form.deal_date,
           probability: form.probability,
+          marketer_name: marketerName,
           cycle_days: 0,
           month,
           year,
@@ -920,6 +929,33 @@ export default function SalesPage() {
                 ))}
               </div>
             </div>
+
+            {/* Marketer (shown only when source is تسويق بالعمولة) */}
+            {form.source === "تسويق بالعمولة" && (
+              <div className="grid gap-1.5">
+                <Label>المسوّق</Label>
+                <Select
+                  value={form.marketer_name}
+                  onValueChange={(val) => val && setForm({ ...form, marketer_name: val })}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="اختر المسوّق" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {marketers.filter((m) => m.is_active).map((m) => (
+                      <SelectItem key={m.id} value={m.name}>
+                        {m.name} ({m.commission_rate}%)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {marketers.filter((m) => m.is_active).length === 0 && (
+                  <p className="text-[11px] text-muted-foreground">
+                    لا يوجد مسوقين. أضف مسوقين من صفحة المسوقين أولاً.
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Stage (dropdown) */}
             <div className="grid gap-1.5">

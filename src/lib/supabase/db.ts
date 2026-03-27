@@ -1,5 +1,5 @@
 import { createClient } from "./client";
-import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating } from "@/types";
+import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, Marketer, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating } from "@/types";
 
 const DEFAULT_ORG = "00000000-0000-0000-0000-000000000001";
 
@@ -928,4 +928,56 @@ export async function updateExpense(
 export async function deleteExpense(id: string): Promise<void> {
   const supabase = createClient();
   await supabase.from("monthly_expenses").delete().eq("id", id);
+}
+
+// ─── Marketers ──────────────────────────────────────────────────────────────
+
+export async function fetchMarketers(): Promise<Marketer[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("marketers")
+    .select("*")
+    .eq("org_id", getOrgId())
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as Marketer[];
+}
+
+export async function createMarketer(
+  marketer: Omit<Marketer, "id" | "org_id" | "created_at" | "updated_at">
+): Promise<Marketer> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("marketers")
+    .insert({ ...marketer, org_id: getOrgId() })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Marketer;
+}
+
+export async function updateMarketer(
+  id: string,
+  marketer: Partial<Omit<Marketer, "id" | "org_id">>
+): Promise<Marketer> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("marketers")
+    .update({ ...marketer, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("org_id", getOrgId())
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Marketer;
+}
+
+export async function deleteMarketer(id: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("marketers")
+    .delete()
+    .eq("id", id)
+    .eq("org_id", getOrgId());
+  if (error) throw error;
 }

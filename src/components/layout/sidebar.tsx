@@ -20,6 +20,7 @@ import {
   Upload,
   ClipboardList,
   BookOpen,
+  Megaphone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
@@ -34,6 +35,7 @@ const NAV_ITEMS = [
   { label: "الدعم", href: "/support", slug: "support", icon: Headphones },
   { label: "التطويرات", href: "/development", slug: "development", icon: Code },
   { label: "الشراكات", href: "/partnerships", slug: "partnerships", icon: Handshake },
+  { label: "المسوقين", href: "/marketers", slug: "marketers", icon: Megaphone },
   { label: "الفريق", href: "/team", slug: "team", icon: Users },
   { label: "المالية", href: "/finance", slug: "finance", icon: Banknote },
   { label: "رفع الملفات", href: "/upload", slug: "upload", icon: Upload },
