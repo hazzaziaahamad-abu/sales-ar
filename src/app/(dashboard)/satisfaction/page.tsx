@@ -600,21 +600,8 @@ export default function SatisfactionPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
-                <Label>التصنيف</Label>
-                <Select value={form.category} onValueChange={(v) => v && setForm({ ...form, category: v })}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {REVIEW_CATEGORIES.map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+
+
             </div>
 
             {/* Date */}
