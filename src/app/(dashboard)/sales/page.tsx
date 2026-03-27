@@ -152,6 +152,88 @@ export default function SalesPage() {
     localStorage.setItem(salesTodayKey, JSON.stringify([]));
   }
 
+  /* ─── Follow-up (متابعة) selection ─── */
+  const [followUpIds, setFollowUpIds] = useState<Set<string>>(new Set());
+  const [showFollowUp, setShowFollowUp] = useState(false);
+
+  const nonCompletedDeals = monthDeals.filter((d) => d.stage !== "مكتملة" && d.stage !== "مرفوض مع سبب");
+
+  function toggleFollowUp(id: string) {
+    setFollowUpIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function selectAllFollowUp() {
+    setFollowUpIds(new Set(nonCompletedDeals.map((d) => d.id)));
+  }
+
+  function clearFollowUp() {
+    setFollowUpIds(new Set());
+  }
+
+  function getRecommendation(deal: Deal): { text: string; color: string; icon: string } {
+    const daysSince = deal.deal_date ? Math.floor((Date.now() - new Date(deal.deal_date).getTime()) / 86400000) : 0;
+
+    if (deal.stage === "انتظار الدفع") {
+      return { text: "تذكير بالدفع — أرسل رسالة تذكير ودية للعميل", color: "text-amber", icon: "💳" };
+    }
+    if (deal.stage === "تفاوض" && deal.probability < 50) {
+      return { text: "قدّم خصم خاص أو عرض محدود لتحفيز القرار", color: "text-cc-purple", icon: "🏷️" };
+    }
+    if (deal.stage === "تفاوض" && deal.probability >= 50) {
+      return { text: "العميل مهتم — ركّز على إبراز القيمة وأرسل عرض سعر نهائي", color: "text-cc-purple", icon: "📋" };
+    }
+    if (deal.stage === "تجريبي") {
+      return { text: "تابع تجربة العميل واسأل عن رأيه ومدى رضاه", color: "text-cc-blue", icon: "🧪" };
+    }
+    if (deal.stage === "تجهيز") {
+      return { text: "أسرع في التجهيز وأبلغ العميل بالتقدم", color: "text-cyan", icon: "⚙️" };
+    }
+    if (daysSince > 14 && deal.stage === "تواصل") {
+      return { text: "مضى أكثر من أسبوعين — اتصل بالعميل مباشرة أو قدّم عرض جديد", color: "text-cc-red", icon: "🔥" };
+    }
+    if (daysSince > 7 && deal.stage === "تواصل") {
+      return { text: "لم يتم التواصل منذ أسبوع — أرسل رسالة متابعة", color: "text-amber", icon: "📱" };
+    }
+    if (deal.deal_value >= 500) {
+      return { text: "صفقة ذات قيمة عالية — أعطها أولوية قصوى", color: "text-cyan", icon: "⭐" };
+    }
+    return { text: "تواصل مع العميل واستفسر عن احتياجاته", color: "text-muted-foreground", icon: "📞" };
+  }
+
+  function buildFollowUpReport() {
+    const followUpDeals = deals.filter((d) => followUpIds.has(d.id));
+    const todayStr = new Date().toLocaleDateString("ar-SA", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+    let report = `📋 قائمة متابعة العملاء\n`;
+    report += `📅 ${todayStr}\n`;
+    report += `${"─".repeat(35)}\n`;
+    report += `📊 عدد العملاء: ${followUpDeals.length}\n`;
+    report += `💰 إجمالي القيمة: ${followUpDeals.reduce((s, d) => s + d.deal_value, 0).toLocaleString()} ر.س\n\n`;
+    followUpDeals.forEach((d, i) => {
+      const rec = getRecommendation(d);
+      report += `${i + 1}. ${d.client_name}\n`;
+      report += `   المرحلة: ${d.stage} | القيمة: ${d.deal_value.toLocaleString()} ر.س\n`;
+      report += `   ${rec.icon} التوصية: ${rec.text}\n`;
+      if (d.assigned_rep_name) report += `   المسؤول: ${d.assigned_rep_name}\n`;
+      report += `\n`;
+    });
+    return report;
+  }
+
+  async function shareFollowUpReport() {
+    const report = buildFollowUpReport();
+    if (navigator.share) {
+      try { await navigator.share({ title: "قائمة متابعة العملاء", text: report }); }
+      catch { await navigator.clipboard.writeText(report); alert("تم نسخ التقرير!"); }
+    } else {
+      await navigator.clipboard.writeText(report);
+      alert("تم نسخ التقرير! يمكنك لصقه في واتساب أو أي تطبيق.");
+    }
+  }
+
   function buildSalesReport() {
     const targetDeals = deals.filter((d) => dailyTargetIds.has(d.id));
     const closed = targetDeals.filter((d) => d.stage === "مكتملة");
@@ -496,6 +578,101 @@ export default function SalesPage() {
               );
             })}
       </div>
+
+      {/* ─── Follow-up Section ─── */}
+      {!loading && nonCompletedDeals.length > 0 && (
+        <div className="cc-card rounded-xl border border-amber/20 bg-gradient-to-l from-amber/[0.04] to-transparent">
+          <button
+            onClick={() => setShowFollowUp(!showFollowUp)}
+            className="w-full p-4 flex items-center justify-between"
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-amber/10 flex items-center justify-center">
+                <Phone className="w-4 h-4 text-amber" />
+              </div>
+              <div className="text-right">
+                <h3 className="text-sm font-bold text-foreground">متابعة العملاء</h3>
+                <span className="text-[10px] text-muted-foreground">{nonCompletedDeals.length} عميل غير مكتمل — {followUpIds.size > 0 ? `${followUpIds.size} محدد` : "اختر للمتابعة"}</span>
+              </div>
+            </div>
+            <svg className={`w-4 h-4 text-muted-foreground transition-transform ${showFollowUp ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {showFollowUp && (
+            <div className="px-4 pb-4 space-y-3">
+              {/* Actions bar */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <button onClick={selectAllFollowUp} className="text-[10px] px-2.5 py-1.5 rounded-lg border border-amber/30 text-amber hover:bg-amber/10 transition-colors">
+                  <SquareCheck className="w-3 h-3 inline-block ml-1" />تحديد الكل
+                </button>
+                {followUpIds.size > 0 && (
+                  <>
+                    <button onClick={shareFollowUpReport} className="text-[10px] px-2.5 py-1.5 rounded-lg border border-cc-purple/30 text-cc-purple hover:bg-cc-purple/10 transition-colors">
+                      <Share2 className="w-3 h-3 inline-block ml-1" />مشاركة مع الفريق
+                    </button>
+                    <button onClick={clearFollowUp} className="text-[10px] text-muted-foreground hover:text-cc-red transition-colors">مسح التحديد</button>
+                    <span className="text-[10px] text-muted-foreground mr-auto">
+                      {followUpIds.size} عميل | {formatMoney(deals.filter((d) => followUpIds.has(d.id)).reduce((s, d) => s + d.deal_value, 0))}
+                    </span>
+                  </>
+                )}
+              </div>
+
+              {/* Client cards */}
+              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                {nonCompletedDeals.map((deal) => {
+                  const isSelected = followUpIds.has(deal.id);
+                  const rec = getRecommendation(deal);
+                  const daysSince = deal.deal_date ? Math.floor((Date.now() - new Date(deal.deal_date).getTime()) / 86400000) : 0;
+
+                  return (
+                    <div
+                      key={deal.id}
+                      onClick={() => toggleFollowUp(deal.id)}
+                      className={`flex gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                        isSelected ? "border-amber/40 bg-amber/[0.06]" : "border-border/30 bg-card/30 hover:border-border/60"
+                      }`}
+                    >
+                      {/* Checkbox */}
+                      <div className={`w-5 h-5 mt-0.5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-all ${
+                        isSelected ? "border-amber bg-amber/20 text-amber" : "border-muted-foreground/30"
+                      }`}>
+                        {isSelected && (
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-bold text-foreground">{deal.client_name}</span>
+                          <ColorBadge color={STAGE_BADGE_COLOR[deal.stage] || "cyan"} className="text-[10px]">{deal.stage}</ColorBadge>
+                          <span className="text-xs font-bold text-cyan">{formatMoney(deal.deal_value)}</span>
+                          {daysSince > 0 && (
+                            <span className={`text-[10px] ${daysSince > 14 ? "text-cc-red" : daysSince > 7 ? "text-amber" : "text-muted-foreground"}`}>
+                              منذ {daysSince} يوم
+                            </span>
+                          )}
+                          {deal.assigned_rep_name && <span className="text-[10px] text-muted-foreground">{deal.assigned_rep_name}</span>}
+                        </div>
+                        {/* Recommendation */}
+                        <div className={`flex items-start gap-1.5 mt-1.5 ${rec.color}`}>
+                          <span className="text-xs leading-none">{rec.icon}</span>
+                          <span className="text-[11px] leading-relaxed">{rec.text}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ─── Daily Sales Target ─── */}
       {dailyTargetIds.size > 0 && !loading && (() => {
