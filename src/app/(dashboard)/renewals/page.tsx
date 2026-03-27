@@ -20,6 +20,7 @@ import {
   KPI_STATUS_STYLES,
 } from "@/lib/utils/constants";
 import { formatMoneyFull, formatDate, formatPhone, formatPercent } from "@/lib/utils/format";
+import { FollowUpLogButton } from "@/components/follow-up-log";
 import { StatCard } from "@/components/ui/stat-card";
 import { DonutChart } from "@/components/ui/donut-chart";
 import { LineChart } from "@/components/ui/line-chart";
@@ -752,6 +753,7 @@ export default function RenewalsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-center gap-1">
+                        <FollowUpLogButton entityType="renewal" entityId={renewal.id} entityName={renewal.customer_name} />
                         <Button
                           variant="ghost"
                           size="icon-xs"

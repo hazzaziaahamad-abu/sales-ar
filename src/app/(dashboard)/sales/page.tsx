@@ -10,6 +10,7 @@ import { STAGES, SOURCES, SOURCE_COLORS, PLANS } from "@/lib/utils/constants";
 
 import SalesKPIsView from "@/components/SalesKPIsView";
 import { formatMoney, formatMoneyFull, formatDate, formatPhone, formatPercent } from "@/lib/utils/format";
+import { FollowUpLogButton } from "@/components/follow-up-log";
 import { getKpiStatus, KPI_STATUS_STYLES, KPI_TARGETS } from "@/lib/utils/constants";
 import { StatCard } from "@/components/ui/stat-card";
 import { KPICard } from "@/components/ui/kpi-card";
@@ -882,6 +883,7 @@ export default function SalesPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-center gap-1">
+                      <FollowUpLogButton entityType="deal" entityId={deal.id} entityName={deal.client_name} />
                       <Button
                         variant="ghost"
                         size="icon-xs"

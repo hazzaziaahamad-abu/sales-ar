@@ -378,3 +378,13 @@ export interface AppNotification {
   timestamp: string;
   isRead: boolean;
 }
+
+export interface FollowUpNote {
+  id: string;
+  org_id: string;
+  entity_type: "deal" | "renewal";
+  entity_id: string;
+  note: string;
+  author_name: string;
+  created_at: string;
+}

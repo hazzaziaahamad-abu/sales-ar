@@ -1,5 +1,5 @@
 import { createClient } from "./client";
-import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, Marketer, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating } from "@/types";
+import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, Marketer, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating, FollowUpNote } from "@/types";
 
 const DEFAULT_ORG = "00000000-0000-0000-0000-000000000001";
 
@@ -980,4 +980,35 @@ export async function deleteMarketer(id: string): Promise<void> {
     .eq("id", id)
     .eq("org_id", getOrgId());
   if (error) throw error;
+}
+
+// ─── FOLLOW-UP NOTES ──────────────────────────────────────────────────────────
+
+export async function fetchFollowUpNotes(entityType: "deal" | "renewal", entityId: string): Promise<FollowUpNote[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("follow_up_notes")
+    .select("*")
+    .eq("org_id", getOrgId())
+    .eq("entity_type", entityType)
+    .eq("entity_id", entityId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data || []) as FollowUpNote[];
+}
+
+export async function createFollowUpNote(
+  entityType: "deal" | "renewal",
+  entityId: string,
+  note: string,
+  authorName: string
+): Promise<FollowUpNote> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("follow_up_notes")
+    .insert({ org_id: getOrgId(), entity_type: entityType, entity_id: entityId, note, author_name: authorName })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as FollowUpNote;
 }
