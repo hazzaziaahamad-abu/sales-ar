@@ -156,8 +156,6 @@ export default function SalesPage() {
   const [followUpIds, setFollowUpIds] = useState<Set<string>>(new Set());
   const [showFollowUp, setShowFollowUp] = useState(false);
 
-  const nonCompletedDeals = monthDeals.filter((d) => d.stage !== "مكتملة" && d.stage !== "مرفوض مع سبب");
-
   function toggleFollowUp(id: string) {
     setFollowUpIds((prev) => {
       const next = new Set(prev);
@@ -300,6 +298,7 @@ export default function SalesPage() {
           return dt.getMonth() + 1 === activeMonthIndex.month && dt.getFullYear() === activeMonthIndex.year;
         })
       : deals;
+  const nonCompletedDeals = monthDeals.filter((d) => d.stage !== "مكتملة" && d.stage !== "مرفوض مع سبب");
   const stageFilteredDeals = stageFilter ? monthDeals.filter((d) => d.stage === stageFilter) : monthDeals;
   const filteredDeals = clientSearch
     ? stageFilteredDeals.filter((d) => d.client_name.toLowerCase().includes(clientSearch.toLowerCase()))
@@ -650,7 +649,7 @@ export default function SalesPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-sm font-bold text-foreground">{deal.client_name}</span>
-                          <ColorBadge color={STAGE_BADGE_COLOR[deal.stage] || "cyan"} className="text-[10px]">{deal.stage}</ColorBadge>
+                          <ColorBadge color={STAGE_BADGE_COLOR[deal.stage] || "cyan"} text={deal.stage} />
                           <span className="text-xs font-bold text-cyan">{formatMoney(deal.deal_value)}</span>
                           {daysSince > 0 && (
                             <span className={`text-[10px] ${daysSince > 14 ? "text-cc-red" : daysSince > 7 ? "text-amber" : "text-muted-foreground"}`}>
