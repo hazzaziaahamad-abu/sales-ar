@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import type { Deal, Renewal, MonthlyExpense } from "@/types";
 import { fetchDeals, fetchRenewals, fetchMonthlyExpenses, createExpense, deleteExpense } from "@/lib/supabase/db";
 import { useAuth } from "@/lib/auth-context";
+import { useTopbarControls } from "@/components/layout/topbar-context";
 import { MONTHS_AR, SOURCE_COLORS } from "@/lib/utils/constants";
 import { formatMoney, formatMoneyFull } from "@/lib/utils/format";
 import { StatCard } from "@/components/ui/stat-card";
@@ -44,22 +45,23 @@ const COLOR_HEX: Record<string, string> = {
 
 export default function FinancePage() {
   const { activeOrgId: orgId } = useAuth();
+  const { activeMonthIndex } = useTopbarControls();
   const [deals, setDeals] = useState<Deal[]>([]);
   const [renewals, setRenewals] = useState<Renewal[]>([]);
   const [expenses, setExpenses] = useState<MonthlyExpense[]>([]);
   const [loading, setLoading] = useState(true);
   const [expenseDialog, setExpenseDialog] = useState(false);
-  const [expenseForm, setExpenseForm] = useState({ category: "", amount: "", description: "" });
+  const [expenseForm, setExpenseForm] = useState({ category: "", amount: "", description: "", expense_date: "" });
   const [savingExpense, setSavingExpense] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
 
   const now = new Date();
-  const currentMonth = now.getMonth() + 1;
-  const currentYear = now.getFullYear();
+  const selectedMonth = activeMonthIndex?.month ?? (now.getMonth() + 1);
+  const selectedYear = activeMonthIndex?.year ?? now.getFullYear();
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([fetchDeals(), fetchRenewals(), fetchMonthlyExpenses(currentMonth, currentYear)])
+    Promise.all([fetchDeals(), fetchRenewals(), fetchMonthlyExpenses(selectedMonth, selectedYear)])
       .then(([d, r, e]) => {
         setDeals(d);
         setRenewals(r);
@@ -67,22 +69,30 @@ export default function FinancePage() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [orgId]);
+    setCategoryFilter(null);
+  }, [orgId, selectedMonth, selectedYear]);
 
   async function handleAddExpense() {
     if (!expenseForm.category.trim() || !expenseForm.amount) return;
     setSavingExpense(true);
     try {
+      const expDate = expenseForm.expense_date || now.toISOString().split("T")[0];
+      const d = new Date(expDate);
+      const expMonth = d.getMonth() + 1;
+      const expYear = d.getFullYear();
       const created = await createExpense({
         category: expenseForm.category.trim(),
         amount: parseFloat(expenseForm.amount),
         description: expenseForm.description.trim() || undefined,
-        expense_date: now.toISOString().split("T")[0],
-        month: currentMonth,
-        year: currentYear,
+        expense_date: expDate,
+        month: expMonth,
+        year: expYear,
       });
-      setExpenses((prev) => [created, ...prev].sort((a, b) => b.amount - a.amount));
-      setExpenseForm({ category: "", amount: "", description: "" });
+      // Only add to current list if it belongs to the selected month
+      if (expMonth === selectedMonth && expYear === selectedYear) {
+        setExpenses((prev) => [created, ...prev].sort((a, b) => b.amount - a.amount));
+      }
+      setExpenseForm({ category: "", amount: "", description: "", expense_date: "" });
       setExpenseDialog(false);
     } catch (err) {
       console.error(err);
@@ -95,33 +105,33 @@ export default function FinancePage() {
     setExpenses((prev) => prev.filter((e) => e.id !== id));
   }
 
-  /* ─── Computed Metrics ─── */
-  const closedDeals = deals.filter((d) => d.stage === "مكتملة");
+  /* ─── Computed Metrics (filtered by selected month) ─── */
+  const monthDeals = deals.filter((d) => d.month === selectedMonth && d.year === selectedYear);
+  const closedDeals = monthDeals.filter((d) => d.stage === "مكتملة");
   const totalRevenue = closedDeals.reduce((s, d) => s + d.deal_value, 0);
-  const pipelineValue = deals.filter((d) => d.stage !== "مكتملة").reduce((s, d) => s + d.deal_value, 0);
+  const pipelineValue = monthDeals.filter((d) => d.stage !== "مكتملة").reduce((s, d) => s + d.deal_value, 0);
   const avgDealValue = closedDeals.length > 0 ? Math.round(totalRevenue / closedDeals.length) : 0;
 
-  /* MRR: current month closed deals + active renewals plan_price */
+  /* MRR: selected month closed deals + active renewals plan_price */
 
-  const currentMonthRevenue = closedDeals
-    .filter((d) => d.month === currentMonth && d.year === currentYear)
-    .reduce((s, d) => s + d.deal_value, 0);
+  const selectedMonthRevenue = closedDeals.reduce((s, d) => s + d.deal_value, 0);
 
   const activeRenewalsRevenue = renewals
     .filter((r) => r.status === "مكتمل")
     .reduce((s, r) => s + r.plan_price, 0);
 
-  const mrr = currentMonthRevenue + activeRenewalsRevenue;
+  const mrr = selectedMonthRevenue + activeRenewalsRevenue;
   const arr = mrr * 12;
 
-  /* ─── Monthly Revenue (last 12 months) ─── */
+  /* ─── Monthly Revenue (last 12 months from selected) ─── */
+  const allClosedDeals = deals.filter((d) => d.stage === "مكتملة");
   const monthlyRevenue = (() => {
     const months: { month: string; revenue: number }[] = [];
     for (let i = 11; i >= 0; i--) {
-      const d = new Date(currentYear, currentMonth - 1 - i, 1);
+      const d = new Date(selectedYear, selectedMonth - 1 - i, 1);
       const m = d.getMonth() + 1;
       const y = d.getFullYear();
-      const rev = closedDeals
+      const rev = allClosedDeals
         .filter((deal) => deal.month === m && deal.year === y)
         .reduce((s, deal) => s + deal.deal_value, 0);
       months.push({ month: MONTHS_AR[d.getMonth()], revenue: rev });
@@ -310,7 +320,7 @@ export default function FinancePage() {
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
             <Receipt className="w-5 h-5 text-cc-red" />
-            <h3 className="text-sm font-bold text-foreground">المصاريف الشهرية — {MONTHS_AR[currentMonth - 1]} {currentYear}</h3>
+            <h3 className="text-sm font-bold text-foreground">المصاريف الشهرية — {MONTHS_AR[selectedMonth - 1]} {selectedYear}</h3>
           </div>
           <Button size="sm" onClick={() => setExpenseDialog(true)} className="gap-1.5">
             <Plus className="w-4 h-4" /> إضافة مصروف
@@ -416,6 +426,7 @@ export default function FinancePage() {
                           {exp.description && (
                             <span className="text-[10px] text-muted-foreground truncate hidden sm:inline">— {exp.description}</span>
                           )}
+                          <span className="text-[10px] text-muted-foreground/60 hidden md:inline">{exp.expense_date}</span>
                         </div>
                         <div className="flex items-center gap-3 shrink-0">
                           <span className={`text-sm font-bold ${textColor}`}>{formatMoney(exp.amount)}</span>
@@ -473,7 +484,7 @@ export default function FinancePage() {
         <DialogContent className="max-w-md" dir="rtl">
           <DialogHeader>
             <DialogTitle>إضافة مصروف</DialogTitle>
-            <DialogDescription>سجل مصروف جديد للشهر الحالي</DialogDescription>
+            <DialogDescription>سجل مصروف جديد وحدد التاريخ</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-3">
             <div className="grid gap-1.5">
@@ -491,6 +502,16 @@ export default function FinancePage() {
                 value={expenseForm.amount}
                 onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
                 placeholder="0"
+                dir="ltr"
+                className="text-right"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>التاريخ</Label>
+              <Input
+                type="date"
+                value={expenseForm.expense_date}
+                onChange={(e) => setExpenseForm({ ...expenseForm, expense_date: e.target.value })}
                 dir="ltr"
                 className="text-right"
               />
