@@ -105,36 +105,53 @@ export default function FinancePage() {
     setExpenses((prev) => prev.filter((e) => e.id !== id));
   }
 
+  /* ─── Helper: get renewal month/year from renewal_date ─── */
+  function getRenewalMonth(r: Renewal) {
+    const d = new Date(r.renewal_date);
+    return { month: d.getMonth() + 1, year: d.getFullYear() };
+  }
+
   /* ─── Computed Metrics (filtered by selected month) ─── */
   const monthDeals = deals.filter((d) => d.month === selectedMonth && d.year === selectedYear);
   const closedDeals = monthDeals.filter((d) => d.stage === "مكتملة");
-  const totalRevenue = closedDeals.reduce((s, d) => s + d.deal_value, 0);
+  const salesRevenue = closedDeals.reduce((s, d) => s + d.deal_value, 0);
   const pipelineValue = monthDeals.filter((d) => d.stage !== "مكتملة").reduce((s, d) => s + d.deal_value, 0);
-  const avgDealValue = closedDeals.length > 0 ? Math.round(totalRevenue / closedDeals.length) : 0;
 
-  /* MRR: selected month closed deals + active renewals plan_price */
+  /* Renewals revenue for the selected month */
+  const monthRenewals = renewals.filter((r) => {
+    if (r.status !== "مكتمل") return false;
+    const rm = getRenewalMonth(r);
+    return rm.month === selectedMonth && rm.year === selectedYear;
+  });
+  const renewalsRevenue = monthRenewals.reduce((s, r) => s + r.plan_price, 0);
 
-  const selectedMonthRevenue = closedDeals.reduce((s, d) => s + d.deal_value, 0);
+  /* Total revenue = sales + renewals */
+  const totalRevenue = salesRevenue + renewalsRevenue;
+  const avgDealValue = closedDeals.length > 0 ? Math.round(salesRevenue / closedDeals.length) : 0;
 
-  const activeRenewalsRevenue = renewals
-    .filter((r) => r.status === "مكتمل")
-    .reduce((s, r) => s + r.plan_price, 0);
-
-  const mrr = selectedMonthRevenue + activeRenewalsRevenue;
+  /* MRR: selected month total revenue */
+  const mrr = totalRevenue;
   const arr = mrr * 12;
 
-  /* ─── Monthly Revenue (last 12 months from selected) ─── */
+  /* ─── Monthly Revenue (last 12 months from selected) — sales + renewals ─── */
   const allClosedDeals = deals.filter((d) => d.stage === "مكتملة");
+  const completedRenewals = renewals.filter((r) => r.status === "مكتمل");
   const monthlyRevenue = (() => {
-    const months: { month: string; revenue: number }[] = [];
+    const months: { month: string; salesRev: number; renewalsRev: number; revenue: number }[] = [];
     for (let i = 11; i >= 0; i--) {
       const d = new Date(selectedYear, selectedMonth - 1 - i, 1);
       const m = d.getMonth() + 1;
       const y = d.getFullYear();
-      const rev = allClosedDeals
+      const sRev = allClosedDeals
         .filter((deal) => deal.month === m && deal.year === y)
         .reduce((s, deal) => s + deal.deal_value, 0);
-      months.push({ month: MONTHS_AR[d.getMonth()], revenue: rev });
+      const rRev = completedRenewals
+        .filter((r) => {
+          const rm = getRenewalMonth(r);
+          return rm.month === m && rm.year === y;
+        })
+        .reduce((s, r) => s + r.plan_price, 0);
+      months.push({ month: MONTHS_AR[d.getMonth()], salesRev: sRev, renewalsRev: rRev, revenue: sRev + rRev });
     }
     return months;
   })();
@@ -147,26 +164,31 @@ export default function FinancePage() {
   const barData = monthlyRevenue.map((m) => ({
     label: m.month.slice(0, 3),
     values: [
-      { value: m.revenue / divisor, color: "#00D4FF", label: "الإيرادات" },
+      { value: m.salesRev / divisor, color: "#00D4FF", label: "مبيعات" },
+      { value: m.renewalsRev / divisor, color: "#10B981", label: "تجديدات" },
     ],
   }));
 
-  /* ─── Revenue by Source (donut) ─── */
+  /* ─── Revenue by Source (donut) — includes renewals as a source ─── */
   const sourceRevenue = (() => {
     const map: Record<string, number> = {};
     closedDeals.forEach((d) => {
       const src = d.source || "اخرى";
       map[src] = (map[src] || 0) + d.deal_value;
     });
+    if (renewalsRevenue > 0) {
+      map["تجديدات"] = (map["تجديدات"] || 0) + renewalsRevenue;
+    }
     return Object.entries(map)
       .map(([source, value]) => ({ source, value }))
       .sort((a, b) => b.value - a.value);
   })();
 
+  const RENEWALS_COLOR = "#10B981";
   const donutSegments = sourceRevenue.map((s) => ({
     label: s.source,
     value: s.value,
-    color: COLOR_HEX[SOURCE_COLORS[s.source] || "cyan"] || "#00D4FF",
+    color: s.source === "تجديدات" ? RENEWALS_COLOR : (COLOR_HEX[SOURCE_COLORS[s.source] || "cyan"] || "#00D4FF"),
   }));
 
   const totalClosedRevenue = sourceRevenue.reduce((s, x) => s + x.value, 0);
