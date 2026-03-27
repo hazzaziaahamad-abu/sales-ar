@@ -61,7 +61,7 @@ export default function TeamPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [saving, setSaving] = useState(false);
-  const [periodFilter, setPeriodFilter] = useState<"day" | "week" | "month">("month");
+  const [periodFilter, setPeriodFilter] = useState<"day" | "week" | "month" | "all">("all");
 
   /* delete confirmation */
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -88,6 +88,7 @@ export default function TeamPage() {
 
   /* Period date range */
   const periodRange = (() => {
+    if (periodFilter === "all") return null;
     const now = new Date();
     const today = now.toISOString().split("T")[0];
     if (periodFilter === "day") return today;
@@ -101,14 +102,19 @@ export default function TeamPage() {
   })();
 
   /* Filter deals & tickets by period */
-  const periodDeals = deals.filter((d) => (d.deal_date || d.created_at.split("T")[0]) >= periodRange);
-  const periodTickets = tickets.filter((t) => (t.open_date || t.created_at.split("T")[0]) >= periodRange);
+  const periodDeals = periodRange
+    ? deals.filter((d) => (d.deal_date || d.created_at.split("T")[0]) >= periodRange)
+    : deals;
+  const periodTickets = periodRange
+    ? tickets.filter((t) => (t.open_date || t.created_at.split("T")[0]) >= periodRange)
+    : tickets;
 
-  /* Stats per employee */
+  /* Stats per employee — trim names to handle whitespace mismatches */
   function getEmployeeStats(empName: string) {
-    const empDeals = periodDeals.filter((d) => d.assigned_rep_name === empName);
+    const name = empName.trim();
+    const empDeals = periodDeals.filter((d) => d.assigned_rep_name?.trim() === name);
     const closedDeals = empDeals.filter((d) => d.stage === "مكتملة");
-    const empTickets = periodTickets.filter((t) => t.assigned_agent_name === empName);
+    const empTickets = periodTickets.filter((t) => t.assigned_agent_name?.trim() === name);
     const resolvedTickets = empTickets.filter((t) => t.status === "محلول");
     return {
       totalDeals: empDeals.length,
@@ -271,6 +277,7 @@ export default function TeamPage() {
         <div className="flex items-center gap-1 bg-white/[0.03] rounded-xl p-1 border border-white/[0.06]">
           <Calendar className="w-4 h-4 text-muted-foreground mr-1.5 ml-1" />
           {([
+            { key: "all" as const, label: "الكل" },
             { key: "day" as const, label: "اليوم" },
             { key: "week" as const, label: "الأسبوع" },
             { key: "month" as const, label: "الشهر" },
