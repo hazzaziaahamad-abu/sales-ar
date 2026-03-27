@@ -270,7 +270,7 @@ export default function SatisfactionPage() {
             />
             <KPICard
               value={`${d.promotersPercent}%`}
-              label="نسبة المروّجين"
+              label="نسبة الرضى"
               target={`${d.promotersTarget}%`}
               status={promotersStatus}
               icon={<Users className="w-4 h-4" />}
@@ -348,7 +348,7 @@ export default function SatisfactionPage() {
         {/* ─── Tab 2: NPS Detail ─── */}
         <TabsContent value="nps" className="space-y-6">
           <div className="cc-card rounded-xl p-8 text-center">
-            <p className="text-sm text-muted-foreground mb-2">مؤشر صافي المروّجين</p>
+            <p className="text-sm text-muted-foreground mb-2">مؤشر صافي الرضى</p>
             <p className="text-7xl font-extrabold text-cyan">+{d.nps}</p>
             <div className="flex items-center justify-center gap-2 mt-3">
               <span className={`w-2 h-2 rounded-full ${KPI_STATUS_STYLES[npsStatus].dot}`} />
