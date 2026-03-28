@@ -187,7 +187,7 @@ export default function RenewalsPage() {
     if (completed.length > 0) {
       report += `── ✅ المكتملة ──\n`;
       completed.forEach((r, i) => {
-        report += `${i + 1}. ${r.customer_name} — ${r.plan_name} — ${r.plan_price} ر.س\n`;
+        report += `${i + 1}. ${r.customer_name}${r.customer_phone ? ` — ${r.customer_phone}` : ""} — ${r.plan_name} — ${r.plan_price} ر.س\n`;
       });
       report += `\n`;
     }
@@ -195,7 +195,7 @@ export default function RenewalsPage() {
     if (remaining.length > 0) {
       report += `── ⏳ المتبقية ──\n`;
       remaining.forEach((r, i) => {
-        report += `${i + 1}. ${r.customer_name} — ${r.plan_name} — ${r.status} — ${r.plan_price} ر.س\n`;
+        report += `${i + 1}. ${r.customer_name}${r.customer_phone ? ` — ${r.customer_phone}` : ""} — ${r.plan_name} — ${r.status} — ${r.plan_price} ر.س\n`;
       });
     }
 
