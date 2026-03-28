@@ -793,7 +793,6 @@ export default function SalesPage() {
               <TableHead className="w-20">الكود</TableHead>
               <TableHead>العميل</TableHead>
               <TableHead>التاريخ</TableHead>
-              <TableHead>الجوال</TableHead>
               <TableHead>المصدر</TableHead>
               <TableHead>القيمة</TableHead>
               <TableHead>المرحلة</TableHead>
@@ -824,7 +823,7 @@ export default function SalesPage() {
               ))
             ) : filteredDeals.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
                   {stageFilter ? `لا توجد مبيعات في مرحلة "${stageFilter}"` : "لا توجد مبيعات"}
                 </TableCell>
               </TableRow>
@@ -864,9 +863,6 @@ export default function SalesPage() {
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs">
                     {deal.deal_date ? formatDate(deal.deal_date) : "—"}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs font-mono" dir="ltr">
-                    {deal.client_phone ? formatPhone(deal.client_phone) : "—"}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs">
                     {deal.source || "—"}

@@ -690,7 +690,6 @@ export default function RenewalsPage() {
               <TableHead className="w-10 text-center">هدف</TableHead>
               <TableHead className="w-20">الكود</TableHead>
               <TableHead>العميل</TableHead>
-              <TableHead>الجوال</TableHead>
               <TableHead>الخطة</TableHead>
               <TableHead>السعر</TableHead>
               <TableHead>تاريخ التجديد</TableHead>
@@ -711,7 +710,7 @@ export default function RenewalsPage() {
               ))
             ) : filteredRenewals.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
                   {statusFilter ? "لا توجد تجديدات مطابقة" : "لا توجد تجديدات بعد. اضغط \"إضافة تجديد\" لإضافة أول تجديد."}
                 </TableCell>
               </TableRow>
@@ -762,9 +761,6 @@ export default function RenewalsPage() {
                           تم الإنجاز
                         </span>
                       )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs font-mono" dir="ltr">
-                      {renewal.customer_phone ? formatPhone(renewal.customer_phone) : "—"}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-xs">
                       {renewal.plan_name}
