@@ -8,6 +8,7 @@ import {
   updateRenewal,
   deleteRenewal,
   createFollowUpNote,
+  fetchRecentFollowUpNotes,
 } from "@/lib/supabase/db";
 import { useAuth } from "@/lib/auth-context";
 import { useTopbarControls } from "@/components/layout/topbar-context";
@@ -163,7 +164,7 @@ export default function RenewalsPage() {
     localStorage.setItem(todayKey, JSON.stringify([]));
   }
 
-  function buildDailyReport() {
+  async function buildDailyReport() {
     const targetRenewals = renewals.filter((r) => dailyTargetIds.has(r.id));
     const completed = targetRenewals.filter((r) => r.status === "مكتمل");
     const remaining = targetRenewals.filter((r) => r.status !== "مكتمل");
@@ -175,6 +176,19 @@ export default function RenewalsPage() {
       month: "long",
       day: "numeric",
     });
+
+    // Fetch latest follow-up notes for all target renewals
+    const latestNotes: Record<string, string> = {};
+    try {
+      const allNotes = await fetchRecentFollowUpNotes(100);
+      const renewalNotes = allNotes.filter((n) => n.entity_type === "renewal");
+      // Get only the latest note per entity (already sorted by created_at desc)
+      renewalNotes.forEach((n) => {
+        if (!latestNotes[n.entity_id]) {
+          latestNotes[n.entity_id] = n.note;
+        }
+      });
+    } catch { /* ignore */ }
 
     let report = `📋 تقرير الهدف اليومي — التجديدات\n`;
     report += `📅 ${todayStr}\n`;
@@ -188,6 +202,9 @@ export default function RenewalsPage() {
       report += `── ✅ المكتملة ──\n`;
       completed.forEach((r, i) => {
         report += `${i + 1}. ${r.customer_name}${r.customer_phone ? ` — ${r.customer_phone}` : ""} — ${r.plan_name} — ${r.plan_price} ر.س\n`;
+        if (latestNotes[r.id]) {
+          report += `   💬 ${latestNotes[r.id]}\n`;
+        }
       });
       report += `\n`;
     }
@@ -196,14 +213,17 @@ export default function RenewalsPage() {
       report += `── ⏳ المتبقية ──\n`;
       remaining.forEach((r, i) => {
         report += `${i + 1}. ${r.customer_name}${r.customer_phone ? ` — ${r.customer_phone}` : ""} — ${r.plan_name} — ${r.status} — ${r.plan_price} ر.س\n`;
+        if (latestNotes[r.id]) {
+          report += `   💬 ${latestNotes[r.id]}\n`;
+        }
       });
     }
 
     return report;
   }
 
-  function exportReport() {
-    const report = buildDailyReport();
+  async function exportReport() {
+    const report = await buildDailyReport();
     const blob = new Blob([report], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -214,7 +234,7 @@ export default function RenewalsPage() {
   }
 
   async function shareReport() {
-    const report = buildDailyReport();
+    const report = await buildDailyReport();
     if (navigator.share) {
       try {
         await navigator.share({
