@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { fetchWeeklyRetentionStats, fetchWeeklyReferralStats } from "@/lib/supabase/db";
+import { fetchWeeklyRetentionStats, fetchWeeklyReferralStats, fetchEmployees, fetchDeals } from "@/lib/supabase/db";
+import type { Employee, Deal } from "@/types";
 
 /* ─── Design Tokens ─── */
 const T = {
@@ -99,6 +100,16 @@ export default function WeeklyMeetingView() {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loaded = useRef(false);
 
+  // Auto-save with debounce
+  const schedSave = useCallback((d: WeeklyData) => {
+    setSaved(false);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      try { localStorage.setItem(LS_KEY, JSON.stringify(d)); } catch { /* ignore */ }
+      setSaved(true);
+    }, 700);
+  }, []);
+
   // Load from localStorage
   useEffect(() => {
     try {
@@ -111,32 +122,73 @@ export default function WeeklyMeetingView() {
     loaded.current = true;
   }, []);
 
-  // Load real stats from DB
+  // Load real stats from DB + employees & deals
   useEffect(() => {
     async function loadStats() {
       setLoadingStats(true);
       try {
-        const [ret, ref] = await Promise.all([
+        const [ret, ref, emps, deals] = await Promise.all([
           fetchWeeklyRetentionStats(),
           fetchWeeklyReferralStats(),
+          fetchEmployees(),
+          fetchDeals(),
         ]);
         setRetentionStats(ret);
         setReferralStats(ref);
+
+        // Auto-populate members from DB employees & deals
+        if (emps.length > 0) {
+          // Get current week start (Saturday)
+          const now = new Date();
+          const dayOfWeek = now.getDay();
+          const diffToSat = (dayOfWeek + 1) % 7; // days since Saturday
+          const weekStart = new Date(now);
+          weekStart.setDate(now.getDate() - diffToSat);
+          weekStart.setHours(0, 0, 0, 0);
+
+          setData(prev => {
+            // Check if members were already customized (not default letters)
+            const defaultNames = ["أ", "ب", "ج", "د", "هـ"];
+            const isDefault = prev.members.length <= 5 && prev.members.every(m => defaultNames.includes(m.name) || m.name === "");
+
+            if (!isDefault) return prev; // Don't overwrite user-customized data
+
+            const members: Member[] = emps.map(emp => {
+              const empDeals = deals.filter((d: Deal) => d.assigned_rep_name?.trim() === emp.name.trim());
+              const weekDeals = empDeals.filter((d: Deal) => {
+                const created = new Date(d.created_at);
+                return created >= weekStart;
+              });
+              const closedDeals = weekDeals.filter((d: Deal) => d.stage === "مكتملة");
+              const totalClosed = closedDeals.length;
+              const totalDeals = weekDeals.length;
+              const avgVal = totalClosed > 0 ? Math.round(closedDeals.reduce((s: number, d: Deal) => s + (d.deal_value || 0), 0) / totalClosed) : 0;
+              const closeRate = totalDeals > 0 ? Math.round((totalClosed / totalDeals) * 100) : 0;
+
+              // Determine status based on close rate
+              const status = closeRate >= 35 ? "🟢" : closeRate >= 15 ? "🟡" : "🔴";
+
+              return {
+                name: emp.name,
+                calls: "",
+                demos: totalDeals > 0 ? String(totalDeals) : "",
+                closed: totalClosed > 0 ? String(totalClosed) : "",
+                avgVal: avgVal > 0 ? String(avgVal) : "",
+                rate: closeRate > 0 ? `${closeRate}%` : "",
+                status,
+              };
+            });
+
+            const next = { ...prev, members };
+            schedSave(next);
+            return next;
+          });
+        }
       } catch { /* ignore */ }
       setLoadingStats(false);
     }
     loadStats();
-  }, []);
-
-  // Auto-save with debounce
-  const schedSave = useCallback((d: WeeklyData) => {
-    setSaved(false);
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      try { localStorage.setItem(LS_KEY, JSON.stringify(d)); } catch { /* ignore */ }
-      setSaved(true);
-    }, 700);
-  }, []);
+  }, [schedSave]);
 
   function update(partial: Partial<WeeklyData>) {
     setData(prev => {
