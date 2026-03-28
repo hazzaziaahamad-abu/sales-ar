@@ -310,6 +310,22 @@ export default function SalesPage() {
         }
       });
     }
+
+    // Top performer
+    const closedWithRep = targetDeals.filter((d) => d.stage === "مكتملة" && d.assigned_rep_name);
+    if (closedWithRep.length > 0) {
+      const repCount: Record<string, { count: number; value: number }> = {};
+      closedWithRep.forEach((d) => {
+        const name = d.assigned_rep_name!;
+        if (!repCount[name]) repCount[name] = { count: 0, value: 0 };
+        repCount[name].count++;
+        repCount[name].value += d.deal_value;
+      });
+      const topRep = Object.entries(repCount).sort((a, b) => b[1].count - a[1].count || b[1].value - a[1].value)[0];
+      report += `\n🏆🔥 الموظف الأكثر إنجازاً: ${topRep[0]}\n`;
+      report += `   🚀 ${topRep[1].count} صفقة — ${topRep[1].value.toLocaleString()} ر.س\n`;
+    }
+
     return report;
   }
 
@@ -837,6 +853,33 @@ export default function SalesPage() {
                 <p className="text-[10px] text-muted-foreground mt-0.5">{allDone ? "أنجزت الهدف" : "الوقت المتبقي"}</p>
               </div>
             </div>
+
+            {/* Top performer */}
+            {(() => {
+              const closedDeals = targetDeals.filter((d) => d.stage === "مكتملة" && d.assigned_rep_name);
+              if (closedDeals.length === 0) return null;
+              const repCount: Record<string, { count: number; value: number }> = {};
+              closedDeals.forEach((d) => {
+                const name = d.assigned_rep_name!;
+                if (!repCount[name]) repCount[name] = { count: 0, value: 0 };
+                repCount[name].count++;
+                repCount[name].value += d.deal_value;
+              });
+              const topRep = Object.entries(repCount).sort((a, b) => b[1].count - a[1].count || b[1].value - a[1].value)[0];
+              return (
+                <div className="mt-3 flex items-center gap-3 p-3 rounded-lg bg-gradient-to-l from-amber/[0.08] to-transparent border border-amber/20">
+                  <div className="w-10 h-10 rounded-full bg-amber/15 flex items-center justify-center text-xl">🏆</div>
+                  <div className="flex-1">
+                    <p className="text-xs text-muted-foreground">🔥 الموظف الأكثر إنجازاً اليوم</p>
+                    <p className="text-sm font-bold text-foreground">🚀 {topRep[0]}</p>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs font-bold text-amber">{topRep[1].count} صفقة 🔥</p>
+                    <p className="text-[10px] text-muted-foreground">{topRep[1].value.toLocaleString()} ر.س</p>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         );
       })()}
