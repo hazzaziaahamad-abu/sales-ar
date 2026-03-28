@@ -644,22 +644,27 @@ export default function SalesPage() {
       )}
 
       {/* ─── Source Distribution Cards ─── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+      <div className="flex flex-wrap gap-3 justify-center">
         {loading
           ? Array.from({ length: 8 }).map((_, i) => <StatCardSkeleton key={i} />)
           : SOURCES.map((src) => {
               const count = sourceCounts[src] || 0;
               const pct = totalDeals > 0 ? Math.round((count / totalDeals) * 100) : 0;
               const rawColor = SOURCE_COLORS[src] || "cyan";
-              const cssVar = rawColor.replace("cc-", "");
+              const isTop = count > 0 && count === Math.max(...SOURCES.map((s) => sourceCounts[s] || 0));
               return (
-                <div key={src} className="cc-card rounded-2xl p-4 border-t-2" style={{ borderTopColor: `var(--${cssVar})` }}>
-                  <p className="text-xl font-bold text-foreground">{count}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{src}</p>
-                  <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full bg-${rawColor}`} style={{ width: `${pct}%` }} />
+                <div
+                  key={src}
+                  className={`cc-card rounded-2xl p-4 text-center min-w-[120px] flex-1 max-w-[160px] border transition-all duration-300 ${
+                    isTop ? `border-${rawColor}/40 bg-${rawColor}/[0.06] shadow-lg shadow-${rawColor}/10` : "border-border/30"
+                  }`}
+                >
+                  <p className={`text-2xl font-extrabold ${count > 0 ? `text-${rawColor}` : "text-muted-foreground/50"}`}>{count}</p>
+                  <p className="text-[11px] text-muted-foreground mt-1 leading-tight">{src}</p>
+                  <div className="flex justify-center mt-2.5 mb-1">
+                    <div className={`w-2.5 h-2.5 rounded-full ${count > 0 ? `bg-${rawColor}` : "bg-muted-foreground/20"}`} />
                   </div>
-                  <p className="text-[10px] text-muted-foreground mt-1">{pct}%</p>
+                  <p className={`text-[11px] font-semibold ${count > 0 ? `text-${rawColor}` : "text-muted-foreground/40"}`}>{pct}%</p>
                 </div>
               );
             })}
