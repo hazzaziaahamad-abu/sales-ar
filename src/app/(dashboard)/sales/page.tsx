@@ -273,9 +273,18 @@ export default function SalesPage() {
       });
     } catch { /* ignore */ }
 
+    // Countdown info
+    const { h, m, s, timeUp } = countdown;
+    const allDone = remaining.length === 0 && total > 0;
+    const timeStr = allDone ? "تم الإنجاز! 🏆" : timeUp ? "انتهى وقت العمل ⏰" : `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    const statusIcon = allDone ? "🏆" : rate >= 80 ? "💪" : rate >= 50 ? "🔥" : rate > 0 ? "⚡" : "🚀";
+    const statusMsg = allDone ? "ممتاز! أنجزت كل الأهداف" : rate >= 80 ? "أنت قريب جداً!" : rate >= 50 ? "استمر، باقي القليل!" : rate > 0 ? "بداية جيدة، واصل!" : "ابدأ الآن!";
+
     let report = `📋 تقرير الهدف اليومي — المبيعات\n`;
     report += `📅 ${todayStr}\n`;
     report += `${"─".repeat(35)}\n\n`;
+    report += `${statusIcon} الحالة: ${statusMsg}\n`;
+    report += `⏱ الوقت المتبقي: ${timeStr}\n\n`;
     report += `🎯 الهدف: ${total} عميل\n`;
     report += `✅ مكتمل: ${closed.length}\n`;
     report += `⏳ متبقي: ${remaining.length}\n`;
