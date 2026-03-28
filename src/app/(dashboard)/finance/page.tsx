@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { Deal, Renewal, MonthlyExpense } from "@/types";
-import { fetchDeals, fetchRenewals, fetchMonthlyExpenses, createExpense, deleteExpense } from "@/lib/supabase/db";
+import { fetchDeals, fetchRenewals, fetchMonthlyExpenses, createExpense, deleteExpense, updateExpense } from "@/lib/supabase/db";
 import { useAuth } from "@/lib/auth-context";
 import { useTopbarControls } from "@/components/layout/topbar-context";
 import { MONTHS_AR, SOURCE_COLORS } from "@/lib/utils/constants";
@@ -30,6 +30,7 @@ import {
   Plus,
   Trash2,
   Receipt,
+  Pencil,
 } from "lucide-react";
 
 /* CSS variable color → hex for donut chart */
@@ -43,6 +44,8 @@ const COLOR_HEX: Record<string, string> = {
   "muted-foreground": "#64748B",
 };
 
+const DEFAULT_CATEGORIES = ["رواتب", "اتصالات", "استضافة", "إيجار", "تسويق", "مواصلات", "صيانة", "اشتراكات", "مستلزمات", "أخرى"];
+
 export default function FinancePage() {
   const { activeOrgId: orgId } = useAuth();
   const { activeMonthIndex } = useTopbarControls();
@@ -54,6 +57,10 @@ export default function FinancePage() {
   const [expenseForm, setExpenseForm] = useState({ category: "", amount: "", description: "", expense_date: "" });
   const [savingExpense, setSavingExpense] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [editingExpense, setEditingExpense] = useState<MonthlyExpense | null>(null);
+  const [editForm, setEditForm] = useState({ category: "", amount: "", description: "", expense_date: "" });
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [customCategory, setCustomCategory] = useState("");
 
   const now = new Date();
   const selectedMonth = activeMonthIndex?.month ?? (now.getMonth() + 1);
@@ -104,6 +111,47 @@ export default function FinancePage() {
     await deleteExpense(id);
     setExpenses((prev) => prev.filter((e) => e.id !== id));
   }
+
+  function openEditDialog(exp: MonthlyExpense) {
+    setEditingExpense(exp);
+    setEditForm({
+      category: exp.category,
+      amount: String(exp.amount),
+      description: exp.description || "",
+      expense_date: exp.expense_date,
+    });
+  }
+
+  async function handleEditExpense() {
+    if (!editingExpense || !editForm.category.trim() || !editForm.amount) return;
+    setSavingEdit(true);
+    try {
+      const expDate = editForm.expense_date || editingExpense.expense_date;
+      const d = new Date(expDate);
+      const expMonth = d.getMonth() + 1;
+      const expYear = d.getFullYear();
+      const updated = await updateExpense(editingExpense.id, {
+        category: editForm.category.trim(),
+        amount: parseFloat(editForm.amount),
+        description: editForm.description.trim() || undefined,
+        expense_date: expDate,
+        month: expMonth,
+        year: expYear,
+      });
+      if (expMonth === selectedMonth && expYear === selectedYear) {
+        setExpenses((prev) => prev.map((e) => e.id === updated.id ? updated : e).sort((a, b) => b.amount - a.amount));
+      } else {
+        setExpenses((prev) => prev.filter((e) => e.id !== editingExpense.id));
+      }
+      setEditingExpense(null);
+    } catch (err) {
+      console.error(err);
+    }
+    setSavingEdit(false);
+  }
+
+  // Merge default categories with existing ones from expenses
+  const allCategories = [...new Set([...DEFAULT_CATEGORIES, ...expenses.map((e) => e.category)])];
 
   /* ─── Helper: match renewal to a month (by month only, ignoring year) ─── */
   function renewalMatchesMonth(r: Renewal, m: number) {
@@ -450,6 +498,12 @@ export default function FinancePage() {
                           <span className={`text-sm font-bold ${textColor}`}>{formatMoney(exp.amount)}</span>
                           <span className="text-[10px] text-muted-foreground">{expPct}%</span>
                           <button
+                            onClick={() => openEditDialog(exp)}
+                            className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-cyan/10 text-muted-foreground hover:text-cyan transition-all"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
                             onClick={() => handleDeleteExpense(exp.id)}
                             className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-cc-red/10 text-muted-foreground hover:text-cc-red transition-all"
                           >
@@ -498,20 +552,54 @@ export default function FinancePage() {
       </div>
 
       {/* ─── Add Expense Dialog ─── */}
-      <Dialog open={expenseDialog} onOpenChange={setExpenseDialog}>
+      <Dialog open={expenseDialog} onOpenChange={(open) => { setExpenseDialog(open); if (!open) setCustomCategory(""); }}>
         <DialogContent className="max-w-md" dir="rtl">
           <DialogHeader>
             <DialogTitle>إضافة مصروف</DialogTitle>
-            <DialogDescription>سجل مصروف جديد وحدد التاريخ</DialogDescription>
+            <DialogDescription>اختر البند وسجل المصروف</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-3">
             <div className="grid gap-1.5">
-              <Label>الصنف / الفئة</Label>
-              <Input
-                value={expenseForm.category}
-                onChange={(e) => setExpenseForm({ ...expenseForm, category: e.target.value })}
-                placeholder="مثال: رواتب، إيجار، تسويق..."
-              />
+              <Label>البند</Label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {allCategories.map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setExpenseForm({ ...expenseForm, category: cat })}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                      expenseForm.category === cat
+                        ? "bg-cyan/15 text-cyan border-cyan/30"
+                        : "bg-white/[0.03] text-muted-foreground border-white/[0.06] hover:border-white/[0.15]"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  value={customCategory}
+                  onChange={(e) => setCustomCategory(e.target.value)}
+                  placeholder="أو أضف بند جديد..."
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={!customCategory.trim()}
+                  onClick={() => {
+                    setExpenseForm({ ...expenseForm, category: customCategory.trim() });
+                    setCustomCategory("");
+                  }}
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+              {expenseForm.category && (
+                <p className="text-xs text-cyan mt-1">البند المختار: {expenseForm.category}</p>
+              )}
             </div>
             <div className="grid gap-1.5">
               <Label>المبلغ (ر.س)</Label>
@@ -547,6 +635,77 @@ export default function FinancePage() {
             <Button variant="outline" onClick={() => setExpenseDialog(false)}>إلغاء</Button>
             <Button onClick={handleAddExpense} disabled={savingExpense || !expenseForm.category.trim() || !expenseForm.amount}>
               {savingExpense ? "جاري الحفظ..." : "إضافة"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Edit Expense Dialog ─── */}
+      <Dialog open={!!editingExpense} onOpenChange={(open) => { if (!open) setEditingExpense(null); }}>
+        <DialogContent className="max-w-md" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>تعديل مصروف</DialogTitle>
+            <DialogDescription>عدّل بيانات المصروف</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-3">
+            <div className="grid gap-1.5">
+              <Label>البند</Label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {allCategories.map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setEditForm({ ...editForm, category: cat })}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                      editForm.category === cat
+                        ? "bg-cyan/15 text-cyan border-cyan/30"
+                        : "bg-white/[0.03] text-muted-foreground border-white/[0.06] hover:border-white/[0.15]"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+              <Input
+                value={editForm.category}
+                onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                placeholder="أو اكتب بند جديد..."
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>المبلغ (ر.س)</Label>
+              <Input
+                type="number"
+                value={editForm.amount}
+                onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })}
+                placeholder="0"
+                dir="ltr"
+                className="text-right"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>التاريخ</Label>
+              <Input
+                type="date"
+                value={editForm.expense_date}
+                onChange={(e) => setEditForm({ ...editForm, expense_date: e.target.value })}
+                dir="ltr"
+                className="text-right"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>وصف (اختياري)</Label>
+              <Input
+                value={editForm.description}
+                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                placeholder="تفاصيل إضافية..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingExpense(null)}>إلغاء</Button>
+            <Button onClick={handleEditExpense} disabled={savingEdit || !editForm.category.trim() || !editForm.amount}>
+              {savingEdit ? "جاري الحفظ..." : "حفظ التعديل"}
             </Button>
           </DialogFooter>
         </DialogContent>
