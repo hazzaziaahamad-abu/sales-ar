@@ -1059,7 +1059,20 @@ export default function SalesPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-center gap-1">
-                      <FollowUpLogButton entityType="deal" entityId={deal.id} entityName={deal.client_name} />
+                      <div className="relative">
+                        <FollowUpLogButton entityType="deal" entityId={deal.id} entityName={deal.client_name} />
+                        {deal.stage !== "مكتملة" && deal.stage !== "مرفوض مع سبب" && (() => {
+                          const daysSince = Math.floor((Date.now() - new Date(deal.updated_at).getTime()) / 86400000);
+                          if (daysSince < 3) return null;
+                          return (
+                            <span className={`absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[9px] font-bold px-1 ${
+                              daysSince >= 7 ? "bg-red-500 text-white" : "bg-amber-500 text-white"
+                            }`} title={`${daysSince} يوم بدون تحديث`}>
+                              {daysSince}
+                            </span>
+                          );
+                        })()}
+                      </div>
                       <Button
                         variant="ghost"
                         size="icon-xs"
