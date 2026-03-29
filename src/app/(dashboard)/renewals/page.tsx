@@ -84,6 +84,8 @@ const STATUS_BADGE: Record<string, { text: string; color: string; bg: string }> 
   "مؤجل مؤقتاً": { text: "مؤجل مؤقتاً", color: "text-cc-blue", bg: "bg-blue-dim" },
   "تواصل وقت آخر": { text: "تواصل وقت آخر", color: "text-cc-purple", bg: "bg-purple-dim" },
   "متردد": { text: "متردد", color: "text-amber", bg: "bg-amber-dim" },
+  "مو حاب يجدد بدون سبب": { text: "مو حاب يجدد بدون سبب", color: "text-cc-red", bg: "bg-red-dim" },
+  "الادارة رفضت": { text: "الادارة رفضت", color: "text-cc-red", bg: "bg-red-dim" },
 };
 
 /* ─── Empty form shape ─── */
