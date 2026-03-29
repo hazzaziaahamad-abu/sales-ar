@@ -1,5 +1,5 @@
 import { createClient } from "./client";
-import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, Marketer, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating, FollowUpNote, MentionNotification } from "@/types";
+import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, Marketer, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating, FollowUpNote, MentionNotification, PendingDeal } from "@/types";
 
 const DEFAULT_ORG = "00000000-0000-0000-0000-000000000001";
 
@@ -1113,4 +1113,97 @@ export async function markMentionNotificationsRead(ids: string[]): Promise<void>
     .update({ is_read: true })
     .in("id", ids)
     .eq("org_id", getOrgId());
+}
+
+// ─── PENDING DEALS ──────────────────────────────────────────────────────────
+
+export async function submitPendingDeal(orgId: string, deal: Omit<PendingDeal, "id" | "status" | "reviewed_at" | "reviewed_by" | "created_at" | "updated_at">): Promise<PendingDeal> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("pending_deals")
+    .insert({ ...deal, org_id: orgId, status: "pending" })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as PendingDeal;
+}
+
+export async function fetchPendingDeals(status?: string): Promise<PendingDeal[]> {
+  const supabase = createClient();
+  let query = supabase
+    .from("pending_deals")
+    .select("*")
+    .eq("org_id", getOrgId());
+  if (status) query = query.eq("status", status);
+  const { data, error } = await query.order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as PendingDeal[];
+}
+
+export async function approvePendingDeal(id: string, reviewerName: string): Promise<Deal> {
+  const supabase = createClient();
+  // 1. Get the pending deal
+  const { data: pd, error: fetchErr } = await supabase
+    .from("pending_deals")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (fetchErr || !pd) throw fetchErr || new Error("Not found");
+
+  // 2. Create real deal
+  const prefix = pd.sales_type === "support" ? "D" : "S";
+  const client_code = await getNextClientCode("deals", prefix);
+  const dealDate = new Date().toISOString().slice(0, 10);
+  const d = new Date(dealDate);
+
+  const { data: deal, error: createErr } = await supabase
+    .from("deals")
+    .insert({
+      org_id: pd.org_id,
+      client_code,
+      sales_type: pd.sales_type || "office",
+      client_name: pd.client_name,
+      client_phone: pd.client_phone,
+      deal_value: pd.deal_value,
+      source: pd.source,
+      stage: pd.stage || "تواصل",
+      plan: pd.plan,
+      assigned_rep_name: pd.assigned_rep_name,
+      notes: pd.notes,
+      probability: 50,
+      cycle_days: 0,
+      deal_date: dealDate,
+      month: d.getMonth() + 1,
+      year: d.getFullYear(),
+    })
+    .select()
+    .single();
+  if (createErr) throw createErr;
+
+  // 3. Mark pending as approved
+  await supabase
+    .from("pending_deals")
+    .update({ status: "approved", reviewed_at: new Date().toISOString(), reviewed_by: reviewerName })
+    .eq("id", id);
+
+  return deal as Deal;
+}
+
+export async function rejectPendingDeal(id: string, reviewerName: string): Promise<void> {
+  const supabase = createClient();
+  await supabase
+    .from("pending_deals")
+    .update({ status: "rejected", reviewed_at: new Date().toISOString(), reviewed_by: reviewerName })
+    .eq("id", id);
+}
+
+export async function countPendingDeals(): Promise<number> {
+  const supabase = createClient();
+  const { count, error } = await supabase
+    .from("pending_deals")
+    .select("*", { count: "exact", head: true })
+    .eq("org_id", getOrgId())
+    .eq("status", "pending");
+  if (error) return 0;
+  return count ?? 0;
 }

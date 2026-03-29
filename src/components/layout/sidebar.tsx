@@ -21,12 +21,14 @@ import {
   ClipboardList,
   BookOpen,
   Megaphone,
+  Inbox,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 
 const NAV_ITEMS = [
   { label: "نظرة عامة", href: "/dashboard", slug: "dashboard", icon: LayoutDashboard, color: "cyan" },
+  { label: "قائمة الطلبات", href: "/requests", slug: "requests", icon: Inbox, color: "violet" },
   { label: "مبيعات المكتب", href: "/sales", slug: "sales", icon: TrendingUp, color: "emerald" },
   { label: "مبيعات الدعم", href: "/support-sales", slug: "support-sales", icon: TrendingUp, color: "orange" },
   { label: "دليل المبيعات", href: "/sales-guide", slug: "sales-guide", icon: BookOpen, color: "amber" },

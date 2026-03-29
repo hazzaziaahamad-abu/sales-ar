@@ -405,3 +405,23 @@ export interface MentionNotification {
   is_read: boolean;
   created_at: string;
 }
+
+export interface PendingDeal {
+  id: string;
+  org_id: string;
+  sales_type: "office" | "support";
+  client_name: string;
+  client_phone?: string;
+  deal_value: number;
+  source?: string;
+  stage?: string;
+  plan?: string;
+  assigned_rep_name?: string;
+  notes?: string;
+  submitter_name?: string;
+  status: "pending" | "approved" | "rejected";
+  reviewed_at?: string;
+  reviewed_by?: string;
+  created_at: string;
+  updated_at: string;
+}
