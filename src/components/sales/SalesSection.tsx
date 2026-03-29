@@ -88,6 +88,7 @@ const STAGE_SUMMARY = [
   { stage: "تجهيز", color: "cyan" as const, icon: <Settings className="w-4 h-4 text-cyan" /> },
   { stage: "تفاوض", color: "purple" as const, icon: <MessageSquare className="w-4 h-4 text-cc-purple" /> },
   { stage: "تجريبي", color: "blue" as const, icon: <FlaskConical className="w-4 h-4 text-cc-blue" /> },
+  { stage: "كنسل التجربة", color: "red" as const, icon: <XCircle className="w-4 h-4 text-cc-red" /> },
   { stage: "مرفوض مع سبب", color: "red" as const, icon: <XCircle className="w-4 h-4 text-cc-red" /> },
 ];
 
@@ -658,7 +659,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
       </div>
 
       {/* ─── Stage Summary Cards ─── */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
         {loading
           ? Array.from({ length: 6 }).map((_, i) => <StatCardSkeleton key={i} />)
           : STAGE_SUMMARY.map((s) => {
