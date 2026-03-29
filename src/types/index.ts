@@ -2,7 +2,7 @@ export interface Deal {
   id: string;
   org_id: string;
   client_code?: string;
-  sales_type: "office" | "support";
+  sales_type?: "office" | "support";
   client_name: string;
   client_phone?: string;
   deal_value: number;

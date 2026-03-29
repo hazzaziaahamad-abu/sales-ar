@@ -360,6 +360,7 @@ export default function UploadPage() {
               notes: cellStr(row, col("notes")) || undefined,
               month: d.getMonth() + 1,
               year: d.getFullYear(),
+              sales_type: "office",
             });
           }
           dealsImported += await insertManyDeals(batch);
