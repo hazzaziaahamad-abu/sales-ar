@@ -22,6 +22,7 @@ import {
   BookOpen,
   Megaphone,
   Inbox,
+  Target,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
@@ -36,6 +37,7 @@ const NAV_ITEMS = [
   { label: "الاجتماع الأسبوعي", href: "/weekly", slug: "weekly", icon: ClipboardList, color: "violet" },
   { label: "التجديدات", href: "/renewals", slug: "renewals", icon: RefreshCw, color: "sky" },
   { label: "رضا العملاء", href: "/satisfaction", slug: "satisfaction", icon: Heart, color: "rose" },
+  { label: "قائمة الاستهداف", href: "/targeting", slug: "targeting", icon: Target, color: "fuchsia" },
   { label: "الدعم", href: "/support", slug: "support", icon: Headphones, color: "orange" },
   { label: "التطويرات", href: "/development", slug: "development", icon: Code, color: "indigo" },
   { label: "الشراكات", href: "/partnerships", slug: "partnerships", icon: Handshake, color: "teal" },
@@ -58,6 +60,7 @@ const COLOR_MAP: Record<string, { bg: string; text: string; ring: string; gradFr
   teal:    { bg: "bg-teal-500/15",    text: "text-teal-400",    ring: "ring-teal-500/20",    gradFrom: "from-teal-500/[0.12]",    border: "border-teal-500/[0.15]",    shadow: "shadow-[0_0_20px_rgba(20,184,166,0.08)]",  bar: "from-teal-400 via-teal-400 to-teal-600" },
   pink:    { bg: "bg-pink-500/15",    text: "text-pink-400",    ring: "ring-pink-500/20",    gradFrom: "from-pink-500/[0.12]",    border: "border-pink-500/[0.15]",    shadow: "shadow-[0_0_20px_rgba(236,72,153,0.08)]",  bar: "from-pink-400 via-pink-400 to-pink-600" },
   blue:    { bg: "bg-blue-500/15",    text: "text-blue-400",    ring: "ring-blue-500/20",    gradFrom: "from-blue-500/[0.12]",    border: "border-blue-500/[0.15]",    shadow: "shadow-[0_0_20px_rgba(59,130,246,0.08)]",  bar: "from-blue-400 via-blue-400 to-blue-600" },
+  fuchsia: { bg: "bg-fuchsia-500/15", text: "text-fuchsia-400", ring: "ring-fuchsia-500/20", gradFrom: "from-fuchsia-500/[0.12]", border: "border-fuchsia-500/[0.15]", shadow: "shadow-[0_0_20px_rgba(217,70,239,0.08)]", bar: "from-fuchsia-400 via-fuchsia-400 to-fuchsia-600" },
   lime:    { bg: "bg-lime-500/15",    text: "text-lime-400",    ring: "ring-lime-500/20",    gradFrom: "from-lime-500/[0.12]",    border: "border-lime-500/[0.15]",    shadow: "shadow-[0_0_20px_rgba(132,204,22,0.08)]",  bar: "from-lime-400 via-lime-400 to-lime-600" },
   slate:   { bg: "bg-slate-500/15",   text: "text-slate-400",   ring: "ring-slate-500/20",   gradFrom: "from-slate-500/[0.12]",   border: "border-slate-500/[0.15]",   shadow: "shadow-[0_0_20px_rgba(100,116,139,0.08)]", bar: "from-slate-400 via-slate-400 to-slate-600" },
   red:     { bg: "bg-red-500/15",     text: "text-red-400",     ring: "ring-red-500/20",     gradFrom: "from-red-500/[0.12]",     border: "border-red-500/[0.15]",     shadow: "shadow-[0_0_20px_rgba(239,68,68,0.08)]",   bar: "from-red-400 via-red-400 to-red-600" },

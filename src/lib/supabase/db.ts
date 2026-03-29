@@ -1,5 +1,5 @@
 import { createClient } from "./client";
-import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, Marketer, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating, FollowUpNote, MentionNotification, PendingDeal } from "@/types";
+import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, Marketer, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating, FollowUpNote, MentionNotification, PendingDeal, TargetClient } from "@/types";
 
 const DEFAULT_ORG = "00000000-0000-0000-0000-000000000001";
 
@@ -1206,4 +1206,74 @@ export async function countPendingDeals(): Promise<number> {
     .eq("status", "pending");
   if (error) return 0;
   return count ?? 0;
+}
+
+// ─── TARGETING CLIENTS ──────────────────────────────────────────────────────
+
+export async function fetchTargetClients(month: number, year: number): Promise<TargetClient[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("targeting_clients")
+    .select("*")
+    .eq("org_id", getOrgId())
+    .eq("month", month)
+    .eq("year", year)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as TargetClient[];
+}
+
+export async function createTargetClient(
+  client: Omit<TargetClient, "id" | "org_id" | "created_at" | "updated_at">
+): Promise<TargetClient> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("targeting_clients")
+    .insert({ ...client, org_id: getOrgId() })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as TargetClient;
+}
+
+export async function updateTargetClient(
+  id: string,
+  updates: Partial<Omit<TargetClient, "id" | "org_id">>
+): Promise<TargetClient> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("targeting_clients")
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as TargetClient;
+}
+
+export async function deleteTargetClient(id: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("targeting_clients")
+    .delete()
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function setDailyTargets(ids: string[], date: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("targeting_clients")
+    .update({ target_date: date, updated_at: new Date().toISOString() })
+    .in("id", ids);
+  if (error) throw error;
+}
+
+export async function clearDailyTarget(id: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("targeting_clients")
+    .update({ target_date: null, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
 }

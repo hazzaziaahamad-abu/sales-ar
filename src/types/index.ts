@@ -406,6 +406,24 @@ export interface MentionNotification {
   created_at: string;
 }
 
+export interface TargetClient {
+  id: string;
+  org_id: string;
+  client_name: string;
+  client_phone?: string;
+  plan?: string;
+  source?: string;
+  month: number;
+  year: number;
+  target_date?: string;
+  contact_status: "pending" | "contacted" | "no_answer" | "postponed";
+  satisfaction_result?: "very_satisfied" | "satisfied" | "neutral" | "needs_improvement" | "unsatisfied";
+  notes?: string;
+  assigned_rep?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface PendingDeal {
   id: string;
   org_id: string;
