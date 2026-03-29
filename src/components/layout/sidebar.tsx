@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
+import { countPendingDeals } from "@/lib/supabase/db";
 
 const NAV_ITEMS = [
   { label: "نظرة عامة", href: "/dashboard", slug: "dashboard", icon: LayoutDashboard, color: "cyan" },
@@ -71,6 +72,13 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { user, loading, signOut, activeOrgId, switchOrg, orgs } = useAuth();
   const [orgMenuOpen, setOrgMenuOpen] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    countPendingDeals().then(setPendingCount).catch(() => {});
+    const id = setInterval(() => { countPendingDeals().then(setPendingCount).catch(() => {}); }, 30000);
+    return () => clearInterval(id);
+  }, [activeOrgId]);
 
   const isSuperAdmin = user?.isSuperAdmin ?? false;
 
@@ -219,6 +227,11 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                   <Icon className="w-[17px] h-[17px]" />
                 </span>
                 <span className="flex-1">{item.label}</span>
+                {item.slug === "requests" && pendingCount > 0 && (
+                  <span className="min-w-[20px] h-5 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1.5 animate-pulse">
+                    {pendingCount}
+                  </span>
+                )}
               </Link>
             );
           })}
