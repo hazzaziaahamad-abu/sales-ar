@@ -173,19 +173,21 @@ export default function GiftsPage() {
     if (!form.client_name.trim() || !form.gift_title.trim()) return;
     setSaving(true);
     try {
-      const created = await createGiftOffer({
+      const payload: Parameters<typeof createGiftOffer>[0] = {
         client_name: form.client_name,
-        client_phone: form.client_phone || undefined,
         entity_type: form.entity_type,
-        entity_id: form.entity_id || undefined,
         gift_title: form.gift_title,
-        gift_description: form.gift_description || undefined,
         gift_type: form.gift_type,
-        gift_value: form.gift_value || undefined,
         gift_emoji: form.gift_emoji,
         box_color: form.box_color,
-        notes: form.notes || undefined,
-      });
+      };
+      if (form.client_phone) payload.client_phone = form.client_phone;
+      if (form.entity_id) payload.entity_id = form.entity_id;
+      if (form.gift_description) payload.gift_description = form.gift_description;
+      if (form.gift_value) payload.gift_value = form.gift_value;
+      if (form.notes) payload.notes = form.notes;
+
+      const created = await createGiftOffer(payload);
       setOffers((prev) => [created, ...prev]);
       setCreateOpen(false);
     } catch (err) {

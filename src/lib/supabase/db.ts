@@ -1292,12 +1292,17 @@ export async function fetchGiftOffers(): Promise<GiftOffer[]> {
 }
 
 export async function createGiftOffer(
-  offer: Omit<GiftOffer, "id" | "org_id" | "status" | "opened_at" | "accepted_at" | "rejected_at" | "created_at" | "updated_at">
+  offer: Partial<Omit<GiftOffer, "id" | "org_id" | "status" | "opened_at" | "accepted_at" | "rejected_at" | "created_at" | "updated_at">> & { client_name: string; entity_type: string; gift_title: string; gift_type: string }
 ): Promise<GiftOffer> {
   const supabase = createClient();
+  // Remove undefined keys to avoid sending null to UUID columns
+  const clean: Record<string, unknown> = { org_id: getOrgId(), status: "pending" };
+  for (const [k, v] of Object.entries(offer)) {
+    if (v !== undefined && v !== "") clean[k] = v;
+  }
   const { data, error } = await supabase
     .from("gift_offers")
-    .insert({ ...offer, org_id: getOrgId(), status: "pending" })
+    .insert(clean)
     .select()
     .single();
   if (error) throw error;
