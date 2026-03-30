@@ -212,12 +212,28 @@ export default function GiftPage() {
         ))}
       </div>
 
+      {/* Logo */}
+      <div className="relative z-10 mb-6">
+        <div className="flex items-center justify-center gap-2 bg-amber-500 rounded-xl px-4 py-2">
+          <div className="grid grid-cols-2 gap-0.5">
+            <div className="w-4 h-4 bg-[#4527A0] rounded-sm" />
+            <div className="w-4 h-4 bg-[#4527A0] rounded-sm" />
+            <div className="w-4 h-4 bg-[#4527A0] rounded-sm" />
+            <div className="w-4 h-4 bg-amber-600 rounded-sm flex items-center justify-center"><div className="w-1.5 h-1.5 bg-white rounded-full" /></div>
+          </div>
+          <div className="text-right">
+            <p className="text-black text-xs font-bold leading-tight">قائمة الطلبات</p>
+            <p className="text-white text-[10px] font-bold tracking-widest bg-black/80 px-1 rounded">MENU</p>
+          </div>
+        </div>
+      </div>
+
       {/* Greeting */}
-      <div className="relative z-10 text-center mb-8">
-        <p className="text-gray-400 text-sm mb-1">مرحباً</p>
-        <h1 className="text-2xl md:text-3xl font-bold text-white">{gift.client_name}</h1>
+      <div className="relative z-10 text-center mb-8 px-6">
+        <p className="text-gray-400 text-lg mb-1">مرحباً</p>
+        <h1 className="text-4xl md:text-5xl font-bold text-white">{gift.client_name}</h1>
         {stage === "box" && (
-          <p className="text-gray-400 text-sm mt-2 animate-pulse">لديك هدية خاصة! اضغط على الصندوق لفتحها</p>
+          <p className="text-gray-300 text-base md:text-lg mt-3 animate-pulse">لديك هدية خاصة! اضغط على الصندوق لفتحها</p>
         )}
       </div>
 
@@ -267,9 +283,9 @@ export default function GiftPage() {
 
             {/* Tap indicator */}
             {stage === "box" && (
-              <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-2">
+              <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 flex items-center gap-2">
                 <span className="block w-8 h-8 border-2 border-white/30 rounded-full animate-ping" />
-                <span className="text-white/50 text-xs">اضغط لفتح الهدية</span>
+                <span className="text-white/60 text-base font-medium">اضغط لفتح الهدية</span>
               </div>
             )}
           </button>
@@ -281,23 +297,23 @@ export default function GiftPage() {
         <div className="relative z-10 w-full max-w-md mx-auto px-4 animate-in fade-in slide-in-from-bottom-8 duration-700">
           <Sparkles count={25} />
 
-          <div className={`relative bg-[#111827]/90 backdrop-blur-xl rounded-3xl border border-white/10 p-8 text-center ${theme.glow}`}>
+          <div className={`relative bg-[#111827]/90 backdrop-blur-xl rounded-3xl border border-white/10 p-8 md:p-10 text-center ${theme.glow}`}>
             {/* Emoji */}
-            <div className="text-7xl mb-4 animate-bounce">{gift.gift_emoji || "🎁"}</div>
+            <div className="text-8xl mb-5 animate-bounce">{gift.gift_emoji || "🎁"}</div>
 
             {/* Title */}
-            <h2 className="text-2xl font-bold text-white mb-2">{gift.gift_title}</h2>
+            <h2 className="text-3xl font-bold text-white mb-3">{gift.gift_title}</h2>
 
             {/* Value badge */}
             {gift.gift_value && (
-              <div className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-l ${theme.bg} text-white font-bold text-lg mb-4`}>
+              <div className={`inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-l ${theme.bg} text-white font-bold text-2xl mb-5`}>
                 {gift.gift_value}
               </div>
             )}
 
             {/* Description */}
             {gift.gift_description && (
-              <p className="text-gray-300 text-sm leading-relaxed mb-6">{gift.gift_description}</p>
+              <p className="text-gray-300 text-base leading-relaxed mb-6">{gift.gift_description}</p>
             )}
 
             {/* Buttons */}
@@ -305,24 +321,24 @@ export default function GiftPage() {
               <div className="space-y-3">
                 <button
                   onClick={handleAccept}
-                  className={`w-full py-4 rounded-2xl bg-gradient-to-l ${theme.bg} text-white font-bold text-lg hover:opacity-90 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-xl`}
+                  className={`w-full py-4 rounded-2xl bg-gradient-to-l ${theme.bg} text-white font-bold text-xl hover:opacity-90 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-xl`}
                 >
                   قبول الهدية 🎉
                 </button>
-                <p className="text-gray-500 text-xs">بالضغط على قبول، سيتم تفعيل العرض لحسابك</p>
+                <p className="text-gray-400 text-sm mt-3">بالضغط على قبول، سيتم تفعيل العرض لحسابك</p>
               </div>
             )}
 
             {/* Accepted state */}
             {stage === "accepted" && (
               <div className="space-y-4">
-                <div className="w-20 h-20 mx-auto bg-emerald-500/20 rounded-full flex items-center justify-center">
-                  <svg className="w-10 h-10 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                <div className="w-24 h-24 mx-auto bg-emerald-500/20 rounded-full flex items-center justify-center">
+                  <svg className="w-12 h-12 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
-                <h3 className="text-xl font-bold text-emerald-400">تم قبول الهدية بنجاح!</h3>
-                <p className="text-gray-400 text-sm">سيتم التواصل معك قريباً لتفعيل العرض</p>
+                <h3 className="text-2xl font-bold text-emerald-400">تم قبول الهدية بنجاح!</h3>
+                <p className="text-gray-400 text-base">سيتم التواصل معك قريباً لتفعيل العرض</p>
               </div>
             )}
           </div>
@@ -331,7 +347,7 @@ export default function GiftPage() {
 
       {/* Footer */}
       <div className="relative z-10 mt-12 text-center">
-        <p className="text-gray-600 text-xs">مدير بلاس — نهتم بعملائنا</p>
+        <p className="text-gray-500 text-sm">مدير بلاس — نهتم بعملائنا</p>
       </div>
 
       {/* CSS animations */}
