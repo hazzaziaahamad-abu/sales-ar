@@ -347,7 +347,7 @@ export default function GiftPage() {
 
       {/* Footer */}
       <div className="relative z-10 mt-12 text-center">
-        <p className="text-gray-500 text-sm">مدير بلاس — نهتم بعملائنا</p>
+        <p className="text-gray-500 text-sm">قائمة الطلبات — نهتم بعملائنا</p>
       </div>
 
       {/* CSS animations */}

@@ -30,12 +30,13 @@ export default function BundleGiftPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
-  // Stages: box → spinning → revealed → accepted
-  const [stage, setStage] = useState<"box"|"spinning"|"revealed"|"accepted">("box");
+  // Stages: box → spinning → revealed → accepted | exhausted
+  const [stage, setStage] = useState<"box"|"spinning"|"revealed"|"accepted"|"exhausted">("box");
   const [selectedGift, setSelectedGift] = useState<GiftOffer|null>(null);
   const [particles, setParticles] = useState<Particle[]>([]);
   const [spinIndex, setSpinIndex] = useState(0);
   const spinRef = useRef<ReturnType<typeof setInterval>|null>(null);
+  const [attemptsLeft, setAttemptsLeft] = useState(2);
 
   useEffect(() => {
     fetchGiftBundle(bundleId)
@@ -44,14 +45,31 @@ export default function BundleGiftPage() {
         setGifts(data);
         // Check if any already accepted
         const accepted = data.find(g => g.status === "accepted");
-        if (accepted) { setSelectedGift(accepted); setStage("accepted"); }
+        if (accepted) { setSelectedGift(accepted); setStage("accepted"); return; }
+        // Check attempts from localStorage
+        const key = `gift_attempts_${bundleId}`;
+        const used = parseInt(localStorage.getItem(key) || "0", 10);
+        const remaining = Math.max(0, 2 - used);
+        setAttemptsLeft(remaining);
+        if (remaining <= 0) {
+          const opened = data.find(g => g.status === "opened");
+          if (opened) { setSelectedGift(opened); setStage("revealed"); }
+          else setStage("exhausted");
+        }
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
   }, [bundleId]);
 
   const handleOpenBox = useCallback(() => {
-    if (stage !== "box" || gifts.length === 0) return;
+    if (stage !== "box" || gifts.length === 0 || attemptsLeft <= 0) return;
+
+    // Track attempt
+    const key = `gift_attempts_${bundleId}`;
+    const used = parseInt(localStorage.getItem(key) || "0", 10) + 1;
+    localStorage.setItem(key, String(used));
+    setAttemptsLeft(Math.max(0, 2 - used));
+
     setStage("spinning");
 
     // Spinning animation - cycle through gifts rapidly then slow down
@@ -91,7 +109,13 @@ export default function BundleGiftPage() {
     spinRef.current = setTimeout(tick, speed);
 
     return () => { if (spinRef.current) clearTimeout(spinRef.current); };
-  }, [stage, gifts]);
+  }, [stage, gifts, attemptsLeft, bundleId]);
+
+  const handleTryAgain = useCallback(() => {
+    if (attemptsLeft <= 0) return;
+    setSelectedGift(null);
+    setStage("box");
+  }, [attemptsLeft]);
 
   const handleAccept = useCallback(async () => {
     if (!selectedGift) return;
@@ -171,9 +195,14 @@ export default function BundleGiftPage() {
         <p className="text-gray-400 text-lg mb-1">مرحباً</p>
         <h1 className="text-4xl md:text-5xl font-bold text-white">{clientName}</h1>
         {stage === "box" && (
-          <p className="text-gray-300 text-base md:text-lg mt-3 animate-pulse">
-            لديك {gifts.length} هدايا مخفية! اضغط على الصندوق لاكتشاف هديتك
-          </p>
+          <>
+            <p className="text-gray-300 text-base md:text-lg mt-3 animate-pulse">
+              لديك {gifts.length} هدايا مخفية! اضغط على الصندوق لاكتشاف هديتك
+            </p>
+            <p className="text-amber-400 text-sm mt-2 font-medium">
+              {attemptsLeft === 2 ? "لديك محاولتين" : "لديك محاولة واحدة فقط"}
+            </p>
+          </>
         )}
       </div>
 
@@ -296,6 +325,16 @@ export default function BundleGiftPage() {
             >
               قبول الهدية 🎉
             </button>
+
+            {attemptsLeft > 0 && (
+              <button
+                onClick={handleTryAgain}
+                className="w-full py-3 mt-3 rounded-2xl border border-white/20 text-white/70 font-medium text-base hover:bg-white/5 transition-all"
+              >
+                جرب مرة أخرى 🔄
+              </button>
+            )}
+
             <p className="text-gray-400 text-sm mt-3">بالضغط على قبول، سيتم تفعيل العرض لحسابك</p>
           </div>
         </div>
@@ -321,8 +360,20 @@ export default function BundleGiftPage() {
         </div>
       )}
 
+      {/* ─── EXHAUSTED STAGE ─── */}
+      {stage === "exhausted" && (
+        <div className="relative z-10 w-full max-w-md mx-auto px-4 animate-in">
+          <div className={`bg-[#111827]/90 backdrop-blur-xl rounded-3xl border border-white/10 p-8 md:p-10 text-center ${theme.glow}`}>
+            <div className="text-7xl mb-5">😔</div>
+            <h3 className="text-2xl font-bold text-white mb-3">انتهت محاولاتك</h3>
+            <p className="text-gray-400 text-base leading-relaxed">لقد استخدمت جميع المحاولات المتاحة لك</p>
+            <p className="text-gray-500 text-sm mt-4">تواصل معنا إذا كنت بحاجة للمساعدة</p>
+          </div>
+        </div>
+      )}
+
       <div className="relative z-10 mt-12 text-center">
-        <p className="text-gray-500 text-sm">مدير بلاس — نهتم بعملائنا</p>
+        <p className="text-gray-500 text-sm">قائمة الطلبات — نهتم بعملائنا</p>
       </div>
 
       <style jsx global>{`
