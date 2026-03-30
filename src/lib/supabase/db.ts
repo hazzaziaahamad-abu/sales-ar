@@ -1315,6 +1315,25 @@ export async function deleteGiftOffer(id: string): Promise<void> {
   if (error) throw error;
 }
 
+export async function updateGiftOffer(
+  id: string,
+  updates: Record<string, unknown>
+): Promise<GiftOffer> {
+  const supabase = createClient();
+  const clean: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  for (const [k, v] of Object.entries(updates)) {
+    if (v !== undefined) clean[k] = v;
+  }
+  const { data, error } = await supabase
+    .from("gift_offers")
+    .update(clean)
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as GiftOffer;
+}
+
 export async function fetchGiftOfferPublic(id: string): Promise<GiftOffer | null> {
   const supabase = createClient();
   const { data, error } = await supabase

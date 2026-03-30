@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { fetchGiftOffers, createGiftOffer, deleteGiftOffer, deleteGiftBundle, createGiftBundle, fetchDeals, fetchRenewals } from "@/lib/supabase/db";
+import { fetchGiftOffers, createGiftOffer, deleteGiftOffer, deleteGiftBundle, createGiftBundle, updateGiftOffer, fetchDeals, fetchRenewals } from "@/lib/supabase/db";
 import type { GiftOffer, Deal, Renewal } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ import {
   Gift,
   Plus,
   Trash2,
+  Pencil,
   Copy,
   Check,
   ExternalLink,
@@ -106,6 +107,50 @@ export default function GiftsPage() {
 
   // Copied link
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Edit
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingOffer, setEditingOffer] = useState<GiftOffer | null>(null);
+  const [editForm, setEditForm] = useState({ gift_title: "", gift_description: "", gift_type: "discount" as string, gift_value: "", gift_emoji: "🎁", client_name: "", client_phone: "", box_color: "purple" });
+  const [editSaving, setEditSaving] = useState(false);
+
+  function openEdit(offer: GiftOffer) {
+    setEditingOffer(offer);
+    setEditForm({
+      gift_title: offer.gift_title,
+      gift_description: offer.gift_description || "",
+      gift_type: offer.gift_type,
+      gift_value: offer.gift_value || "",
+      gift_emoji: offer.gift_emoji || "🎁",
+      client_name: offer.client_name,
+      client_phone: offer.client_phone || "",
+      box_color: offer.box_color || "purple",
+    });
+    setEditOpen(true);
+  }
+
+  async function handleEditSave() {
+    if (!editingOffer || !editForm.gift_title.trim() || !editForm.client_name.trim()) return;
+    setEditSaving(true);
+    try {
+      const updated = await updateGiftOffer(editingOffer.id, {
+        gift_title: editForm.gift_title,
+        gift_description: editForm.gift_description || null,
+        gift_type: editForm.gift_type,
+        gift_value: editForm.gift_value || null,
+        gift_emoji: editForm.gift_emoji,
+        client_name: editForm.client_name,
+        client_phone: editForm.client_phone || null,
+        box_color: editForm.box_color,
+      });
+      setOffers(prev => prev.map(o => o.id === editingOffer.id ? updated : o));
+      setEditOpen(false);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setEditSaving(false);
+    }
+  }
 
   // Delete
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -394,6 +439,14 @@ export default function GiftsPage() {
                   <Button
                     variant="ghost"
                     size="sm"
+                    className="gap-1 text-xs"
+                    onClick={() => openEdit(offer)}
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     className="flex-1 gap-1 text-xs"
                     onClick={() => copyLink(offer)}
                   >
@@ -647,6 +700,90 @@ export default function GiftsPage() {
               {saving ? "جاري الإنشاء..." : (
                 <><Gift className="w-4 h-4" />{giftItems.length > 1 ? `إنشاء ${giftItems.length} هدايا` : "إنشاء الهدية"}</>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Edit Gift Modal ─── */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-5 h-5 text-amber-400" />
+              تعديل الهدية
+            </DialogTitle>
+            <DialogDescription>عدّل بيانات الهدية</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>اسم العميل</Label>
+                <Input value={editForm.client_name} onChange={(e) => setEditForm({ ...editForm, client_name: e.target.value })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>رقم الجوال</Label>
+                <Input value={editForm.client_phone} onChange={(e) => setEditForm({ ...editForm, client_phone: e.target.value })} dir="ltr" />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>عنوان الهدية</Label>
+              <Input value={editForm.gift_title} onChange={(e) => setEditForm({ ...editForm, gift_title: e.target.value })} />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>نوع الهدية</Label>
+              <div className="flex items-center gap-2 flex-wrap">
+                {GIFT_TYPES.map((t) => (
+                  <button key={t.key} onClick={() => setEditForm({ ...editForm, gift_type: t.key })}
+                    className={`px-3 py-2 rounded-lg text-xs border transition-colors ${editForm.gift_type === t.key ? "bg-amber-500/10 text-amber-400 border-amber-500/30 font-medium" : "border-border text-muted-foreground"}`}>
+                    {t.emoji} {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>قيمة العرض</Label>
+              <Input value={editForm.gift_value} onChange={(e) => setEditForm({ ...editForm, gift_value: e.target.value })} placeholder="خصم 30%" />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>وصف العرض</Label>
+              <textarea value={editForm.gift_description} onChange={(e) => setEditForm({ ...editForm, gift_description: e.target.value })} rows={3}
+                className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>لون الصندوق</Label>
+              <div className="flex items-center gap-2">
+                {BOX_COLORS.map((c) => (
+                  <button key={c.key} onClick={() => setEditForm({ ...editForm, box_color: c.key })}
+                    className={`w-9 h-9 rounded-lg ${c.class} transition-all ${editForm.box_color === c.key ? "ring-2 ring-white ring-offset-2 ring-offset-background scale-110" : "opacity-60 hover:opacity-100"}`}
+                    title={c.label} />
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>إيموجي الهدية</Label>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {GIFT_EMOJIS.map((e) => (
+                  <button key={e} onClick={() => setEditForm({ ...editForm, gift_emoji: e })}
+                    className={`w-9 h-9 rounded-lg text-xl flex items-center justify-center transition-all ${editForm.gift_emoji === e ? "bg-white/10 ring-2 ring-amber-500/50 scale-110" : "hover:bg-white/5"}`}>
+                    {e}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>إلغاء</Button>
+            <Button onClick={handleEditSave} disabled={editSaving} className="gap-1.5 bg-amber-600 hover:bg-amber-700">
+              {editSaving ? "جاري الحفظ..." : "حفظ التعديلات"}
             </Button>
           </DialogFooter>
         </DialogContent>
