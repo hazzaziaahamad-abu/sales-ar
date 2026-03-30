@@ -443,3 +443,26 @@ export interface PendingDeal {
   created_at: string;
   updated_at: string;
 }
+
+export interface GiftOffer {
+  id: string;
+  org_id: string;
+  client_name: string;
+  client_phone?: string;
+  entity_type: "renewal" | "deal";
+  entity_id?: string;
+  gift_title: string;
+  gift_description?: string;
+  gift_type: "discount" | "free_month" | "upgrade" | "custom";
+  gift_value?: string;
+  gift_emoji?: string;
+  box_color?: string;
+  status: "pending" | "opened" | "accepted" | "rejected";
+  opened_at?: string;
+  accepted_at?: string;
+  rejected_at?: string;
+  created_by?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}

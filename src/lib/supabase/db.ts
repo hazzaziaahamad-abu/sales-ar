@@ -1,5 +1,5 @@
 import { createClient } from "./client";
-import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, Marketer, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating, FollowUpNote, MentionNotification, PendingDeal, TargetClient } from "@/types";
+import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, Marketer, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating, FollowUpNote, MentionNotification, PendingDeal, TargetClient, GiftOffer } from "@/types";
 
 const DEFAULT_ORG = "00000000-0000-0000-0000-000000000001";
 
@@ -1276,4 +1276,72 @@ export async function clearDailyTarget(id: string): Promise<void> {
     .update({ target_date: null, updated_at: new Date().toISOString() })
     .eq("id", id);
   if (error) throw error;
+}
+
+// ─── GIFT OFFERS ──────────────────────────────────────────────────────────
+
+export async function fetchGiftOffers(): Promise<GiftOffer[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("gift_offers")
+    .select("*")
+    .eq("org_id", getOrgId())
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as GiftOffer[];
+}
+
+export async function createGiftOffer(
+  offer: Omit<GiftOffer, "id" | "org_id" | "status" | "opened_at" | "accepted_at" | "rejected_at" | "created_at" | "updated_at">
+): Promise<GiftOffer> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("gift_offers")
+    .insert({ ...offer, org_id: getOrgId(), status: "pending" })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as GiftOffer;
+}
+
+export async function deleteGiftOffer(id: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from("gift_offers").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function fetchGiftOfferPublic(id: string): Promise<GiftOffer | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("gift_offers")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (error) return null;
+  return data as GiftOffer;
+}
+
+export async function markGiftOpened(id: string): Promise<void> {
+  const supabase = createClient();
+  await supabase
+    .from("gift_offers")
+    .update({ status: "opened", opened_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .in("status", ["pending"]);
+}
+
+export async function markGiftAccepted(id: string): Promise<void> {
+  const supabase = createClient();
+  await supabase
+    .from("gift_offers")
+    .update({ status: "accepted", accepted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq("id", id);
+}
+
+export async function markGiftRejected(id: string): Promise<void> {
+  const supabase = createClient();
+  await supabase
+    .from("gift_offers")
+    .update({ status: "rejected", rejected_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq("id", id);
 }
