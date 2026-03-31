@@ -1419,6 +1419,19 @@ export async function deleteGiftBundle(bundleId: string): Promise<void> {
   if (error) throw error;
 }
 
+// ─── USER PROFILES (for task assignment) ────────────────────────────────────
+
+export async function fetchUserProfiles(): Promise<{ id: string; name: string; email: string }[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("user_profiles")
+    .select("id, name, email")
+    .eq("org_id", getOrgId())
+    .order("name");
+  if (error) throw error;
+  return (data ?? []) as { id: string; name: string; email: string }[];
+}
+
 // ─── EMPLOYEE TASKS ─────────────────────────────────────────────────────────
 
 export async function fetchEmployeeTasks(filters?: { assigned_to?: string; status?: string; due_date?: string }): Promise<EmployeeTask[]> {

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import type { Deal, Marketer } from "@/types";
 import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createFollowUpNote, fetchRecentFollowUpNotes } from "@/lib/supabase/db";
+import { AssignTaskModal } from "@/components/tasks/AssignTaskModal";
 import { useAuth } from "@/lib/auth-context";
 import { useTopbarControls } from "@/components/layout/topbar-context";
 import { STAGES, SOURCES, SOURCE_COLORS, PLANS } from "@/lib/utils/constants";
@@ -65,6 +66,7 @@ import {
   SquareCheck,
   Download,
   Share2,
+  UserPlus,
 } from "lucide-react";
 
 /* ─── Stage badge color mapping ─── */
@@ -148,6 +150,9 @@ export function SalesSection({ salesType }: SalesPageProps) {
   /* delete confirmation */
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  /* assign task modal */
+  const [assignDeal, setAssignDeal] = useState<Deal | null>(null);
 
   /* daily target selection — persisted per day in localStorage */
   const salesTodayKey = `sales_daily_target_${salesType}_${new Date().toISOString().slice(0, 10)}`;
@@ -1087,6 +1092,15 @@ export function SalesSection({ salesType }: SalesPageProps) {
                       <Button
                         variant="ghost"
                         size="icon-xs"
+                        onClick={() => setAssignDeal(deal)}
+                        title="تعيين لموظف"
+                        className="text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10"
+                      >
+                        <UserPlus className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
                         onClick={() => openEditModal(deal)}
                         title="تعديل"
                       >
@@ -1641,6 +1655,19 @@ export function SalesSection({ salesType }: SalesPageProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Assign Task Modal */}
+      {assignDeal && (
+        <AssignTaskModal
+          open={!!assignDeal}
+          onClose={() => setAssignDeal(null)}
+          clientName={assignDeal.client_name}
+          clientPhone={assignDeal.client_phone}
+          entityType="deal"
+          entityId={assignDeal.id}
+          defaultTitle={`متابعة ${assignDeal.client_name} — ${assignDeal.stage}`}
+        />
+      )}
     </div>
   );
 }
