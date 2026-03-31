@@ -1,5 +1,5 @@
 import { createClient } from "./client";
-import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, Marketer, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating, FollowUpNote, MentionNotification, PendingDeal, TargetClient, GiftOffer } from "@/types";
+import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, Marketer, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating, FollowUpNote, MentionNotification, PendingDeal, TargetClient, GiftOffer, EmployeeTask } from "@/types";
 
 const DEFAULT_ORG = "00000000-0000-0000-0000-000000000001";
 
@@ -1417,4 +1417,95 @@ export async function deleteGiftBundle(bundleId: string): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase.from("gift_offers").delete().eq("bundle_id", bundleId);
   if (error) throw error;
+}
+
+// ─── EMPLOYEE TASKS ─────────────────────────────────────────────────────────
+
+export async function fetchEmployeeTasks(filters?: { assigned_to?: string; status?: string; due_date?: string }): Promise<EmployeeTask[]> {
+  const supabase = createClient();
+  let query = supabase.from("employee_tasks").select("*").eq("org_id", getOrgId());
+  if (filters?.assigned_to) query = query.eq("assigned_to", filters.assigned_to);
+  if (filters?.status) query = query.eq("status", filters.status);
+  if (filters?.due_date) query = query.eq("due_date", filters.due_date);
+  const { data, error } = await query.order("due_date", { ascending: true }).order("priority", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as EmployeeTask[];
+}
+
+export async function createEmployeeTask(
+  task: Omit<EmployeeTask, "id" | "org_id" | "created_at" | "updated_at">
+): Promise<EmployeeTask> {
+  const supabase = createClient();
+  const clean: Record<string, unknown> = { org_id: getOrgId() };
+  for (const [k, v] of Object.entries(task)) {
+    if (v !== undefined && v !== "") clean[k] = v;
+  }
+  const { data, error } = await supabase.from("employee_tasks").insert(clean).select().single();
+  if (error) throw error;
+  return data as EmployeeTask;
+}
+
+export async function updateEmployeeTask(id: string, updates: Partial<EmployeeTask>): Promise<EmployeeTask> {
+  const supabase = createClient();
+  const clean: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  for (const [k, v] of Object.entries(updates)) {
+    if (k !== "id" && k !== "org_id" && k !== "created_at" && v !== undefined) clean[k] = v;
+  }
+  if (updates.status === "completed" && !updates.completed_at) {
+    clean.completed_at = new Date().toISOString();
+  }
+  const { data, error } = await supabase.from("employee_tasks").update(clean).eq("id", id).select().single();
+  if (error) throw error;
+  return data as EmployeeTask;
+}
+
+export async function deleteEmployeeTask(id: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from("employee_tasks").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function fetchMyTaskStats(userId: string): Promise<{ total: number; completed: number; pending: number; in_progress: number; overdue: number }> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("employee_tasks")
+    .select("status, due_date")
+    .eq("org_id", getOrgId())
+    .eq("assigned_to", userId);
+  if (error) throw error;
+  const tasks = data ?? [];
+  const today = new Date().toISOString().split("T")[0];
+  return {
+    total: tasks.length,
+    completed: tasks.filter(t => t.status === "completed").length,
+    pending: tasks.filter(t => t.status === "pending").length,
+    in_progress: tasks.filter(t => t.status === "in_progress").length,
+    overdue: tasks.filter(t => t.status !== "completed" && t.status !== "cancelled" && t.due_date && t.due_date < today).length,
+  };
+}
+
+export async function fetchTeamTaskStats(): Promise<{ employee_name: string; employee_id: string; total: number; completed: number; pending: number; completion_rate: number }[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("employee_tasks")
+    .select("assigned_to, assigned_to_name, status")
+    .eq("org_id", getOrgId());
+  if (error) throw error;
+  const tasks = data ?? [];
+  const map = new Map<string, { name: string; total: number; completed: number; pending: number }>();
+  for (const t of tasks) {
+    const existing = map.get(t.assigned_to) || { name: t.assigned_to_name, total: 0, completed: 0, pending: 0 };
+    existing.total++;
+    if (t.status === "completed") existing.completed++;
+    else if (t.status === "pending" || t.status === "in_progress") existing.pending++;
+    map.set(t.assigned_to, existing);
+  }
+  return Array.from(map.entries()).map(([id, s]) => ({
+    employee_name: s.name,
+    employee_id: id,
+    total: s.total,
+    completed: s.completed,
+    pending: s.pending,
+    completion_rate: s.total > 0 ? Math.round((s.completed / s.total) * 100) : 0,
+  })).sort((a, b) => b.completion_rate - a.completion_rate);
 }

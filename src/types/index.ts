@@ -444,6 +444,32 @@ export interface PendingDeal {
   updated_at: string;
 }
 
+export interface EmployeeTask {
+  id: string;
+  org_id: string;
+  title: string;
+  description?: string;
+  task_type: "general" | "call" | "meeting" | "followup" | "renewal" | "support";
+  priority: "low" | "medium" | "high" | "urgent";
+  status: "pending" | "in_progress" | "completed" | "cancelled";
+  assigned_to: string;
+  assigned_to_name: string;
+  assigned_by?: string;
+  assigned_by_name?: string;
+  due_date?: string;
+  due_time?: string;
+  start_date?: string;
+  completed_at?: string;
+  client_name?: string;
+  client_phone?: string;
+  entity_type?: "deal" | "renewal" | "ticket";
+  entity_id?: string;
+  notes?: string;
+  completion_notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface GiftOffer {
   id: string;
   org_id: string;

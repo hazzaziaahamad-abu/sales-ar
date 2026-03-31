@@ -24,6 +24,8 @@ import {
   Inbox,
   Target,
   Gift,
+  ListTodo,
+  UserCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
@@ -40,6 +42,8 @@ const NAV_ITEMS = [
   { label: "رضا العملاء", href: "/satisfaction", slug: "satisfaction", icon: Heart, color: "rose" },
   { label: "قائمة الاستهداف", href: "/targeting", slug: "targeting", icon: Target, color: "fuchsia" },
   { label: "بوكس الهدايا", href: "/gifts", slug: "gifts", icon: Gift, color: "amber" },
+  { label: "إدارة المهام", href: "/tasks", slug: "tasks", icon: ListTodo, color: "indigo" },
+  { label: "مهامي", href: "/my-tasks", slug: "my-tasks", icon: UserCheck, color: "cyan" },
   { label: "الدعم", href: "/support", slug: "support", icon: Headphones, color: "orange" },
   { label: "التطويرات", href: "/development", slug: "development", icon: Code, color: "indigo" },
   { label: "الشراكات", href: "/partnerships", slug: "partnerships", icon: Handshake, color: "teal" },
