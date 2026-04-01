@@ -1173,8 +1173,8 @@ export async function fetchRecentFollowUpNotes(limit = 20): Promise<(FollowUpNot
     deals?.forEach(d => { nameMap[d.id] = d.client_name; });
   }
   if (renewalIds.length > 0) {
-    const { data: renewals } = await supabase.from("renewals").select("id, business_name").in("id", renewalIds);
-    renewals?.forEach(r => { nameMap[r.id] = r.business_name; });
+    const { data: renewals } = await supabase.from("renewals").select("id, customer_name").in("id", renewalIds);
+    renewals?.forEach(r => { nameMap[r.id] = r.customer_name; });
   }
 
   return notes.map(n => ({ ...n, entity_name: nameMap[n.entity_id] || "" })) as (FollowUpNote & { entity_name?: string })[];
