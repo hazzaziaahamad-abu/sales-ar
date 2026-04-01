@@ -203,6 +203,18 @@ export interface MonthlyExpense {
   updated_at: string;
 }
 
+export interface MonthlyBudget {
+  id: string;
+  org_id: string;
+  category: string;
+  planned_amount: number;
+  month: number;
+  year: number;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Marketer {
   id: string;
   org_id: string;

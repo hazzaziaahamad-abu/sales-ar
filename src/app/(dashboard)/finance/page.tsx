@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { Deal, Renewal, MonthlyExpense } from "@/types";
-import { fetchDeals, fetchRenewals, fetchMonthlyExpenses, createExpense, deleteExpense, updateExpense } from "@/lib/supabase/db";
+import type { Deal, Renewal, MonthlyExpense, MonthlyBudget } from "@/types";
+import { fetchDeals, fetchRenewals, fetchMonthlyExpenses, createExpense, deleteExpense, updateExpense, fetchMonthlyBudget, upsertBudgetItem, deleteBudgetItem, copyBudgetFromPreviousMonth } from "@/lib/supabase/db";
 import { useAuth } from "@/lib/auth-context";
 import { useTopbarControls } from "@/components/layout/topbar-context";
 import { MONTHS_AR, SOURCE_COLORS } from "@/lib/utils/constants";
@@ -31,6 +31,12 @@ import {
   Trash2,
   Receipt,
   Pencil,
+  ClipboardList,
+  Copy,
+  AlertTriangle,
+  CheckCircle2,
+  ArrowDown,
+  ArrowUp,
 } from "lucide-react";
 
 /* CSS variable color → hex for donut chart */
@@ -62,17 +68,28 @@ export default function FinancePage() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [customCategory, setCustomCategory] = useState("");
 
+  /* Budget state */
+  const [budget, setBudget] = useState<MonthlyBudget[]>([]);
+  const [budgetDialog, setBudgetDialog] = useState(false);
+  const [budgetForm, setBudgetForm] = useState({ category: "", planned_amount: "", notes: "" });
+  const [savingBudget, setSavingBudget] = useState(false);
+  const [editingBudget, setEditingBudget] = useState<MonthlyBudget | null>(null);
+  const [editBudgetForm, setEditBudgetForm] = useState({ planned_amount: "", notes: "" });
+  const [copyingBudget, setCopyingBudget] = useState(false);
+  const [budgetCustomCat, setBudgetCustomCat] = useState("");
+
   const now = new Date();
   const selectedMonth = activeMonthIndex?.month ?? (now.getMonth() + 1);
   const selectedYear = activeMonthIndex?.year ?? now.getFullYear();
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([fetchDeals(), fetchRenewals(), fetchMonthlyExpenses(selectedMonth, selectedYear)])
-      .then(([d, r, e]) => {
+    Promise.all([fetchDeals(), fetchRenewals(), fetchMonthlyExpenses(selectedMonth, selectedYear), fetchMonthlyBudget(selectedMonth, selectedYear)])
+      .then(([d, r, e, b]) => {
         setDeals(d);
         setRenewals(r);
         setExpenses(e);
+        setBudget(b);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -148,6 +165,66 @@ export default function FinancePage() {
       console.error(err);
     }
     setSavingEdit(false);
+  }
+
+  /* ─── Budget Handlers ─── */
+  async function handleAddBudget() {
+    if (!budgetForm.category.trim() || !budgetForm.planned_amount) return;
+    setSavingBudget(true);
+    try {
+      const created = await upsertBudgetItem({
+        category: budgetForm.category.trim(),
+        planned_amount: parseFloat(budgetForm.planned_amount),
+        month: selectedMonth,
+        year: selectedYear,
+        notes: budgetForm.notes.trim() || undefined,
+      });
+      setBudget(prev => {
+        const existing = prev.findIndex(b => b.category === created.category);
+        if (existing >= 0) {
+          const next = [...prev];
+          next[existing] = created;
+          return next.sort((a, b) => b.planned_amount - a.planned_amount);
+        }
+        return [...prev, created].sort((a, b) => b.planned_amount - a.planned_amount);
+      });
+      setBudgetForm({ category: "", planned_amount: "", notes: "" });
+      setBudgetDialog(false);
+    } catch (err) { console.error(err); }
+    setSavingBudget(false);
+  }
+
+  async function handleEditBudget() {
+    if (!editingBudget || !editBudgetForm.planned_amount) return;
+    setSavingBudget(true);
+    try {
+      const updated = await upsertBudgetItem({
+        category: editingBudget.category,
+        planned_amount: parseFloat(editBudgetForm.planned_amount),
+        month: selectedMonth,
+        year: selectedYear,
+        notes: editBudgetForm.notes.trim() || undefined,
+      });
+      setBudget(prev => prev.map(b => b.id === editingBudget.id ? updated : b).sort((a, b) => b.planned_amount - a.planned_amount));
+      setEditingBudget(null);
+    } catch (err) { console.error(err); }
+    setSavingBudget(false);
+  }
+
+  async function handleDeleteBudget(id: string) {
+    await deleteBudgetItem(id);
+    setBudget(prev => prev.filter(b => b.id !== id));
+  }
+
+  async function handleCopyBudget() {
+    setCopyingBudget(true);
+    try {
+      const copied = await copyBudgetFromPreviousMonth(selectedMonth, selectedYear);
+      if (copied.length > 0) {
+        setBudget(copied.sort((a, b) => b.planned_amount - a.planned_amount));
+      }
+    } catch (err) { console.error(err); }
+    setCopyingBudget(false);
   }
 
   // Merge default categories with existing ones from expenses
@@ -379,6 +456,226 @@ export default function FinancePage() {
             </>
           )}
         </div>
+      </div>
+
+      {/* ─── Monthly Budget Plan vs Actual ─── */}
+      <div className="cc-card rounded-xl p-5">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <ClipboardList className="w-5 h-5 text-cyan" />
+            <h3 className="text-sm font-bold text-foreground">الخطة المالية الشهرية — {MONTHS_AR[selectedMonth - 1]} {selectedYear}</h3>
+          </div>
+          <div className="flex items-center gap-2">
+            {budget.length === 0 && (
+              <Button size="sm" variant="outline" onClick={handleCopyBudget} disabled={copyingBudget} className="gap-1.5 text-xs">
+                <Copy className="w-3.5 h-3.5" /> {copyingBudget ? "جاري النسخ..." : "نسخ من الشهر السابق"}
+              </Button>
+            )}
+            <Button size="sm" onClick={() => setBudgetDialog(true)} className="gap-1.5">
+              <Plus className="w-4 h-4" /> إضافة بند
+            </Button>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-lg" />)}
+          </div>
+        ) : budget.length === 0 ? (
+          <div className="text-center py-10 text-muted-foreground">
+            <ClipboardList className="w-12 h-12 mx-auto mb-3 opacity-30" />
+            <p>لا توجد خطة مالية لهذا الشهر</p>
+            <p className="text-sm mt-1">أضف البنود المخططة أو انسخها من الشهر السابق</p>
+          </div>
+        ) : (
+          <>
+            {/* Budget overview cards */}
+            {(() => {
+              const totalPlanned = budget.reduce((s, b) => s + b.planned_amount, 0);
+              const totalActual = expenses.reduce((s, e) => s + e.amount, 0);
+              const variance = totalPlanned - totalActual;
+              const usagePct = totalPlanned > 0 ? Math.round((totalActual / totalPlanned) * 100) : 0;
+              const overBudgetCount = budget.filter(b => {
+                const actual = expenses.filter(e => e.category === b.category).reduce((s, e) => s + e.amount, 0);
+                return actual > b.planned_amount;
+              }).length;
+
+              return (
+                <div className="space-y-5">
+                  {/* Summary row */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="p-3 rounded-lg bg-cyan/10 border border-cyan/20 text-center">
+                      <p className="text-xl font-bold text-cyan">{formatMoney(totalPlanned)}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">إجمالي الميزانية</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-cc-purple/10 border border-cc-purple/20 text-center">
+                      <p className="text-xl font-bold text-cc-purple">{formatMoney(totalActual)}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">المصروف الفعلي</p>
+                    </div>
+                    <div className={`p-3 rounded-lg text-center border ${
+                      variance >= 0 ? "bg-cc-green/10 border-cc-green/20" : "bg-cc-red/10 border-cc-red/20"
+                    }`}>
+                      <p className={`text-xl font-bold ${variance >= 0 ? "text-cc-green" : "text-cc-red"}`}>
+                        {variance >= 0 ? "+" : ""}{formatMoney(variance)}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{variance >= 0 ? "متبقي من الميزانية" : "تجاوز الميزانية"}</p>
+                    </div>
+                    <div className={`p-3 rounded-lg text-center border ${
+                      usagePct <= 80 ? "bg-cc-green/10 border-cc-green/20" : usagePct <= 100 ? "bg-amber/10 border-amber/20" : "bg-cc-red/10 border-cc-red/20"
+                    }`}>
+                      <p className={`text-xl font-bold ${
+                        usagePct <= 80 ? "text-cc-green" : usagePct <= 100 ? "text-amber" : "text-cc-red"
+                      }`}>{usagePct}%</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">نسبة الاستخدام</p>
+                    </div>
+                  </div>
+
+                  {/* Overall progress bar */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs text-muted-foreground">استهلاك الميزانية الإجمالي</span>
+                      {overBudgetCount > 0 && (
+                        <span className="text-xs text-cc-red flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" /> {overBudgetCount} بند تجاوز الميزانية
+                        </span>
+                      )}
+                    </div>
+                    <div className="h-3 bg-white/[0.04] rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-700 ${
+                          usagePct <= 80 ? "bg-gradient-to-l from-emerald-400 to-emerald-600" :
+                          usagePct <= 100 ? "bg-gradient-to-l from-amber-400 to-amber-600" :
+                          "bg-gradient-to-l from-red-400 to-red-600"
+                        }`}
+                        style={{ width: `${Math.min(usagePct, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Budget items comparison table */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="text-right py-3 px-3 text-xs font-semibold text-muted-foreground">البند</th>
+                          <th className="text-right py-3 px-3 text-xs font-semibold text-muted-foreground">المخطط</th>
+                          <th className="text-right py-3 px-3 text-xs font-semibold text-muted-foreground">الفعلي</th>
+                          <th className="text-right py-3 px-3 text-xs font-semibold text-muted-foreground">الفرق</th>
+                          <th className="text-right py-3 px-3 text-xs font-semibold text-muted-foreground">الاستخدام</th>
+                          <th className="text-center py-3 px-3 text-xs font-semibold text-muted-foreground w-20">إجراء</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {budget.map(b => {
+                          const actual = expenses.filter(e => e.category === b.category).reduce((s, e) => s + e.amount, 0);
+                          const diff = b.planned_amount - actual;
+                          const pct = b.planned_amount > 0 ? Math.round((actual / b.planned_amount) * 100) : 0;
+                          const isOver = actual > b.planned_amount;
+                          const barColor = pct <= 80 ? "bg-cc-green" : pct <= 100 ? "bg-amber" : "bg-cc-red";
+                          const textColor = pct <= 80 ? "text-cc-green" : pct <= 100 ? "text-amber" : "text-cc-red";
+
+                          return (
+                            <tr key={b.id} className="group border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
+                              <td className="py-3 px-3">
+                                <div className="flex items-center gap-2">
+                                  {isOver ? (
+                                    <ArrowUp className="w-3.5 h-3.5 text-cc-red shrink-0" />
+                                  ) : actual > 0 ? (
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-cc-green shrink-0" />
+                                  ) : (
+                                    <div className="w-3.5 h-3.5 rounded-full border border-white/20 shrink-0" />
+                                  )}
+                                  <span className="font-medium text-foreground">{b.category}</span>
+                                  {b.notes && <span className="text-[10px] text-muted-foreground hidden sm:inline">({b.notes})</span>}
+                                </div>
+                              </td>
+                              <td className="py-3 px-3 text-cyan font-semibold">{formatMoney(b.planned_amount)}</td>
+                              <td className="py-3 px-3 text-cc-purple font-semibold">{formatMoney(actual)}</td>
+                              <td className={`py-3 px-3 font-semibold ${isOver ? "text-cc-red" : "text-cc-green"}`}>
+                                <span className="flex items-center gap-1">
+                                  {isOver ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
+                                  {formatMoney(Math.abs(diff))}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3">
+                                <div className="flex items-center gap-2">
+                                  <div className="flex-1 h-2 bg-white/[0.04] rounded-full overflow-hidden min-w-[60px]">
+                                    <div className={`h-full rounded-full ${barColor} transition-all`} style={{ width: `${Math.min(pct, 100)}%` }} />
+                                  </div>
+                                  <span className={`text-xs font-bold ${textColor} min-w-[36px] text-left`}>{pct}%</span>
+                                </div>
+                              </td>
+                              <td className="py-3 px-3 text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  <button
+                                    onClick={() => { setEditingBudget(b); setEditBudgetForm({ planned_amount: String(b.planned_amount), notes: b.notes || "" }); }}
+                                    className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-cyan/10 text-muted-foreground hover:text-cyan transition-all"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteBudget(b.id)}
+                                    className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-cc-red/10 text-muted-foreground hover:text-cc-red transition-all"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t border-border font-bold">
+                          <td className="py-3 px-3 text-foreground">الإجمالي</td>
+                          <td className="py-3 px-3 text-cyan">{formatMoney(totalPlanned)}</td>
+                          <td className="py-3 px-3 text-cc-purple">{formatMoney(totalActual)}</td>
+                          <td className={`py-3 px-3 ${variance >= 0 ? "text-cc-green" : "text-cc-red"}`}>
+                            {variance >= 0 ? "+" : ""}{formatMoney(variance)}
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className={`text-xs font-bold ${
+                              usagePct <= 80 ? "text-cc-green" : usagePct <= 100 ? "text-amber" : "text-cc-red"
+                            }`}>{usagePct}%</span>
+                          </td>
+                          <td />
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+
+                  {/* Unbudgeted expenses warning */}
+                  {(() => {
+                    const budgetCats = new Set(budget.map(b => b.category));
+                    const unbudgeted = expenses.filter(e => !budgetCats.has(e.category));
+                    if (unbudgeted.length === 0) return null;
+                    const unbudgetedTotal = unbudgeted.reduce((s, e) => s + e.amount, 0);
+                    const unbudgetedCats = [...new Set(unbudgeted.map(e => e.category))];
+                    return (
+                      <div className="mt-4 p-3 rounded-lg bg-amber/10 border border-amber/20">
+                        <div className="flex items-center gap-2 mb-1">
+                          <AlertTriangle className="w-4 h-4 text-amber" />
+                          <span className="text-sm font-semibold text-amber">مصاريف خارج الميزانية</span>
+                          <span className="text-xs text-muted-foreground mr-auto">{formatMoney(unbudgetedTotal)}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {unbudgetedCats.map(cat => {
+                            const catTotal = unbudgeted.filter(e => e.category === cat).reduce((s, e) => s + e.amount, 0);
+                            return (
+                              <span key={cat} className="px-2 py-1 rounded-md bg-amber/15 text-amber text-[11px] font-medium">
+                                {cat}: {formatMoney(catTotal)}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              );
+            })()}
+          </>
+        )}
       </div>
 
       {/* ─── Monthly Expenses Section ─── */}
@@ -706,6 +1003,123 @@ export default function FinancePage() {
             <Button variant="outline" onClick={() => setEditingExpense(null)}>إلغاء</Button>
             <Button onClick={handleEditExpense} disabled={savingEdit || !editForm.category.trim() || !editForm.amount}>
               {savingEdit ? "جاري الحفظ..." : "حفظ التعديل"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Add Budget Item Dialog ─── */}
+      <Dialog open={budgetDialog} onOpenChange={(open) => { setBudgetDialog(open); if (!open) setBudgetCustomCat(""); }}>
+        <DialogContent className="max-w-md" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>إضافة بند للميزانية</DialogTitle>
+            <DialogDescription>حدد البند والمبلغ المخطط لهذا الشهر</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-3">
+            <div className="grid gap-1.5">
+              <Label>البند</Label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {allCategories.map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setBudgetForm({ ...budgetForm, category: cat })}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                      budgetForm.category === cat
+                        ? "bg-cyan/15 text-cyan border-cyan/30"
+                        : "bg-white/[0.03] text-muted-foreground border-white/[0.06] hover:border-white/[0.15]"
+                    }`}
+                  >
+                    {cat}
+                    {(() => { const b = budget.find(b => b.category === cat); return b ? ` ✓` : ""; })()}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  value={budgetCustomCat}
+                  onChange={(e) => setBudgetCustomCat(e.target.value)}
+                  placeholder="أو أضف بند جديد..."
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={!budgetCustomCat.trim()}
+                  onClick={() => {
+                    setBudgetForm({ ...budgetForm, category: budgetCustomCat.trim() });
+                    setBudgetCustomCat("");
+                  }}
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+              {budgetForm.category && (
+                <p className="text-xs text-cyan mt-1">البند المختار: {budgetForm.category}</p>
+              )}
+            </div>
+            <div className="grid gap-1.5">
+              <Label>المبلغ المخطط (ر.س)</Label>
+              <Input
+                type="number"
+                value={budgetForm.planned_amount}
+                onChange={(e) => setBudgetForm({ ...budgetForm, planned_amount: e.target.value })}
+                placeholder="0"
+                dir="ltr"
+                className="text-right"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>ملاحظات (اختياري)</Label>
+              <Input
+                value={budgetForm.notes}
+                onChange={(e) => setBudgetForm({ ...budgetForm, notes: e.target.value })}
+                placeholder="تفاصيل إضافية..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBudgetDialog(false)}>إلغاء</Button>
+            <Button onClick={handleAddBudget} disabled={savingBudget || !budgetForm.category.trim() || !budgetForm.planned_amount}>
+              {savingBudget ? "جاري الحفظ..." : "إضافة"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Edit Budget Item Dialog ─── */}
+      <Dialog open={!!editingBudget} onOpenChange={(open) => { if (!open) setEditingBudget(null); }}>
+        <DialogContent className="max-w-sm" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>تعديل بند: {editingBudget?.category}</DialogTitle>
+            <DialogDescription>عدّل المبلغ المخطط لهذا البند</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-3">
+            <div className="grid gap-1.5">
+              <Label>المبلغ المخطط (ر.س)</Label>
+              <Input
+                type="number"
+                value={editBudgetForm.planned_amount}
+                onChange={(e) => setEditBudgetForm({ ...editBudgetForm, planned_amount: e.target.value })}
+                placeholder="0"
+                dir="ltr"
+                className="text-right"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>ملاحظات (اختياري)</Label>
+              <Input
+                value={editBudgetForm.notes}
+                onChange={(e) => setEditBudgetForm({ ...editBudgetForm, notes: e.target.value })}
+                placeholder="تفاصيل إضافية..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingBudget(null)}>إلغاء</Button>
+            <Button onClick={handleEditBudget} disabled={savingBudget || !editBudgetForm.planned_amount}>
+              {savingBudget ? "جاري الحفظ..." : "حفظ التعديل"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,5 +1,5 @@
 import { createClient } from "./client";
-import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, Marketer, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating, FollowUpNote, MentionNotification, PendingDeal, TargetClient, GiftOffer, EmployeeTask } from "@/types";
+import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, MonthlyBudget, Marketer, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating, FollowUpNote, MentionNotification, PendingDeal, TargetClient, GiftOffer, EmployeeTask } from "@/types";
 
 const DEFAULT_ORG = "00000000-0000-0000-0000-000000000001";
 
@@ -954,6 +954,74 @@ export async function updateExpense(
 export async function deleteExpense(id: string): Promise<void> {
   const supabase = createClient();
   await supabase.from("monthly_expenses").delete().eq("id", id);
+}
+
+// ─── Monthly Budget ─────────────────────────────────────────────────────────
+
+export async function fetchMonthlyBudget(month: number, year: number): Promise<MonthlyBudget[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("monthly_budget")
+    .select("*")
+    .eq("org_id", getOrgId())
+    .eq("month", month)
+    .eq("year", year)
+    .order("planned_amount", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as MonthlyBudget[];
+}
+
+export async function upsertBudgetItem(item: {
+  category: string;
+  planned_amount: number;
+  month: number;
+  year: number;
+  notes?: string;
+}): Promise<MonthlyBudget> {
+  const supabase = createClient();
+  const orgId = getOrgId();
+  const { data, error } = await supabase
+    .from("monthly_budget")
+    .upsert(
+      {
+        org_id: orgId,
+        category: item.category,
+        planned_amount: item.planned_amount,
+        month: item.month,
+        year: item.year,
+        notes: item.notes || null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "org_id,category,month,year" }
+    )
+    .select()
+    .single();
+  if (error) throw error;
+  return data as MonthlyBudget;
+}
+
+export async function deleteBudgetItem(id: string): Promise<void> {
+  const supabase = createClient();
+  await supabase.from("monthly_budget").delete().eq("id", id);
+}
+
+export async function copyBudgetFromPreviousMonth(month: number, year: number): Promise<MonthlyBudget[]> {
+  const prevMonth = month === 1 ? 12 : month - 1;
+  const prevYear = month === 1 ? year - 1 : year;
+  const prevBudget = await fetchMonthlyBudget(prevMonth, prevYear);
+  if (prevBudget.length === 0) return [];
+  const results: MonthlyBudget[] = [];
+  for (const item of prevBudget) {
+    const created = await upsertBudgetItem({
+      category: item.category,
+      planned_amount: item.planned_amount,
+      month,
+      year,
+      notes: item.notes,
+    });
+    results.push(created);
+  }
+  return results;
 }
 
 // ─── Marketers ──────────────────────────────────────────────────────────────
