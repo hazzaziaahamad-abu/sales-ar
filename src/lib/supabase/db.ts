@@ -1,5 +1,5 @@
 import { createClient } from "./client";
-import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, MonthlyBudget, Marketer, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating, FollowUpNote, MentionNotification, PendingDeal, TargetClient, GiftOffer, EmployeeTask } from "@/types";
+import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, MonthlyBudget, StartupCost, Marketer, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating, FollowUpNote, MentionNotification, PendingDeal, TargetClient, GiftOffer, EmployeeTask } from "@/types";
 
 const DEFAULT_ORG = "00000000-0000-0000-0000-000000000001";
 
@@ -1022,6 +1022,47 @@ export async function copyBudgetFromPreviousMonth(month: number, year: number): 
     results.push(created);
   }
   return results;
+}
+
+// ─── Startup Costs ──────────────────────────────────────────────────────────
+
+export async function fetchStartupCosts(): Promise<StartupCost[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("startup_costs")
+    .select("*")
+    .eq("org_id", getOrgId())
+    .order("amount", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as StartupCost[];
+}
+
+export async function createStartupCost(item: Omit<StartupCost, "id" | "org_id" | "created_at" | "updated_at">): Promise<StartupCost> {
+  const supabase = createClient();
+  const clean: Record<string, unknown> = { org_id: getOrgId() };
+  for (const [k, v] of Object.entries(item)) {
+    if (v !== undefined && v !== "") clean[k] = v;
+  }
+  const { data, error } = await supabase.from("startup_costs").insert(clean).select().single();
+  if (error) throw error;
+  return data as StartupCost;
+}
+
+export async function updateStartupCost(id: string, updates: Partial<StartupCost>): Promise<StartupCost> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("startup_costs")
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as StartupCost;
+}
+
+export async function deleteStartupCost(id: string): Promise<void> {
+  const supabase = createClient();
+  await supabase.from("startup_costs").delete().eq("id", id);
 }
 
 // ─── Marketers ──────────────────────────────────────────────────────────────

@@ -215,6 +215,18 @@ export interface MonthlyBudget {
   updated_at: string;
 }
 
+export interface StartupCost {
+  id: string;
+  org_id: string;
+  category: string;
+  item_name: string;
+  amount: number;
+  paid_date?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Marketer {
   id: string;
   org_id: string;

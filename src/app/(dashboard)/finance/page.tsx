@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { Deal, Renewal, MonthlyExpense, MonthlyBudget } from "@/types";
-import { fetchDeals, fetchRenewals, fetchMonthlyExpenses, createExpense, deleteExpense, updateExpense, fetchMonthlyBudget, upsertBudgetItem, deleteBudgetItem, copyBudgetFromPreviousMonth } from "@/lib/supabase/db";
+import type { Deal, Renewal, MonthlyExpense, MonthlyBudget, StartupCost } from "@/types";
+import { fetchDeals, fetchRenewals, fetchMonthlyExpenses, createExpense, deleteExpense, updateExpense, fetchMonthlyBudget, upsertBudgetItem, deleteBudgetItem, copyBudgetFromPreviousMonth, fetchStartupCosts, createStartupCost, deleteStartupCost } from "@/lib/supabase/db";
 import { useAuth } from "@/lib/auth-context";
 import { useTopbarControls } from "@/components/layout/topbar-context";
 import { MONTHS_AR, SOURCE_COLORS } from "@/lib/utils/constants";
@@ -37,6 +37,10 @@ import {
   CheckCircle2,
   ArrowDown,
   ArrowUp,
+  Building2,
+  Timer,
+  TrendingDown,
+  CalendarClock,
 } from "lucide-react";
 
 /* CSS variable color → hex for donut chart */
@@ -78,18 +82,25 @@ export default function FinancePage() {
   const [copyingBudget, setCopyingBudget] = useState(false);
   const [budgetCustomCat, setBudgetCustomCat] = useState("");
 
+  /* Startup costs state */
+  const [startupCosts, setStartupCosts] = useState<StartupCost[]>([]);
+  const [startupDialog, setStartupDialog] = useState(false);
+  const [startupForm, setStartupForm] = useState({ category: "", item_name: "", amount: "", paid_date: "", notes: "" });
+  const [savingStartup, setSavingStartup] = useState(false);
+
   const now = new Date();
   const selectedMonth = activeMonthIndex?.month ?? (now.getMonth() + 1);
   const selectedYear = activeMonthIndex?.year ?? now.getFullYear();
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([fetchDeals(), fetchRenewals(), fetchMonthlyExpenses(selectedMonth, selectedYear), fetchMonthlyBudget(selectedMonth, selectedYear)])
-      .then(([d, r, e, b]) => {
+    Promise.all([fetchDeals(), fetchRenewals(), fetchMonthlyExpenses(selectedMonth, selectedYear), fetchMonthlyBudget(selectedMonth, selectedYear), fetchStartupCosts()])
+      .then(([d, r, e, b, sc]) => {
         setDeals(d);
         setRenewals(r);
         setExpenses(e);
         setBudget(b);
+        setStartupCosts(sc);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -225,6 +236,32 @@ export default function FinancePage() {
       }
     } catch (err) { console.error(err); }
     setCopyingBudget(false);
+  }
+
+  /* ─── Startup Cost Handlers ─── */
+  const STARTUP_CATEGORIES = ["تقنية", "تراخيص", "تجهيزات", "تسويق تأسيسي", "قانونية", "توظيف", "أخرى"];
+
+  async function handleAddStartupCost() {
+    if (!startupForm.item_name.trim() || !startupForm.amount) return;
+    setSavingStartup(true);
+    try {
+      const created = await createStartupCost({
+        category: startupForm.category.trim() || "أخرى",
+        item_name: startupForm.item_name.trim(),
+        amount: parseFloat(startupForm.amount),
+        paid_date: startupForm.paid_date || undefined,
+        notes: startupForm.notes.trim() || undefined,
+      });
+      setStartupCosts(prev => [created, ...prev].sort((a, b) => b.amount - a.amount));
+      setStartupForm({ category: "", item_name: "", amount: "", paid_date: "", notes: "" });
+      setStartupDialog(false);
+    } catch (err) { console.error(err); }
+    setSavingStartup(false);
+  }
+
+  async function handleDeleteStartupCost(id: string) {
+    await deleteStartupCost(id);
+    setStartupCosts(prev => prev.filter(c => c.id !== id));
   }
 
   // Merge default categories with existing ones from expenses
@@ -848,6 +885,223 @@ export default function FinancePage() {
         )}
       </div>
 
+      {/* ─── Startup Costs & ROI Section ─── */}
+      <div className="cc-card rounded-xl p-5">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <Building2 className="w-5 h-5 text-cc-purple" />
+            <h3 className="text-sm font-bold text-foreground">مصاريف تأسيس المشروع</h3>
+          </div>
+          <Button size="sm" onClick={() => setStartupDialog(true)} className="gap-1.5">
+            <Plus className="w-4 h-4" /> إضافة تكلفة
+          </Button>
+        </div>
+
+        {loading ? (
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-lg" />)}
+          </div>
+        ) : startupCosts.length === 0 ? (
+          <div className="text-center py-10 text-muted-foreground">
+            <Building2 className="w-12 h-12 mx-auto mb-3 opacity-30" />
+            <p>لا توجد مصاريف تأسيس مسجلة</p>
+            <p className="text-sm mt-1">سجّل تكاليف التأسيس لمتابعة استرداد رأس المال</p>
+          </div>
+        ) : (
+          <>
+            {(() => {
+              const totalStartup = startupCosts.reduce((s, c) => s + c.amount, 0);
+
+              // Calculate cumulative net profit across all months
+              const allClosedD = deals.filter(d => d.stage === "مكتملة");
+              const allCompRen = renewals.filter(r => r.status === "مكتمل");
+
+              // Build monthly profit history (all months that have data)
+              const monthlyProfits: { month: number; year: number; label: string; revenue: number; expenses: number; netProfit: number }[] = [];
+
+              // Get unique months from deals and renewals
+              const monthSet = new Set<string>();
+              allClosedD.forEach(d => monthSet.add(`${d.year}-${d.month}`));
+              allCompRen.forEach(r => {
+                const rd = new Date(r.renewal_date);
+                monthSet.add(`${rd.getFullYear()}-${rd.getMonth() + 1}`);
+              });
+              // Also add current selected month
+              monthSet.add(`${selectedYear}-${selectedMonth}`);
+
+              const sortedMonths = [...monthSet].map(s => {
+                const [y, m] = s.split("-").map(Number);
+                return { year: y, month: m };
+              }).sort((a, b) => a.year - b.year || a.month - b.month);
+
+              // We only have current month's expenses loaded
+              // For net profit: revenue from all months, expenses only from current month loaded
+              // Simple approach: calculate cumulative revenue and subtract current month expenses * months approximation
+              // Better: just use actual total revenue - total startup costs to show recovery
+              const totalAllRevenue = allClosedD.reduce((s, d) => s + d.deal_value, 0) + allCompRen.reduce((s, r) => s + r.plan_price, 0);
+              const currentMonthExpenses = expenses.reduce((s, e) => s + e.amount, 0);
+              const currentNetProfit = totalRevenue - currentMonthExpenses;
+
+              // Recovery calculation
+              const recoveredAmount = Math.max(0, totalAllRevenue - currentMonthExpenses); // Simplified: total revenue earned
+              const recoveryPct = totalStartup > 0 ? Math.min(Math.round((recoveredAmount / totalStartup) * 100), 100) : 0;
+              const remaining = Math.max(0, totalStartup - recoveredAmount);
+              const isRecovered = recoveredAmount >= totalStartup;
+
+              // Estimated months to recover (based on current month net profit)
+              const monthsToRecover = currentNetProfit > 0 && !isRecovered
+                ? Math.ceil(remaining / currentNetProfit)
+                : 0;
+
+              // Category breakdown
+              const catMap: Record<string, number> = {};
+              startupCosts.forEach(c => { catMap[c.category] = (catMap[c.category] || 0) + c.amount; });
+              const catEntries = Object.entries(catMap).sort((a, b) => b[1] - a[1]);
+              const catColors = ["#8B5CF6", "#00D4FF", "#F59E0B", "#EC4899", "#10B981", "#3B82F6", "#EF4444"];
+
+              return (
+                <div className="space-y-5">
+                  {/* Recovery progress */}
+                  <div className={`rounded-xl p-5 border ${
+                    isRecovered
+                      ? "bg-gradient-to-l from-emerald-500/10 to-emerald-600/5 border-emerald-500/20"
+                      : "bg-gradient-to-l from-purple-500/10 to-indigo-500/5 border-purple-500/20"
+                  }`}>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        {isRecovered ? (
+                          <CheckCircle2 className="w-5 h-5 text-cc-green" />
+                        ) : (
+                          <Timer className="w-5 h-5 text-cc-purple" />
+                        )}
+                        <span className="text-sm font-bold text-foreground">
+                          {isRecovered ? "تم استرداد رأس المال بالكامل! 🎉" : "مؤشر استرداد رأس المال"}
+                        </span>
+                      </div>
+                      <span className={`text-2xl font-bold ${isRecovered ? "text-cc-green" : "text-cc-purple"}`}>
+                        {recoveryPct}%
+                      </span>
+                    </div>
+
+                    {/* Progress bar */}
+                    <div className="h-4 bg-white/[0.06] rounded-full overflow-hidden mb-3">
+                      <div
+                        className={`h-full rounded-full transition-all duration-1000 ${
+                          isRecovered
+                            ? "bg-gradient-to-l from-emerald-400 to-emerald-600"
+                            : recoveryPct >= 70
+                              ? "bg-gradient-to-l from-amber-400 to-amber-600"
+                              : "bg-gradient-to-l from-purple-400 to-indigo-600"
+                        }`}
+                        style={{ width: `${recoveryPct}%` }}
+                      />
+                    </div>
+
+                    {/* Key numbers */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="text-center">
+                        <p className="text-lg font-bold text-cc-purple">{formatMoney(totalStartup)}</p>
+                        <p className="text-[10px] text-muted-foreground">إجمالي التأسيس</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-lg font-bold text-cyan">{formatMoney(recoveredAmount)}</p>
+                        <p className="text-[10px] text-muted-foreground">تم استرداده</p>
+                      </div>
+                      <div className="text-center">
+                        <p className={`text-lg font-bold ${isRecovered ? "text-cc-green" : "text-amber"}`}>
+                          {isRecovered ? "0" : formatMoney(remaining)}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">المتبقي</p>
+                      </div>
+                      <div className="text-center">
+                        {isRecovered ? (
+                          <>
+                            <p className="text-lg font-bold text-cc-green">✅</p>
+                            <p className="text-[10px] text-muted-foreground">مكتمل</p>
+                          </>
+                        ) : monthsToRecover > 0 ? (
+                          <>
+                            <p className="text-lg font-bold text-foreground flex items-center justify-center gap-1">
+                              <CalendarClock className="w-4 h-4 text-muted-foreground" />
+                              {monthsToRecover}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">شهر للاسترداد (تقديري)</p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-lg font-bold text-muted-foreground">—</p>
+                            <p className="text-[10px] text-muted-foreground">يعتمد على الأرباح</p>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Monthly net profit indicator */}
+                    <div className="mt-3 pt-3 border-t border-white/[0.06] flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">صافي ربح الشهر الحالي ({MONTHS_AR[selectedMonth - 1]})</span>
+                      <span className={`text-sm font-bold ${currentNetProfit >= 0 ? "text-cc-green" : "text-cc-red"}`}>
+                        {currentNetProfit >= 0 ? "+" : ""}{formatMoney(currentNetProfit)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Category breakdown */}
+                  {catEntries.length > 1 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                      {catEntries.map(([cat, val], i) => {
+                        const pct = totalStartup > 0 ? Math.round((val / totalStartup) * 100) : 0;
+                        const color = catColors[i % catColors.length];
+                        return (
+                          <div key={cat} className="p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.06] text-center">
+                            <div className="w-3 h-3 rounded-full mx-auto mb-1.5" style={{ backgroundColor: color }} />
+                            <p className="text-[11px] font-semibold text-foreground truncate">{cat}</p>
+                            <p className="text-xs font-bold mt-0.5" style={{ color }}>{formatMoney(val)}</p>
+                            <p className="text-[10px] text-muted-foreground">{pct}%</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Cost items list */}
+                  <div className="space-y-2">
+                    {startupCosts.map((cost, idx) => {
+                      const maxAmt = Math.max(...startupCosts.map(c => c.amount), 1);
+                      const pct = Math.round((cost.amount / maxAmt) * 100);
+                      return (
+                        <div key={cost.id} className="group relative bg-white/[0.02] rounded-xl p-3 border border-white/[0.06] hover:border-white/[0.1] transition-colors">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <span className="text-xs font-bold text-cc-purple w-8 shrink-0">#{idx + 1}</span>
+                              <span className="text-sm font-semibold text-foreground truncate">{cost.item_name}</span>
+                              <span className="text-[10px] text-muted-foreground bg-white/[0.04] rounded px-1.5 py-0.5">{cost.category}</span>
+                              {cost.notes && <span className="text-[10px] text-muted-foreground truncate hidden sm:inline">— {cost.notes}</span>}
+                              {cost.paid_date && <span className="text-[10px] text-muted-foreground/60 hidden md:inline">{cost.paid_date}</span>}
+                            </div>
+                            <div className="flex items-center gap-3 shrink-0">
+                              <span className="text-sm font-bold text-cc-purple">{formatMoney(cost.amount)}</span>
+                              <button
+                                onClick={() => handleDeleteStartupCost(cost.id)}
+                                className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-cc-red/10 text-muted-foreground hover:text-cc-red transition-all"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="h-2 bg-white/[0.04] rounded-full overflow-hidden">
+                            <div className="h-full rounded-full bg-cc-purple/60 transition-all" style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+          </>
+        )}
+      </div>
+
       {/* ─── Add Expense Dialog ─── */}
       <Dialog open={expenseDialog} onOpenChange={(open) => { setExpenseDialog(open); if (!open) setCustomCategory(""); }}>
         <DialogContent className="max-w-md" dir="rtl">
@@ -1120,6 +1374,82 @@ export default function FinancePage() {
             <Button variant="outline" onClick={() => setEditingBudget(null)}>إلغاء</Button>
             <Button onClick={handleEditBudget} disabled={savingBudget || !editBudgetForm.planned_amount}>
               {savingBudget ? "جاري الحفظ..." : "حفظ التعديل"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Add Startup Cost Dialog ─── */}
+      <Dialog open={startupDialog} onOpenChange={setStartupDialog}>
+        <DialogContent className="max-w-md" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>إضافة تكلفة تأسيس</DialogTitle>
+            <DialogDescription>سجّل بنود مصاريف تأسيس المشروع</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-3">
+            <div className="grid gap-1.5">
+              <Label>التصنيف</Label>
+              <div className="flex flex-wrap gap-2">
+                {STARTUP_CATEGORIES.map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setStartupForm({ ...startupForm, category: cat })}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                      startupForm.category === cat
+                        ? "bg-cc-purple/15 text-cc-purple border-cc-purple/30"
+                        : "bg-white/[0.03] text-muted-foreground border-white/[0.06] hover:border-white/[0.15]"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>البند <span className="text-cc-red">*</span></Label>
+              <Input
+                value={startupForm.item_name}
+                onChange={(e) => setStartupForm({ ...startupForm, item_name: e.target.value })}
+                placeholder="مثال: تطوير الموقع، اشتراك سيرفر..."
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label>المبلغ (ر.س) <span className="text-cc-red">*</span></Label>
+                <Input
+                  type="number"
+                  value={startupForm.amount}
+                  onChange={(e) => setStartupForm({ ...startupForm, amount: e.target.value })}
+                  placeholder="0"
+                  dir="ltr"
+                  className="text-right"
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label>تاريخ الدفع</Label>
+                <Input
+                  type="date"
+                  value={startupForm.paid_date}
+                  onChange={(e) => setStartupForm({ ...startupForm, paid_date: e.target.value })}
+                  dir="ltr"
+                  className="text-right"
+                />
+              </div>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>ملاحظات (اختياري)</Label>
+              <Input
+                value={startupForm.notes}
+                onChange={(e) => setStartupForm({ ...startupForm, notes: e.target.value })}
+                placeholder="تفاصيل إضافية..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStartupDialog(false)}>إلغاء</Button>
+            <Button onClick={handleAddStartupCost} disabled={savingStartup || !startupForm.item_name.trim() || !startupForm.amount}>
+              {savingStartup ? "جاري الحفظ..." : "إضافة"}
             </Button>
           </DialogFooter>
         </DialogContent>
