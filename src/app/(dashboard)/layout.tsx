@@ -11,7 +11,6 @@ import { AIAlertsBanner } from "@/components/ai/ai-alerts-banner";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { OrgProvider } from "@/lib/org-context";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DEMO_TICKETS, DEMO_PROJECTS, DEMO_PARTNERSHIPS } from "@/lib/demo-data";
 import { fetchDeals, fetchSalesTargets, fetchSalesActivities, fetchTickets, fetchMentionNotifications, markMentionNotificationsRead, fetchRecentFollowUpNotes } from "@/lib/supabase/db";
 import type { AppNotification } from "@/types";
 
@@ -92,64 +91,6 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function generateDemoNotifications(): AppNotification[] {
-  const now = new Date().toISOString();
-  const notifications: AppNotification[] = [];
-
-  // Urgent tickets (demo)
-  DEMO_TICKETS.filter((t) => t.priority === "عاجل" && t.status !== "محلول").forEach((t) => {
-    notifications.push({
-      id: `notif-ticket-${t.id}`,
-      type: "urgent_ticket",
-      icon: "🚨",
-      message: `تذكرة عاجلة: "${t.issue}" من ${t.client_name}`,
-      section: "support",
-      timestamp: now,
-      isRead: false,
-    });
-  });
-
-  // Overdue projects
-  DEMO_PROJECTS.filter((p) => p.status_tag === "متأخر").forEach((p) => {
-    notifications.push({
-      id: `notif-project-${p.id}`,
-      type: "overdue_project",
-      icon: "⏰",
-      message: `مشروع متأخر: "${p.name}" — تقدم ${p.progress}%`,
-      section: "development",
-      timestamp: now,
-      isRead: false,
-    });
-  });
-
-  // Near-complete projects (90%+)
-  DEMO_PROJECTS.filter((p) => p.progress >= 85 && p.status_tag !== "متأخر").forEach((p) => {
-    notifications.push({
-      id: `notif-near-${p.id}`,
-      type: "near_complete",
-      icon: "🎯",
-      message: `مشروع يقترب من الاكتمال: "${p.name}" — ${p.progress}%`,
-      section: "development",
-      timestamp: now,
-      isRead: true,
-    });
-  });
-
-  // Negotiating partnerships
-  DEMO_PARTNERSHIPS.filter((p) => p.status === "قيد التفاوض").forEach((p) => {
-    notifications.push({
-      id: `notif-partner-${p.id}`,
-      type: "negotiating",
-      icon: "◇",
-      message: `شراكة قيد التفاوض: ${p.name}`,
-      section: "partnerships",
-      timestamp: now,
-      isRead: true,
-    });
-  });
-
-  return notifications;
-}
 
 async function generateLiveNotifications(): Promise<AppNotification[]> {
   const now = new Date().toISOString();
@@ -301,17 +242,13 @@ export default function DashboardLayout({
   const router = useRouter();
   const [notifOpen, setNotifOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [notifications, setNotifications] = useState<AppNotification[]>(() => generateDemoNotifications());
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
   // Load live notifications from DB
   useEffect(() => {
     generateLiveNotifications().then((live) => {
       if (live.length > 0) {
-        setNotifications((prev) => {
-          const existingIds = new Set(prev.map((n) => n.id));
-          const newOnes = live.filter((n) => !existingIds.has(n.id));
-          return [...newOnes, ...prev];
-        });
+        setNotifications(live);
       }
     });
   }, []);
