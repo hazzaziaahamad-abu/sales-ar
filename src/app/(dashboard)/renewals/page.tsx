@@ -163,6 +163,8 @@ export default function RenewalsPage() {
   type SummaryPeriod = "today" | "week" | "month" | "quarter" | "custom";
   const [summaryPeriod, setSummaryPeriod] = useState<SummaryPeriod>("month");
   const [customRange, setCustomRange] = useState({ from: "", to: "" });
+  type SummaryFilterType = "completed" | "revenue" | "contacted" | "success" | "lost" | null;
+  const [summaryFilter, setSummaryFilter] = useState<SummaryFilterType>(null);
 
   /* daily target selection — persisted per day in localStorage */
   const todayKey = `daily_target_${new Date().toISOString().slice(0, 10)}`;
@@ -314,7 +316,7 @@ export default function RenewalsPage() {
       ? monthRenewals.filter((r) => PENDING_STATUSES.has(r.status))
       : monthRenewals.filter((r) => r.status === statusFilter)
     : monthRenewals;
-  const filteredRenewals = clientSearch
+  const filteredRenewals_base = clientSearch
     ? statusFilteredRenewals.filter((r) => r.customer_name.toLowerCase().includes(clientSearch.toLowerCase()) || (r.client_code && r.client_code.toLowerCase().includes(clientSearch.toLowerCase())))
     : statusFilteredRenewals;
 
@@ -449,8 +451,26 @@ export default function RenewalsPage() {
       avgDealValue,
       successRate,
       topRep: topRep ? { name: topRep[0], count: topRep[1] } : null,
+      // Store IDs for filtering
+      completedIds: new Set(completed.map(r => r.id)),
+      cancelledIds: new Set(cancelled.map(r => r.id)),
+      contactedIds: new Set(contacted.map(r => r.id)),
+      allPeriodIds: new Set(periodRenewals.map(r => r.id)),
     };
   }, [renewals, summaryPeriod, customRange]);
+
+  // Apply summary filter if active (overrides base filter to show matching renewals)
+  const filteredRenewals = summaryFilter
+    ? (() => {
+        const ids = summaryFilter === "completed" || summaryFilter === "revenue" || summaryFilter === "success"
+          ? achievementSummary.completedIds
+          : summaryFilter === "lost" ? achievementSummary.cancelledIds
+          : summaryFilter === "contacted" ? achievementSummary.contactedIds
+          : achievementSummary.allPeriodIds;
+        const result = renewals.filter(r => ids.has(r.id));
+        return clientSearch ? result.filter(r => r.customer_name.toLowerCase().includes(clientSearch.toLowerCase()) || (r.client_code && r.client_code.toLowerCase().includes(clientSearch.toLowerCase()))) : result;
+      })()
+    : filteredRenewals_base;
 
   /* ─── Donut data ─── */
   const donutSegments = [
@@ -639,7 +659,7 @@ export default function RenewalsPage() {
               ]).map(p => (
                 <button
                   key={p.key}
-                  onClick={() => setSummaryPeriod(p.key)}
+                  onClick={() => { setSummaryPeriod(p.key); setSummaryFilter(null); }}
                   className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
                     summaryPeriod === p.key
                       ? "bg-cyan text-white shadow-lg"
@@ -676,33 +696,75 @@ export default function RenewalsPage() {
             </div>
           )}
 
-          {/* Achievement cards */}
+          {/* Achievement cards - clickable to filter table */}
+          {summaryFilter && (
+            <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-lg bg-cyan/10 border border-cyan/20">
+              <span className="text-xs text-cyan font-medium">🔍 عرض: {
+                summaryFilter === "completed" ? "التجديدات المكتملة" :
+                summaryFilter === "revenue" ? "الإيرادات المحققة" :
+                summaryFilter === "contacted" ? "تم التواصل معهم" :
+                summaryFilter === "success" ? "نسبة النجاح" :
+                "الإيرادات المفقودة"
+              } ({filteredRenewals.length} عميل)</span>
+              <button
+                onClick={() => setSummaryFilter(null)}
+                className="mr-auto text-xs text-cyan hover:text-white font-medium px-2 py-1 rounded-md hover:bg-cyan/20 transition-colors"
+              >
+                ✕ إلغاء الفلتر
+              </button>
+            </div>
+          )}
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 mb-4">
-            <div className="p-3 rounded-xl bg-cc-green/10 border border-cc-green/20 text-center">
+            <button
+              onClick={() => { setSummaryFilter(summaryFilter === "completed" ? null : "completed"); setStatusFilter(null); document.getElementById("renewals-table")?.scrollIntoView({ behavior: "smooth" }); }}
+              className={`p-3 rounded-xl text-center transition-all cursor-pointer ${
+                summaryFilter === "completed" ? "bg-cc-green/20 border-2 border-cc-green/50 ring-2 ring-cc-green/20" : "bg-cc-green/10 border border-cc-green/20 hover:bg-cc-green/15 hover:scale-[1.02]"
+              }`}
+            >
               <CheckCircle2 className="w-5 h-5 text-cc-green mx-auto mb-1" />
               <p className="text-2xl font-bold text-cc-green">{achievementSummary.completed}</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">تجديد مكتمل</p>
-            </div>
-            <div className="p-3 rounded-xl bg-cyan/10 border border-cyan/20 text-center">
+            </button>
+            <button
+              onClick={() => { setSummaryFilter(summaryFilter === "revenue" ? null : "revenue"); setStatusFilter(null); document.getElementById("renewals-table")?.scrollIntoView({ behavior: "smooth" }); }}
+              className={`p-3 rounded-xl text-center transition-all cursor-pointer ${
+                summaryFilter === "revenue" ? "bg-cyan/20 border-2 border-cyan/50 ring-2 ring-cyan/20" : "bg-cyan/10 border border-cyan/20 hover:bg-cyan/15 hover:scale-[1.02]"
+              }`}
+            >
               <TrendingUp className="w-5 h-5 text-cyan mx-auto mb-1" />
               <p className="text-2xl font-bold text-cyan">{formatMoneyFull(achievementSummary.completedRevenue)}</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">إيرادات محققة</p>
-            </div>
-            <div className="p-3 rounded-xl bg-cc-purple/10 border border-cc-purple/20 text-center">
+            </button>
+            <button
+              onClick={() => { setSummaryFilter(summaryFilter === "contacted" ? null : "contacted"); setStatusFilter(null); document.getElementById("renewals-table")?.scrollIntoView({ behavior: "smooth" }); }}
+              className={`p-3 rounded-xl text-center transition-all cursor-pointer ${
+                summaryFilter === "contacted" ? "bg-cc-purple/20 border-2 border-cc-purple/50 ring-2 ring-cc-purple/20" : "bg-cc-purple/10 border border-cc-purple/20 hover:bg-cc-purple/15 hover:scale-[1.02]"
+              }`}
+            >
               <Users className="w-5 h-5 text-cc-purple mx-auto mb-1" />
               <p className="text-2xl font-bold text-cc-purple">{achievementSummary.contacted}</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">تم التواصل</p>
-            </div>
-            <div className="p-3 rounded-xl bg-amber/10 border border-amber/20 text-center">
+            </button>
+            <button
+              onClick={() => { setSummaryFilter(summaryFilter === "success" ? null : "success"); setStatusFilter(null); document.getElementById("renewals-table")?.scrollIntoView({ behavior: "smooth" }); }}
+              className={`p-3 rounded-xl text-center transition-all cursor-pointer ${
+                summaryFilter === "success" ? "bg-amber/20 border-2 border-amber/50 ring-2 ring-amber/20" : "bg-amber/10 border border-amber/20 hover:bg-amber/15 hover:scale-[1.02]"
+              }`}
+            >
               <Zap className="w-5 h-5 text-amber mx-auto mb-1" />
               <p className="text-2xl font-bold text-amber">{achievementSummary.successRate}%</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">نسبة النجاح</p>
-            </div>
-            <div className="p-3 rounded-xl bg-cc-red/10 border border-cc-red/20 text-center col-span-2 md:col-span-1">
+            </button>
+            <button
+              onClick={() => { setSummaryFilter(summaryFilter === "lost" ? null : "lost"); setStatusFilter(null); document.getElementById("renewals-table")?.scrollIntoView({ behavior: "smooth" }); }}
+              className={`p-3 rounded-xl text-center transition-all cursor-pointer col-span-2 md:col-span-1 ${
+                summaryFilter === "lost" ? "bg-cc-red/20 border-2 border-cc-red/50 ring-2 ring-cc-red/20" : "bg-cc-red/10 border border-cc-red/20 hover:bg-cc-red/15 hover:scale-[1.02]"
+              }`}
+            >
               <TrendingDown className="w-5 h-5 text-cc-red mx-auto mb-1" />
               <p className="text-2xl font-bold text-cc-red">{formatMoneyFull(achievementSummary.lostRevenue)}</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">إيرادات مفقودة</p>
-            </div>
+            </button>
           </div>
 
           {/* Progress bar + extra info */}
@@ -950,7 +1012,7 @@ export default function RenewalsPage() {
       })()}
 
       {/* ─── Renewals Table ─── */}
-      <div className="cc-card rounded-xl overflow-x-auto">
+      <div id="renewals-table" className="cc-card rounded-xl overflow-x-auto scroll-mt-4">
         <div className="p-4 pb-0 flex items-center gap-3">
           <Input
             value={clientSearch}
