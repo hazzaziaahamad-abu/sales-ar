@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import type { Renewal } from "@/types";
 import {
   fetchRenewals,
@@ -71,6 +71,10 @@ import {
   Download,
   Share2,
   UserPlus,
+  Award,
+  Calendar,
+  TrendingUp,
+  Zap,
 } from "lucide-react";
 
 /* ─── Status badge color mapping ─── */
@@ -154,6 +158,11 @@ export default function RenewalsPage() {
 
   /* assign task modal */
   const [assignRenewal, setAssignRenewal] = useState<Renewal | null>(null);
+
+  /* Achievement summary period */
+  type SummaryPeriod = "today" | "week" | "month" | "quarter" | "custom";
+  const [summaryPeriod, setSummaryPeriod] = useState<SummaryPeriod>("month");
+  const [customRange, setCustomRange] = useState({ from: "", to: "" });
 
   /* daily target selection — persisted per day in localStorage */
   const todayKey = `daily_target_${new Date().toISOString().slice(0, 10)}`;
@@ -386,6 +395,63 @@ export default function RenewalsPage() {
     };
   }, [renewals, monthRenewals]);
 
+  /* ─── Achievement Summary (filtered by period) ─── */
+  const achievementSummary = useMemo(() => {
+    const now = new Date();
+    let startDate: Date;
+    let endDate = new Date(now);
+    endDate.setHours(23, 59, 59, 999);
+
+    if (summaryPeriod === "today") {
+      startDate = new Date(now);
+      startDate.setHours(0, 0, 0, 0);
+    } else if (summaryPeriod === "week") {
+      startDate = new Date(now);
+      startDate.setDate(now.getDate() - now.getDay());
+      startDate.setHours(0, 0, 0, 0);
+    } else if (summaryPeriod === "month") {
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    } else if (summaryPeriod === "quarter") {
+      const qMonth = Math.floor(now.getMonth() / 3) * 3;
+      startDate = new Date(now.getFullYear(), qMonth, 1);
+    } else {
+      // custom
+      startDate = customRange.from ? new Date(customRange.from) : new Date(now.getFullYear(), now.getMonth(), 1);
+      if (customRange.to) endDate = new Date(customRange.to + "T23:59:59");
+    }
+
+    // Filter renewals that were updated/completed in the period
+    const periodRenewals = renewals.filter(r => {
+      const updated = new Date(r.updated_at);
+      return updated >= startDate && updated <= endDate;
+    });
+
+    const completed = periodRenewals.filter(r => r.status === "مكتمل");
+    const cancelled = periodRenewals.filter(r => r.status === "ملغي بسبب");
+    const contacted = periodRenewals.filter(r => r.status === "جاري المتابعة" || r.status === "انتظار الدفع");
+    const completedRevenue = completed.reduce((s, r) => s + r.plan_price, 0);
+    const lostRevenue = cancelled.reduce((s, r) => s + r.plan_price, 0);
+    const avgDealValue = completed.length > 0 ? Math.round(completedRevenue / completed.length) : 0;
+    const successRate = periodRenewals.length > 0 ? Math.round((completed.length / periodRenewals.length) * 100) : 0;
+
+    // Top performer (assigned_rep with most completions)
+    const repMap: Record<string, number> = {};
+    completed.forEach(r => { if (r.assigned_rep) repMap[r.assigned_rep] = (repMap[r.assigned_rep] || 0) + 1; });
+    const topRep = Object.entries(repMap).sort((a, b) => b[1] - a[1])[0];
+
+    return {
+      periodRenewals: periodRenewals.length,
+      completed: completed.length,
+      cancelled: cancelled.length,
+      contacted: contacted.length,
+      completedRevenue,
+      lostRevenue,
+      avgDealValue,
+      successRate,
+      topRep: topRep ? { name: topRep[0], count: topRep[1] } : null,
+    };
+  }, [renewals, summaryPeriod, customRange]);
+
   /* ─── Donut data ─── */
   const donutSegments = [
     { label: "مكتمل", value: analytics.renewed, color: "#10B981" },
@@ -553,6 +619,131 @@ export default function RenewalsPage() {
           إضافة تجديد
         </Button>
       </div>
+
+      {/* ─── Achievement Summary ─── */}
+      {!loading && (
+        <div className="cc-card rounded-xl p-5 border border-cyan/10 bg-gradient-to-l from-cyan/[0.03] to-transparent">
+          {/* Header + period selector */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <Award className="w-5 h-5 text-cyan" />
+              <h3 className="text-sm font-bold text-foreground">ملخص الإنجازات</h3>
+            </div>
+            <div className="flex items-center gap-1.5 bg-white/[0.03] rounded-lg p-1 border border-white/[0.06]">
+              {([
+                { key: "today" as SummaryPeriod, label: "اليوم" },
+                { key: "week" as SummaryPeriod, label: "الأسبوع" },
+                { key: "month" as SummaryPeriod, label: "الشهر" },
+                { key: "quarter" as SummaryPeriod, label: "الربع" },
+                { key: "custom" as SummaryPeriod, label: "مخصص" },
+              ]).map(p => (
+                <button
+                  key={p.key}
+                  onClick={() => setSummaryPeriod(p.key)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                    summaryPeriod === p.key
+                      ? "bg-cyan text-white shadow-lg"
+                      : "text-muted-foreground hover:text-foreground hover:bg-white/[0.06]"
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Custom date range */}
+          {summaryPeriod === "custom" && (
+            <div className="flex items-center gap-3 mb-4 p-3 rounded-lg bg-white/[0.03] border border-white/[0.06]">
+              <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
+              <div className="flex items-center gap-2 flex-1">
+                <input
+                  type="date"
+                  value={customRange.from}
+                  onChange={e => setCustomRange(prev => ({ ...prev, from: e.target.value }))}
+                  className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/10 text-foreground text-xs focus:outline-none focus:border-cyan/50"
+                  dir="ltr"
+                />
+                <span className="text-xs text-muted-foreground">إلى</span>
+                <input
+                  type="date"
+                  value={customRange.to}
+                  onChange={e => setCustomRange(prev => ({ ...prev, to: e.target.value }))}
+                  className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/10 text-foreground text-xs focus:outline-none focus:border-cyan/50"
+                  dir="ltr"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Achievement cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 mb-4">
+            <div className="p-3 rounded-xl bg-cc-green/10 border border-cc-green/20 text-center">
+              <CheckCircle2 className="w-5 h-5 text-cc-green mx-auto mb-1" />
+              <p className="text-2xl font-bold text-cc-green">{achievementSummary.completed}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">تجديد مكتمل</p>
+            </div>
+            <div className="p-3 rounded-xl bg-cyan/10 border border-cyan/20 text-center">
+              <TrendingUp className="w-5 h-5 text-cyan mx-auto mb-1" />
+              <p className="text-2xl font-bold text-cyan">{formatMoneyFull(achievementSummary.completedRevenue)}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">إيرادات محققة</p>
+            </div>
+            <div className="p-3 rounded-xl bg-cc-purple/10 border border-cc-purple/20 text-center">
+              <Users className="w-5 h-5 text-cc-purple mx-auto mb-1" />
+              <p className="text-2xl font-bold text-cc-purple">{achievementSummary.contacted}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">تم التواصل</p>
+            </div>
+            <div className="p-3 rounded-xl bg-amber/10 border border-amber/20 text-center">
+              <Zap className="w-5 h-5 text-amber mx-auto mb-1" />
+              <p className="text-2xl font-bold text-amber">{achievementSummary.successRate}%</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">نسبة النجاح</p>
+            </div>
+            <div className="p-3 rounded-xl bg-cc-red/10 border border-cc-red/20 text-center col-span-2 md:col-span-1">
+              <TrendingDown className="w-5 h-5 text-cc-red mx-auto mb-1" />
+              <p className="text-2xl font-bold text-cc-red">{formatMoneyFull(achievementSummary.lostRevenue)}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">إيرادات مفقودة</p>
+            </div>
+          </div>
+
+          {/* Progress bar + extra info */}
+          <div className="flex items-center gap-4 flex-wrap">
+            {/* Success rate bar */}
+            <div className="flex-1 min-w-[200px]">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[11px] text-muted-foreground">معدل الإنجاز</span>
+                <span className={`text-xs font-bold ${
+                  achievementSummary.successRate >= 70 ? "text-cc-green" :
+                  achievementSummary.successRate >= 40 ? "text-amber" : "text-cc-red"
+                }`}>{achievementSummary.successRate}%</span>
+              </div>
+              <div className="h-2.5 bg-white/[0.04] rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-700 ${
+                    achievementSummary.successRate >= 70 ? "bg-gradient-to-l from-emerald-400 to-emerald-600" :
+                    achievementSummary.successRate >= 40 ? "bg-gradient-to-l from-amber-400 to-amber-600" :
+                    "bg-gradient-to-l from-red-400 to-red-600"
+                  }`}
+                  style={{ width: `${achievementSummary.successRate}%` }}
+                />
+              </div>
+            </div>
+
+            {achievementSummary.avgDealValue > 0 && (
+              <div className="text-center px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06]">
+                <p className="text-xs font-bold text-foreground">{formatMoneyFull(achievementSummary.avgDealValue)}</p>
+                <p className="text-[10px] text-muted-foreground">متوسط القيمة</p>
+              </div>
+            )}
+
+            {achievementSummary.topRep && (
+              <div className="text-center px-3 py-1.5 rounded-lg bg-amber/10 border border-amber/20">
+                <p className="text-xs font-bold text-amber">🏆 {achievementSummary.topRep.name}</p>
+                <p className="text-[10px] text-muted-foreground">{achievementSummary.topRep.count} تجديد</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ─── 4 KPI Cards ─── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
