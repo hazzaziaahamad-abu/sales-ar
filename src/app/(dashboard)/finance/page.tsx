@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { Deal, Renewal, MonthlyExpense, MonthlyBudget, StartupCost } from "@/types";
-import { fetchDeals, fetchRenewals, fetchMonthlyExpenses, createExpense, deleteExpense, updateExpense, fetchMonthlyBudget, upsertBudgetItem, deleteBudgetItem, copyBudgetFromPreviousMonth, fetchStartupCosts, createStartupCost, deleteStartupCost } from "@/lib/supabase/db";
+import { fetchDeals, fetchRenewals, fetchMonthlyExpenses, createExpense, deleteExpense, updateExpense, fetchMonthlyBudget, upsertBudgetItem, deleteBudgetItem, copyBudgetFromPreviousMonth, fetchStartupCosts, createStartupCost, deleteStartupCost, fetchEmployees } from "@/lib/supabase/db";
 import { useAuth } from "@/lib/auth-context";
 import { useTopbarControls } from "@/components/layout/topbar-context";
 import { MONTHS_AR, SOURCE_COLORS } from "@/lib/utils/constants";
@@ -64,11 +64,12 @@ export default function FinancePage() {
   const [expenses, setExpenses] = useState<MonthlyExpense[]>([]);
   const [loading, setLoading] = useState(true);
   const [expenseDialog, setExpenseDialog] = useState(false);
-  const [expenseForm, setExpenseForm] = useState({ category: "", amount: "", description: "", expense_date: "" });
+  const [expenseForm, setExpenseForm] = useState({ category: "", amount: "", description: "", expense_date: "", employee_name: "" });
+  const [employees, setEmployees] = useState<{ id: string; name: string }[]>([]);
   const [savingExpense, setSavingExpense] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [editingExpense, setEditingExpense] = useState<MonthlyExpense | null>(null);
-  const [editForm, setEditForm] = useState({ category: "", amount: "", description: "", expense_date: "" });
+  const [editForm, setEditForm] = useState({ category: "", amount: "", description: "", expense_date: "", employee_name: "" });
   const [savingEdit, setSavingEdit] = useState(false);
   const [customCategory, setCustomCategory] = useState("");
 
@@ -95,13 +96,14 @@ export default function FinancePage() {
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([fetchDeals(), fetchRenewals(), fetchMonthlyExpenses(selectedMonth, selectedYear), fetchMonthlyBudget(selectedMonth, selectedYear), fetchStartupCosts()])
-      .then(([d, r, e, b, sc]) => {
+    Promise.all([fetchDeals(), fetchRenewals(), fetchMonthlyExpenses(selectedMonth, selectedYear), fetchMonthlyBudget(selectedMonth, selectedYear), fetchStartupCosts(), fetchEmployees()])
+      .then(([d, r, e, b, sc, emp]) => {
         setDeals(d);
         setRenewals(r);
         setExpenses(e);
         setBudget(b);
         setStartupCosts(sc);
+        setEmployees(emp.map(em => ({ id: em.id, name: em.name })));
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -116,10 +118,13 @@ export default function FinancePage() {
       const d = new Date(expDate);
       const expMonth = d.getMonth() + 1;
       const expYear = d.getFullYear();
+      const descParts: string[] = [];
+      if (expenseForm.category === "رواتب" && expenseForm.employee_name) descParts.push(`راتب: ${expenseForm.employee_name}`);
+      if (expenseForm.description.trim()) descParts.push(expenseForm.description.trim());
       const created = await createExpense({
         category: expenseForm.category.trim(),
         amount: parseFloat(expenseForm.amount),
-        description: expenseForm.description.trim() || undefined,
+        description: descParts.join(" - ") || undefined,
         expense_date: expDate,
         month: expMonth,
         year: expYear,
@@ -128,7 +133,7 @@ export default function FinancePage() {
       if (expMonth === selectedMonth && expYear === selectedYear) {
         setExpenses((prev) => [created, ...prev].sort((a, b) => b.amount - a.amount));
       }
-      setExpenseForm({ category: "", amount: "", description: "", expense_date: "" });
+      setExpenseForm({ category: "", amount: "", description: "", expense_date: "", employee_name: "" });
       setExpenseDialog(false);
     } catch (err) {
       console.error(err);
@@ -143,11 +148,19 @@ export default function FinancePage() {
 
   function openEditDialog(exp: MonthlyExpense) {
     setEditingExpense(exp);
+    let empName = "";
+    let desc = exp.description || "";
+    if (exp.category === "رواتب" && desc.startsWith("راتب: ")) {
+      const parts = desc.split(" - ");
+      empName = parts[0].replace("راتب: ", "");
+      desc = parts.slice(1).join(" - ");
+    }
     setEditForm({
       category: exp.category,
       amount: String(exp.amount),
-      description: exp.description || "",
+      description: desc,
       expense_date: exp.expense_date,
+      employee_name: empName,
     });
   }
 
@@ -159,10 +172,13 @@ export default function FinancePage() {
       const d = new Date(expDate);
       const expMonth = d.getMonth() + 1;
       const expYear = d.getFullYear();
+      const editDescParts: string[] = [];
+      if (editForm.category === "رواتب" && editForm.employee_name) editDescParts.push(`راتب: ${editForm.employee_name}`);
+      if (editForm.description.trim()) editDescParts.push(editForm.description.trim());
       const updated = await updateExpense(editingExpense.id, {
         category: editForm.category.trim(),
         amount: parseFloat(editForm.amount),
-        description: editForm.description.trim() || undefined,
+        description: editDescParts.join(" - ") || undefined,
         expense_date: expDate,
         month: expMonth,
         year: expYear,
@@ -1186,6 +1202,30 @@ export default function FinancePage() {
                 <p className="text-xs text-cyan mt-1">البند المختار: {expenseForm.category}</p>
               )}
             </div>
+            {expenseForm.category === "رواتب" && employees.length > 0 && (
+              <div className="grid gap-1.5">
+                <Label>الموظف</Label>
+                <div className="flex flex-wrap gap-2">
+                  {employees.map((emp) => (
+                    <button
+                      key={emp.id}
+                      type="button"
+                      onClick={() => setExpenseForm({ ...expenseForm, employee_name: expenseForm.employee_name === emp.name ? "" : emp.name })}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                        expenseForm.employee_name === emp.name
+                          ? "bg-cc-purple/15 text-cc-purple border-cc-purple/30"
+                          : "bg-white/[0.03] text-muted-foreground border-white/[0.06] hover:border-white/[0.15]"
+                      }`}
+                    >
+                      {emp.name}
+                    </button>
+                  ))}
+                </div>
+                {expenseForm.employee_name && (
+                  <p className="text-xs text-cc-purple mt-1">الموظف المختار: {expenseForm.employee_name}</p>
+                )}
+              </div>
+            )}
             <div className="grid gap-1.5">
               <Label>المبلغ (ر.س)</Label>
               <Input
@@ -1257,6 +1297,30 @@ export default function FinancePage() {
                 placeholder="أو اكتب بند جديد..."
               />
             </div>
+            {editForm.category === "رواتب" && employees.length > 0 && (
+              <div className="grid gap-1.5">
+                <Label>الموظف</Label>
+                <div className="flex flex-wrap gap-2">
+                  {employees.map((emp) => (
+                    <button
+                      key={emp.id}
+                      type="button"
+                      onClick={() => setEditForm({ ...editForm, employee_name: editForm.employee_name === emp.name ? "" : emp.name })}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                        editForm.employee_name === emp.name
+                          ? "bg-cc-purple/15 text-cc-purple border-cc-purple/30"
+                          : "bg-white/[0.03] text-muted-foreground border-white/[0.06] hover:border-white/[0.15]"
+                      }`}
+                    >
+                      {emp.name}
+                    </button>
+                  ))}
+                </div>
+                {editForm.employee_name && (
+                  <p className="text-xs text-cc-purple mt-1">الموظف المختار: {editForm.employee_name}</p>
+                )}
+              </div>
+            )}
             <div className="grid gap-1.5">
               <Label>المبلغ (ر.س)</Label>
               <Input
