@@ -252,8 +252,8 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             <span className="text-muted-foreground">الحالة التشغيلية</span>
             <span className="rounded-full bg-green-dim px-2 py-0.5 text-cc-green">مباشر</span>
             </div>
-          </div>
           <div className="flex items-center gap-3">
+
             <div className="w-9 h-9 rounded-2xl bg-cyan-dim flex items-center justify-center text-cyan text-xs font-bold ring-1 ring-cyan/20">
               {user?.name?.[0] || "م"}
             </div>
