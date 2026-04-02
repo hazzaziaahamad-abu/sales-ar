@@ -106,7 +106,7 @@ export function StatCard({ value, label, color, progress, icon, subtext, muted, 
       <div className="flex items-start justify-between relative z-10">
         <div>
           <p className="text-xs text-muted-foreground font-semibold">{label}</p>
-          <p className={cn("mt-2 text-[22px] font-extrabold tracking-tight font-mono", c.text)}>{value}</p>
+          <p className={cn("mt-2 text-[28px] font-extrabold tracking-tight font-mono", c.text)}>{value}</p>
           {subtext && <p className="text-[11px] text-muted-foreground mt-1.5">{subtext}</p>}
         </div>
         {icon && (

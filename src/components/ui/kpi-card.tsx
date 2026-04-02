@@ -55,7 +55,7 @@ export function KPICard({ label, value, target, status, icon }: KPICardProps) {
       <p className="text-xs text-muted-foreground font-semibold relative z-10">{label}</p>
 
       {/* Center: Value */}
-      <p className={cn("text-[22px] font-extrabold font-mono relative z-10 my-2", colors.text)}>
+      <p className={cn("text-[28px] font-extrabold font-mono relative z-10 my-2", colors.text)}>
         {value}
       </p>
 
