@@ -169,23 +169,11 @@
   }
 
   .panel-grid {
-    position: relative;
-  }
-  .panel-grid::before {
-    content: "";
-    position: absolute;
-    inset: 0;
+    /* Subtle grid pattern via background only — no opacity on container */
     background-image:
-      linear-gradient(var(--border) 1px, transparent 1px),
-      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      linear-gradient(rgba(40, 58, 82, 0.12) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(40, 58, 82, 0.12) 1px, transparent 1px);
     background-size: 22px 22px;
-    opacity: 0.12;
-    pointer-events: none;
-    z-index: 0;
-  }
-  .panel-grid > * {
-    position: relative;
-    z-index: 1;
   }
 }
 
