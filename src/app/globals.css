@@ -119,7 +119,7 @@
 
 /* ─── Light theme ─── */
 .light {
-  --background: #FAFAFA;
+  --background: #FFFFFF;
   --foreground: #000000;
   --card: #FFFFFF;
   --card-foreground: #000000;
@@ -193,7 +193,7 @@
   /* Light body background */
   .light body {
     background-image: none;
-    background-color: #FAFAFA;
+    background-color: #FFFFFF;
   }
   html {
     @apply font-sans;
