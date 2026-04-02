@@ -175,6 +175,10 @@
   * {
     @apply border-border outline-ring/50;
   }
+  /* Smooth theme transition */
+  html, body, .glass-surface, .cc-card {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+  }
   body {
     @apply bg-background text-foreground;
     min-height: 100vh;
@@ -200,17 +204,32 @@
   .glass-surface {
     background: var(--glass-bg);
     border: 1px solid var(--glass-border);
-    box-shadow:
-      var(--glass-shadow),
-      var(--glass-inset);
+    box-shadow: var(--glass-shadow);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+  }
+
+  .light .glass-surface {
+    border-radius: 16px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.02);
+  }
+
+  .light .glass-surface:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 4px 16px rgba(0, 0, 0, 0.03);
   }
 
   .cc-card {
     background-color: var(--card);
     border: 1px solid var(--glass-border);
-    box-shadow:
-      var(--glass-shadow),
-      var(--glass-inset);
+    box-shadow: var(--glass-shadow);
+    transition: box-shadow 0.2s ease;
+  }
+
+  .light .cc-card {
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  }
+
+  .light .cc-card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   }
 
   .panel-grid {
