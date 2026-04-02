@@ -258,104 +258,233 @@
 }
 
 /* ════════════════════════════════════════════════════
-   LIGHT MODE - NUCLEAR OVERRIDES
-   Force maximum contrast and zero transparency
+   LIGHT MODE - COMPREHENSIVE OVERRIDES
+   Strategy: Force ALL text black, then re-apply accents
    ════════════════════════════════════════════════════ */
 
-/* ── MASTER TEXT OVERRIDE: all text must be readable ── */
-.light,
-.light *:not([class*="text-cyan"]):not([class*="text-emerald"]):not([class*="text-amber"]):not([class*="text-violet"]):not([class*="text-sky"]):not([class*="text-rose"]):not([class*="text-orange"]):not([class*="text-indigo"]):not([class*="text-teal"]):not([class*="text-pink"]):not([class*="text-blue"]):not([class*="text-fuchsia"]):not([class*="text-lime"]):not([class*="text-red"]):not([class*="text-green"]):not([class*="text-cc-"]):not([class*="text-destructive"]):not([class*="text-primary-foreground"]):not(button[class*="bg-primary"]) {
-  color: #000000;
+/* ── 1. FORCE ALL TEXT TO BLACK ──
+   html.light gives high specificity.
+   !important ensures it beats Tailwind utilities. */
+html.light,
+html.light * {
+  color: #111827 !important;
 }
 
-/* Muted text - dark gray, NOT light gray */
-.light .text-muted-foreground { color: #333333 !important; }
+/* ── 2. RE-APPLY ACCENT COLORS ──
+   These must come AFTER the wildcard and have equal/higher specificity */
+html.light .text-cyan-400,
+html.light [class*="text-cyan-"] { color: #0E7490 !important; }
+html.light .text-emerald-400,
+html.light .text-emerald-500,
+html.light [class*="text-emerald-"] { color: #059669 !important; }
+html.light .text-amber-400,
+html.light .text-amber-500,
+html.light [class*="text-amber-"] { color: #B45309 !important; }
+html.light .text-violet-400,
+html.light .text-violet-500,
+html.light [class*="text-violet-"] { color: #6D28D9 !important; }
+html.light .text-sky-400,
+html.light .text-sky-500,
+html.light [class*="text-sky-"] { color: #0369A1 !important; }
+html.light .text-rose-400,
+html.light .text-rose-500,
+html.light [class*="text-rose-"] { color: #BE123C !important; }
+html.light .text-orange-400,
+html.light .text-orange-500,
+html.light [class*="text-orange-"] { color: #C2410C !important; }
+html.light .text-indigo-400,
+html.light .text-indigo-500,
+html.light [class*="text-indigo-"] { color: #4338CA !important; }
+html.light .text-teal-400,
+html.light .text-teal-500,
+html.light [class*="text-teal-"] { color: #0F766E !important; }
+html.light .text-pink-400,
+html.light .text-pink-500,
+html.light [class*="text-pink-"] { color: #BE185D !important; }
+html.light .text-blue-400,
+html.light .text-blue-500,
+html.light [class*="text-blue-"] { color: #1D4ED8 !important; }
+html.light .text-fuchsia-400,
+html.light [class*="text-fuchsia-"] { color: #A21CAF !important; }
+html.light .text-lime-400,
+html.light [class*="text-lime-"] { color: #4D7C0F !important; }
+html.light .text-red-400,
+html.light .text-red-500,
+html.light [class*="text-red-"] { color: #DC2626 !important; }
+html.light .text-green-400,
+html.light .text-green-500,
+html.light [class*="text-green-"] { color: #16A34A !important; }
+html.light .text-purple-400,
+html.light .text-purple-500,
+html.light [class*="text-purple-"] { color: #7C3AED !important; }
+html.light .text-yellow-400,
+html.light .text-yellow-500,
+html.light [class*="text-yellow-"] { color: #CA8A04 !important; }
+html.light [class*="text-cc-green"] { color: #059669 !important; }
+html.light [class*="text-cc-red"] { color: #DC2626 !important; }
+html.light [class*="text-cc-purple"] { color: #7C3AED !important; }
+html.light [class*="text-cc-blue"] { color: #2563EB !important; }
+html.light [class*="text-destructive"] { color: #DC2626 !important; }
 
-/* Specific text classes that need to stay dark */
-.light .text-white { color: #000000 !important; }
-.light .text-foreground { color: #000000 !important; }
+/* Hover text accents */
+html.light .group-hover\:text-cyan-400 { color: #0E7490 !important; }
+html.light .group-hover\:text-emerald-400 { color: #059669 !important; }
+html.light .hover\:text-cyan-300:hover { color: #0E7490 !important; }
 
-/* ── BACKGROUNDS: solid, no transparency ── */
-.light .bg-white\/\[0\.02\],
-.light .bg-white\/\[0\.03\],
-.light .bg-white\/\[0\.04\],
-.light .bg-white\/\[0\.05\] { background-color: #FFFFFF !important; }
+/* ── 3. MUTED/SECONDARY TEXT: visible gray ── */
+html.light .text-muted-foreground { color: #4B5563 !important; }
+html.light .text-gray-400 { color: #6B7280 !important; }
+html.light .text-gray-500 { color: #4B5563 !important; }
+html.light .text-gray-300 { color: #9CA3AF !important; }
+html.light .text-slate-400 { color: #475569 !important; }
+html.light .text-slate-500 { color: #334155 !important; }
 
-.light .bg-white\/\[0\.06\],
-.light .bg-white\/\[0\.08\],
-.light .bg-white\/10 { background-color: #F2F2F2 !important; }
+/* ── 4. BUTTONS & BADGES: white text on colored backgrounds ── */
+html.light button[class*="bg-primary"],
+html.light button[class*="bg-emerald"],
+html.light button[class*="bg-indigo"],
+html.light button[class*="bg-cyan"],
+html.light button[class*="bg-red"],
+html.light button[class*="bg-cc-"],
+html.light [class*="bg-primary"]:not([class*="bg-primary/"]),
+html.light [class*="bg-emerald-500"],
+html.light [class*="bg-emerald-600"],
+html.light [class*="bg-indigo-500"],
+html.light [class*="bg-indigo-600"],
+html.light [class*="bg-red-500"],
+html.light [class*="bg-red-600"],
+html.light [class*="bg-blue-500"],
+html.light [class*="bg-blue-600"],
+html.light [class*="bg-violet-500"],
+html.light [class*="bg-violet-600"] {
+  color: #FFFFFF !important;
+}
+html.light button[class*="bg-primary"] *,
+html.light button[class*="bg-emerald"] *,
+html.light button[class*="bg-indigo"] *,
+html.light button[class*="bg-cyan"] *,
+html.light [class*="bg-emerald-500"] *,
+html.light [class*="bg-emerald-600"] *,
+html.light [class*="bg-indigo-500"] *,
+html.light [class*="bg-indigo-600"] * {
+  color: #FFFFFF !important;
+}
 
-.light .bg-white\/20 { background-color: #E5E5E5 !important; }
+/* ── 5. BACKGROUNDS: solid, no transparency ── */
+html.light .bg-white\/\[0\.02\],
+html.light .bg-white\/\[0\.03\],
+html.light .bg-white\/\[0\.04\],
+html.light .bg-white\/\[0\.05\] { background-color: #FFFFFF !important; }
 
-/* ── BORDERS: visible gray lines ── */
-.light .border-white\/6,
-.light .border-white\/\[0\.06\],
-.light .border-white\/\[0\.08\],
-.light .border-white\/10,
-.light .border-white\/8 { border-color: #D1D1D6 !important; }
+html.light .bg-white\/\[0\.06\],
+html.light .bg-white\/\[0\.08\],
+html.light .bg-white\/10 { background-color: #F5F5F5 !important; }
 
-.light .border-white\/\[0\.15\] { border-color: #B0B0B8 !important; }
+html.light .bg-white\/20 { background-color: #EBEBEB !important; }
 
-/* ── HOVER: visible feedback ── */
-.light .hover\:bg-white\/\[0\.04\]:hover,
-.light .hover\:bg-white\/\[0\.06\]:hover { background-color: #E9E9E9 !important; }
-.light .hover\:bg-white\/\[0\.08\]:hover,
-.light .hover\:bg-white\/10:hover { background-color: #DFDFDF !important; }
-.light .hover\:border-white\/\[0\.15\]:hover { border-color: #A0A0A8 !important; }
+html.light .bg-black\/60,
+html.light .bg-black\/50 { background-color: rgba(0, 0, 0, 0.5) !important; }
 
-/* ── RINGS ── */
-.light .ring-white\/8,
-.light .ring-white\/20 { --tw-ring-color: #D1D1D6 !important; }
+/* Dark hardcoded backgrounds → white */
+html.light .bg-\[\#111827\],
+html.light .bg-\[\#07090F\],
+html.light .bg-\[\#0D1117\],
+html.light .bg-\[\#0B1120\],
+html.light .bg-\[\#0a0f1a\] { background-color: #FFFFFF !important; }
 
-/* ── ACCENT BACKGROUNDS ── */
-.light .bg-cyan\/10,
-.light .bg-cyan\/15 { background-color: rgba(14, 116, 144, 0.1) !important; }
-.light .bg-cc-purple\/10,
-.light .bg-cc-purple\/15 { background-color: rgba(139, 92, 246, 0.1) !important; }
-.light .bg-cc-green\/10,
-.light .bg-cc-green\/15,
-.light .bg-cc-green\/5 { background-color: rgba(16, 185, 129, 0.1) !important; }
-.light .bg-cc-red\/10,
-.light .bg-cc-red\/15 { background-color: rgba(220, 38, 38, 0.1) !important; }
-.light .bg-amber\/10,
-.light .bg-amber\/5 { background-color: rgba(245, 158, 11, 0.1) !important; }
+/* ── 6. BORDERS: visible gray lines ── */
+html.light .border-white\/6,
+html.light .border-white\/\[0\.06\],
+html.light .border-white\/\[0\.08\],
+html.light .border-white\/10,
+html.light .border-white\/8,
+html.light .border-white\/\[0\.1\],
+html.light .border-white\/\[0\.15\] { border-color: #D1D5DB !important; }
 
-/* ── KILL ALL GLOW SHADOWS ── */
-.light .shadow-lg { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06) !important; }
-.light .shadow-xl { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08) !important; }
-.light [class*="shadow-\[0_0"] { box-shadow: none !important; }
+/* ── 7. HOVER: visible feedback ── */
+html.light .hover\:bg-white\/\[0\.04\]:hover,
+html.light .hover\:bg-white\/\[0\.06\]:hover { background-color: #F0F0F0 !important; }
+html.light .hover\:bg-white\/\[0\.08\]:hover,
+html.light .hover\:bg-white\/10:hover { background-color: #E5E5E5 !important; }
+html.light .hover\:bg-white\/\[0\.1\]:hover { background-color: #E5E5E5 !important; }
 
-/* ── SIDEBAR NAV: use 800 darkest shades ── */
-.light .text-cyan-400 { color: #155E75 !important; }
-.light .text-emerald-400 { color: #065F46 !important; }
-.light .text-amber-400 { color: #92400E !important; }
-.light .text-violet-400 { color: #5B21B6 !important; }
-.light .text-sky-400 { color: #075985 !important; }
-.light .text-rose-400 { color: #9F1239 !important; }
-.light .text-orange-400 { color: #9A3412 !important; }
-.light .text-indigo-400 { color: #3730A3 !important; }
-.light .text-teal-400 { color: #115E59 !important; }
-.light .text-pink-400 { color: #9D174D !important; }
-.light .text-blue-400 { color: #1E40AF !important; }
-.light .text-fuchsia-400 { color: #86198F !important; }
-.light .text-lime-400 { color: #3F6212 !important; }
-.light .text-slate-400 { color: #1E293B !important; }
-.light .text-red-400 { color: #991B1B !important; }
-.light .text-green-400 { color: #166534 !important; }
+/* ── 8. RINGS ── */
+html.light .ring-white\/8,
+html.light .ring-white\/10,
+html.light .ring-white\/20 { --tw-ring-color: #D1D5DB !important; }
 
-/* Hover text */
-.light .group-hover\:text-cyan-400 { color: #155E75 !important; }
-.light .group-hover\:text-emerald-400 { color: #065F46 !important; }
+/* ── 9. ACCENT BACKGROUNDS ── */
+html.light .bg-cyan\/10,
+html.light .bg-cyan\/15 { background-color: rgba(14, 116, 144, 0.08) !important; }
+html.light .bg-cc-purple\/10,
+html.light .bg-cc-purple\/15 { background-color: rgba(124, 58, 237, 0.08) !important; }
+html.light .bg-cc-green\/10,
+html.light .bg-cc-green\/15,
+html.light .bg-cc-green\/5 { background-color: rgba(5, 150, 105, 0.08) !important; }
+html.light .bg-cc-red\/10,
+html.light .bg-cc-red\/15 { background-color: rgba(220, 38, 38, 0.08) !important; }
+html.light .bg-amber\/10,
+html.light .bg-amber\/5 { background-color: rgba(180, 83, 9, 0.08) !important; }
+html.light .bg-emerald-500\/10,
+html.light .bg-emerald-500\/20 { background-color: rgba(5, 150, 105, 0.1) !important; }
+html.light .bg-sky-500\/10 { background-color: rgba(3, 105, 161, 0.1) !important; }
+html.light .bg-indigo-500\/10,
+html.light .bg-indigo-500\/20 { background-color: rgba(67, 56, 202, 0.1) !important; }
 
-/* ── KILL ALL OPACITY/TRANSPARENCY ── */
-.light .opacity-60 { opacity: 1 !important; }
-.light .opacity-70 { opacity: 1 !important; }
-.light .opacity-30 { opacity: 0.6 !important; }
+/* ── 10. KILL ALL GLOW SHADOWS ── */
+html.light .shadow-lg { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important; }
+html.light .shadow-xl { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important; }
+html.light [style*="box-shadow"] { box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06) !important; }
+html.light [style*="boxShadow"] { box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06) !important; }
 
-/* ── Primary button text stays white ── */
-.light button.bg-primary span,
-.light button.bg-primary,
-.light [class*="bg-primary"]:not([class*="bg-primary/"]) { color: #FFFFFF; }
+/* ── 11. KILL ALL OPACITY ── */
+html.light .opacity-60,
+html.light .opacity-70 { opacity: 1 !important; }
+html.light .opacity-30,
+html.light .opacity-40 { opacity: 0.7 !important; }
+html.light .opacity-50 { opacity: 0.8 !important; }
+
+/* ── 12. INLINE STYLE OVERRIDES for hardcoded hex text colors ── */
+html.light [style*="color: rgb(148, 163, 184)"],
+html.light [style*="color: #94A3B8"],
+html.light [style*="color:#94A3B8"] { color: #4B5563 !important; }
+html.light [style*="color: rgb(241, 245, 249)"],
+html.light [style*="color: #F1F5F9"],
+html.light [style*="color:#F1F5F9"] { color: #111827 !important; }
+html.light [style*="color: rgb(0, 212, 255)"],
+html.light [style*="color: #00D4FF"],
+html.light [style*="color:#00D4FF"] { color: #0E7490 !important; }
+
+/* ── 13. PLACEHOLDER text ── */
+html.light input::placeholder,
+html.light textarea::placeholder { color: #9CA3AF !important; }
+
+/* ── 14. SELECT/OPTION elements ── */
+html.light select option { background-color: #FFFFFF !important; color: #111827 !important; }
+
+/* ── 15. GRADIENT TEXT backgrounds → remove ── */
+html.light [style*="background: linear-gradient"] { background: none !important; }
+html.light [style*="backgroundImage: linear-gradient"] { background-image: none !important; }
+html.light [style*="-webkit-background-clip: text"] { -webkit-background-clip: unset !important; -webkit-text-fill-color: #111827 !important; }
+html.light [style*="WebkitBackgroundClip"] { -webkit-background-clip: unset !important; -webkit-text-fill-color: #111827 !important; }
+
+/* ── 16. INPUT FIELDS ── */
+html.light input,
+html.light textarea,
+html.light select {
+  background-color: #FFFFFF !important;
+  border-color: #D1D5DB !important;
+  color: #111827 !important;
+}
+html.light input:focus,
+html.light textarea:focus,
+html.light select:focus {
+  border-color: #6366F1 !important;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15) !important;
+}
+
+/* ── 17. MODAL BACKDROP → keep dark ── */
+html.light .backdrop-blur-sm { backdrop-filter: blur(4px) !important; }
 
 .scrollbar-hide {
   -ms-overflow-style: none;
