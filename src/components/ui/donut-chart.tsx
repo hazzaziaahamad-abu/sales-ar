@@ -60,7 +60,7 @@ export function DonutChart({
                 x={size / 2}
                 y={size / 2 - 6}
                 textAnchor="middle"
-                className="fill-foreground text-xl font-bold"
+                className="fill-foreground font-mono font-extrabold"
                 style={{ fontSize: "20px" }}
               >
                 {centerValue}

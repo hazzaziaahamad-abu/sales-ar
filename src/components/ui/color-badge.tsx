@@ -20,9 +20,9 @@ export function ColorBadge({ text, color, size = "sm" }: ColorBadgeProps) {
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full font-medium",
+        "inline-flex items-center rounded-full font-bold whitespace-nowrap",
         COLOR_CLASSES[color],
-        size === "sm" ? "px-2 py-0.5 text-[10px]" : "px-3 py-1 text-xs"
+        size === "sm" ? "px-[9px] py-[3px] text-[11px]" : "px-[10px] py-[3px] text-xs"
       )}
     >
       {text}

@@ -10,28 +10,26 @@ interface KPICardProps {
   icon?: React.ReactNode;
 }
 
-const STATUS_COLORS: Record<string, { border: string; glow: string; orb: string; text: string }> = {
+const STATUS_COLORS: Record<string, { border: string; glow: string; text: string; hex: string }> = {
   excellent: {
-    border: "rgba(16, 185, 129, 0.5)",
-    glow: "0 0 20px rgba(16, 185, 129, 0.15), inset 0 1px 0 rgba(16, 185, 129, 0.1)",
-    orb: "radial-gradient(circle, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0.08) 40%, transparent 70%)",
+    border: "rgba(16, 185, 129, 0.30)",
+    glow: "0 0 18px rgba(16, 185, 129, 0.08)",
     text: "text-cc-green",
+    hex: "#10B981",
   },
   improving: {
-    border: "rgba(245, 158, 11, 0.5)",
-    glow: "0 0 20px rgba(245, 158, 11, 0.15), inset 0 1px 0 rgba(245, 158, 11, 0.1)",
-    orb: "radial-gradient(circle, rgba(245, 158, 11, 0.25) 0%, rgba(245, 158, 11, 0.08) 40%, transparent 70%)",
+    border: "rgba(245, 158, 11, 0.30)",
+    glow: "0 0 18px rgba(245, 158, 11, 0.08)",
     text: "text-amber",
+    hex: "#F59E0B",
   },
   behind: {
-    border: "rgba(239, 68, 68, 0.5)",
-    glow: "0 0 20px rgba(239, 68, 68, 0.15), inset 0 1px 0 rgba(239, 68, 68, 0.1)",
-    orb: "radial-gradient(circle, rgba(239, 68, 68, 0.25) 0%, rgba(239, 68, 68, 0.08) 40%, transparent 70%)",
+    border: "rgba(239, 68, 68, 0.30)",
+    glow: "0 0 18px rgba(239, 68, 68, 0.08)",
     text: "text-cc-red",
+    hex: "#EF4444",
   },
 };
-
-const STATUS_BG = "var(--card)";
 
 export function KPICard({ label, value, target, status, icon }: KPICardProps) {
   const styles = KPI_STATUS_STYLES[status];
@@ -40,27 +38,35 @@ export function KPICard({ label, value, target, status, icon }: KPICardProps) {
 
   return (
     <div
-      className="relative overflow-hidden rounded-2xl p-5 min-h-[160px] flex flex-col justify-between"
+      className="relative overflow-hidden rounded-[14px] p-5 min-h-[160px] flex flex-col justify-between transition-all duration-200"
       style={{
-        backgroundColor: STATUS_BG,
+        backgroundColor: "var(--card)",
         border: `1px solid ${colors.border}`,
         boxShadow: colors.glow,
       }}
+      onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.borderColor = colors.hex; }}
+      onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.borderColor = colors.border; }}
     >
+      {/* Decorative orb */}
+      <div className="absolute -top-4 -right-4 w-[60px] h-[60px] rounded-full opacity-[0.08]"
+        style={{ background: colors.hex }} />
 
       {/* Top: Label */}
-      <p className="text-xs text-muted-foreground relative z-10">{label}</p>
+      <p className="text-xs text-muted-foreground font-semibold relative z-10">{label}</p>
 
       {/* Center: Value */}
-      <p className={cn("text-3xl font-extrabold relative z-10 my-2", colors.text)}>
+      <p className={cn("text-[22px] font-extrabold font-mono relative z-10 my-2", colors.text)}>
         {value}
       </p>
 
       {/* Bottom: Status + Target */}
       <div className="flex items-center justify-between relative z-10">
-        <StatusIcon className={cn("w-5 h-5", colors.text)} />
+        <span className="cc-badge" style={{ background: `${colors.hex}25`, color: colors.hex }}>
+          <StatusIcon className="w-3.5 h-3.5" />
+          {status === "excellent" ? "ممتاز" : status === "improving" ? "تحسن" : "متأخر"}
+        </span>
         <span className="text-[11px] text-muted-foreground">
-          الهدف: {target}
+          الهدف: <span className="font-mono">{target}</span>
         </span>
       </div>
     </div>

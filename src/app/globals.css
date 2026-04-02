@@ -60,6 +60,8 @@
   --color-cc-blue: #7da6ff;
   --color-blue-dim: var(--blue-dim);
   --color-pink: #EC4899;
+  --color-border-hi: var(--border-hi);
+  --color-dim: var(--dim);
 }
 
 /* ─── Dark theme (default) ─── */
@@ -105,6 +107,10 @@
   --purple-dim: rgba(139, 92, 246, 0.14);
   --blue-dim: rgba(125, 166, 255, 0.14);
 
+  /* Extended design tokens */
+  --border-hi: #2E3F55;
+  --dim: #475569;
+
   /* Glass & surface */
   --glass-bg: linear-gradient(180deg, #0D1117 0%, #0B0F14 100%);
   --glass-border: rgba(0, 212, 255, 0.2);
@@ -139,15 +145,25 @@
   .glass-surface {
     background: var(--glass-bg);
     border: 1px solid var(--glass-border);
+    border-radius: 14px;
     box-shadow: var(--glass-shadow);
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.15s ease;
+  }
+  .glass-surface:hover {
+    transform: translateY(-2px);
+    border-color: var(--primary);
   }
 
   .cc-card {
     background-color: var(--card);
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--glass-shadow);
-    transition: box-shadow 0.2s ease;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: none;
+    transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.15s ease;
+  }
+  .cc-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--border-hi);
   }
 
   .panel-grid {
@@ -175,6 +191,70 @@
   background: var(--scrollbar-thumb-hover);
 }
 
+
+/* ─── Design System Animations ─── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translate(-50%, 20px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.35s ease-out both;
+}
+
+/* ─── Card hover identity: lift + accent border ─── */
+.cc-card {
+  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+.cc-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--glass-border);
+}
+
+/* ─── Monospace for financial numbers ─── */
+.font-mono-num {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+/* ─── Status badge pattern ─── */
+.cc-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 20px;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ─── Empty state ─── */
+.cc-empty {
+  text-align: center;
+  padding: 44px 0;
+  color: var(--dim);
+}
+.cc-empty-icon {
+  font-size: 34px;
+  margin-bottom: 8px;
+}
+.cc-empty-text {
+  font-size: 13px;
+}
+
+/* ─── Date picker indicator invert ─── */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.6);
+}
 
 .scrollbar-hide {
   -ms-overflow-style: none;

@@ -49,6 +49,12 @@ export function LineChart({
 
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto">
+      <defs>
+        <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.3" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
       {/* Grid lines */}
       {[0, 0.25, 0.5, 0.75, 1].map((pct) => {
         const y = padding.top + chartH * (1 - pct);
@@ -60,7 +66,7 @@ export function LineChart({
               y1={y}
               x2={width - padding.right}
               y2={y}
-              stroke="#1e293b"
+              stroke="var(--border)"
               strokeWidth="1"
             />
             <text
@@ -92,7 +98,7 @@ export function LineChart({
 
       {/* Area fill */}
       {showArea && (
-        <path d={areaPath} fill={color} opacity={0.08} />
+        <path d={areaPath} fill="url(#areaGrad)" />
       )}
 
       {/* Target line */}
@@ -102,7 +108,7 @@ export function LineChart({
           fill="none"
           stroke={targetColor}
           strokeWidth="1.5"
-          strokeDasharray="5,5"
+          strokeDasharray="4 3"
         />
       )}
 
