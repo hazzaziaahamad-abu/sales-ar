@@ -1,5 +1,5 @@
 import { createClient } from "./client";
-import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, MonthlyBudget, StartupCost, Marketer, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating, FollowUpNote, MentionNotification, PendingDeal, TargetClient, GiftOffer, EmployeeTask, Package } from "@/types";
+import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, MonthlyBudget, StartupCost, Marketer, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating, FollowUpNote, MentionNotification, PendingDeal, TargetClient, GiftOffer, EmployeeTask, Package, AcademyContent } from "@/types";
 
 const DEFAULT_ORG = "00000000-0000-0000-0000-000000000001";
 
@@ -1705,5 +1705,41 @@ export async function updatePackage(
 export async function deletePackage(id: string): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase.from("packages").delete().eq("id", id);
+  if (error) throw error;
+}
+
+/* ─── Academy Content ─── */
+
+export async function fetchAcademyContent(section?: "menu" | "reservations"): Promise<AcademyContent[]> {
+  const supabase = createClient();
+  let query = supabase.from("academy_content").select("*").order("sort_order", { ascending: true });
+  if (section) query = query.eq("section", section);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data || []) as AcademyContent[];
+}
+
+export async function createAcademyContent(content: Omit<AcademyContent, "id" | "created_at" | "updated_at">): Promise<AcademyContent> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from("academy_content").insert(content).select().single();
+  if (error) throw error;
+  return data as AcademyContent;
+}
+
+export async function updateAcademyContent(id: string, updates: Partial<AcademyContent>): Promise<AcademyContent> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("academy_content")
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as AcademyContent;
+}
+
+export async function deleteAcademyContent(id: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from("academy_content").delete().eq("id", id);
   if (error) throw error;
 }

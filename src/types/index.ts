@@ -541,3 +541,17 @@ export interface GiftOffer {
   created_at: string;
   updated_at: string;
 }
+
+export interface AcademyContent {
+  id: string;
+  org_id: string;
+  section: "menu" | "reservations";
+  title: string;
+  content: string;
+  sort_order: number;
+  is_published: boolean;
+  created_by?: string;
+  updated_by?: string;
+  created_at: string;
+  updated_at: string;
+}
