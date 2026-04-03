@@ -9,6 +9,7 @@ import {
   fetchMyTaskStats,
   fetchTeamTaskStats,
   fetchUserProfiles,
+  fetchEmployees,
   submitPendingDeal,
   fetchDeals,
   fetchPendingDeals,
@@ -187,6 +188,7 @@ export default function MyTasksPage() {
   const [clientForm, setClientForm] = useState(EMPTY_CLIENT_FORM);
   const [clientSaving, setClientSaving] = useState(false);
   const [clientError, setClientError] = useState("");
+  const [myEmployeeId, setMyEmployeeId] = useState<string | null>(null);
 
   /* Transfer modal */
   const [transferTask, setTransferTask] = useState<EmployeeTask | null>(null);
@@ -288,9 +290,23 @@ export default function MyTasksPage() {
   const loadData = useCallback(async () => {
     if (!user) return;
     try {
+      // First: resolve employee ID (assigned_to references employees table, not auth.users)
+      let empId = myEmployeeId;
+      if (!empId) {
+        try {
+          const employees = await fetchEmployees();
+          const me = employees.find(e => e.email === user.email || e.name === user.name);
+          if (me) {
+            empId = me.id;
+            setMyEmployeeId(me.id);
+          }
+        } catch { /* ignore */ }
+      }
+
+      const assignedTo = empId || user.id;
       const [tasksResult, statsResult, teamResult, dealsResult, pendingResult] = await Promise.allSettled([
-        fetchEmployeeTasks({ assigned_to: user.id }),
-        fetchMyTaskStats(user.id),
+        fetchEmployeeTasks({ assigned_to: assignedTo }),
+        fetchMyTaskStats(assignedTo),
         fetchTeamTaskStats(),
         fetchDeals(),
         fetchPendingDeals(),
@@ -309,8 +325,8 @@ export default function MyTasksPage() {
       // Team ranking
       if (teamResult.status === "fulfilled") {
         const teamStats = teamResult.value;
-        const myTeam = teamStats.find(s => s.employee_id === user.id);
-        const rank = teamStats.findIndex(s => s.employee_id === user.id) + 1;
+        const myTeam = teamStats.find(s => s.employee_id === assignedTo);
+        const rank = teamStats.findIndex(s => s.employee_id === assignedTo) + 1;
         setMyRank({
           rank: rank || teamStats.length + 1,
           total: teamStats.length,
@@ -342,13 +358,17 @@ export default function MyTasksPage() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, myEmployeeId]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
   /* ─── Add Client Handler ─── */
   const handleAddClient = async () => {
     if (!user || !clientForm.client_name.trim()) return;
+    if (!myEmployeeId) {
+      setClientError("لم يتم العثور على حسابك في قائمة الموظفين. تواصل مع المسؤول.");
+      return;
+    }
     setClientSaving(true);
     setClientError("");
     try {
@@ -358,7 +378,7 @@ export default function MyTasksPage() {
         task_type: "followup",
         priority: "medium",
         status: "in_progress",
-        assigned_to: user.id,
+        assigned_to: myEmployeeId,
         assigned_to_name: user.name,
         assigned_by: user.id,
         assigned_by_name: user.name,
