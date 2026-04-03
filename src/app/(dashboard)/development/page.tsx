@@ -133,7 +133,6 @@ export default function DevelopmentPage() {
     setFormDate(proj.start_date || "");
     setFormTotalTasks(String(proj.total_tasks));
     setFormRemainingTasks(String(proj.remaining_tasks));
-    setFormStatus(proj.status_tag || "في الموعد");
     setModalOpen(true);
   };
 
