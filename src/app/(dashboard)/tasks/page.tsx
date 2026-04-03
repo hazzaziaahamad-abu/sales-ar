@@ -66,6 +66,8 @@ export default function TasksPage() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterEmployee, setFilterEmployee] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     title: "",
@@ -109,6 +111,8 @@ export default function TasksPage() {
 
   const handleSubmit = async () => {
     if (!form.title || !form.assigned_to) return;
+    setSubmitting(true);
+    setSubmitError(null);
     try {
       if (editingTask) {
         await updateEmployeeTask(editingTask.id, {
@@ -134,8 +138,8 @@ export default function TasksPage() {
           status: "pending",
           assigned_to: form.assigned_to,
           assigned_to_name: form.assigned_to_name,
-          assigned_by: user?.id,
-          assigned_by_name: user?.name,
+          assigned_by: user?.id || "",
+          assigned_by_name: user?.name || "",
           due_date: form.due_date || undefined,
           due_time: form.due_time || undefined,
           client_name: form.client_name || undefined,
@@ -146,8 +150,12 @@ export default function TasksPage() {
       }
       resetForm();
       loadData();
-    } catch (e) {
-      console.error(e);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "حدث خطأ أثناء حفظ المهمة";
+      setSubmitError(msg);
+      console.error("Task submit error:", e);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -545,12 +553,18 @@ export default function TasksPage() {
                 />
               </div>
 
+              {submitError && (
+                <div className="rounded-[10px] border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-400">
+                  {submitError}
+                </div>
+              )}
+
               <button
                 onClick={handleSubmit}
-                disabled={!form.title || !form.assigned_to}
+                disabled={!form.title || !form.assigned_to || submitting}
                 className="w-full py-3 rounded-[14px] bg-indigo-500 hover:bg-indigo-600 disabled:opacity-40 text-white font-medium transition-all"
               >
-                {editingTask ? "حفظ التعديلات" : "إنشاء المهمة"}
+                {submitting ? "جاري الحفظ..." : editingTask ? "حفظ التعديلات" : "إنشاء المهمة"}
               </button>
             </div>
           </div>
