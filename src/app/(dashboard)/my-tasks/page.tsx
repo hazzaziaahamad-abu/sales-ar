@@ -186,6 +186,7 @@ export default function MyTasksPage() {
   const [showClientForm, setShowClientForm] = useState(false);
   const [clientForm, setClientForm] = useState(EMPTY_CLIENT_FORM);
   const [clientSaving, setClientSaving] = useState(false);
+  const [clientError, setClientError] = useState("");
 
   /* Transfer modal */
   const [transferTask, setTransferTask] = useState<EmployeeTask | null>(null);
@@ -287,24 +288,39 @@ export default function MyTasksPage() {
   const loadData = useCallback(async () => {
     if (!user) return;
     try {
-      const [myTasks, myStats, teamStats, allDeals, pendingDeals] = await Promise.all([
+      const [tasksResult, statsResult, teamResult, dealsResult, pendingResult] = await Promise.allSettled([
         fetchEmployeeTasks({ assigned_to: user.id }),
         fetchMyTaskStats(user.id),
         fetchTeamTaskStats(),
         fetchDeals(),
         fetchPendingDeals(),
       ]);
-      setTasks(myTasks);
-      setStats(myStats);
-      const myTeam = teamStats.find(s => s.employee_id === user.id);
-      const rank = teamStats.findIndex(s => s.employee_id === user.id) + 1;
-      setMyRank({
-        rank: rank || teamStats.length + 1,
-        total: teamStats.length,
-        rate: myTeam?.completion_rate ?? 0,
-      });
+
+      // Tasks - core data, always update
+      if (tasksResult.status === "fulfilled") {
+        setTasks(tasksResult.value);
+      }
+
+      // Stats
+      if (statsResult.status === "fulfilled") {
+        setStats(statsResult.value);
+      }
+
+      // Team ranking
+      if (teamResult.status === "fulfilled") {
+        const teamStats = teamResult.value;
+        const myTeam = teamStats.find(s => s.employee_id === user.id);
+        const rank = teamStats.findIndex(s => s.employee_id === user.id) + 1;
+        setMyRank({
+          rank: rank || teamStats.length + 1,
+          total: teamStats.length,
+          rate: myTeam?.completion_rate ?? 0,
+        });
+      }
 
       // Sales performance stats
+      const allDeals = dealsResult.status === "fulfilled" ? dealsResult.value : [];
+      const pendingDeals = pendingResult.status === "fulfilled" ? pendingResult.value : [];
       const myDeals = allDeals.filter(d => d.assigned_rep_name?.trim() === user.name.trim());
       const closedDeals = myDeals.filter(d => d.stage === "مكتملة");
       const myPending = pendingDeals.filter(d => d.submitter_name?.trim() === user.name.trim() || d.assigned_rep_name?.trim() === user.name.trim());
@@ -334,8 +350,9 @@ export default function MyTasksPage() {
   const handleAddClient = async () => {
     if (!user || !clientForm.client_name.trim()) return;
     setClientSaving(true);
+    setClientError("");
     try {
-      await createEmployeeTask({
+      const created = await createEmployeeTask({
         title: `${clientForm.stage} — ${clientForm.client_name}`,
         description: `${clientForm.sales_type === "office" ? "مبيعات المكتب" : "مبيعات الدعم"} | المصدر: ${clientForm.source}${clientForm.plan ? ` | الباقة: ${clientForm.plan}` : ""}${clientForm.deal_value ? ` | القيمة: ${clientForm.deal_value} ر.س` : ""}`,
         task_type: "followup",
@@ -350,11 +367,14 @@ export default function MyTasksPage() {
         client_phone: clientForm.client_phone.trim() || undefined,
         notes: clientForm.notes.trim() || undefined,
       });
+      // Immediately add to local state so it appears even if loadData fails
+      setTasks((prev) => [created, ...prev]);
       setClientForm(EMPTY_CLIENT_FORM);
       setShowClientForm(false);
       loadData();
     } catch (e) {
       console.error(e);
+      setClientError(e instanceof Error ? e.message : "حدث خطأ أثناء إضافة العميل. حاول مرة أخرى.");
     } finally {
       setClientSaving(false);
     }
@@ -546,7 +566,7 @@ export default function MyTasksPage() {
             </div>
             <div className="flex items-center gap-3">
               <button
-                onClick={() => { setClientForm(EMPTY_CLIENT_FORM); setShowClientForm(true); }}
+                onClick={() => { setClientForm(EMPTY_CLIENT_FORM); setClientError(""); setShowClientForm(true); }}
                 className="flex items-center gap-2 px-4 py-3 rounded-[14px] bg-cyan-500 hover:bg-cyan-600 text-white font-medium text-sm transition-all shadow-lg"
               >
                 <Plus className="w-4 h-4" /> إضافة عميل
@@ -1128,6 +1148,12 @@ export default function MyTasksPage() {
                   className="w-full px-4 py-2.5 rounded-[14px] bg-white/[0.04] border border-white/10 text-white text-sm placeholder:text-gray-500 focus:outline-none focus:border-cyan-500/50 resize-none"
                 />
               </div>
+
+              {clientError && (
+                <div className="p-3 rounded-[14px] bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                  {clientError}
+                </div>
+              )}
 
               <button
                 onClick={handleAddClient}
