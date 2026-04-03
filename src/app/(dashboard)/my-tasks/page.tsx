@@ -394,7 +394,8 @@ export default function MyTasksPage() {
       loadData();
     } catch (e) {
       console.error(e);
-      setClientError(e instanceof Error ? e.message : "حدث خطأ أثناء إضافة العميل. حاول مرة أخرى.");
+      const errMsg = e instanceof Error ? e.message : typeof e === "object" && e !== null ? JSON.stringify(e) : "حدث خطأ أثناء إضافة العميل. حاول مرة أخرى.";
+      setClientError(`خطأ: ${errMsg} | employee_id: ${myEmployeeId || "غير موجود"} | user_id: ${user.id}`);
     } finally {
       setClientSaving(false);
     }
