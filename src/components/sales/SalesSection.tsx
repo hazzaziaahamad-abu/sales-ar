@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import type { Deal, Marketer, Package } from "@/types";
 import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createFollowUpNote, fetchRecentFollowUpNotes, fetchPackages } from "@/lib/supabase/db";
@@ -12,6 +12,7 @@ import { STAGES, SOURCES, SOURCE_COLORS, PLANS } from "@/lib/utils/constants";
 import SalesKPIsView from "@/components/SalesKPIsView";
 import { formatMoney, formatMoneyFull, formatDate, formatPhone, formatPercent } from "@/lib/utils/format";
 import { FollowUpLogButton } from "@/components/follow-up-log";
+import { AchievementSummary } from "@/components/achievement-summary";
 import { getKpiStatus, KPI_STATUS_STYLES, KPI_TARGETS } from "@/lib/utils/constants";
 import { StatCard } from "@/components/ui/stat-card";
 import { KPICard } from "@/components/ui/kpi-card";
@@ -374,6 +375,10 @@ export function SalesSection({ salesType }: SalesPageProps) {
   /* card filter */
   const [stageFilter, setStageFilter] = useState<string | null>(null);
   const [clientSearch, setClientSearch] = useState("");
+
+  /* achievement summary filter */
+  const [achieveFilter, setAchieveFilter] = useState<string | null>(null);
+  const [achieveFilterIds, setAchieveFilterIds] = useState<Set<string>>(new Set());
   const { activeMonthIndex, filterCutoff } = useTopbarControls();
 
   /* time/month-filtered deals (used for all analytics + table) */
@@ -386,10 +391,25 @@ export function SalesSection({ salesType }: SalesPageProps) {
         })
       : deals;
   const nonCompletedDeals = monthDeals.filter((d) => d.stage !== "مكتملة" && d.stage !== "مرفوض مع سبب");
-  const stageFilteredDeals = stageFilter ? monthDeals.filter((d) => d.stage === stageFilter) : monthDeals;
+
+  /* Achievement summary items */
+  const achievementItems = useMemo(() => deals.map(d => ({
+    id: d.id,
+    updated_at: d.updated_at,
+    value: d.deal_value,
+    isCompleted: d.stage === "مكتملة",
+    isCancelled: d.stage === "مرفوض مع سبب" || d.stage === "كنسل التجربة",
+    isContacted: d.stage === "تواصل" || d.stage === "تفاوض" || d.stage === "انتظار الدفع",
+    repName: d.assigned_rep_name || undefined,
+  })), [deals]);
+
+  // Apply achievement filter or stage filter
+  const baseFilteredDeals = achieveFilter
+    ? monthDeals.filter(d => achieveFilterIds.has(d.id))
+    : stageFilter ? monthDeals.filter((d) => d.stage === stageFilter) : monthDeals;
   const filteredDeals = clientSearch
-    ? stageFilteredDeals.filter((d) => d.client_name.toLowerCase().includes(clientSearch.toLowerCase()) || (d.client_code && d.client_code.toLowerCase().includes(clientSearch.toLowerCase())))
-    : stageFilteredDeals;
+    ? baseFilteredDeals.filter((d) => d.client_name.toLowerCase().includes(clientSearch.toLowerCase()) || (d.client_code && d.client_code.toLowerCase().includes(clientSearch.toLowerCase())))
+    : baseFilteredDeals;
 
   useEffect(() => {
     setLoading(true);
@@ -734,6 +754,29 @@ export function SalesSection({ salesType }: SalesPageProps) {
         </div>
       )}
 
+      {/* ─── Achievement Summary ─── */}
+      {!loading && (
+        <AchievementSummary
+          items={achievementItems}
+          labels={{
+            completed: "صفقة مكتملة",
+            revenue: "إيرادات محققة",
+            contacted: "تم التواصل",
+            successRate: "نسبة النجاح",
+            lostRevenue: "إيرادات مفقودة",
+            topRep: "صفقة",
+          }}
+          onFilterChange={(filter, ids) => {
+            setAchieveFilter(filter);
+            setAchieveFilterIds(ids);
+            if (filter) setStageFilter(null);
+          }}
+          activeFilter={achieveFilter}
+          filteredCount={filteredDeals.length}
+          tableAnchorId="sales-table"
+        />
+      )}
+
       {/* ─── Source Distribution Cards ─── */}
       <div className="flex flex-wrap gap-3 justify-center">
         {loading
@@ -995,7 +1038,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
       })()}
 
       {/* ─── Deals Table ─── */}
-      <div className="cc-card rounded-2xl overflow-x-auto">
+      <div id="sales-table" className="cc-card rounded-2xl overflow-x-auto">
         <div className="p-4 pb-0 flex items-center gap-3">
           <Input
             value={clientSearch}

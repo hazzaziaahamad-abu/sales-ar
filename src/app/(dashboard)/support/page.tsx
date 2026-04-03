@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   fetchTickets, createTicket, updateTicket, deleteTicket,
   fetchEmployees,
@@ -12,6 +12,7 @@ import { PRIORITY_COLORS, TICKET_STATUS_COLORS } from "@/lib/utils/constants";
 import { formatDate, formatPhone } from "@/lib/utils/format";
 import type { Ticket, Employee } from "@/types";
 
+import { AchievementSummary } from "@/components/achievement-summary";
 import { StatCard } from "@/components/ui/stat-card";
 import { ColorBadge } from "@/components/ui/color-badge";
 import { Button } from "@/components/ui/button";
@@ -108,14 +109,31 @@ export default function SupportPage() {
   // Card filter: "مفتوح" | "قيد الحل" | "محلول" | "عاجل" | null
   const [cardFilter, setCardFilter] = useState<string | null>(null);
   const [clientSearch, setClientSearch] = useState("");
-  const cardFilteredTickets = cardFilter
-    ? cardFilter === "عاجل"
-      ? monthTickets.filter((t) => t.priority === "عاجل")
-      : monthTickets.filter((t) => t.status === cardFilter)
-    : monthTickets;
+
+  // Achievement summary
+  const [achieveFilter, setAchieveFilter] = useState<string | null>(null);
+  const [achieveFilterIds, setAchieveFilterIds] = useState<Set<string>>(new Set());
+
+  const achievementItems = useMemo(() => tickets.map(t => ({
+    id: t.id,
+    updated_at: t.updated_at,
+    value: 0,
+    isCompleted: t.status === "محلول",
+    isCancelled: false,
+    isContacted: t.status === "قيد الحل",
+    repName: t.assigned_agent_name || undefined,
+  })), [tickets]);
+
+  const baseFilteredTickets = achieveFilter
+    ? monthTickets.filter(t => achieveFilterIds.has(t.id))
+    : cardFilter
+      ? cardFilter === "عاجل"
+        ? monthTickets.filter((t) => t.priority === "عاجل")
+        : monthTickets.filter((t) => t.status === cardFilter)
+      : monthTickets;
   const filteredTickets = clientSearch
-    ? cardFilteredTickets.filter((t) => t.client_name.toLowerCase().includes(clientSearch.toLowerCase()))
-    : cardFilteredTickets;
+    ? baseFilteredTickets.filter((t) => t.client_name.toLowerCase().includes(clientSearch.toLowerCase()))
+    : baseFilteredTickets;
 
   useEffect(() => {
     setLoading(true);
@@ -320,8 +338,30 @@ export default function SupportPage() {
         )}
       </div>
 
+      {/* -------- Achievement Summary -------- */}
+      {!loading && (
+        <AchievementSummary
+          items={achievementItems}
+          labels={{
+            completed: "تذكرة محلولة",
+            contacted: "قيد الحل",
+            successRate: "نسبة الحل",
+            lostRevenue: "غير محلولة",
+            topRep: "تذكرة",
+          }}
+          onFilterChange={(filter, ids) => {
+            setAchieveFilter(filter);
+            setAchieveFilterIds(ids);
+            if (filter) setCardFilter(null);
+          }}
+          activeFilter={achieveFilter}
+          filteredCount={filteredTickets.length}
+          tableAnchorId="tickets-table"
+        />
+      )}
+
       {/* -------- Tickets Table -------- */}
-      <div className="cc-card rounded-[14px] overflow-x-auto">
+      <div id="tickets-table" className="cc-card rounded-[14px] overflow-x-auto">
         <div className="p-4 pb-0">
           <Input
             value={clientSearch}
