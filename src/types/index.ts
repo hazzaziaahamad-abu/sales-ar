@@ -131,6 +131,16 @@ export interface Project {
   updated_at: string;
 }
 
+export interface Package {
+  id: string;
+  org_id: string;
+  name: string;
+  original_price: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Partnership {
   id: string;
   org_id: string;

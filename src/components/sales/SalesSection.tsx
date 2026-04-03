@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import type { Deal, Marketer } from "@/types";
-import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createFollowUpNote, fetchRecentFollowUpNotes } from "@/lib/supabase/db";
+import type { Deal, Marketer, Package } from "@/types";
+import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createFollowUpNote, fetchRecentFollowUpNotes, fetchPackages } from "@/lib/supabase/db";
 import { AssignTaskModal } from "@/components/tasks/AssignTaskModal";
 import { useAuth } from "@/lib/auth-context";
 import { useTopbarControls } from "@/components/layout/topbar-context";
@@ -119,6 +119,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const clientCodePrefix = isOffice ? "S" : "D";
   const { activeOrgId: orgId, user: authUser } = useAuth();
   const [deals, setDeals] = useState<Deal[]>([]);
+  const [packages, setPackages] = useState<Package[]>([]);
   const [marketers, setMarketers] = useState<Marketer[]>([]);
   const [loading, setLoading] = useState(true);
   const [countdown, setCountdown] = useState({ h: 0, m: 0, s: 0, timeUp: false });
@@ -395,6 +396,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
     Promise.all([
       fetchDeals(salesType).then(setDeals),
       fetchMarketers().then(setMarketers),
+      fetchPackages().then(setPackages),
     ])
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -424,15 +426,39 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const pipelineValue = monthDeals.filter((d) => d.stage !== "مكتملة").reduce((s, d) => s + d.deal_value, 0);
 
   /* Rep performance */
+  // Build price map from packages
+  const pkgPriceMap = new Map<string, number>();
+  packages.forEach((p) => pkgPriceMap.set(p.name.toLowerCase().trim(), p.original_price));
+  const getOrigPrice = (plan: string | undefined): number | null => {
+    if (!plan) return null;
+    const n = plan.toLowerCase().trim();
+    if (pkgPriceMap.has(n)) return pkgPriceMap.get(n)!;
+    for (const [key, val] of pkgPriceMap) {
+      if (n.includes(key) || key.includes(n)) return val;
+    }
+    return null;
+  };
+
   const repPerformance = (() => {
-    const repMap: Record<string, { deals: number; closed: number; value: number; cycleDays: number; plans: Record<string, number> }> = {};
+    const repMap: Record<string, { deals: number; closed: number; value: number; cycleDays: number; plans: Record<string, number>; fullPrice: number; discounted: number; discountTotal: number }> = {};
     monthDeals.forEach((d) => {
       const rep = d.assigned_rep_name || "غير محدد";
-      if (!repMap[rep]) repMap[rep] = { deals: 0, closed: 0, value: 0, cycleDays: 0, plans: {} };
+      if (!repMap[rep]) repMap[rep] = { deals: 0, closed: 0, value: 0, cycleDays: 0, plans: {}, fullPrice: 0, discounted: 0, discountTotal: 0 };
       repMap[rep].deals++;
       repMap[rep].value += d.deal_value;
       repMap[rep].cycleDays += d.cycle_days;
-      if (d.stage === "مكتملة") repMap[rep].closed++;
+      if (d.stage === "مكتملة") {
+        repMap[rep].closed++;
+        const origP = getOrigPrice(d.plan);
+        if (origP !== null) {
+          if (d.deal_value >= origP) {
+            repMap[rep].fullPrice++;
+          } else {
+            repMap[rep].discounted++;
+            repMap[rep].discountTotal += origP - d.deal_value;
+          }
+        }
+      }
       if (d.plan) repMap[rep].plans[d.plan] = (repMap[rep].plans[d.plan] || 0) + 1;
     });
     return Object.entries(repMap)
@@ -444,6 +470,10 @@ export function SalesSection({ salesType }: SalesPageProps) {
         plans: data.plans,
         winRate: data.deals > 0 ? Math.round((data.closed / data.deals) * 100) : 0,
         avgCycle: data.deals > 0 ? Math.round(data.cycleDays / data.deals) : 0,
+        fullPrice: data.fullPrice,
+        discounted: data.discounted,
+        discountTotal: data.discountTotal,
+        fullPriceRate: (data.fullPrice + data.discounted) > 0 ? Math.round((data.fullPrice / (data.fullPrice + data.discounted)) * 100) : 0,
       }))
       .sort((a, b) => b.value - a.value);
   })();
@@ -1138,6 +1168,9 @@ export function SalesSection({ salesType }: SalesPageProps) {
                   <th className="py-3 px-4 text-center font-medium">مُغلق</th>
                   <th className="py-3 px-4 text-right font-medium">الباقات</th>
                   <th className="py-3 px-4 text-right font-medium min-w-[140px]">معدل الإغلاق</th>
+                  <th className="py-3 px-4 text-center font-medium">بالأصلي</th>
+                  <th className="py-3 px-4 text-center font-medium">بخصم</th>
+                  <th className="py-3 px-4 text-right font-medium min-w-[100px]">نسبة الأصلي</th>
                   <th className="py-3 px-4 text-center font-medium">متوسط الدورة</th>
                   <th className="py-3 px-4 text-right font-medium">إجمالي القيمة</th>
                   <th className="py-3 px-4 text-center font-medium">الترتيب</th>
@@ -1189,6 +1222,18 @@ export function SalesSection({ salesType }: SalesPageProps) {
                             <div className={`h-full rounded-full ${rateColor} transition-all`} style={{ width: `${rep.winRate}%` }} />
                           </div>
                         </div>
+                      </td>
+                      <td className="py-3.5 px-4 text-center text-emerald-400 font-medium">{rep.fullPrice}</td>
+                      <td className="py-3.5 px-4 text-center text-amber-400">{rep.discounted}</td>
+                      <td className="py-3.5 px-4">
+                        {(rep.fullPrice + rep.discounted) > 0 ? (
+                          <div className="flex items-center gap-1.5">
+                            <div className="flex-1 h-1.5 bg-muted/20 rounded-full overflow-hidden">
+                              <div className={`h-full rounded-full transition-all ${rep.fullPriceRate >= 70 ? "bg-emerald-400" : rep.fullPriceRate >= 40 ? "bg-amber-400" : "bg-red-400"}`} style={{ width: `${rep.fullPriceRate}%` }} />
+                            </div>
+                            <span className={`text-xs font-bold ${rep.fullPriceRate >= 70 ? "text-emerald-400" : rep.fullPriceRate >= 40 ? "text-amber-400" : "text-red-400"}`}>{rep.fullPriceRate}%</span>
+                          </div>
+                        ) : <span className="text-muted-foreground/50">—</span>}
                       </td>
                       <td className="py-3.5 px-4 text-center text-muted-foreground">
                         <span dir="ltr">+{rep.avgCycle}</span> ي

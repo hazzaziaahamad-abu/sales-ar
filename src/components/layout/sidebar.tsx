@@ -27,6 +27,7 @@ import {
   ListTodo,
   UserCheck,
   Palette,
+  Package,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
@@ -50,6 +51,7 @@ const NAV_ITEMS = [
   { label: "الشراكات", href: "/partnerships", slug: "partnerships", icon: Handshake, color: "teal" },
   { label: "المسوقين", href: "/marketers", slug: "marketers", icon: Megaphone, color: "pink" },
   { label: "الفريق", href: "/team", slug: "team", icon: Users, color: "blue" },
+  { label: "الباقات", href: "/packages", slug: "packages", icon: Package, color: "violet" },
   { label: "المالية", href: "/finance", slug: "finance", icon: Banknote, color: "lime" },
   { label: "رفع الملفات", href: "/upload", slug: "upload", icon: Upload, color: "slate" },
   { label: "إدارة المستخدمين", href: "/users", slug: "users", icon: Shield, color: "red" },

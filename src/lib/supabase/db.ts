@@ -1,5 +1,5 @@
 import { createClient } from "./client";
-import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, MonthlyBudget, StartupCost, Marketer, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating, FollowUpNote, MentionNotification, PendingDeal, TargetClient, GiftOffer, EmployeeTask } from "@/types";
+import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, MonthlyBudget, StartupCost, Marketer, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating, FollowUpNote, MentionNotification, PendingDeal, TargetClient, GiftOffer, EmployeeTask, Package } from "@/types";
 
 const DEFAULT_ORG = "00000000-0000-0000-0000-000000000001";
 
@@ -1630,4 +1630,51 @@ export async function fetchTeamTaskStats(): Promise<{ employee_name: string; emp
     pending: s.pending,
     completion_rate: s.total > 0 ? Math.round((s.completed / s.total) * 100) : 0,
   })).sort((a, b) => b.completion_rate - a.completion_rate);
+}
+
+// ─── PACKAGES ───────────────────────────────────────────────────────────────
+
+export async function fetchPackages(): Promise<Package[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("packages")
+    .select("*")
+    .eq("org_id", getOrgId())
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data || []) as Package[];
+}
+
+export async function createPackage(
+  pkg: Pick<Package, "name" | "original_price" | "is_active">
+): Promise<Package> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("packages")
+    .insert({ ...pkg, org_id: getOrgId() })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Package;
+}
+
+export async function updatePackage(
+  id: string,
+  updates: Partial<Pick<Package, "name" | "original_price" | "is_active">>
+): Promise<Package> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("packages")
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Package;
+}
+
+export async function deletePackage(id: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from("packages").delete().eq("id", id);
+  if (error) throw error;
 }
