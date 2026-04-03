@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
-import { Shield, Plus, Pencil, Trash2, ChevronDown } from "lucide-react";
+import { Shield, Plus, Pencil, Trash2, ChevronDown, Link2, Share2, MessageCircle, Mail, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -92,6 +92,38 @@ export default function UsersPage() {
 
   // Expanded user (to show pages inline)
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+
+  // Share menu
+  const [shareMenuId, setShareMenuId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const getLoginUrl = () => {
+    if (typeof window === "undefined") return "";
+    return `${window.location.origin}/login`;
+  };
+
+  const buildShareText = (u: UserProfile) => {
+    const url = getLoginUrl();
+    return `مرحباً ${u.name}،\n\nيمكنك الدخول إلى لوحة التحكم من الرابط التالي:\n${url}\n\nبيانات الدخول:\n📧 البريد: ${u.email}\n\nفي حال نسيت كلمة المرور تواصل مع المدير.`;
+  };
+
+  const shareWhatsApp = (u: UserProfile) => {
+    window.open(`https://wa.me/?text=${encodeURIComponent(buildShareText(u))}`, "_blank");
+    setShareMenuId(null);
+  };
+
+  const shareEmail = (u: UserProfile) => {
+    const subject = `دعوة للدخول إلى لوحة التحكم`;
+    window.open(`mailto:${u.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(buildShareText(u))}`, "_blank");
+    setShareMenuId(null);
+  };
+
+  const copyLink = (u: UserProfile) => {
+    navigator.clipboard.writeText(buildShareText(u));
+    setCopiedId(u.id);
+    setTimeout(() => setCopiedId(null), 2000);
+    setShareMenuId(null);
+  };
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -239,6 +271,44 @@ export default function UsersPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
+                      <div className="relative">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShareMenuId(shareMenuId === u.id ? null : u.id);
+                          }}
+                          title="مشاركة رابط الدخول"
+                        >
+                          {copiedId === u.id ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5 text-indigo-400" />}
+                        </Button>
+                        {shareMenuId === u.id && (
+                          <div className="absolute left-0 top-full mt-1 z-50 bg-card border border-border rounded-xl shadow-lg overflow-hidden min-w-[170px]" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={() => shareWhatsApp(u)}
+                              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-foreground hover:bg-white/[0.06] transition-colors"
+                            >
+                              <MessageCircle className="w-4 h-4 text-emerald-400" />
+                              واتساب
+                            </button>
+                            <button
+                              onClick={() => shareEmail(u)}
+                              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-foreground hover:bg-white/[0.06] transition-colors"
+                            >
+                              <Mail className="w-4 h-4 text-blue-400" />
+                              بريد إلكتروني
+                            </button>
+                            <button
+                              onClick={() => copyLink(u)}
+                              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-foreground hover:bg-white/[0.06] transition-colors"
+                            >
+                              <Copy className="w-4 h-4 text-gray-400" />
+                              نسخ الرسالة
+                            </button>
+                          </div>
+                        )}
+                      </div>
                       <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); openDialog(u); }}>
                         <Pencil className="w-3.5 h-3.5" />
                       </Button>
@@ -261,7 +331,39 @@ export default function UsersPage() {
 
                   {/* Expanded: show page permissions */}
                   {isExpanded && (
-                    <div className="px-4 sm:px-5 pb-3 pt-0">
+                    <div className="px-4 sm:px-5 pb-3 pt-0 space-y-2">
+                      {/* Login link */}
+                      <div className="rounded-[14px] bg-indigo-500/5 border border-indigo-500/15 p-3 flex items-center gap-3">
+                        <Link2 className="w-4 h-4 text-indigo-400 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] text-muted-foreground mb-0.5">رابط الدخول</p>
+                          <p className="text-xs text-indigo-300 truncate" dir="ltr">{getLoginUrl()}</p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() => copyLink(u)}
+                            className="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                            title="نسخ"
+                          >
+                            {copiedId === u.id ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                          <button
+                            onClick={() => shareWhatsApp(u)}
+                            className="p-1.5 rounded-lg hover:bg-emerald-500/10 text-gray-400 hover:text-emerald-400 transition-colors"
+                            title="واتساب"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => shareEmail(u)}
+                            className="p-1.5 rounded-lg hover:bg-blue-500/10 text-gray-400 hover:text-blue-400 transition-colors"
+                            title="إيميل"
+                          >
+                            <Mail className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
                       <div className="rounded-[14px] bg-white/[0.02] border border-border p-3">
                         <p className="text-[11px] text-muted-foreground mb-2">الصفحات المسموح بها:</p>
                         {u.is_super_admin ? (
