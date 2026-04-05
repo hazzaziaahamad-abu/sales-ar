@@ -1591,6 +1591,22 @@ export async function markGiftAccepted(id: string): Promise<void> {
     .eq("id", id);
 }
 
+export async function registerGiftClient(id: string, clientName: string, clientPhone: string): Promise<void> {
+  const supabase = createClient();
+  await supabase
+    .from("gift_offers")
+    .update({ client_name: clientName, client_phone: clientPhone, updated_at: new Date().toISOString() })
+    .eq("id", id);
+}
+
+export async function registerGiftBundleClient(bundleId: string, clientName: string, clientPhone: string): Promise<void> {
+  const supabase = createClient();
+  await supabase
+    .from("gift_offers")
+    .update({ client_name: clientName, client_phone: clientPhone, updated_at: new Date().toISOString() })
+    .eq("bundle_id", bundleId);
+}
+
 export async function markGiftRejected(id: string): Promise<void> {
   const supabase = createClient();
   await supabase

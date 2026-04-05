@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { fetchGiftOfferPublic, markGiftOpened, markGiftAccepted } from "@/lib/supabase/db";
+import { fetchGiftOfferPublic, markGiftOpened, markGiftAccepted, registerGiftClient } from "@/lib/supabase/db";
 import type { GiftOffer } from "@/types";
 
 /* ─── confetti particle ─── */
@@ -119,6 +119,8 @@ const BOX_THEMES: Record<string, { bg: string; lid: string; ribbon: string; glow
   },
 };
 
+const UNREGISTERED_MARKER = "__unregistered__";
+
 /* ─── page ─── */
 export default function GiftPage() {
   const params = useParams();
@@ -128,8 +130,13 @@ export default function GiftPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
-  const [stage, setStage] = useState<"box" | "opening" | "revealed" | "accepted">("box");
+  const [stage, setStage] = useState<"register" | "box" | "opening" | "revealed" | "accepted">("box");
   const [particles, setParticles] = useState<Particle[]>([]);
+
+  // Registration form
+  const [regName, setRegName] = useState("");
+  const [regPhone, setRegPhone] = useState("");
+  const [regSaving, setRegSaving] = useState(false);
 
   useEffect(() => {
     fetchGiftOfferPublic(id)
@@ -138,10 +145,26 @@ export default function GiftPage() {
         setGift(data);
         if (data.status === "accepted") setStage("accepted");
         else if (data.status === "opened") setStage("revealed");
+        else if (data.client_name === UNREGISTERED_MARKER) setStage("register");
+        else setStage("box");
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
   }, [id]);
+
+  const handleRegister = useCallback(async () => {
+    if (!gift || !regName.trim() || !regPhone.trim()) return;
+    setRegSaving(true);
+    try {
+      await registerGiftClient(gift.id, regName.trim(), regPhone.trim());
+      setGift({ ...gift, client_name: regName.trim(), client_phone: regPhone.trim() });
+      setStage("box");
+    } catch {
+      // ignore
+    } finally {
+      setRegSaving(false);
+    }
+  }, [gift, regName, regPhone]);
 
   const handleOpenBox = useCallback(async () => {
     if (stage !== "box") return;
@@ -228,14 +251,66 @@ export default function GiftPage() {
         </div>
       </div>
 
-      {/* Greeting */}
-      <div className="relative z-10 text-center mb-8 px-6">
-        <p className="text-gray-400 text-lg mb-1">مرحباً</p>
-        <h1 className="text-4xl md:text-5xl font-bold text-white">{gift.client_name}</h1>
-        {stage === "box" && (
-          <p className="text-gray-300 text-base md:text-lg mt-3 animate-pulse">لديك هدية خاصة! اضغط على الصندوق لفتحها</p>
-        )}
-      </div>
+      {/* ─── REGISTRATION STAGE ─── */}
+      {stage === "register" && (
+        <div className="relative z-10 w-full max-w-md mx-auto px-4 animate-in">
+          <div className={`relative bg-[#111827]/90 backdrop-blur-xl rounded-3xl border border-white/10 p-8 md:p-10 text-center ${theme.glow}`}>
+            <div className="text-6xl mb-5">🎁</div>
+            <h2 className="text-2xl font-bold text-white mb-2">لديك هدية بانتظارك!</h2>
+            <p className="text-gray-400 text-base mb-8">سجّل بياناتك لفتح الهدية</p>
+
+            <div className="space-y-4 text-right">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">اسم المتجر / المحل</label>
+                <input
+                  type="text"
+                  value={regName}
+                  onChange={(e) => setRegName(e.target.value)}
+                  placeholder="مثال: مطعم الشاورما"
+                  className="w-full px-4 py-3.5 rounded-2xl bg-white/[0.06] border border-white/10 text-white placeholder-gray-500 text-base focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/30 transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">رقم الجوال</label>
+                <input
+                  type="tel"
+                  value={regPhone}
+                  onChange={(e) => setRegPhone(e.target.value)}
+                  placeholder="05xxxxxxxx"
+                  dir="ltr"
+                  className="w-full px-4 py-3.5 rounded-2xl bg-white/[0.06] border border-white/10 text-white placeholder-gray-500 text-base text-right focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/30 transition-all"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={handleRegister}
+              disabled={!regName.trim() || !regPhone.trim() || regSaving}
+              className={`w-full mt-8 py-4 rounded-2xl bg-gradient-to-l ${theme.bg} text-white font-bold text-xl hover:opacity-90 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-xl disabled:opacity-50 disabled:hover:scale-100`}
+            >
+              {regSaving ? (
+                <span className="inline-flex items-center gap-2">
+                  <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  جاري الحفظ...
+                </span>
+              ) : (
+                "متابعة لفتح الهدية 🎁"
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Greeting - show for all stages except register */}
+      {stage !== "register" && (
+        <div className="relative z-10 text-center mb-8 px-6">
+          <p className="text-gray-400 text-lg mb-1">مرحباً</p>
+          <h1 className="text-4xl md:text-5xl font-bold text-white">{gift.client_name}</h1>
+          {stage === "box" && (
+            <p className="text-gray-300 text-base md:text-lg mt-3 animate-pulse">لديك هدية خاصة! اضغط على الصندوق لفتحها</p>
+          )}
+        </div>
+      )}
 
       {/* Gift Box - Pre-open state */}
       {(stage === "box" || stage === "opening") && (

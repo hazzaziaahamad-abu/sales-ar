@@ -76,6 +76,7 @@ export default function GiftsPage() {
   // Create modal
   const [createOpen, setCreateOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [isUnregistered, setIsUnregistered] = useState(false);
 
   // Select client modal
   const [selectOpen, setSelectOpen] = useState(false);
@@ -200,19 +201,21 @@ export default function GiftsPage() {
   function openCreateDirect() {
     setClientForm({ client_name: "", client_phone: "", entity_type: "renewal", entity_id: "", box_color: "purple" });
     setGiftItems([emptyGift()]);
+    setIsUnregistered(false);
     setCreateOpen(true);
   }
 
   async function handleCreate() {
     const validGifts = giftItems.filter(g => g.gift_title.trim());
-    if (!clientForm.client_name.trim() || validGifts.length === 0) return;
+    const effectiveName = isUnregistered ? "__unregistered__" : clientForm.client_name.trim();
+    if ((!isUnregistered && !clientForm.client_name.trim()) || validGifts.length === 0) return;
     setSaving(true);
     try {
       if (validGifts.length === 1) {
         // Single gift - use original method
         const g = validGifts[0];
         const payload: Parameters<typeof createGiftOffer>[0] = {
-          client_name: clientForm.client_name,
+          client_name: effectiveName,
           entity_type: clientForm.entity_type,
           gift_title: g.gift_title,
           gift_type: g.gift_type,
@@ -229,7 +232,7 @@ export default function GiftsPage() {
         // Multiple gifts - create bundle
         const { offers } = await createGiftBundle(
           {
-            client_name: clientForm.client_name,
+            client_name: effectiveName,
             client_phone: clientForm.client_phone || undefined,
             entity_type: clientForm.entity_type,
             entity_id: clientForm.entity_id || undefined,
@@ -396,7 +399,11 @@ export default function GiftsPage() {
                   <div className="flex items-center gap-3">
                     <div className="text-3xl">{offer.gift_emoji || "🎁"}</div>
                     <div>
-                      <p className="text-sm font-bold text-foreground">{offer.client_name}</p>
+                      <p className="text-sm font-bold text-foreground">
+                        {offer.client_name === "__unregistered__" ? (
+                          <span className="text-amber-400">عميل غير مسجل</span>
+                        ) : offer.client_name}
+                      </p>
                       {offer.client_phone && (
                         <p className="text-[10px] text-muted-foreground mt-0.5" dir="ltr">{offer.client_phone}</p>
                       )}
@@ -575,26 +582,57 @@ export default function GiftsPage() {
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            {/* Client info */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>اسم العميل</Label>
-                <Input
-                  value={clientForm.client_name}
-                  onChange={(e) => setClientForm({ ...clientForm, client_name: e.target.value })}
-                  placeholder="اسم العميل"
-                />
+            {/* Unregistered client toggle */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsUnregistered(!isUnregistered);
+                if (!isUnregistered) {
+                  setClientForm({ ...clientForm, client_name: "", client_phone: "" });
+                }
+              }}
+              className={`w-full flex items-center justify-between rounded-[14px] border px-4 py-3 transition-all ${
+                isUnregistered
+                  ? "border-amber-500/30 bg-amber-500/5 text-amber-400"
+                  : "border-border bg-white/[0.02] text-muted-foreground hover:bg-white/[0.04]"
+              }`}
+            >
+              <span className="text-sm font-semibold">عميل غير مسجل (يسجّل عند فتح الرابط)</span>
+              <div className={`w-10 h-5 rounded-full transition-all relative ${isUnregistered ? "bg-amber-500" : "bg-white/10"}`}>
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${isUnregistered ? "right-0.5" : "right-[calc(100%-18px)]"}`} />
               </div>
-              <div className="space-y-1.5">
-                <Label>رقم الجوال</Label>
-                <Input
-                  value={clientForm.client_phone}
-                  onChange={(e) => setClientForm({ ...clientForm, client_phone: e.target.value })}
-                  placeholder="05xxxxxxxx"
-                  dir="ltr"
-                />
+            </button>
+
+            {/* Client info - hidden when unregistered */}
+            {!isUnregistered && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>اسم العميل</Label>
+                  <Input
+                    value={clientForm.client_name}
+                    onChange={(e) => setClientForm({ ...clientForm, client_name: e.target.value })}
+                    placeholder="اسم العميل"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>رقم الجوال</Label>
+                  <Input
+                    value={clientForm.client_phone}
+                    onChange={(e) => setClientForm({ ...clientForm, client_phone: e.target.value })}
+                    placeholder="05xxxxxxxx"
+                    dir="ltr"
+                  />
+                </div>
               </div>
-            </div>
+            )}
+
+            {isUnregistered && (
+              <div className="rounded-[14px] border border-amber-500/10 bg-amber-500/5 px-4 py-3">
+                <p className="text-xs text-amber-400/80">
+                  سيُطلب من العميل تسجيل اسم المتجر ورقم الجوال عند فتح رابط الهدية
+                </p>
+              </div>
+            )}
 
             {/* Box color */}
             <div className="space-y-1.5">

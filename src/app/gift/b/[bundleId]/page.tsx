@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
-import { fetchGiftBundle, markGiftOpened, markGiftAccepted } from "@/lib/supabase/db";
+import { fetchGiftBundle, markGiftOpened, markGiftAccepted, registerGiftBundleClient } from "@/lib/supabase/db";
 import type { GiftOffer } from "@/types";
 
 /* ─── confetti ─── */
@@ -22,6 +22,8 @@ const BOX_THEMES: Record<string,{bg:string;lid:string;ribbon:string;glow:string}
   blue:{bg:"from-blue-500 to-blue-800",lid:"from-blue-400 to-blue-700",ribbon:"bg-white",glow:"shadow-[0_0_80px_rgba(59,130,246,0.4)]"},
 };
 
+const UNREGISTERED_MARKER = "__unregistered__";
+
 export default function BundleGiftPage() {
   const params = useParams();
   const bundleId = params.bundleId as string;
@@ -30,19 +32,28 @@ export default function BundleGiftPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
-  // Stages: box → spinning → revealed → accepted | exhausted
-  const [stage, setStage] = useState<"box"|"spinning"|"revealed"|"accepted"|"exhausted">("box");
+  const [stage, setStage] = useState<"register"|"box"|"spinning"|"revealed"|"accepted"|"exhausted">("box");
   const [selectedGift, setSelectedGift] = useState<GiftOffer|null>(null);
   const [particles, setParticles] = useState<Particle[]>([]);
   const [spinIndex, setSpinIndex] = useState(0);
   const spinRef = useRef<ReturnType<typeof setInterval>|null>(null);
   const [attemptsLeft, setAttemptsLeft] = useState(2);
 
+  // Registration form
+  const [regName, setRegName] = useState("");
+  const [regPhone, setRegPhone] = useState("");
+  const [regSaving, setRegSaving] = useState(false);
+
   useEffect(() => {
     fetchGiftBundle(bundleId)
       .then((data) => {
         if (!data.length) { setNotFound(true); return; }
         setGifts(data);
+        // Check if unregistered client
+        if (data[0].client_name === UNREGISTERED_MARKER) {
+          setStage("register");
+          return;
+        }
         // Check if any already accepted
         const accepted = data.find(g => g.status === "accepted");
         if (accepted) { setSelectedGift(accepted); setStage("accepted"); return; }
@@ -61,10 +72,23 @@ export default function BundleGiftPage() {
       .finally(() => setLoading(false));
   }, [bundleId]);
 
+  const handleRegister = useCallback(async () => {
+    if (gifts.length === 0 || !regName.trim() || !regPhone.trim()) return;
+    setRegSaving(true);
+    try {
+      await registerGiftBundleClient(bundleId, regName.trim(), regPhone.trim());
+      setGifts(gifts.map(g => ({ ...g, client_name: regName.trim(), client_phone: regPhone.trim() })));
+      setStage("box");
+    } catch {
+      // ignore
+    } finally {
+      setRegSaving(false);
+    }
+  }, [gifts, bundleId, regName, regPhone]);
+
   const handleOpenBox = useCallback(() => {
     if (stage !== "box" || gifts.length === 0 || attemptsLeft <= 0) return;
 
-    // Track attempt
     const key = `gift_attempts_${bundleId}`;
     const used = parseInt(localStorage.getItem(key) || "0", 10) + 1;
     localStorage.setItem(key, String(used));
@@ -72,11 +96,9 @@ export default function BundleGiftPage() {
 
     setStage("spinning");
 
-    // Spinning animation - cycle through gifts rapidly then slow down
     let speed = 80;
     let count = 0;
     const totalSpins = 25 + Math.floor(Math.random() * 10);
-    // Pick winner randomly from pending gifts
     const pending = gifts.filter(g => g.status === "pending" || g.status === "opened");
     const winner = pending.length > 0
       ? pending[Math.floor(Math.random() * pending.length)]
@@ -88,7 +110,6 @@ export default function BundleGiftPage() {
       setSpinIndex(prev => (prev + 1) % gifts.length);
 
       if (count >= totalSpins) {
-        // Land on winner
         setSpinIndex(winnerIdx);
         setSelectedGift(winner);
         markGiftOpened(winner.id);
@@ -99,7 +120,6 @@ export default function BundleGiftPage() {
         return;
       }
 
-      // Slow down as we approach the end
       if (count > totalSpins - 10) speed += 40;
       else if (count > totalSpins - 5) speed += 80;
 
@@ -190,21 +210,76 @@ export default function BundleGiftPage() {
         </div>
       </div>
 
-      {/* Greeting */}
-      <div className="relative z-10 text-center mb-8 px-6">
-        <p className="text-gray-400 text-lg mb-1">مرحباً</p>
-        <h1 className="text-4xl md:text-5xl font-bold text-white">{clientName}</h1>
-        {stage === "box" && (
-          <>
-            <p className="text-gray-300 text-base md:text-lg mt-3 animate-pulse">
-              لديك {gifts.length} هدايا مخفية! اضغط على الصندوق لاكتشاف هديتك
+      {/* ─── REGISTRATION STAGE ─── */}
+      {stage === "register" && (
+        <div className="relative z-10 w-full max-w-md mx-auto px-4 animate-in">
+          <div className={`relative bg-[#111827]/90 backdrop-blur-xl rounded-3xl border border-white/10 p-8 md:p-10 text-center ${theme.glow}`}>
+            <div className="text-6xl mb-5">🎁</div>
+            <h2 className="text-2xl font-bold text-white mb-2">لديك هدايا بانتظارك!</h2>
+            <p className="text-gray-400 text-base mb-2">
+              {gifts.length} هدايا مخفية في الصندوق
             </p>
-            <p className="text-amber-400 text-sm mt-2 font-medium">
-              {attemptsLeft === 2 ? "لديك محاولتين" : "لديك محاولة واحدة فقط"}
-            </p>
-          </>
-        )}
-      </div>
+            <p className="text-gray-500 text-sm mb-8">سجّل بياناتك لفتح الصندوق</p>
+
+            <div className="space-y-4 text-right">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">اسم المتجر / المحل</label>
+                <input
+                  type="text"
+                  value={regName}
+                  onChange={(e) => setRegName(e.target.value)}
+                  placeholder="مثال: مطعم الشاورما"
+                  className="w-full px-4 py-3.5 rounded-2xl bg-white/[0.06] border border-white/10 text-white placeholder-gray-500 text-base focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/30 transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">رقم الجوال</label>
+                <input
+                  type="tel"
+                  value={regPhone}
+                  onChange={(e) => setRegPhone(e.target.value)}
+                  placeholder="05xxxxxxxx"
+                  dir="ltr"
+                  className="w-full px-4 py-3.5 rounded-2xl bg-white/[0.06] border border-white/10 text-white placeholder-gray-500 text-base text-right focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/30 transition-all"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={handleRegister}
+              disabled={!regName.trim() || !regPhone.trim() || regSaving}
+              className={`w-full mt-8 py-4 rounded-2xl bg-gradient-to-l ${theme.bg} text-white font-bold text-xl hover:opacity-90 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-xl disabled:opacity-50 disabled:hover:scale-100`}
+            >
+              {regSaving ? (
+                <span className="inline-flex items-center gap-2">
+                  <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  جاري الحفظ...
+                </span>
+              ) : (
+                "متابعة لفتح الهدية 🎁"
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Greeting - show for stages after registration */}
+      {stage !== "register" && (
+        <div className="relative z-10 text-center mb-8 px-6">
+          <p className="text-gray-400 text-lg mb-1">مرحباً</p>
+          <h1 className="text-4xl md:text-5xl font-bold text-white">{clientName}</h1>
+          {stage === "box" && (
+            <>
+              <p className="text-gray-300 text-base md:text-lg mt-3 animate-pulse">
+                لديك {gifts.length} هدايا مخفية! اضغط على الصندوق لاكتشاف هديتك
+              </p>
+              <p className="text-amber-400 text-sm mt-2 font-medium">
+                {attemptsLeft === 2 ? "لديك محاولتين" : "لديك محاولة واحدة فقط"}
+              </p>
+            </>
+          )}
+        </div>
+      )}
 
       {/* ─── BOX STAGE ─── */}
       {stage === "box" && (
@@ -222,7 +297,6 @@ export default function BundleGiftPage() {
             <div className="relative w-52 h-52 md:w-64 md:h-64">
               <div className={`absolute bottom-0 left-0 right-0 h-[60%] bg-gradient-to-b ${theme.bg} rounded-2xl shadow-2xl`}>
                 <div className={`absolute left-1/2 -translate-x-1/2 top-0 bottom-0 w-6 ${theme.ribbon} opacity-80`} />
-                {/* Gift count badge */}
                 <div className="absolute -top-3 -right-3 w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center text-white font-bold text-lg shadow-lg animate-bounce">
                   {gifts.length}
                 </div>
@@ -247,14 +321,12 @@ export default function BundleGiftPage() {
       {stage === "spinning" && currentDisplayGift && (
         <div className="relative z-10 w-full max-w-sm mx-auto px-4">
           <div className="relative">
-            {/* Spinning indicator dots */}
             <div className="flex items-center justify-center gap-2 mb-6">
               {gifts.map((g, i) => (
                 <div key={g.id} className={`w-3 h-3 rounded-full transition-all duration-100 ${i === spinIndex ? "bg-amber-400 scale-150" : "bg-white/20"}`} />
               ))}
             </div>
 
-            {/* Spinning card */}
             <div className={`bg-[#111827]/90 backdrop-blur-xl rounded-3xl border-2 border-amber-500/40 p-8 text-center transition-all duration-100 ${theme.glow}`}>
               <div className="text-7xl mb-4 transition-all duration-100">{currentDisplayGift.gift_emoji || "🎁"}</div>
               <h2 className="text-2xl font-bold text-white mb-3 transition-all duration-100">{currentDisplayGift.gift_title}</h2>
@@ -265,7 +337,6 @@ export default function BundleGiftPage() {
               )}
             </div>
 
-            {/* Scanning line effect */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-3xl">
               <div className="absolute w-full h-1 bg-gradient-to-r from-transparent via-amber-400 to-transparent animate-scan" />
             </div>
@@ -278,7 +349,6 @@ export default function BundleGiftPage() {
       {/* ─── REVEALED STAGE ─── */}
       {stage === "revealed" && selectedGift && (
         <div className="relative z-10 w-full max-w-md mx-auto px-4 animate-in">
-          {/* Sparkles */}
           <div className="absolute inset-0 pointer-events-none overflow-hidden">
             {Array.from({length:25},(_,i)=>(
               <div key={i} className="absolute animate-ping" style={{left:`${Math.random()*100}%`,top:`${Math.random()*100}%`,animationDelay:`${Math.random()*3}s`,animationDuration:`${Math.random()*2+1}s`}}>
@@ -305,7 +375,6 @@ export default function BundleGiftPage() {
               <p className="text-gray-300 text-base leading-relaxed mb-6">{selectedGift.gift_description}</p>
             )}
 
-            {/* Other gifts preview */}
             {gifts.length > 1 && (
               <div className="mb-6">
                 <p className="text-gray-500 text-sm mb-2">كان بإمكانك الحصول على:</p>
