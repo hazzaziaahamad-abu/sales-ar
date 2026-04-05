@@ -16,6 +16,7 @@ import {
 } from "@/lib/supabase/db";
 import type { AcademyContent, SalesMessage, SalesMessageRating } from "@/types";
 
+import { TrainingSession } from "@/components/academy/TrainingSession";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -158,6 +159,7 @@ export default function AcademyPage() {
   const { activeOrgId: orgId, user } = useAuth();
   const isSuperAdmin = user?.isSuperAdmin ?? false;
 
+  const [showTraining, setShowTraining] = useState(false);
   const [activeSection, setActiveSection] = useState<SectionKey>("menu");
   const [contents, setContents] = useState<AcademyContent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -344,6 +346,10 @@ export default function AcademyPage() {
   };
   const colors = colorMap[sectionConfig.color];
 
+  if (showTraining) {
+    return <TrainingSession onBack={() => setShowTraining(false)} />;
+  }
+
   return (
     <div className="space-y-6">
       {/* -------- Header -------- */}
@@ -357,12 +363,18 @@ export default function AcademyPage() {
             <p className="text-xs text-muted-foreground">تعلّم المنتجات وطرق البيع الاحترافية</p>
           </div>
         </div>
-        {isSuperAdmin && (
-          <Button onClick={openCreate} className="gap-1.5">
-            <Plus className="w-4 h-4" />
-            إضافة محتوى
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setShowTraining(true)} className="gap-1.5 border-cyan/30 text-cyan hover:bg-cyan/10">
+            <Sparkles className="w-4 h-4" />
+            جلسة تدريبية
           </Button>
-        )}
+          {isSuperAdmin && (
+            <Button onClick={openCreate} className="gap-1.5">
+              <Plus className="w-4 h-4" />
+              إضافة محتوى
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* -------- Section Tabs -------- */}
