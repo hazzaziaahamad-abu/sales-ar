@@ -146,7 +146,6 @@ const TOPICS = [
 ];
 
 function formatMessage(text: string) {
-  // Simple markdown rendering for training messages
   return text
     .replace(/\[✅ ([^\]]+)\]/g, '<span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-medium my-1">✅ $1</span>')
     .replace(/\[📝 ([^\]]+)\]/g, '<span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-cyan/10 border border-cyan/20 text-cyan text-[11px] font-medium my-1">📝 $1</span>')
@@ -160,24 +159,38 @@ function formatMessage(text: string) {
     .replace(/\n/g, "<br/>");
 }
 
-interface TrainingSessionProps {
-  onBack: () => void;
-}
-
-export function TrainingSession({ onBack }: TrainingSessionProps) {
-  const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
+// ── Chat sub-component (remounted per topic via key) ──
+function ChatSession({ topic, onReset }: { topic: string; onReset: () => void }) {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const topicInfo = TOPICS.find((t) => t.key === topic)!;
 
-  const { messages, sendMessage, status, setMessages } = useChat({
+  const { messages, sendMessage, status } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/ai/training-session",
-      body: { topic: selectedTopic },
+      body: { topic },
     }),
+    initialMessages: [
+      {
+        id: "init",
+        role: "user",
+        content: `مرحباً، أنا مندوب مبيعات في Menus. أبي أتدرب على "${topicInfo.title}". ابدأ الجلسة.`,
+        parts: [{ type: "text" as const, text: `مرحباً، أنا مندوب مبيعات في Menus. أبي أتدرب على "${topicInfo.title}". ابدأ الجلسة.` }],
+        createdAt: new Date(),
+      },
+    ],
   });
 
   const isLoading = status === "streaming" || status === "submitted";
+
+  // Auto-send initial message on mount
+  useEffect(() => {
+    sendMessage({
+      text: `مرحباً، أنا مندوب مبيعات في Menus. أبي أتدرب على "${topicInfo.title}". ابدأ الجلسة.`,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -186,8 +199,8 @@ export function TrainingSession({ onBack }: TrainingSessionProps) {
   }, [messages]);
 
   useEffect(() => {
-    if (selectedTopic) inputRef.current?.focus();
-  }, [selectedTopic]);
+    inputRef.current?.focus();
+  }, []);
 
   const getMessageText = (msg: typeof messages[number]): string => {
     if ("content" in msg && typeof msg.content === "string") return msg.content;
@@ -205,24 +218,126 @@ export function TrainingSession({ onBack }: TrainingSessionProps) {
     await sendMessage({ text: text.trim() });
   };
 
-  const startSession = (topicKey: string) => {
-    setSelectedTopic(topicKey);
-    setMessages([]);
-    const topic = TOPICS.find((t) => t.key === topicKey);
-    setTimeout(() => {
-      sendMessage({
-        text: `مرحباً، أنا مندوب مبيعات في RESTAVO. أبي أتدرب على "${topic?.title}". ابدأ الجلسة.`,
-      });
-    }, 100);
-  };
+  return (
+    <div className="flex flex-col cc-card rounded-xl overflow-hidden" style={{ height: "calc(100vh - 7rem)" }}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-3 border-b border-border">
+        <div className="flex items-center gap-3">
+          <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center bg-gradient-to-br", topicInfo.gradient)}>
+            <topicInfo.icon className={cn("w-5 h-5", topicInfo.color)} />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-foreground">جلسة تدريبية: {topicInfo.title}</h3>
+            <p className="text-[10px] text-muted-foreground">مدرب ذكي — تفاعل كأنك مع عميل حقيقي</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={onReset} className="text-xs text-muted-foreground gap-1.5">
+            <RotateCcw className="w-3 h-3" />
+            موضوع آخر
+          </Button>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-5" ref={scrollRef}>
+        <div className="space-y-4 py-5">
+          {messages.map((msg) => {
+            const text = getMessageText(msg);
+            if (!text) return null;
+            return (
+              <div key={msg.id} className="flex gap-3">
+                <div
+                  className={cn(
+                    "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5",
+                    msg.role === "user"
+                      ? "bg-cyan/15"
+                      : `bg-gradient-to-br ${topicInfo.gradient}`
+                  )}
+                >
+                  {msg.role === "user" ? (
+                    <span className="text-xs font-bold text-cyan">أنت</span>
+                  ) : (
+                    <Bot className={cn("w-4 h-4", topicInfo.color)} />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs font-bold text-foreground">
+                      {msg.role === "user" ? "أنت (المندوب)" : "المدرب (العميل)"}
+                    </span>
+                  </div>
+                  {msg.role === "user" ? (
+                    <p className="text-sm text-foreground/90 leading-relaxed">{text}</p>
+                  ) : (
+                    <div
+                      className="text-sm text-foreground/90 leading-relaxed prose-sm"
+                      dangerouslySetInnerHTML={{ __html: formatMessage(text) }}
+                    />
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Loading indicator */}
+          {isLoading && messages[messages.length - 1]?.role === "user" && (
+            <div className="flex gap-3">
+              <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br", topicInfo.gradient)}>
+                <Bot className={cn("w-4 h-4", topicInfo.color)} />
+              </div>
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.03]">
+                <Loader2 className="w-3.5 h-3.5 text-muted-foreground animate-spin" />
+                <span className="text-xs text-muted-foreground">المدرب يكتب...</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Input */}
+      <div className="border-t border-border p-4">
+        <div className="flex items-end gap-3">
+          <textarea
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                submitMessage(input);
+              }
+            }}
+            placeholder="اكتب ردك كمندوب مبيعات..."
+            rows={1}
+            className="flex-1 resize-none rounded-xl bg-white/[0.04] border border-border px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-cyan/30 focus:border-cyan/30"
+            style={{ minHeight: 44, maxHeight: 120 }}
+          />
+          <Button
+            onClick={() => submitMessage(input)}
+            disabled={!input.trim() || isLoading}
+            size="icon"
+            className="h-[44px] w-[44px] rounded-xl bg-cyan hover:bg-cyan/80 shrink-0"
+          >
+            <Send className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Component ──
+interface TrainingSessionProps {
+  onBack: () => void;
+}
+
+export function TrainingSession({ onBack }: TrainingSessionProps) {
+  const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
 
   const resetSession = () => {
     setSelectedTopic(null);
-    setMessages([]);
-    setInput("");
   };
-
-  const topicInfo = TOPICS.find((t) => t.key === selectedTopic);
 
   // ── Topic Selection Screen ──
   if (!selectedTopic) {
@@ -273,7 +388,7 @@ export function TrainingSession({ onBack }: TrainingSessionProps) {
             return (
               <button
                 key={topic.key}
-                onClick={() => startSession(topic.key)}
+                onClick={() => setSelectedTopic(topic.key)}
                 className={cn(
                   "flex items-start gap-3.5 p-4 rounded-[14px] border text-right transition-all hover:scale-[1.02]",
                   topic.bg
@@ -294,112 +409,6 @@ export function TrainingSession({ onBack }: TrainingSessionProps) {
     );
   }
 
-  // ── Chat Session Screen ──
-  return (
-    <div className="flex flex-col cc-card rounded-xl overflow-hidden" style={{ height: "calc(100vh - 7rem)" }}>
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-border">
-        <div className="flex items-center gap-3">
-          <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center bg-gradient-to-br", topicInfo?.gradient)}>
-            {topicInfo && <topicInfo.icon className={cn("w-5 h-5", topicInfo.color)} />}
-          </div>
-          <div>
-            <h3 className="text-sm font-bold text-foreground">جلسة تدريبية: {topicInfo?.title}</h3>
-            <p className="text-[10px] text-muted-foreground">مدرب ذكي — تفاعل كأنك مع عميل حقيقي</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={resetSession} className="text-xs text-muted-foreground gap-1.5">
-            <RotateCcw className="w-3 h-3" />
-            موضوع آخر
-          </Button>
-        </div>
-      </div>
-
-      {/* Messages */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-5" ref={scrollRef}>
-        <div className="space-y-4 py-5">
-          {messages.map((msg) => {
-            const text = getMessageText(msg);
-            if (!text) return null;
-            return (
-              <div key={msg.id} className="flex gap-3">
-                <div
-                  className={cn(
-                    "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5",
-                    msg.role === "user"
-                      ? "bg-cyan/15"
-                      : `bg-gradient-to-br ${topicInfo?.gradient || "from-cyan/20 to-cc-purple/20"}`
-                  )}
-                >
-                  {msg.role === "user" ? (
-                    <span className="text-xs font-bold text-cyan">أنت</span>
-                  ) : (
-                    <Bot className={cn("w-4 h-4", topicInfo?.color || "text-cyan")} />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs font-bold text-foreground">
-                      {msg.role === "user" ? "أنت (المندوب)" : "المدرب (العميل)"}
-                    </span>
-                  </div>
-                  {msg.role === "user" ? (
-                    <p className="text-sm text-foreground/90 leading-relaxed">{text}</p>
-                  ) : (
-                    <div
-                      className="text-sm text-foreground/90 leading-relaxed prose-sm"
-                      dangerouslySetInnerHTML={{ __html: formatMessage(text) }}
-                    />
-                  )}
-                </div>
-              </div>
-            );
-          })}
-
-          {/* Loading indicator */}
-          {isLoading && messages[messages.length - 1]?.role === "user" && (
-            <div className="flex gap-3">
-              <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br", topicInfo?.gradient)}>
-                <Bot className={cn("w-4 h-4", topicInfo?.color)} />
-              </div>
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.03]">
-                <Loader2 className="w-3.5 h-3.5 text-muted-foreground animate-spin" />
-                <span className="text-xs text-muted-foreground">المدرب يكتب...</span>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Input */}
-      <div className="border-t border-border p-4">
-        <div className="flex items-end gap-3">
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                submitMessage(input);
-              }
-            }}
-            placeholder="اكتب ردك كمندوب مبيعات..."
-            rows={1}
-            className="flex-1 resize-none rounded-xl bg-white/[0.04] border border-border px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-cyan/30 focus:border-cyan/30"
-            style={{ minHeight: 44, maxHeight: 120 }}
-          />
-          <Button
-            onClick={() => submitMessage(input)}
-            disabled={!input.trim() || isLoading}
-            size="icon"
-            className="h-[44px] w-[44px] rounded-xl bg-cyan hover:bg-cyan/80 shrink-0"
-          >
-            <Send className="w-4 h-4" />
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
+  // ── Chat Session Screen (key forces remount per topic) ──
+  return <ChatSession key={selectedTopic} topic={selectedTopic} onReset={resetSession} />;
 }
