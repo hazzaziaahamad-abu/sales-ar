@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Employee, Deal, Ticket } from "@/types";
-import { Users, UserPlus, Pencil, Trash2, TrendingUp, Headphones, Calendar, GraduationCap } from "lucide-react";
+import { Users, UserPlus, Pencil, Trash2, TrendingUp, Headphones, Calendar, GraduationCap, Award } from "lucide-react";
 import { getAcademyStats, TOTAL_LESSONS } from "@/components/academy/LearningAcademy";
 import { formatMoney } from "@/lib/utils/format";
 
@@ -49,6 +49,59 @@ function workloadTextColor(pct: number): string {
   if (pct > 85) return "text-cc-red";
   if (pct >= 70) return "text-amber";
   return "text-cc-green";
+}
+
+/* ---------- performance levels ---------- */
+
+interface PerformanceLevel {
+  label: string;
+  color: string;
+  bgColor: string;
+  ringColor: string;
+  barColor: string;
+  min: number;
+}
+
+const LEVELS: PerformanceLevel[] = [
+  { label: "استثنائي", color: "text-cyan", bgColor: "bg-cyan/10", ringColor: "ring-cyan/30", barColor: "bg-cyan", min: 85 },
+  { label: "متميّز", color: "text-cc-green", bgColor: "bg-cc-green/10", ringColor: "ring-cc-green/30", barColor: "bg-cc-green", min: 70 },
+  { label: "جيد", color: "text-amber", bgColor: "bg-amber/10", ringColor: "ring-amber/30", barColor: "bg-amber", min: 50 },
+  { label: "يحتاج تطوير", color: "text-orange-400", bgColor: "bg-orange-400/10", ringColor: "ring-orange-400/30", barColor: "bg-orange-400", min: 30 },
+  { label: "ضعيف", color: "text-cc-red", bgColor: "bg-cc-red/10", ringColor: "ring-cc-red/30", barColor: "bg-cc-red", min: 0 },
+];
+
+function getLevel(score: number): PerformanceLevel {
+  return LEVELS.find((l) => score >= l.min) || LEVELS[LEVELS.length - 1];
+}
+
+function computeEmployeeScore(stats: { totalDeals: number; closedDeals: number; dealsValue: number; totalTickets: number; resolvedTickets: number }): number {
+  let score = 0;
+  const totalTasks = stats.totalDeals + stats.totalTickets;
+  const completedTasks = stats.closedDeals + stats.resolvedTickets;
+
+  if (totalTasks === 0) return 0;
+
+  // Completion rate (40 points max)
+  const completionRate = completedTasks / totalTasks;
+  score += completionRate * 40;
+
+  // Volume bonus (30 points max) - more tasks = higher score
+  const volumeScore = Math.min(1, totalTasks / 20) * 30;
+  score += volumeScore;
+
+  // Sales value bonus (20 points max)
+  if (stats.dealsValue > 0) {
+    const valueScore = Math.min(1, stats.dealsValue / 50000) * 20;
+    score += valueScore;
+  }
+
+  // Support resolution rate bonus (10 points max)
+  if (stats.totalTickets > 0) {
+    const resRate = stats.resolvedTickets / stats.totalTickets;
+    score += resRate * 10;
+  }
+
+  return Math.min(100, Math.round(score));
 }
 
 /* ---------- page ---------- */
@@ -345,6 +398,27 @@ export default function TeamPage() {
                     color={STATUS_COLOR[emp.status] || "blue"}
                   />
                 </div>
+
+                {/* Performance Level */}
+                {(() => {
+                  const score = computeEmployeeScore(stats);
+                  const level = getLevel(score);
+                  if (score === 0) return null;
+                  return (
+                    <div className={`rounded-lg ${level.bgColor} ring-1 ${level.ringColor} p-2.5`}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <Award className={`w-3.5 h-3.5 ${level.color}`} />
+                          <span className={`text-xs font-bold ${level.color}`}>{level.label}</span>
+                        </div>
+                        <span className={`text-lg font-extrabold ${level.color} font-mono`}>{score}</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+                        <div className={`h-full ${level.barColor} rounded-full transition-all duration-700`} style={{ width: `${score}%` }} />
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Performance Stats */}
                 <div className="grid grid-cols-2 gap-2">

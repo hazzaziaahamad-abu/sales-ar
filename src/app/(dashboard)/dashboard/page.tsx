@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { useTopbarControls } from "@/components/layout/topbar-context";
 import { formatMoney, formatDate } from "@/lib/utils/format";
-import { AlertCircle, ArrowUpLeft, Ticket as TicketIcon, TrendingUp, DollarSign, Users, Heart, FolderOpen } from "lucide-react";
+import { AlertCircle, ArrowUpLeft, Ticket as TicketIcon, TrendingUp, DollarSign, Users, Heart, FolderOpen, Award } from "lucide-react";
 
 const STAGE_COLORS: Record<string, string> = {
   "تواصل": "#10B981",
@@ -46,7 +46,7 @@ export default function DashboardPage() {
     projects: null,
     kpis: null,
   });
-  const { activeOrgId: orgId } = useAuth();
+  const { activeOrgId: orgId, user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
@@ -147,8 +147,81 @@ export default function DashboardPage() {
 
   const retryAll = () => void loadDashboardData({ silent: true });
 
+  // ── Personal Performance ──
+  const myName = user?.name?.trim();
+  const myPerf = (() => {
+    if (!myName || isLoading) return null;
+    const myDeals = deals.filter((d) => d.assigned_rep_name?.trim() === myName);
+    const myClosed = myDeals.filter((d) => d.stage === "مكتملة");
+    const myTickets = tickets.filter((t) => t.assigned_agent_name?.trim() === myName);
+    const myResolved = myTickets.filter((t) => t.status === "محلول");
+    const totalTasks = myDeals.length + myTickets.length;
+    if (totalTasks === 0) return null;
+
+    const completed = myClosed.length + myResolved.length;
+    const completionRate = completed / totalTasks;
+    let score = completionRate * 40;
+    score += Math.min(1, totalTasks / 20) * 30;
+    if (myClosed.length > 0) score += Math.min(1, myClosed.reduce((s, d) => s + d.deal_value, 0) / 50000) * 20;
+    if (myTickets.length > 0) score += (myResolved.length / myTickets.length) * 10;
+    score = Math.min(100, Math.round(score));
+
+    const levels = [
+      { label: "استثنائي", color: "text-cyan", bg: "bg-cyan/10", bar: "bg-cyan", ring: "border-cyan/20", min: 85 },
+      { label: "متميّز", color: "text-cc-green", bg: "bg-cc-green/10", bar: "bg-cc-green", ring: "border-cc-green/20", min: 70 },
+      { label: "جيد", color: "text-amber", bg: "bg-amber/10", bar: "bg-amber", ring: "border-amber/20", min: 50 },
+      { label: "يحتاج تطوير", color: "text-orange-400", bg: "bg-orange-400/10", bar: "bg-orange-400", ring: "border-orange-400/20", min: 30 },
+      { label: "ضعيف", color: "text-cc-red", bg: "bg-cc-red/10", bar: "bg-cc-red", ring: "border-cc-red/20", min: 0 },
+    ];
+    const level = levels.find((l) => score >= l.min) || levels[levels.length - 1];
+    return { score, level, closedDeals: myClosed.length, totalDeals: myDeals.length, dealsValue: myClosed.reduce((s, d) => s + d.deal_value, 0), resolvedTickets: myResolved.length, totalTickets: myTickets.length };
+  })();
+
   return (
     <div className="space-y-6">
+      {/* ── Personal Performance Card ── */}
+      {myPerf && (
+        <div className={`cc-card rounded-[14px] p-5 border ${myPerf.level.ring} ${myPerf.level.bg}`}>
+          <div className="flex items-center gap-3 mb-4">
+            <div className={`w-10 h-10 rounded-xl ${myPerf.level.bg} flex items-center justify-center`}>
+              <Award className={`w-5 h-5 ${myPerf.level.color}`} />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-bold text-foreground">مستوى أدائي</h3>
+              <p className="text-[11px] text-muted-foreground">تقييمك بناءً على إنجازاتك الحالية</p>
+            </div>
+            <div className="text-left">
+              <span className={`text-3xl font-extrabold ${myPerf.level.color} font-mono`}>{myPerf.score}</span>
+              <span className="text-xs text-muted-foreground">/100</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 mb-3">
+            <span className={`text-xs font-bold ${myPerf.level.color} px-2.5 py-1 rounded-full ${myPerf.level.bg}`}>
+              {myPerf.level.label}
+            </span>
+            <div className="flex-1 h-2 bg-white/[0.06] rounded-full overflow-hidden">
+              <div className={`h-full ${myPerf.level.bar} rounded-full transition-all duration-1000`} style={{ width: `${myPerf.score}%` }} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div className="rounded-lg bg-white/[0.04] p-2.5 text-center">
+              <p className="text-lg font-bold text-cc-green">{myPerf.closedDeals}<span className="text-xs text-muted-foreground">/{myPerf.totalDeals}</span></p>
+              <p className="text-[10px] text-muted-foreground">صفقات مغلقة</p>
+            </div>
+            <div className="rounded-lg bg-white/[0.04] p-2.5 text-center">
+              <p className="text-lg font-bold text-cyan">{formatMoney(myPerf.dealsValue)}</p>
+              <p className="text-[10px] text-muted-foreground">إيرادات محققة</p>
+            </div>
+            <div className="rounded-lg bg-white/[0.04] p-2.5 text-center">
+              <p className="text-lg font-bold text-cc-purple">{myPerf.resolvedTickets}<span className="text-xs text-muted-foreground">/{myPerf.totalTickets}</span></p>
+              <p className="text-[10px] text-muted-foreground">تذاكر محلولة</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <section className="grid grid-cols-1 xl:grid-cols-[1.55fr_1fr] gap-4">
         <div className="glass-surface relative overflow-hidden rounded-[14px] p-4 sm:p-6">
           <div className="relative">
