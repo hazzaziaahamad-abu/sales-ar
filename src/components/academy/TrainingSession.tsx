@@ -20,6 +20,7 @@ import {
   TrendingUp,
   Phone,
   MessageCircle,
+  BadgePercent,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -132,6 +133,15 @@ const TOPICS = [
     color: "text-violet-400",
     bg: "bg-violet-400/10 border-violet-400/20 hover:bg-violet-400/15",
     gradient: "from-violet-400/20 to-violet-400/5",
+  },
+  {
+    key: "discounts",
+    title: "فن الخصومات والعروض",
+    desc: "نوّع العروض وخلّ العميل يحتار ويختار",
+    icon: BadgePercent,
+    color: "text-lime-400",
+    bg: "bg-lime-400/10 border-lime-400/20 hover:bg-lime-400/15",
+    gradient: "from-lime-400/20 to-lime-400/5",
   },
 ];
 
