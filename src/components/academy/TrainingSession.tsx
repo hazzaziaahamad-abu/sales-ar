@@ -171,15 +171,6 @@ function ChatSession({ topic, onReset }: { topic: string; onReset: () => void })
       api: "/api/ai/training-session",
       body: { topic },
     }),
-    initialMessages: [
-      {
-        id: "init",
-        role: "user",
-        content: `مرحباً، أنا مندوب مبيعات في Menus. أبي أتدرب على "${topicInfo.title}". ابدأ الجلسة.`,
-        parts: [{ type: "text" as const, text: `مرحباً، أنا مندوب مبيعات في Menus. أبي أتدرب على "${topicInfo.title}". ابدأ الجلسة.` }],
-        createdAt: new Date(),
-      },
-    ],
   });
 
   const isLoading = status === "streaming" || status === "submitted";
