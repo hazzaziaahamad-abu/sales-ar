@@ -22,7 +22,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { id } = await params;
   const body = await req.json();
-  const { name, email, org_id, allowed_pages, is_super_admin } = body;
+  const { name, email, org_id, allowed_pages, is_super_admin, password } = body;
 
   const profileUpdates: Record<string, unknown> = {};
   if (name !== undefined) profileUpdates.name = name;
@@ -30,9 +30,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (org_id !== undefined) profileUpdates.org_id = org_id;
   if (is_super_admin !== undefined) profileUpdates.is_super_admin = is_super_admin;
 
-  // Update auth email if changed
-  if (email) {
-    await supabaseAdmin.auth.admin.updateUserById(id, { email });
+  // Update auth email and/or password if changed
+  const authUpdates: Record<string, string> = {};
+  if (email) authUpdates.email = email;
+  if (password) authUpdates.password = password;
+  if (Object.keys(authUpdates).length > 0) {
+    const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(id, authUpdates);
+    if (authError) return NextResponse.json({ error: authError.message }, { status: 500 });
   }
 
   // Update the user's role allowed_pages if provided

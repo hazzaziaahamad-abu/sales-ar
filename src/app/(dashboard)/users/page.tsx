@@ -174,6 +174,8 @@ export default function UsersPage() {
 
     if (!editingUser) {
       body.password = userPassword;
+    } else if (userPassword) {
+      body.password = userPassword;
     }
 
     const url = editingUser ? `/api/users/${editingUser.id}` : "/api/users";
@@ -428,18 +430,19 @@ export default function UsersPage() {
               />
             </div>
 
-            {!editingUser && (
-              <div className="space-y-1.5">
-                <Label>كلمة المرور</Label>
-                <Input
-                  type="password"
-                  dir="ltr"
-                  value={userPassword}
-                  onChange={(e) => setUserPassword(e.target.value)}
-                  placeholder="••••••••"
-                />
-              </div>
-            )}
+            <div className="space-y-1.5">
+              <Label>{editingUser ? "كلمة المرور الجديدة" : "كلمة المرور"}</Label>
+              <Input
+                type="password"
+                dir="ltr"
+                value={userPassword}
+                onChange={(e) => setUserPassword(e.target.value)}
+                placeholder={editingUser ? "اتركها فارغة إذا لا تريد التغيير" : "••••••••"}
+              />
+              {editingUser && (
+                <p className="text-[10px] text-muted-foreground">اتركها فارغة إذا لا تريد تغيير كلمة المرور</p>
+              )}
+            </div>
 
             <div className="space-y-1.5">
               <Label>المنظمة</Label>
