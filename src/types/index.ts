@@ -28,6 +28,7 @@ export interface Ticket {
   id: string;
   org_id: string;
   ticket_number?: number;
+  request_type?: "problem" | "service";
   client_name: string;
   client_phone?: string;
   issue: string;

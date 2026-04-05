@@ -7,7 +7,7 @@ import {
 } from "@/lib/supabase/db";
 import { useAuth } from "@/lib/auth-context";
 import { useTopbarControls } from "@/components/layout/topbar-context";
-import { PRIORITIES, TICKET_STATUSES, TICKET_CATEGORIES } from "@/lib/utils/constants";
+import { PRIORITIES, TICKET_STATUSES, TICKET_CATEGORIES, PROBLEM_CATEGORIES, SERVICE_CATEGORIES, REQUEST_TYPES } from "@/lib/utils/constants";
 import { PRIORITY_COLORS, TICKET_STATUS_COLORS } from "@/lib/utils/constants";
 import { formatDate, formatPhone } from "@/lib/utils/format";
 import type { Ticket, Employee } from "@/types";
@@ -108,6 +108,7 @@ function getDailySupportQuote() {
 /*  Types for local form state                                        */
 /* ------------------------------------------------------------------ */
 interface TicketForm {
+  request_type: "problem" | "service";
   client_name: string;
   client_phone: string;
   issue: string;
@@ -122,6 +123,7 @@ interface TicketForm {
 }
 
 const EMPTY_FORM: TicketForm = {
+  request_type: "problem",
   client_name: "",
   client_phone: "",
   issue: "",
@@ -180,13 +182,16 @@ export default function SupportPage() {
     repName: t.assigned_agent_name || undefined,
   })), [tickets]);
 
+  const typeFilteredTickets = typeFilter
+    ? monthTickets.filter((t) => (t.request_type || "problem") === typeFilter)
+    : monthTickets;
   const baseFilteredTickets = achieveFilter
-    ? monthTickets.filter(t => achieveFilterIds.has(t.id))
+    ? typeFilteredTickets.filter(t => achieveFilterIds.has(t.id))
     : cardFilter
       ? cardFilter === "عاجل"
-        ? monthTickets.filter((t) => t.priority === "عاجل")
-        : monthTickets.filter((t) => t.status === cardFilter)
-      : monthTickets;
+        ? typeFilteredTickets.filter((t) => t.priority === "عاجل")
+        : typeFilteredTickets.filter((t) => t.status === cardFilter)
+      : typeFilteredTickets;
   const filteredTickets = clientSearch
     ? baseFilteredTickets.filter((t) => t.client_name.toLowerCase().includes(clientSearch.toLowerCase()))
     : baseFilteredTickets;
@@ -201,11 +206,16 @@ export default function SupportPage() {
       .finally(() => setLoading(false));
   }, [orgId]);
 
+  // Type filter: "problem" | "service" | null
+  const [typeFilter, setTypeFilter] = useState<string | null>(null);
+
   /* ---------- derived counts ---------- */
   const countOpen = monthTickets.filter((t) => t.status === "مفتوح").length;
   const countInProgress = monthTickets.filter((t) => t.status === "قيد الحل").length;
   const countResolved = monthTickets.filter((t) => t.status === "محلول").length;
   const countUrgent = monthTickets.filter((t) => t.priority === "عاجل").length;
+  const countProblems = monthTickets.filter((t) => (t.request_type || "problem") === "problem").length;
+  const countServices = monthTickets.filter((t) => t.request_type === "service").length;
 
   /* ---------- Issue Pattern Analytics ---------- */
   const issueAnalytics = useMemo(() => {
@@ -288,7 +298,34 @@ export default function SupportPage() {
       });
     }
 
-    return { sorted, recommendations, totalCategorized: categorized.length, peakHour, peakDay: peakDay ? dayNames[Number(peakDay[0])] : null };
+    // Service-specific analytics
+    const serviceTickets = categorized.filter(t => t.request_type === "service");
+    const serviceCatCounts: Record<string, { total: number; resolved: number }> = {};
+    for (const t of serviceTickets) {
+      const cat = t.issue_category!;
+      if (!serviceCatCounts[cat]) serviceCatCounts[cat] = { total: 0, resolved: 0 };
+      serviceCatCounts[cat].total++;
+      if (t.status === "محلول") serviceCatCounts[cat].resolved++;
+    }
+    const sortedServices = Object.entries(serviceCatCounts).sort((a, b) => b[1].total - a[1].total);
+
+    // Problem-specific analytics
+    const problemTickets = categorized.filter(t => (t.request_type || "problem") === "problem");
+    const problemCatCounts: Record<string, { total: number; resolved: number }> = {};
+    for (const t of problemTickets) {
+      const cat = t.issue_category!;
+      if (!problemCatCounts[cat]) problemCatCounts[cat] = { total: 0, resolved: 0 };
+      problemCatCounts[cat].total++;
+      if (t.status === "محلول") problemCatCounts[cat].resolved++;
+    }
+    const sortedProblems = Object.entries(problemCatCounts).sort((a, b) => b[1].total - a[1].total);
+
+    return {
+      sorted, recommendations, totalCategorized: categorized.length, peakHour,
+      peakDay: peakDay ? dayNames[Number(peakDay[0])] : null,
+      sortedServices, totalServices: serviceTickets.length,
+      sortedProblems, totalProblems: problemTickets.length,
+    };
   }, [tickets]);
 
   /* ---------- helpers ---------- */
@@ -301,6 +338,7 @@ export default function SupportPage() {
   function openEditDialog(ticket: Ticket) {
     setEditingId(ticket.id);
     setForm({
+      request_type: ticket.request_type || "problem",
       client_name: ticket.client_name,
       client_phone: ticket.client_phone || "",
       issue: ticket.issue,
@@ -322,6 +360,7 @@ export default function SupportPage() {
     try {
       if (editingId) {
         const updated = await updateTicket(editingId, {
+          request_type: form.request_type,
           client_name: form.client_name,
           client_phone: form.client_phone,
           issue: form.issue,
@@ -340,6 +379,7 @@ export default function SupportPage() {
           Math.max(0, ...tickets.map((t) => t.ticket_number ?? 0)) + 1;
         const created = await createTicket({
           ticket_number: nextNumber,
+          request_type: form.request_type,
           client_name: form.client_name,
           client_phone: form.client_phone,
           issue: form.issue,
@@ -464,6 +504,32 @@ export default function SupportPage() {
           </div>
         </div>
       </div>
+
+      {/* -------- Type Filter Pills -------- */}
+      {!loading && (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => { setTypeFilter(null); setCardFilter(null); }}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${!typeFilter ? "bg-foreground/10 text-foreground" : "bg-white/[0.04] text-muted-foreground hover:bg-white/[0.08]"}`}
+          >
+            الكل ({monthTickets.length})
+          </button>
+          <button
+            onClick={() => { setTypeFilter(typeFilter === "problem" ? null : "problem"); setCardFilter(null); }}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5 ${typeFilter === "problem" ? "bg-cc-red/15 text-cc-red ring-1 ring-cc-red/30" : "bg-white/[0.04] text-muted-foreground hover:bg-white/[0.08]"}`}
+          >
+            <span className="w-2 h-2 rounded-full bg-cc-red" />
+            مشاكل ({countProblems})
+          </button>
+          <button
+            onClick={() => { setTypeFilter(typeFilter === "service" ? null : "service"); setCardFilter(null); }}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5 ${typeFilter === "service" ? "bg-cc-blue/15 text-cc-blue ring-1 ring-cc-blue/30" : "bg-white/[0.04] text-muted-foreground hover:bg-white/[0.08]"}`}
+          >
+            <span className="w-2 h-2 rounded-full bg-cc-blue" />
+            خدمات ({countServices})
+          </button>
+        </div>
+      )}
 
       {/* -------- Status Cards -------- */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -608,6 +674,97 @@ export default function SupportPage() {
         </div>
       )}
 
+      {/* -------- Service & Problem Breakdown -------- */}
+      {!loading && issueAnalytics && (issueAnalytics.totalServices > 0 || issueAnalytics.totalProblems > 0) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Services breakdown */}
+          {issueAnalytics.totalServices > 0 && (
+            <div className="cc-card rounded-[14px] p-5 border border-cc-blue/10 bg-gradient-to-l from-cc-blue/[0.03] to-transparent">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-2 h-2 rounded-full bg-cc-blue" />
+                <h3 className="text-sm font-bold text-foreground">الخدمات الأكثر طلباً</h3>
+                <span className="text-[10px] text-muted-foreground mr-auto">{issueAnalytics.totalServices} طلب خدمة</span>
+              </div>
+              <div className="space-y-2.5">
+                {issueAnalytics.sortedServices.map(([cat, data]) => {
+                  const resRate = data.total > 0 ? Math.round((data.resolved / data.total) * 100) : 0;
+                  const pct = issueAnalytics.totalServices > 0 ? Math.round((data.total / issueAnalytics.totalServices) * 100) : 0;
+                  return (
+                    <div key={cat} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="flex items-center gap-1.5">
+                          <span>{SERVICE_CATEGORIES[cat]?.icon || "📝"}</span>
+                          <span className="text-foreground font-medium">{cat}</span>
+                        </span>
+                        <span className="flex items-center gap-2">
+                          <span className="text-muted-foreground">{data.total} طلب</span>
+                          <span className={`text-[10px] font-bold ${resRate >= 70 ? "text-cc-green" : resRate >= 40 ? "text-amber" : "text-cc-red"}`}>
+                            انجاز {resRate}%
+                          </span>
+                        </span>
+                      </div>
+                      <div className="h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
+                        <div className="h-full rounded-full bg-cc-blue/60" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Overall service completion rate */}
+              {(() => {
+                const totalSvc = issueAnalytics.sortedServices.reduce((s, [, d]) => s + d.total, 0);
+                const resolvedSvc = issueAnalytics.sortedServices.reduce((s, [, d]) => s + d.resolved, 0);
+                const overallRate = totalSvc > 0 ? Math.round((resolvedSvc / totalSvc) * 100) : 0;
+                return (
+                  <div className="mt-4 pt-3 border-t border-white/[0.06] flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">معدل الإنجاز الكلي</span>
+                    <span className={`text-sm font-bold ${overallRate >= 70 ? "text-cc-green" : overallRate >= 40 ? "text-amber" : "text-cc-red"}`}>
+                      {overallRate}%
+                    </span>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* Problems breakdown */}
+          {issueAnalytics.totalProblems > 0 && (
+            <div className="cc-card rounded-[14px] p-5 border border-cc-red/10 bg-gradient-to-l from-cc-red/[0.03] to-transparent">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-2 h-2 rounded-full bg-cc-red" />
+                <h3 className="text-sm font-bold text-foreground">المشاكل الأكثر تكراراً</h3>
+                <span className="text-[10px] text-muted-foreground mr-auto">{issueAnalytics.totalProblems} مشكلة</span>
+              </div>
+              <div className="space-y-2.5">
+                {issueAnalytics.sortedProblems.map(([cat, data]) => {
+                  const resRate = data.total > 0 ? Math.round((data.resolved / data.total) * 100) : 0;
+                  const pct = issueAnalytics.totalProblems > 0 ? Math.round((data.total / issueAnalytics.totalProblems) * 100) : 0;
+                  return (
+                    <div key={cat} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="flex items-center gap-1.5">
+                          <span>{PROBLEM_CATEGORIES[cat]?.icon || TICKET_CATEGORIES[cat]?.icon || "📋"}</span>
+                          <span className="text-foreground font-medium">{cat}</span>
+                        </span>
+                        <span className="flex items-center gap-2">
+                          <span className="text-muted-foreground">{data.total} مشكلة</span>
+                          <span className={`text-[10px] font-bold ${resRate >= 70 ? "text-cc-green" : resRate >= 40 ? "text-amber" : "text-cc-red"}`}>
+                            حل {resRate}%
+                          </span>
+                        </span>
+                      </div>
+                      <div className="h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
+                        <div className="h-full rounded-full bg-cc-red/60" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* -------- Tickets Table -------- */}
       <div id="tickets-table" className="cc-card rounded-[14px] overflow-x-auto">
         <div className="p-4 pb-0">
@@ -622,11 +779,12 @@ export default function SupportPage() {
           <TableHeader>
             <TableRow>
               <TableHead className="text-right">#</TableHead>
+              <TableHead className="text-right">النوع</TableHead>
               <TableHead className="text-right">العميل</TableHead>
               <TableHead className="text-right">التاريخ</TableHead>
               <TableHead className="text-right">الجوال</TableHead>
               <TableHead className="text-right">التصنيف</TableHead>
-              <TableHead className="text-right">المشكلة</TableHead>
+              <TableHead className="text-right">الوصف</TableHead>
               <TableHead className="text-right">موعد التسليم</TableHead>
               <TableHead className="text-right">الأولوية</TableHead>
               <TableHead className="text-right">الحالة</TableHead>
@@ -639,6 +797,7 @@ export default function SupportPage() {
               Array.from({ length: 6 }).map((_, index) => (
                 <TableRow key={index}>
                   <TableCell className="text-right"><Skeleton className="mr-auto h-4 w-10" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="mr-auto h-6 w-14 rounded-full" /></TableCell>
                   <TableCell className="text-right"><Skeleton className="mr-auto h-4 w-24" /></TableCell>
                   <TableCell className="text-right"><Skeleton className="mr-auto h-4 w-20" /></TableCell>
                   <TableCell className="text-right"><Skeleton className="mr-auto h-4 w-24" /></TableCell>
@@ -658,7 +817,7 @@ export default function SupportPage() {
               ))
             ) : filteredTickets.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
                   {cardFilter ? `لا توجد تذاكر "${cardFilter}"` : "لا توجد تذاكر"}
                 </TableCell>
               </TableRow>
@@ -667,6 +826,15 @@ export default function SupportPage() {
                 <TableRow key={ticket.id}>
                   <TableCell className="text-right font-mono text-xs text-muted-foreground">
                     {ticket.ticket_number}
+                  </TableCell>
+                  <TableCell className="text-right text-xs">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                      (ticket.request_type || "problem") === "service"
+                        ? "bg-cc-blue/10 text-cc-blue"
+                        : "bg-cc-red/10 text-cc-red"
+                    }`}>
+                      {(ticket.request_type || "problem") === "service" ? "خدمة" : "مشكلة"}
+                    </span>
                   </TableCell>
                   <TableCell className="text-right text-xs font-medium">
                     {ticket.client_name}
@@ -756,6 +924,34 @@ export default function SupportPage() {
           </DialogHeader>
 
           <div className="grid grid-cols-1 gap-4 py-2 md:grid-cols-2">
+            {/* نوع الطلب */}
+            <div className="space-y-1.5 md:col-span-2">
+              <Label>نوع الطلب</Label>
+              <div className="flex gap-2">
+                {REQUEST_TYPES.map((rt) => (
+                  <button
+                    key={rt.value}
+                    type="button"
+                    onClick={() => {
+                      updateField("request_type", rt.value as "problem" | "service");
+                      updateField("issue_category", "");
+                      updateField("issue_subcategory", "");
+                    }}
+                    className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                      form.request_type === rt.value
+                        ? rt.value === "problem"
+                          ? "bg-cc-red/15 text-cc-red ring-1 ring-cc-red/30"
+                          : "bg-cc-blue/15 text-cc-blue ring-1 ring-cc-blue/30"
+                        : "bg-white/[0.04] text-muted-foreground hover:bg-white/[0.08]"
+                    }`}
+                  >
+                    <span>{rt.icon}</span>
+                    <span>{rt.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* اسم العميل */}
             <div className="space-y-1.5">
               <Label htmlFor="client_name">اسم العميل</Label>
@@ -779,9 +975,9 @@ export default function SupportPage() {
               />
             </div>
 
-            {/* تصنيف المشكلة */}
+            {/* تصنيف */}
             <div className="space-y-1.5">
-              <Label>تصنيف المشكلة</Label>
+              <Label>{form.request_type === "service" ? "نوع الخدمة" : "تصنيف المشكلة"}</Label>
               <Select
                 value={form.issue_category}
                 onValueChange={(val) => { updateField("issue_category", val ?? ""); updateField("issue_subcategory", ""); }}
@@ -790,7 +986,7 @@ export default function SupportPage() {
                   <SelectValue placeholder="اختر التصنيف" />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(TICKET_CATEGORIES).map(([key, cat]) => (
+                  {Object.entries(form.request_type === "service" ? SERVICE_CATEGORIES : PROBLEM_CATEGORIES).map(([key, cat]) => (
                     <SelectItem key={key} value={key}>
                       {cat.icon} {cat.label}
                     </SelectItem>
@@ -820,14 +1016,14 @@ export default function SupportPage() {
               </Select>
             </div>
 
-            {/* وصف المشكلة */}
+            {/* الوصف */}
             <div className="space-y-1.5 md:col-span-2">
-              <Label htmlFor="issue">وصف المشكلة</Label>
+              <Label htmlFor="issue">{form.request_type === "service" ? "تفاصيل الخدمة" : "وصف المشكلة"}</Label>
               <Textarea
                 id="issue"
                 value={form.issue}
                 onChange={(e) => updateField("issue", e.target.value)}
-                placeholder="صف المشكلة بالتفصيل..."
+                placeholder={form.request_type === "service" ? "صف الخدمة المطلوبة بالتفصيل..." : "صف المشكلة بالتفصيل..."}
                 rows={3}
               />
             </div>
