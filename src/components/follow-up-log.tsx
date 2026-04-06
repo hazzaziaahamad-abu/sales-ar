@@ -231,7 +231,7 @@ export function FollowUpLogButton({ entityType, entityId, entityName }: FollowUp
                 />
                 {/* Mention suggestions dropdown */}
                 {showMentions && filteredEmployees.length > 0 && (
-                  <div className="absolute bottom-full mb-1 right-0 w-full bg-card border border-border rounded-lg shadow-lg z-50 max-h-[200px] overflow-y-auto">
+                  <div className="absolute top-full mt-1 right-0 w-full min-w-[280px] bg-card border border-border rounded-lg shadow-lg z-50 max-h-[200px] overflow-y-auto">
                     {filteredEmployees.map((emp, idx) => (
                       <button
                         key={emp.id}
@@ -243,8 +243,8 @@ export function FollowUpLogButton({ entityType, entityId, entityName }: FollowUp
                         <div className="w-7 h-7 rounded-full bg-amber/15 text-amber flex items-center justify-center text-xs font-bold flex-shrink-0">
                           {emp.name.charAt(0)}
                         </div>
-                        <span className="font-medium">{emp.name}</span>
-                        {emp.role && <span className="text-[10px] text-muted-foreground mr-auto">{emp.role}</span>}
+                        <span className="font-medium whitespace-nowrap">{emp.name}</span>
+                        {emp.role && <span className="text-[10px] text-muted-foreground mr-auto whitespace-nowrap">{emp.role}</span>}
                       </button>
                     ))}
                   </div>
