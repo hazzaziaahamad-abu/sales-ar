@@ -1,596 +1,584 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import type { Renewal, Employee } from "@/types";
 import { fetchRenewals, fetchEmployees } from "@/lib/supabase/db";
 import { useAuth } from "@/lib/auth-context";
 import { useTopbarControls } from "@/components/layout/topbar-context";
-import { formatMoneyFull } from "@/lib/utils/format";
-import type { Renewal, Employee } from "@/types";
+import {
+  RENEWAL_STATUSES,
+  RENEWAL_STATUS_COLORS,
+  RENEWAL_CANCEL_REASONS,
+  MONTHS_AR,
+  getKpiStatus,
+} from "@/lib/utils/constants";
+import { formatMoney, formatMoneyFull, formatPercent } from "@/lib/utils/format";
+import { StatCard } from "@/components/ui/stat-card";
+import { ColorBadge } from "@/components/ui/color-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Zap,
+  Activity,
   TrendingDown,
   TrendingUp,
   AlertTriangle,
+  Shield,
   Target,
   Users,
-  Phone,
-  MessageSquare,
-  Shield,
-  Clock,
   CheckCircle2,
   XCircle,
-  ArrowUpRight,
-  ChevronDown,
-  DollarSign,
+  Clock,
+  Phone,
+  MessageSquare,
   UserX,
-  RefreshCw,
-  Flame,
+  DollarSign,
+  BarChart3,
+  Lightbulb,
+  ClipboardList,
+  ArrowLeft,
+  ChevronDown,
+  ChevronUp,
+  CircleDot,
   Eye,
-  Heart,
-  Award,
-  BookOpen,
+  UserCheck,
+  CalendarClock,
+  ShieldAlert,
+  Flame,
+  Star,
 } from "lucide-react";
 
-/* ------------------------------------------------------------------ */
-/*  Strategy Map — per cancel reason                                   */
-/* ------------------------------------------------------------------ */
-const STRATEGY_MAP: Record<
-  string,
-  {
-    icon: string;
-    color: string;
-    impact: string;
-    steps: string[];
-    script: string;
-  }
-> = {
+/* ─── Helpers ─── */
+function getDaysRemaining(renewalDate: string): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const renewal = new Date(renewalDate);
+  renewal.setHours(0, 0, 0, 0);
+  return Math.ceil((renewal.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function clamp(v: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, v));
+}
+
+/* ─── Strategy Map ─── */
+const STRATEGY_MAP: Record<string, {
+  icon: React.ReactNode;
+  impact: string;
+  steps: string[];
+  script: string;
+}> = {
   "ارتفاع السعر": {
-    icon: "💰",
-    color: "amber",
-    impact: "عالي",
+    icon: <DollarSign className="w-4 h-4" />,
+    impact: "high",
     steps: [
-      "قدّم عرض خصم تجديد مبكّر (10-15%) لمدة محدودة",
-      "وضّح العائد على الاستثمار مقارنة بالتكلفة الشهرية",
-      "اعرض خطة دفع مرنة (شهري بدل سنوي) لتخفيف العبء",
-      "قارن السعر مع تكلفة البدائل (أنظمة يدوية أو منافسين)",
+      "عرض خصم تجديد مبكر (10-15%)",
+      "تقديم خطة دفع مرنة (أقساط شهرية)",
+      "إعداد عرض قيمة يوضح العائد على الاستثمار",
+      "مقارنة التكلفة مع البدائل في السوق",
     ],
-    script:
-      "مرحبا {اسم_العميل}، نقدّر شراكتك معنا. بمناسبة تجديد اشتراكك، عندنا عرض خاص لك: خصم {نسبة}% على التجديد السنوي. النظام ساعدك توفّر وقت وجهد كبير، ونبي نضمن لك استمرار هالفائدة. تبي أشرح لك التفاصيل؟",
+    script: "مرحباً [اسم العميل]، نقدّر شراكتكم معنا. بمناسبة تجديد اشتراككم، لدينا عرض خاص لكم: خصم [النسبة]% على التجديد السنوي، مع إمكانية الدفع على أقساط مريحة. كما أن الخدمة وفّرت لكم [القيمة] خلال الفترة الماضية. هل يناسبكم نتحدث عن التفاصيل؟",
   },
   "قلة الاستخدام": {
-    icon: "📉",
-    color: "sky",
-    impact: "عالي",
+    icon: <Eye className="w-4 h-4" />,
+    impact: "high",
     steps: [
-      "حدد جلسة تدريب مجانية 1-على-1 لشرح المزايا غير المُستخدمة",
-      "شارك قصص نجاح عملاء مشابهين يستخدمون النظام بفعالية",
-      "عيّن مسؤول دعم مخصص للمتابعة الأسبوعية لمدة شهر",
-      "أرسل تقرير شهري يوضّح كم وفّر العميل باستخدام النظام",
+      "جدولة جلسة تدريب مجانية للفريق",
+      "مشاركة قصص نجاح عملاء مشابهين",
+      "تعيين مسؤول دعم مخصص للمتابعة",
+      "إرسال تقرير شهري بفرص الاستفادة غير المستغلة",
     ],
-    script:
-      "مرحبا {اسم_العميل}، لاحظنا إن فيه مزايا كثيرة في النظام ممكن تساعدك أكثر. نبي نخصص لك جلسة تدريب مجانية عشان تستفيد من كل الإمكانيات. متى يناسبك؟",
+    script: "مرحباً [اسم العميل]، لاحظنا أن هناك ميزات كثيرة في النظام ممكن تساعدكم أكثر. نحب نرتب لكم جلسة تدريب مجانية لفريقكم عشان تستفيدون من كامل إمكانيات النظام. عميل مشابه لكم زاد مبيعاته 30% بعد التدريب. متى يناسبكم؟",
   },
   "التحوّل لمنافس": {
-    icon: "🔄",
-    color: "red",
-    impact: "حرج",
+    icon: <Shield className="w-4 h-4" />,
+    impact: "high",
     steps: [
-      "اسأل عن المنافس المحدد واعرف ايش ميّزه عندهم",
-      "جهّز مقارنة واضحة توضّح مزاياك الفريدة",
-      "قدّم عرض مطابقة أو تفوّق على عرض المنافس",
-      "وضّح تكلفة النقل (وقت، بيانات، تدريب من جديد)",
+      "إجراء تحليل مقارنة تنافسية مفصل",
+      "مطابقة أو تحسين العرض المنافس",
+      "إبراز الميزات الفريدة والتكاملات الحصرية",
+      "عرض فترة تجربة مجانية للميزات الجديدة",
     ],
-    script:
-      "مرحبا {اسم_العميل}، سمعنا إنك تفكر في خيارات ثانية. نحب نعرف ايش اللي يهمك عشان نشوف كيف نقدر نخدمك أحسن. عندنا مزايا حصرية مثل {ميزة_1} و{ميزة_2}. ممكن نتكلم 5 دقايق؟",
+    script: "مرحباً [اسم العميل]، فهمنا أنكم تدرسون خيارات أخرى. نحب نشارككم مقارنة شاملة توضح المزايا اللي عندنا وما تقدرون تحصلونها عند غيرنا. كمان عندنا عرض خاص لكم كعملاء مميزين. ممكن نرتب اجتماع سريع نستعرض فيه كل شي؟",
   },
   "نقص ميزات": {
-    icon: "🧩",
-    color: "indigo",
-    impact: "متوسط",
+    icon: <Lightbulb className="w-4 h-4" />,
+    impact: "medium",
     steps: [
-      "اجمع طلبات المزايا المحددة من العميل",
-      "شارك خارطة الطريق القادمة وبيّن إن طلبه مُدرج",
-      "قدّم وصول مبكر (Beta) للمزايا الجديدة",
-      "اقترح حلول بديلة مؤقتة باستخدام المزايا الحالية",
+      "توثيق الميزات المطلوبة وإرسالها لفريق التطوير",
+      "مشاركة خارطة طريق المنتج القادمة",
+      "عرض وصول مبكر للميزات التجريبية",
+      "اقتراح حلول بديلة مؤقتة",
     ],
-    script:
-      "مرحبا {اسم_العميل}، شكراً لملاحظاتك. فريق التطوير يشتغل على تحديثات جديدة تشمل {ميزة_مطلوبة}. نبي نعطيك وصول مبكر لها. هل تحب نرتب لك عرض للمزايا القادمة؟",
+    script: "مرحباً [اسم العميل]، شكراً على ملاحظاتكم القيّمة. الميزات اللي طلبتوها موجودة في خطة التطوير القادمة. نحب نعطيكم وصول حصري للنسخة التجريبية قبل الإطلاق. كمان عندنا حلول بديلة تقدر تساعدكم حالياً. هل يناسبكم نشرحها لكم؟",
   },
   "مشكلات تقنية": {
-    icon: "🔧",
-    color: "orange",
-    impact: "حرج",
+    icon: <ShieldAlert className="w-4 h-4" />,
+    impact: "high",
     steps: [
-      "صعّد المشكلة فوراً لفريق التطوير مع أولوية عالية",
-      "وفّر دعم مخصص ومباشر حتى حل المشكلة بالكامل",
-      "قدّم تعويض (شهر مجاني أو خصم) كاعتذار",
-      "تابع بعد الحل للتأكد من رضا العميل التام",
+      "تصعيد فوري لفريق التطوير مع أولوية قصوى",
+      "تعيين مهندس دعم مخصص للعميل",
+      "تقديم ضمان مستوى خدمة (SLA) محسّن",
+      "عرض تعويض أو تمديد مجاني",
     ],
-    script:
-      "مرحبا {اسم_العميل}، نعتذر جداً عن المشكلة التقنية اللي واجهتك. خصصنا فريق لحلها بأسرع وقت. كتعويض، بنقدم لك {تعويض}. أولويتنا رضاك التام.",
+    script: "مرحباً [اسم العميل]، نعتذر بشدة عن المشكلات التقنية اللي واجهتوها. تم تصعيد حالتكم كأولوية قصوى وعيّنا لكم مهندس دعم مخصص. كتعويض، نقدم لكم [شهر/شهرين] مجاناً مع ضمان SLA محسّن. هل تحبون نرتب مكالمة مع المهندس المختص؟",
   },
   "اغلاق المحل": {
-    icon: "🏪",
-    color: "slate",
-    impact: "منخفض",
+    icon: <XCircle className="w-4 h-4" />,
+    impact: "low",
     steps: [
-      "اعرض إمكانية إيقاف الاشتراك مؤقتاً بدل الإلغاء",
-      "اسأل عن خطط فتح فرع جديد أو مشروع آخر",
-      "اطلب ترشيح (Referral) لمعارف يحتاجون النظام",
-      "احتفظ ببيانات العميل للتواصل المستقبلي",
+      "عرض خيار تجميد الاشتراك مؤقتاً",
+      "تسهيل نقل الاشتراك لموقع/فرع جديد",
+      "تقديم برنامج إحالة مع مكافآت",
+      "الحفاظ على العلاقة للمستقبل",
     ],
-    script:
-      "نتمنى لك التوفيق. لو فكّرت تفتح مشروع جديد، اشتراكك محفوظ وتقدر ترجع بنفس الشروط. هل تعرف أحد ممكن يستفيد من النظام؟ عندنا عرض إحالة مميز.",
+    script: "مرحباً [اسم العميل]، نأسف لسماع ذلك. نحب نساعدكم: نقدر نجمّد اشتراككم بدون رسوم لمدة [3-6] شهور لحين ترتيب أموركم. وإذا عندكم فرع ثاني، نقدر ننقل الاشتراك بسهولة. كمان لو تعرفون أحد يحتاج خدماتنا، عندنا برنامج إحالة مميز.",
   },
   "مو حاب يجدد بدون سبب": {
-    icon: "🤷",
-    color: "purple",
-    impact: "متوسط",
+    icon: <UserX className="w-4 h-4" />,
+    impact: "medium",
     steps: [
-      "تواصل شخصي من المدير لفهم السبب الحقيقي",
-      "قدّم عرض حصري (خصم كبير أو ميزة إضافية)",
-      "أرسل استبيان خروج قصير ومباشر",
-      "حدد موعد مكالمة متابعة بعد أسبوع",
+      "تواصل شخصي من المدير أو المسؤول الأعلى",
+      "تقديم عرض حصري ومحدود المدة",
+      "إجراء استبيان خروج مختصر لفهم السبب الحقيقي",
+      "عرض تجربة مجانية لمدة شهر إضافي",
     ],
-    script:
-      "مرحبا {اسم_العميل}، أنا {اسم_المدير} مدير العلاقات. نقدّر تعاملك معنا ونبي نفهم كيف نقدر نخدمك أحسن. عندنا عرض خاص مخصص لك. ممكن نتكلم دقيقتين؟",
+    script: "مرحباً [اسم العميل]، أنا [اسم المدير] مدير قسم [القسم]. حبيت أتواصل معكم شخصياً لأن عملاءنا المميزين مهمين لنا. نحب نفهم كيف نقدر نخدمكم أفضل. كمان لدينا عرض حصري لكم: [تفاصيل العرض]. هل عندكم وقت لمكالمة سريعة؟",
   },
   "الادارة رفضت": {
-    icon: "👔",
-    color: "blue",
-    impact: "عالي",
+    icon: <ClipboardList className="w-4 h-4" />,
+    impact: "medium",
     steps: [
-      "جهّز عرض تقديمي ROI مخصص لصاحب القرار",
-      "اطلب اجتماع مباشر مع الإدارة لشرح القيمة",
-      "وفّر بيانات وأرقام عن توفير التكاليف",
-      "اعرض فترة تجربة مجانية إضافية لإثبات القيمة",
+      "إعداد عرض ROI مخصص لصاحب القرار",
+      "طلب اجتماع مباشر مع الإدارة العليا",
+      "تقديم دراسة حالة من نفس القطاع",
+      "عرض خطة تجريبية بمخاطر منخفضة",
     ],
-    script:
-      "مرحبا {اسم_العميل}، جهزنا لك تقرير يوضح كيف النظام وفّر لكم {مبلغ} ريال وساعد في تحسين العمليات. ممكن نرتب اجتماع قصير مع الإدارة لعرض الأرقام؟",
+    script: "مرحباً [اسم العميل]، نتفهم أن القرار يحتاج موافقة الإدارة. جهّزنا لكم تقرير عائد استثمار مخصص يوضح القيمة الفعلية للخدمة. كمان عندنا دراسة حالة من شركة في نفس مجالكم حققت [النتائج]. هل نقدر نرتب اجتماع قصير مع صاحب القرار؟",
   },
   "أخرى": {
-    icon: "📋",
-    color: "gray",
-    impact: "متوسط",
+    icon: <MessageSquare className="w-4 h-4" />,
+    impact: "low",
     steps: [
-      "تواصل هاتفي لفهم السبب الحقيقي",
-      "وثّق الملاحظات بالتفصيل لتحسين الخدمة",
-      "قدّم عرض مخصص بناءً على احتياج العميل",
-      "تابع بعد أسبوع حتى لو رفض",
+      "إجراء مقابلة خروج شاملة",
+      "توثيق جميع الملاحظات والأسباب",
+      "مشاركة التقرير مع الفرق المعنية",
+      "متابعة بعد شهر للتحقق من إمكانية العودة",
     ],
-    script:
-      "مرحبا {اسم_العميل}، نحب نسمع رأيك عشان نتطور. ايش الشي اللي نقدر نحسنه عشان نخليك تستمر معنا؟ رأيك يهمنا جداً.",
+    script: "مرحباً [اسم العميل]، نحب نفهم تجربتكم معنا بشكل أفضل. هل عندكم دقائق لمشاركتنا ملاحظاتكم؟ رأيكم مهم جداً لنا لتحسين خدماتنا. وبابنا مفتوح لكم دائماً إذا حبيتوا ترجعون.",
   },
 };
 
+const IMPACT_STYLES: Record<string, { label: string; color: string; bg: string }> = {
+  high: { label: "تأثير عالي", color: "text-cc-red", bg: "bg-red-dim" },
+  medium: { label: "تأثير متوسط", color: "text-amber", bg: "bg-amber-dim" },
+  low: { label: "تأثير منخفض", color: "text-cc-blue", bg: "bg-blue-dim" },
+};
 
-/* ------------------------------------------------------------------ */
-/*  Page Component                                                     */
-/* ------------------------------------------------------------------ */
+/* ─── Health Score SVG Arc ─── */
+function HealthScoreRing({ score, size = 180 }: { score: number; size?: number }) {
+  const strokeWidth = 12;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const progress = clamp(score, 0, 100) / 100;
+  const dashOffset = circumference * (1 - progress);
+  const color = score >= 70 ? "#10B981" : score >= 40 ? "#F59E0B" : "#EF4444";
+  const bgColor = score >= 70 ? "rgba(16,185,129,0.1)" : score >= 40 ? "rgba(245,158,11,0.1)" : "rgba(239,68,68,0.1)";
+
+  return (
+    <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle
+          cx={size / 2} cy={size / 2} r={radius}
+          fill="none" stroke="var(--border)" strokeWidth={strokeWidth}
+        />
+        <circle
+          cx={size / 2} cy={size / 2} r={radius}
+          fill="none" stroke={color} strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={dashOffset}
+          className="transition-all duration-1000 ease-out"
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-4xl font-extrabold font-mono" style={{ color }}>{Math.round(score)}</span>
+        <span className="text-[10px] text-muted-foreground mt-0.5">من 100</span>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Simple Bar ─── */
+function SimpleBar({ value, max, color, height = 8 }: { value: number; max: number; color: string; height?: number }) {
+  const pct = max > 0 ? clamp((value / max) * 100, 0, 100) : 0;
+  return (
+    <div className="w-full rounded-full overflow-hidden" style={{ height, background: "var(--border)" }}>
+      <div
+        className="h-full rounded-full transition-all duration-500"
+        style={{ width: `${pct}%`, background: color }}
+      />
+    </div>
+  );
+}
+
+
+/* ─── STATUS BADGE ─── */
+const STATUS_BADGE: Record<string, { color: string; bg: string }> = {
+  "مجدول": { color: "text-cc-blue", bg: "bg-blue-dim" },
+  "جاري المتابعة": { color: "text-amber", bg: "bg-amber-dim" },
+  "انتظار الدفع": { color: "text-cc-purple", bg: "bg-purple-dim" },
+  "مكتمل": { color: "text-cc-green", bg: "bg-green-dim" },
+  "ملغي بسبب": { color: "text-cc-red", bg: "bg-red-dim" },
+  "إيقاف مؤقت": { color: "text-amber", bg: "bg-amber-dim" },
+  "الرقم غلط": { color: "text-cc-red", bg: "bg-red-dim" },
+  "مافي تجاوب": { color: "text-cc-red", bg: "bg-red-dim" },
+  "مؤجل مؤقتاً": { color: "text-cc-blue", bg: "bg-blue-dim" },
+  "تواصل وقت آخر": { color: "text-cc-purple", bg: "bg-purple-dim" },
+  "متردد": { color: "text-amber", bg: "bg-amber-dim" },
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
 export default function RenewalBoostPage() {
   const { activeOrgId: orgId } = useAuth();
   const { activeMonthIndex, filterCutoff } = useTopbarControls();
+
   const [renewals, setRenewals] = useState<Renewal[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedStrategy, setExpandedStrategy] = useState<string | null>(null);
+  const [expandedStrategies, setExpandedStrategies] = useState<Set<string>>(new Set());
 
+  /* ─── Fetch data ─── */
   useEffect(() => {
+    if (!orgId) return;
     setLoading(true);
     Promise.all([fetchRenewals(), fetchEmployees()])
       .then(([r, e]) => { setRenewals(r); setEmployees(e); })
-      .catch(console.error)
       .finally(() => setLoading(false));
   }, [orgId]);
 
-  /* ─── Month filter ─── */
+  /* ─── Month filtering (same as renewals page) ─── */
   const monthRenewals = useMemo(() => {
     if (filterCutoff) return renewals.filter((r) => new Date(r.renewal_date) >= filterCutoff);
-    if (activeMonthIndex) {
-      return renewals.filter((r) => {
-        const d = new Date(r.renewal_date);
-        return d.getMonth() + 1 === activeMonthIndex.month && d.getFullYear() === activeMonthIndex.year;
-      });
-    }
+    if (activeMonthIndex) return renewals.filter((r) => {
+      const rd = new Date(r.renewal_date);
+      return rd.getMonth() + 1 === activeMonthIndex.month;
+    });
     return renewals;
-  }, [renewals, activeMonthIndex, filterCutoff]);
+  }, [renewals, filterCutoff, activeMonthIndex]);
 
-  /* ─── Analytics ─── */
-  const analytics = useMemo(() => {
+  /* ─── Core metrics ─── */
+  const metrics = useMemo(() => {
     const total = monthRenewals.length;
-    const renewed = monthRenewals.filter((r) => r.status === "مكتمل").length;
+    const completed = monthRenewals.filter((r) => r.status === "مكتمل").length;
     const cancelled = monthRenewals.filter((r) => r.status === "ملغي بسبب").length;
     const scheduled = monthRenewals.filter((r) => r.status === "مجدول").length;
-    const following = monthRenewals.filter((r) => r.status === "جاري المتابعة").length;
-    const waiting = monthRenewals.filter((r) => r.status === "انتظار الدفع").length;
-    const noResponse = monthRenewals.filter((r) => ["مافي تجاوب", "الرقم غلط"].includes(r.status)).length;
-    const hesitant = monthRenewals.filter((r) => r.status === "متردد").length;
-    const renewalRate = total > 0 ? Math.round((renewed / total) * 100) : 0;
-    const churnRate = total > 0 ? Math.round((cancelled / total) * 100) : 0;
-    const activeFollowUp = total > 0 ? Math.round(((following + waiting) / total) * 100) : 0;
-    const idle = total > 0 ? Math.round((scheduled / total) * 100) : 0;
-    const revenueLoss = monthRenewals.filter((r) => r.status === "ملغي بسبب").reduce((s, r) => s + r.plan_price, 0);
-    const totalRevenue = monthRenewals.filter((r) => r.status === "مكتمل").reduce((s, r) => s + r.plan_price, 0);
-    const potentialRevenue = monthRenewals.reduce((s, r) => s + r.plan_price, 0);
-    const retentionRate = potentialRevenue > 0 ? Math.round((totalRevenue / potentialRevenue) * 100) : 0;
+    const activeFollowUp = monthRenewals.filter((r) => r.status !== "مجدول" && r.status !== "مكتمل" && r.status !== "ملغي بسبب").length;
 
-    // Cancel reasons
-    const cancelReasons = monthRenewals
-      .filter((r) => r.status === "ملغي بسبب" && r.cancel_reason)
-      .reduce<Record<string, number>>((acc, r) => { acc[r.cancel_reason!] = (acc[r.cancel_reason!] || 0) + 1; return acc; }, {});
-    const cancelReasonsArr = Object.entries(cancelReasons)
-      .map(([reason, count]) => ({ reason, count, pct: cancelled > 0 ? Math.round((count / cancelled) * 100) : 0 }))
-      .sort((a, b) => b.count - a.count);
+    const renewalRate = total > 0 ? (completed / total) * 100 : 0;
+    const churnRate = total > 0 ? (cancelled / total) * 100 : 0;
+    const coverageRate = total > 0 ? ((total - scheduled) / total) * 100 : 0;
 
-    // Health score (0-100)
-    const renewalScore = Math.min(40, (renewalRate / 75) * 40);
-    const churnScore = Math.min(30, churnRate <= 15 ? 30 : Math.max(0, 30 - ((churnRate - 15) / 85) * 30));
-    const coverageScore = Math.min(20, (activeFollowUp / 50) * 20);
-    const revenueScore = Math.min(10, (retentionRate / 100) * 10);
-    const healthScore = Math.round(renewalScore + churnScore + coverageScore + revenueScore);
+    const totalRevenue = monthRenewals.reduce((s, r) => s + (r.plan_price || 0), 0);
+    const completedRevenue = monthRenewals.filter((r) => r.status === "مكتمل").reduce((s, r) => s + (r.plan_price || 0), 0);
+    const lostRevenue = monthRenewals.filter((r) => r.status === "ملغي بسبب").reduce((s, r) => s + (r.plan_price || 0), 0);
+    const revenueRetention = totalRevenue > 0 ? (completedRevenue / totalRevenue) * 100 : 0;
 
-    // At-risk renewals
-    const now = new Date();
-    const atRisk = monthRenewals.filter((r) => {
-      if (r.status === "مكتمل" || r.status === "ملغي بسبب") return false;
-      const daysUntil = Math.ceil((new Date(r.renewal_date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      if (daysUntil <= 7) return true;
-      if (["مافي تجاوب", "الرقم غلط", "متردد"].includes(r.status)) return true;
-      if (!r.assigned_rep) return true;
-      // Stale: no update in 7+ days
-      const daysSinceUpdate = Math.ceil((now.getTime() - new Date(r.updated_at).getTime()) / (1000 * 60 * 60 * 24));
-      if (daysSinceUpdate >= 7 && !["مكتمل", "ملغي بسبب"].includes(r.status)) return true;
-      return false;
-    }).sort((a, b) => new Date(a.renewal_date).getTime() - new Date(b.renewal_date).getTime());
-
-    // Team performance
-    const repMap = new Map<string, { total: number; completed: number; cancelled: number; pending: number }>();
-    for (const r of monthRenewals) {
-      const rep = r.assigned_rep || "غير معيّن";
-      if (!repMap.has(rep)) repMap.set(rep, { total: 0, completed: 0, cancelled: 0, pending: 0 });
-      const d = repMap.get(rep)!;
-      d.total++;
-      if (r.status === "مكتمل") d.completed++;
-      else if (r.status === "ملغي بسبب") d.cancelled++;
-      else d.pending++;
-    }
-    const teamPerformance = Array.from(repMap.entries())
-      .map(([name, data]) => ({ name, ...data, rate: data.total > 0 ? Math.round((data.completed / data.total) * 100) : 0 }))
-      .sort((a, b) => b.rate - a.rate);
-
-    // Weekly action plan
-    const overdue = monthRenewals.filter((r) => {
-      if (["مكتمل", "ملغي بسبب"].includes(r.status)) return false;
-      return new Date(r.renewal_date) < now;
-    }).length;
-    const noResponseCount = noResponse;
-    const unassigned = monthRenewals.filter((r) => !r.assigned_rep && !["مكتمل", "ملغي بسبب"].includes(r.status)).length;
-    const stale = monthRenewals.filter((r) => {
-      if (["مكتمل", "ملغي بسبب"].includes(r.status)) return false;
-      return Math.ceil((now.getTime() - new Date(r.updated_at).getTime()) / (1000 * 60 * 60 * 24)) >= 7;
-    }).length;
-
-    return {
-      total, renewed, cancelled, scheduled, following, waiting, noResponse, hesitant,
-      renewalRate, churnRate, activeFollowUp, idle, revenueLoss, totalRevenue, potentialRevenue, retentionRate,
-      cancelReasonsArr, healthScore, atRisk, teamPerformance,
-      overdue, noResponseCount, unassigned, stale,
-      topReason: cancelReasonsArr[0]?.reason || null,
-    };
+    return { total, completed, cancelled, scheduled, activeFollowUp, renewalRate, churnRate, coverageRate, totalRevenue, completedRevenue, lostRevenue, revenueRetention };
   }, [monthRenewals]);
 
-  /* ─── Health color ─── */
-  const healthColor = analytics.healthScore >= 70 ? "emerald" : analytics.healthScore >= 40 ? "amber" : "red";
-  const healthLabel = analytics.healthScore >= 70 ? "جيد" : analytics.healthScore >= 40 ? "يحتاج تحسين" : "حرج";
+  /* ─── Health Score ─── */
+  const healthScore = useMemo(() => {
+    const renewalScore = clamp(metrics.renewalRate / 75, 0, 1) * 40;
+    const churnScore = metrics.churnRate <= 15 ? 30 : clamp(1 - ((metrics.churnRate - 15) / 50), 0, 1) * 30;
+    const coverageScore = clamp(metrics.coverageRate / 100, 0, 1) * 20;
+    const revenueScore = clamp(metrics.revenueRetention / 100, 0, 1) * 10;
+    return Math.round(renewalScore + churnScore + coverageScore + revenueScore);
+  }, [metrics]);
 
-  /* ─── SVG Arc for health score ─── */
-  const radius = 54;
-  const circumference = 2 * Math.PI * radius;
-  const progress = (analytics.healthScore / 100) * circumference;
-  const strokeColor = healthColor === "emerald" ? "#10B981" : healthColor === "amber" ? "#F59E0B" : "#EF4444";
+  /* ─── Cancel reasons breakdown ─── */
+  const cancelReasons = useMemo(() => {
+    const cancelled = monthRenewals.filter((r) => r.status === "ملغي بسبب");
+    const reasons: Record<string, number> = {};
+    cancelled.forEach((r) => {
+      const reason = r.cancel_reason || "أخرى";
+      reasons[reason] = (reasons[reason] || 0) + 1;
+    });
+    const sorted = Object.entries(reasons).sort((a, b) => b[1] - a[1]);
+    const maxCount = sorted.length > 0 ? sorted[0][1] : 1;
+    return { sorted, maxCount, totalCancelled: cancelled.length };
+  }, [monthRenewals]);
+
+  /* ─── At-risk renewals ─── */
+  const atRiskRenewals = useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const risky = monthRenewals.filter((r) => {
+      if (r.status === "مكتمل" || r.status === "ملغي بسبب") return false;
+      const days = getDaysRemaining(r.renewal_date);
+      if (r.status === "مجدول" && days <= 7) return true;
+      if (["مافي تجاوب", "الرقم غلط", "متردد"].includes(r.status)) return true;
+      if (!r.assigned_rep) return true;
+      return false;
+    });
+    return risky.sort((a, b) => getDaysRemaining(a.renewal_date) - getDaysRemaining(b.renewal_date));
+  }, [monthRenewals]);
+
+  /* ─── Team performance ─── */
+  const teamPerformance = useMemo(() => {
+    const repMap: Record<string, { total: number; completed: number; cancelled: number; pending: number }> = {};
+    monthRenewals.forEach((r) => {
+      const rep = r.assigned_rep || "غير معيّن";
+      if (!repMap[rep]) repMap[rep] = { total: 0, completed: 0, cancelled: 0, pending: 0 };
+      repMap[rep].total++;
+      if (r.status === "مكتمل") repMap[rep].completed++;
+      else if (r.status === "ملغي بسبب") repMap[rep].cancelled++;
+      else repMap[rep].pending++;
+    });
+    return Object.entries(repMap).sort((a, b) => b[1].total - a[1].total);
+  }, [monthRenewals]);
+
+  /* ─── Weekly action plan ─── */
+  const actionPlan = useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const overdue = monthRenewals.filter((r) => r.status !== "مكتمل" && r.status !== "ملغي بسبب" && getDaysRemaining(r.renewal_date) < 0);
+    const noResponse = monthRenewals.filter((r) => r.status === "مافي تجاوب");
+    const unassigned = monthRenewals.filter((r) => !r.assigned_rep && r.status !== "مكتمل" && r.status !== "ملغي بسبب");
+    const hesitant = monthRenewals.filter((r) => r.status === "متردد");
+    const stale = monthRenewals.filter((r) => {
+      if (r.status === "مكتمل" || r.status === "ملغي بسبب") return false;
+      const updated = new Date(r.updated_at);
+      const diff = Math.ceil((now.getTime() - updated.getTime()) / (1000 * 60 * 60 * 24));
+      return diff >= 7;
+    });
+
+    return [
+      { priority: 1, label: "تواصل فوري مع التجديدات المتأخرة", count: overdue.length, color: "#EF4444", icon: <Flame className="w-4 h-4" />, guidance: "اتصل بهؤلاء العملاء اليوم. كل يوم تأخير يزيد احتمال الإلغاء." },
+      { priority: 2, label: "متابعة العملاء اللي ما ردوا", count: noResponse.length, color: "#F59E0B", icon: <Phone className="w-4 h-4" />, guidance: "جرّب التواصل بطريقة مختلفة (واتساب، إيميل) أو في وقت مختلف." },
+      { priority: 3, label: "معالجة أكثر سبب إلغاء", count: cancelReasons.sorted.length > 0 ? cancelReasons.sorted[0][1] : 0, color: "#8B5CF6", icon: <Target className="w-4 h-4" />, guidance: cancelReasons.sorted.length > 0 ? `السبب الأول: "${cancelReasons.sorted[0][0]}" - راجع الاستراتيجية المقترحة أعلاه.` : "لا يوجد إلغاءات حالياً." },
+      { priority: 4, label: "توزيع التجديدات غير المعيّنة", count: unassigned.length, color: "#00D4FF", icon: <UserCheck className="w-4 h-4" />, guidance: "وزّع هذه التجديدات على الفريق حسب الحمل الحالي لكل موظف." },
+      { priority: 5, label: "مراجعة التجديدات الراكدة (+7 أيام)", count: stale.length, color: "#7da6ff", icon: <CalendarClock className="w-4 h-4" />, guidance: "هذه التجديدات لم يتم تحديثها منذ أسبوع أو أكثر. تحتاج مراجعة ومتابعة." },
+      { priority: 6, label: "إقناع العملاء المترددين", count: hesitant.length, color: "#F59E0B", icon: <Star className="w-4 h-4" />, guidance: "قدّم عروض محدودة المدة أو اطلب من المدير التواصل شخصياً." },
+    ];
+  }, [monthRenewals, cancelReasons]);
+
+  function toggleStrategy(reason: string) {
+    setExpandedStrategies((prev) => {
+      const next = new Set(prev);
+      if (next.has(reason)) next.delete(reason); else next.add(reason);
+      return next;
+    });
+  }
 
 
-  /* ================================================================ */
-  /*  RENDER                                                           */
-  /* ================================================================ */
+  /* ─── Loading State ─── */
   if (loading) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-8 w-64" />
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-[14px]" />)}
+      <div className="space-y-6 p-1">
+        <div className="flex items-center gap-3 mb-6">
+          <Skeleton className="h-8 w-8 rounded-lg" />
+          <div>
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-3 w-72 mt-2" />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-32 rounded-[14px]" />
+          ))}
         </div>
         <Skeleton className="h-64 rounded-[14px]" />
-        <Skeleton className="h-48 rounded-[14px]" />
+        <Skeleton className="h-96 rounded-[14px]" />
       </div>
     );
   }
 
-  if (analytics.total === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <RefreshCw className="w-12 h-12 text-muted-foreground mb-4 opacity-30" />
-        <h2 className="text-lg font-bold text-foreground mb-2">لا توجد تجديدات</h2>
-        <p className="text-sm text-muted-foreground">أضف تجديدات من صفحة التجديدات أولاً لعرض خطة التحسين</p>
-      </div>
-    );
-  }
+  const scoreColor = healthScore >= 70 ? "cc-green" : healthScore >= 40 ? "amber" : "cc-red";
+  const scoreLabel = healthScore >= 70 ? "صحة ممتازة" : healthScore >= 40 ? "تحتاج تحسين" : "وضع حرج";
 
   return (
-    <div className="space-y-6">
-      {/* -------- Header -------- */}
-      <div>
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/15 flex items-center justify-center ring-1 ring-amber-500/20">
-            <Zap className="w-5 h-5 text-amber-400" />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-foreground">خطة تحسين التجديدات</h1>
-            <p className="text-xs text-muted-foreground">تحليل ذكي للأرقام وخطط عملية لرفع معدل التجديد وتقليل الإلغاء</p>
-          </div>
+    <div className="space-y-6 p-1">
+      {/* ═══ HEADER ═══ */}
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-2xl bg-amber-dim flex items-center justify-center ring-1 ring-white/8">
+          <Zap className="w-5 h-5 text-amber" />
+        </div>
+        <div>
+          <h1 className="text-lg font-bold text-foreground">خطة تحسين التجديدات</h1>
+          <p className="text-[11px] text-muted-foreground">تحليل ذكي للأرقام وخطط عملية لرفع معدل التجديد وتقليل الإلغاء</p>
         </div>
       </div>
 
-      {/* -------- Health Score + Diagnosis -------- */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Health Score */}
-        <div className="cc-card rounded-[14px] p-6 border border-white/[0.06] flex flex-col items-center justify-center text-center">
-          <p className="text-xs font-bold text-muted-foreground mb-4">نتيجة صحة التجديدات</p>
-          <div className="relative w-[140px] h-[140px]">
-            <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
-              <circle cx="60" cy="60" r={radius} fill="none" stroke="currentColor" className="text-white/[0.06]" strokeWidth="10" />
-              <circle cx="60" cy="60" r={radius} fill="none" stroke={strokeColor} strokeWidth="10"
-                strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={circumference - progress}
-                className="transition-all duration-1000" />
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-3xl font-extrabold font-mono" style={{ color: strokeColor }}>{analytics.healthScore}</span>
-              <span className="text-[10px] text-muted-foreground">من 100</span>
+      {/* ═══ HEALTH SCORE + DIAGNOSIS ═══ */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        {/* Health Score Card */}
+        <div className="lg:col-span-4 cc-card rounded-[14px] border border-white/[0.06] p-6 flex flex-col items-center justify-center gap-3">
+          <p className="text-xs font-semibold text-muted-foreground">نتيجة الصحة</p>
+          <HealthScoreRing score={healthScore} />
+          <span className={`text-xs font-bold ${healthScore >= 70 ? "text-cc-green" : healthScore >= 40 ? "text-amber" : "text-cc-red"}`}>
+            {scoreLabel}
+          </span>
+          <div className="w-full mt-2 space-y-1.5">
+            {[
+              { label: "معدل التجديد", value: metrics.renewalRate, target: 75, weight: "40%" },
+              { label: "معدل الإلغاء", value: metrics.churnRate, target: 15, weight: "30%", inverted: true },
+              { label: "تغطية المتابعة", value: metrics.coverageRate, target: 100, weight: "20%" },
+              { label: "استرداد الإيرادات", value: metrics.revenueRetention, target: 100, weight: "10%" },
+            ].map((item) => (
+              <div key={item.label} className="flex items-center gap-2 text-[10px]">
+                <span className="text-muted-foreground w-24 shrink-0">{item.label}</span>
+                <div className="flex-1">
+                  <SimpleBar
+                    value={item.inverted ? Math.max(0, item.target - (item.value - item.target)) : item.value}
+                    max={item.target}
+                    color={
+                      item.inverted
+                        ? item.value <= item.target ? "#10B981" : item.value <= item.target * 1.5 ? "#F59E0B" : "#EF4444"
+                        : item.value >= item.target ? "#10B981" : item.value >= item.target * 0.7 ? "#F59E0B" : "#EF4444"
+                    }
+                    height={4}
+                  />
+                </div>
+                <span className="text-foreground font-mono w-10 text-left">{item.value.toFixed(0)}%</span>
+                <span className="text-muted-foreground w-8">({item.weight})</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Diagnosis Cards */}
+        <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <StatCard
+            label="معدل التجديد"
+            value={formatPercent(metrics.renewalRate)}
+            color={metrics.renewalRate >= 75 ? "green" : metrics.renewalRate >= 50 ? "amber" : "red"}
+            icon={<CheckCircle2 className="w-5 h-5 text-cc-green" />}
+            progress={metrics.renewalRate}
+            subtext={`الهدف: 75% | الفجوة: ${Math.max(0, 75 - metrics.renewalRate).toFixed(0)}%`}
+          />
+          <StatCard
+            label="معدل الإلغاء"
+            value={formatPercent(metrics.churnRate)}
+            color={metrics.churnRate <= 15 ? "green" : metrics.churnRate <= 25 ? "amber" : "red"}
+            icon={<TrendingDown className="w-5 h-5 text-cc-red" />}
+            progress={Math.min(100, metrics.churnRate * 2)}
+            subtext={`الهدف: أقل من 15% | الزيادة: ${Math.max(0, metrics.churnRate - 15).toFixed(0)}%`}
+          />
+          <StatCard
+            label="الإيرادات المفقودة"
+            value={formatMoney(metrics.lostRevenue)}
+            color="red"
+            icon={<DollarSign className="w-5 h-5 text-cc-red" />}
+            subtext={`من إجمالي ${formatMoney(metrics.totalRevenue)}`}
+          />
+          <StatCard
+            label="تغطية المتابعة"
+            value={formatPercent(metrics.coverageRate)}
+            color={metrics.coverageRate >= 80 ? "green" : metrics.coverageRate >= 50 ? "amber" : "red"}
+            icon={<Activity className="w-5 h-5 text-cyan" />}
+            progress={metrics.coverageRate}
+            subtext={`${metrics.scheduled} تجديد لم يُتابع بعد من ${metrics.total}`}
+          />
+        </div>
+      </div>
+
+      {/* ═══ TOP CHURN REASONS ═══ */}
+      {cancelReasons.totalCancelled > 0 && (
+        <div className="cc-card rounded-[14px] border border-cc-red/10 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-xl bg-red-dim flex items-center justify-center">
+              <BarChart3 className="w-4 h-4 text-cc-red" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-foreground">أسباب الإلغاء الرئيسية</h2>
+              <p className="text-[10px] text-muted-foreground">{cancelReasons.totalCancelled} إلغاء في هذه الفترة</p>
             </div>
           </div>
-          <span className={`mt-3 inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full ${
-            healthColor === "emerald" ? "bg-emerald-500/10 text-emerald-400" :
-            healthColor === "amber" ? "bg-amber-500/10 text-amber-400" :
-            "bg-red-500/10 text-red-400"
-          }`}>
-            <span className={`w-2 h-2 rounded-full ${
-              healthColor === "emerald" ? "bg-emerald-400" : healthColor === "amber" ? "bg-amber-400" : "bg-red-400"
-            }`} />
-            {healthLabel}
-          </span>
-          <div className="mt-4 w-full space-y-2 text-[11px]">
-            {[
-              { label: "معدل التجديد", value: analytics.renewalRate, target: 75, weight: "40%" },
-              { label: "معدل الإلغاء", value: analytics.churnRate, target: 15, weight: "30%", inverted: true },
-              { label: "تغطية المتابعة", value: analytics.activeFollowUp, target: 50, weight: "20%" },
-              { label: "الاحتفاظ بالإيرادات", value: analytics.retentionRate, target: 100, weight: "10%" },
-            ].map((item) => {
-              const isGood = item.inverted ? item.value <= item.target : item.value >= item.target;
+          <div className="space-y-3">
+            {cancelReasons.sorted.map(([reason, count]) => {
+              const pct = cancelReasons.totalCancelled > 0 ? (count / cancelReasons.totalCancelled) * 100 : 0;
+              const strategy = STRATEGY_MAP[reason] || STRATEGY_MAP["أخرى"];
               return (
-                <div key={item.label} className="flex items-center gap-2">
-                  <span className={`w-1.5 h-1.5 rounded-full ${isGood ? "bg-emerald-400" : "bg-red-400"}`} />
-                  <span className="text-muted-foreground flex-1 text-right">{item.label}</span>
-                  <span className="font-mono font-bold text-foreground">{item.value}%</span>
+                <div key={reason} className="space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="text-foreground font-semibold">{reason}</span>
+                      <span className="text-muted-foreground">({count})</span>
+                    </div>
+                    <span className="text-muted-foreground font-mono">{pct.toFixed(0)}%</span>
+                  </div>
+                  <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: "var(--border)" }}>
+                    <div
+                      className="h-full rounded-full bg-cc-red transition-all duration-500"
+                      style={{ width: `${pct}%`, opacity: 0.6 + (pct / 100) * 0.4 }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    {strategy && `الاستراتيجية: ${strategy.steps[0]}`}
+                  </p>
                 </div>
               );
             })}
           </div>
         </div>
+      )}
 
-        {/* Diagnosis Cards */}
-        <div className="lg:col-span-2 grid grid-cols-2 gap-3">
-          {/* Renewal Rate */}
-          <div className="cc-card rounded-[14px] p-4 border border-white/[0.06]">
-            <div className="flex items-center gap-2 mb-3">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${analytics.renewalRate >= 75 ? "bg-emerald-500/10" : "bg-red-500/10"}`}>
-                <TrendingUp className={`w-4 h-4 ${analytics.renewalRate >= 75 ? "text-emerald-400" : "text-red-400"}`} />
-              </div>
-              <span className="text-xs font-bold text-foreground">معدل التجديد</span>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className={`text-2xl font-extrabold font-mono ${analytics.renewalRate >= 75 ? "text-emerald-400" : "text-red-400"}`}>{analytics.renewalRate}%</span>
-              <span className="text-[10px] text-muted-foreground">الهدف: 75%</span>
-            </div>
-            <div className="mt-2 h-2 bg-white/[0.04] rounded-full overflow-hidden">
-              <div className={`h-full rounded-full transition-all ${analytics.renewalRate >= 75 ? "bg-emerald-500" : "bg-red-500"}`} style={{ width: `${Math.min(100, (analytics.renewalRate / 75) * 100)}%` }} />
-            </div>
-            {analytics.renewalRate < 75 && (
-              <p className="text-[10px] text-red-400 mt-2">ينقصك {75 - analytics.renewalRate} نقطة للوصول للهدف — تحتاج تجديد {Math.ceil(analytics.total * 0.75) - analytics.renewed} عميل إضافي</p>
-            )}
-          </div>
-
-          {/* Churn Rate */}
-          <div className="cc-card rounded-[14px] p-4 border border-white/[0.06]">
-            <div className="flex items-center gap-2 mb-3">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${analytics.churnRate <= 15 ? "bg-emerald-500/10" : "bg-red-500/10"}`}>
-                <TrendingDown className={`w-4 h-4 ${analytics.churnRate <= 15 ? "text-emerald-400" : "text-red-400"}`} />
-              </div>
-              <span className="text-xs font-bold text-foreground">معدل الإلغاء (Churn)</span>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className={`text-2xl font-extrabold font-mono ${analytics.churnRate <= 15 ? "text-emerald-400" : "text-red-400"}`}>{analytics.churnRate}%</span>
-              <span className="text-[10px] text-muted-foreground">الهدف: أقل من 15%</span>
-            </div>
-            <div className="mt-2 h-2 bg-white/[0.04] rounded-full overflow-hidden">
-              <div className={`h-full rounded-full transition-all ${analytics.churnRate <= 15 ? "bg-emerald-500" : "bg-red-500"}`} style={{ width: `${Math.min(100, analytics.churnRate)}%` }} />
-            </div>
-            {analytics.churnRate > 15 && (
-              <p className="text-[10px] text-red-400 mt-2">تجاوز الهدف بـ {analytics.churnRate - 15} نقطة — {analytics.cancelled} عميل ألغى من أصل {analytics.total}</p>
-            )}
-          </div>
-
-          {/* Revenue Loss */}
-          <div className="cc-card rounded-[14px] p-4 border border-white/[0.06]">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-red-500/10">
-                <DollarSign className="w-4 h-4 text-red-400" />
-              </div>
-              <span className="text-xs font-bold text-foreground">الإيرادات المفقودة</span>
-            </div>
-            <span className="text-2xl font-extrabold font-mono text-red-400">{formatMoneyFull(analytics.revenueLoss)}</span>
-            <p className="text-[10px] text-muted-foreground mt-1">من أصل {formatMoneyFull(analytics.potentialRevenue)} إجمالي محتمل</p>
-            {analytics.potentialRevenue > 0 && (
-              <p className="text-[10px] text-amber-400 mt-1">فقدان {Math.round((analytics.revenueLoss / analytics.potentialRevenue) * 100)}% من الإيرادات المحتملة</p>
-            )}
-          </div>
-
-          {/* Follow-up Coverage */}
-          <div className="cc-card rounded-[14px] p-4 border border-white/[0.06]">
-            <div className="flex items-center gap-2 mb-3">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${analytics.idle < 30 ? "bg-emerald-500/10" : "bg-amber-500/10"}`}>
-                <Eye className={`w-4 h-4 ${analytics.idle < 30 ? "text-emerald-400" : "text-amber-400"}`} />
-              </div>
-              <span className="text-xs font-bold text-foreground">تغطية المتابعة</span>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className={`text-2xl font-extrabold font-mono ${analytics.idle < 30 ? "text-emerald-400" : "text-amber-400"}`}>{analytics.activeFollowUp}%</span>
-              <span className="text-[10px] text-muted-foreground">متابعة نشطة</span>
-            </div>
-            <div className="flex gap-1 mt-2 text-[10px]">
-              <span className="text-amber-400">{analytics.scheduled} مجدول</span>
-              <span className="text-muted-foreground">·</span>
-              <span className="text-red-400">{analytics.noResponse} بلا تجاوب</span>
-              <span className="text-muted-foreground">·</span>
-              <span className="text-amber-400">{analytics.hesitant} متردد</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-
-      {/* -------- Weekly Action Plan -------- */}
-      <div className="cc-card rounded-[14px] p-5 border border-cyan/10 bg-gradient-to-l from-cyan/[0.03] to-transparent">
-        <div className="flex items-center gap-2 mb-4">
-          <Target className="w-5 h-5 text-cyan" />
-          <h2 className="text-sm font-bold text-foreground">خطة العمل الأسبوعية</h2>
-          <span className="text-[10px] text-muted-foreground mr-auto">مرتبة حسب الأولوية</span>
-        </div>
-        <div className="space-y-2">
-          {[
-            { priority: 1, label: "تواصل فوري مع التجديدات المتأخرة", count: analytics.overdue, icon: Flame, color: "red", desc: "تجديدات تجاوزت موعدها — تحتاج اتصال اليوم" },
-            { priority: 2, label: "متابعة العملاء بدون تجاوب", count: analytics.noResponseCount, icon: Phone, color: "orange", desc: "جرّب التواصل بقناة مختلفة (واتساب، زيارة)" },
-            { priority: 3, label: "معالجة السبب الرئيسي للإلغاء", count: analytics.cancelReasonsArr[0]?.count || 0, icon: Shield, color: "amber", desc: analytics.topReason ? `أكثر سبب: "${analytics.topReason}" — طبّق الاستراتيجية المقترحة أدناه` : "لا توجد إلغاءات" },
-            { priority: 4, label: "تعيين مسؤول للتجديدات غير المعيّنة", count: analytics.unassigned, icon: UserX, color: "purple", desc: "تجديدات بدون مسؤول متابعة" },
-            { priority: 5, label: "مراجعة التجديدات الراكدة", count: analytics.stale, icon: Clock, color: "blue", desc: "لم يتم تحديثها منذ 7 أيام أو أكثر" },
-            { priority: 6, label: "متابعة العملاء المترددين", count: analytics.hesitant, icon: Heart, color: "pink", desc: "يحتاجون دفعة أخيرة — قدّم عرض حصري أو اتصال من المدير" },
-          ].filter((a) => a.count > 0).map((action) => {
-            const Icon = action.icon;
-            return (
-              <div key={action.priority} className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-${action.color}-500/10`}>
-                  <Icon className={`w-4 h-4 text-${action.color}-400`} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-${action.color}-500/10 text-${action.color}-400`}>
-                      أولوية {action.priority}
-                    </span>
-                    <span className="text-xs font-bold text-foreground">{action.label}</span>
-                    <span className="text-xs font-extrabold font-mono text-foreground mr-auto">{action.count}</span>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground mt-1">{action.desc}</p>
-                </div>
-              </div>
-            );
-          })}
-          {[analytics.overdue, analytics.noResponseCount, analytics.unassigned, analytics.stale, analytics.hesitant].every((c) => c === 0) && analytics.cancelReasonsArr.length === 0 && (
-            <div className="text-center py-6">
-              <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
-              <p className="text-sm font-bold text-emerald-400">ممتاز! لا توجد إجراءات عاجلة</p>
-              <p className="text-[11px] text-muted-foreground mt-1">استمر في المتابعة المنتظمة للحفاظ على النتائج</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* -------- Cancel Reasons + Strategies -------- */}
-      {analytics.cancelReasonsArr.length > 0 && (
-        <div className="cc-card rounded-[14px] p-5 border border-red-500/10 bg-gradient-to-l from-red-500/[0.03] to-transparent">
+      {/* ═══ STRATEGY PLAYBOOKS ═══ */}
+      {cancelReasons.totalCancelled > 0 && (
+        <div className="cc-card rounded-[14px] border border-amber/10 p-5">
           <div className="flex items-center gap-2 mb-4">
-            <AlertTriangle className="w-5 h-5 text-red-400" />
-            <h2 className="text-sm font-bold text-foreground">أسباب الإلغاء والخطط الاستراتيجية</h2>
-            <span className="text-[10px] text-muted-foreground mr-auto">{analytics.cancelled} إلغاء</span>
+            <div className="w-8 h-8 rounded-xl bg-amber/10 flex items-center justify-center">
+              <Lightbulb className="w-4 h-4 text-amber" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-foreground">استراتيجيات الاستعادة</h2>
+              <p className="text-[10px] text-muted-foreground">خطط عملية لكل سبب إلغاء مع سكربتات جاهزة للتواصل</p>
+            </div>
           </div>
-
-          {/* Reasons bars */}
-          <div className="space-y-3 mb-4">
-            {analytics.cancelReasonsArr.map((item) => (
-              <div key={item.reason}>
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="flex items-center gap-1.5">
-                    <span>{STRATEGY_MAP[item.reason]?.icon || "📋"}</span>
-                    <span className="font-medium text-foreground">{item.reason}</span>
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <span className="text-muted-foreground">{item.count} عميل</span>
-                    <span className="font-bold text-red-400">{item.pct}%</span>
-                  </span>
-                </div>
-                <div className="h-2 bg-white/[0.04] rounded-full overflow-hidden">
-                  <div className="h-full rounded-full bg-red-500/60 transition-all" style={{ width: `${item.pct}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Strategy cards */}
-          <div className="space-y-3">
-            {analytics.cancelReasonsArr.map((item) => {
-              const strategy = STRATEGY_MAP[item.reason];
+          <div className="space-y-2">
+            {cancelReasons.sorted.map(([reason]) => {
+              const strategy = STRATEGY_MAP[reason] || STRATEGY_MAP["أخرى"];
               if (!strategy) return null;
-              const isExpanded = expandedStrategy === item.reason;
+              const isExpanded = expandedStrategies.has(reason);
+              const impact = IMPACT_STYLES[strategy.impact] || IMPACT_STYLES.low;
               return (
-                <div key={item.reason} className="rounded-xl bg-white/[0.02] border border-white/[0.06] overflow-hidden">
+                <div key={reason} className="rounded-xl border border-white/[0.06] overflow-hidden">
                   <button
-                    onClick={() => setExpandedStrategy(isExpanded ? null : item.reason)}
+                    onClick={() => toggleStrategy(reason)}
                     className="w-full flex items-center gap-3 p-3.5 text-right hover:bg-white/[0.02] transition-colors"
                   >
-                    <span className="text-xl">{strategy.icon}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-foreground">{item.reason}</span>
-                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-                          strategy.impact === "حرج" ? "bg-red-500/10 text-red-400" :
-                          strategy.impact === "عالي" ? "bg-amber-500/10 text-amber-400" :
-                          "bg-sky-500/10 text-sky-400"
-                        }`}>
-                          {strategy.impact}
-                        </span>
-                      </div>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">{item.count} عميل · {item.pct}% من الإلغاءات</p>
+                    <div className="w-8 h-8 rounded-lg bg-amber/10 flex items-center justify-center shrink-0 text-amber">
+                      {strategy.icon}
                     </div>
-                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                    <div className="flex-1 text-right">
+                      <span className="text-xs font-bold text-foreground">{reason}</span>
+                      <span className={`mr-2 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${impact.bg} ${impact.color}`}>
+                        {impact.label}
+                      </span>
+                    </div>
+                    {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
                   </button>
-
                   {isExpanded && (
-                    <div className="px-4 pb-4 space-y-3 border-t border-white/[0.04] pt-3">
+                    <div className="px-4 pb-4 space-y-3 border-t border-white/[0.06] pt-3">
                       {/* Steps */}
                       <div>
-                        <p className="text-[11px] font-bold text-foreground mb-2 flex items-center gap-1.5">
-                          <BookOpen className="w-3.5 h-3.5 text-cyan" />
-                          خطوات التنفيذ
-                        </p>
+                        <p className="text-[11px] font-bold text-foreground mb-2">الخطوات المقترحة:</p>
                         <div className="space-y-1.5">
                           {strategy.steps.map((step, i) => (
-                            <div key={i} className="flex items-start gap-2 text-[11px]">
-                              <span className="w-5 h-5 rounded-full bg-cyan/10 text-cyan flex items-center justify-center shrink-0 text-[10px] font-bold mt-0.5">{i + 1}</span>
-                              <span className="text-muted-foreground leading-relaxed">{step}</span>
+                            <div key={i} className="flex items-start gap-2">
+                              <div className="w-5 h-5 rounded-full bg-amber/10 text-amber flex items-center justify-center shrink-0 text-[10px] font-bold mt-0.5">
+                                {i + 1}
+                              </div>
+                              <span className="text-xs text-foreground/80">{step}</span>
                             </div>
                           ))}
                         </div>
                       </div>
-
                       {/* Script */}
                       <div>
-                        <p className="text-[11px] font-bold text-foreground mb-2 flex items-center gap-1.5">
-                          <MessageSquare className="w-3.5 h-3.5 text-amber-400" />
-                          نص مقترح للتواصل
-                        </p>
-                        <div className="rounded-lg bg-amber-500/[0.05] border border-amber-500/10 p-3">
-                          <p className="text-[11px] text-amber-200/80 leading-relaxed" dir="rtl">
-                            {strategy.script}
-                          </p>
+                        <p className="text-[11px] font-bold text-foreground mb-1.5">سكربت التواصل:</p>
+                        <div className="p-3 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-foreground/70 leading-relaxed">
+                          {strategy.script}
                         </div>
                       </div>
                     </div>
@@ -602,139 +590,168 @@ export default function RenewalBoostPage() {
         </div>
       )}
 
-
-      {/* -------- At-Risk Renewals -------- */}
-      {analytics.atRisk.length > 0 && (
-        <div className="cc-card rounded-[14px] p-5 border border-amber-500/10 bg-gradient-to-l from-amber-500/[0.03] to-transparent">
-          <div className="flex items-center gap-2 mb-4">
-            <Flame className="w-5 h-5 text-amber-400" />
-            <h2 className="text-sm font-bold text-foreground">تجديدات تحتاج تدخل عاجل</h2>
-            <span className="text-[10px] bg-amber-500/10 text-amber-400 rounded-full px-2 py-0.5 font-bold">{analytics.atRisk.length}</span>
+      {/* ═══ WEEKLY ACTION PLAN ═══ */}
+      <div className="cc-card rounded-[14px] border border-cyan/10 p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-8 h-8 rounded-xl bg-cyan/10 flex items-center justify-center">
+            <ClipboardList className="w-4 h-4 text-cyan" />
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-white/[0.06]">
-                  <th className="text-right py-2 px-2 text-muted-foreground font-medium">العميل</th>
-                  <th className="text-right py-2 px-2 text-muted-foreground font-medium">الباقة</th>
-                  <th className="text-right py-2 px-2 text-muted-foreground font-medium">السعر</th>
-                  <th className="text-right py-2 px-2 text-muted-foreground font-medium">الحالة</th>
-                  <th className="text-right py-2 px-2 text-muted-foreground font-medium">الأيام</th>
-                  <th className="text-right py-2 px-2 text-muted-foreground font-medium">المسؤول</th>
-                  <th className="text-right py-2 px-2 text-muted-foreground font-medium">السبب</th>
-                </tr>
-              </thead>
-              <tbody>
-                {analytics.atRisk.slice(0, 20).map((r) => {
-                  const daysUntil = Math.ceil((new Date(r.renewal_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-                  const isOverdue = daysUntil < 0;
-                  const daysSinceUpdate = Math.ceil((new Date().getTime() - new Date(r.updated_at).getTime()) / (1000 * 60 * 60 * 24));
-                  let riskReason = "";
-                  if (isOverdue) riskReason = "متأخر";
-                  else if (["مافي تجاوب", "الرقم غلط"].includes(r.status)) riskReason = "بلا تجاوب";
-                  else if (r.status === "متردد") riskReason = "متردد";
-                  else if (!r.assigned_rep) riskReason = "بدون مسؤول";
-                  else if (daysSinceUpdate >= 7) riskReason = "راكد " + daysSinceUpdate + " يوم";
-                  else if (daysUntil <= 7) riskReason = "قريب";
-                  return (
-                    <tr key={r.id} className="border-b border-white/[0.03] hover:bg-white/[0.02]">
-                      <td className="py-2.5 px-2 font-medium text-foreground">{r.customer_name}</td>
-                      <td className="py-2.5 px-2 text-muted-foreground">{r.plan_name}</td>
-                      <td className="py-2.5 px-2 text-muted-foreground font-mono">{r.plan_price}</td>
-                      <td className="py-2.5 px-2">
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                          r.status === "مكتمل" ? "bg-emerald-500/10 text-emerald-400" :
-                          r.status === "ملغي بسبب" ? "bg-red-500/10 text-red-400" :
-                          ["مافي تجاوب", "الرقم غلط"].includes(r.status) ? "bg-red-500/10 text-red-400" :
-                          r.status === "متردد" ? "bg-amber-500/10 text-amber-400" :
-                          "bg-sky-500/10 text-sky-400"
-                        }`}>{r.status}</span>
-                      </td>
-                      <td className="py-2.5 px-2">
-                        <span className={`font-mono font-bold ${isOverdue ? "text-red-400" : daysUntil <= 3 ? "text-red-400" : "text-amber-400"}`}>
-                          {isOverdue ? `${Math.abs(daysUntil)}-` : daysUntil} يوم
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-2 text-muted-foreground">{r.assigned_rep || <span className="text-red-400">—</span>}</td>
-                      <td className="py-2.5 px-2">
-                        <span className="text-[10px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded-full">{riskReason}</span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div>
+            <h2 className="text-sm font-bold text-foreground">خطة العمل الأسبوعية</h2>
+            <p className="text-[10px] text-muted-foreground">مرتبة حسب الأولوية - ابدأ من الأعلى</p>
           </div>
-          {analytics.atRisk.length > 20 && (
-            <p className="text-center text-[11px] text-muted-foreground mt-3">يتم عرض أول 20 من أصل {analytics.atRisk.length}</p>
+        </div>
+        <div className="space-y-2">
+          {actionPlan.filter((a) => a.count > 0).map((action) => (
+            <div
+              key={action.priority}
+              className="flex items-start gap-3 p-3.5 rounded-xl border border-white/[0.06] bg-white/[0.01] hover:bg-white/[0.03] transition-colors"
+            >
+              <div
+                className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                style={{ background: `${action.color}15`, color: action.color }}
+              >
+                {action.icon}
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-foreground">{action.label}</span>
+                  <span
+                    className="text-[10px] font-bold font-mono px-1.5 py-0.5 rounded-full"
+                    style={{ background: `${action.color}15`, color: action.color }}
+                  >
+                    {action.count}
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">{action.guidance}</p>
+              </div>
+              <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-white/[0.04] text-[10px] font-bold text-muted-foreground">
+                {action.priority}
+              </div>
+            </div>
+          ))}
+          {actionPlan.filter((a) => a.count > 0).length === 0 && (
+            <div className="text-center py-6">
+              <CheckCircle2 className="w-8 h-8 text-cc-green mx-auto mb-2" />
+              <p className="text-sm text-cc-green font-medium">ممتاز! لا توجد مهام عاجلة حالياً</p>
+            </div>
           )}
         </div>
-      )}
+      </div>
 
-      {/* -------- Team Performance -------- */}
-      {analytics.teamPerformance.length > 0 && (
-        <div className="cc-card rounded-[14px] p-5 border border-sky-500/10 bg-gradient-to-l from-sky-500/[0.03] to-transparent">
+      {/* ═══ TEAM PERFORMANCE ═══ */}
+      {teamPerformance.length > 0 && (
+        <div className="cc-card rounded-[14px] border border-white/[0.06] p-5">
           <div className="flex items-center gap-2 mb-4">
-            <Users className="w-5 h-5 text-sky-400" />
-            <h2 className="text-sm font-bold text-foreground">أداء الفريق</h2>
+            <div className="w-8 h-8 rounded-xl bg-cc-blue/10 flex items-center justify-center">
+              <Users className="w-4 h-4 text-cc-blue" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-foreground">أداء الفريق</h2>
+              <p className="text-[10px] text-muted-foreground">توزيع التجديدات ومعدل النجاح لكل موظف</p>
+            </div>
           </div>
           <div className="space-y-3">
-            {analytics.teamPerformance.map((rep, idx) => (
-              <div key={rep.name} className="rounded-xl bg-white/[0.02] border border-white/[0.04] p-3">
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                    idx === 0 && rep.rate >= 50 ? "bg-amber-500/15 text-amber-400" : "bg-white/[0.06] text-muted-foreground"
-                  }`}>
-                    {idx === 0 && rep.rate >= 50 ? <Award className="w-4 h-4" /> : rep.name.charAt(0)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-foreground">{rep.name}</span>
-                      <span className={`text-sm font-extrabold font-mono ${rep.rate >= 70 ? "text-emerald-400" : rep.rate >= 40 ? "text-amber-400" : "text-red-400"}`}>
-                        {rep.rate}%
-                      </span>
+            {teamPerformance.map(([rep, data]) => {
+              const rate = data.total > 0 ? Math.round((data.completed / data.total) * 100) : 0;
+              const rateColor = rate >= 70 ? "#10B981" : rate >= 40 ? "#F59E0B" : "#EF4444";
+              return (
+                <div key={rep} className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-cc-blue/10 text-cc-blue flex items-center justify-center text-[10px] font-bold">
+                        {rep.charAt(0)}
+                      </div>
+                      <span className="font-medium text-foreground">{rep}</span>
                     </div>
-                    <div className="flex items-center gap-3 mt-1 text-[10px]">
-                      <span className="text-muted-foreground">الكل: {rep.total}</span>
-                      <span className="text-emerald-400">مكتمل: {rep.completed}</span>
-                      <span className="text-red-400">ملغي: {rep.cancelled}</span>
-                      <span className="text-amber-400">معلق: {rep.pending}</span>
-                    </div>
-                    <div className="mt-2 h-1.5 bg-white/[0.04] rounded-full overflow-hidden flex">
-                      {rep.total > 0 && (
-                        <>
-                          <div className="h-full bg-emerald-500" style={{ width: `${(rep.completed / rep.total) * 100}%` }} />
-                          <div className="h-full bg-red-500" style={{ width: `${(rep.cancelled / rep.total) * 100}%` }} />
-                          <div className="h-full bg-amber-500/50" style={{ width: `${(rep.pending / rep.total) * 100}%` }} />
-                        </>
-                      )}
+                    <div className="flex items-center gap-3 text-[10px]">
+                      <span className="text-cc-green">{data.completed} مكتمل</span>
+                      <span className="text-cc-red">{data.cancelled} ملغي</span>
+                      <span className="text-amber">{data.pending} معلق</span>
+                      <span className="font-bold font-mono" style={{ color: rateColor }}>{rate}%</span>
                     </div>
                   </div>
+                  <SimpleBar value={data.completed} max={data.total} color={rateColor} height={4} />
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* -------- Quick Tips -------- */}
-      <div className="cc-card rounded-[14px] p-5 border border-emerald-500/10 bg-gradient-to-l from-emerald-500/[0.03] to-transparent">
-        <div className="flex items-center gap-2 mb-4">
-          <Award className="w-5 h-5 text-emerald-400" />
-          <h2 className="text-sm font-bold text-foreground">نصائح ذهبية لتحسين التجديدات</h2>
+      {/* ═══ AT-RISK RENEWALS ═══ */}
+      {atRiskRenewals.length > 0 && (
+        <div className="cc-card rounded-[14px] border border-cc-red/10 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-xl bg-red-dim flex items-center justify-center">
+              <AlertTriangle className="w-4 h-4 text-cc-red" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-foreground">تجديدات في خطر</h2>
+              <p className="text-[10px] text-muted-foreground">{atRiskRenewals.length} تجديد يحتاج تدخل فوري</p>
+            </div>
+          </div>
+          <div className="space-y-2 max-h-[400px] overflow-y-auto">
+            {atRiskRenewals.slice(0, 20).map((r) => {
+              const days = getDaysRemaining(r.renewal_date);
+              const badge = STATUS_BADGE[r.status] || { color: "text-muted-foreground", bg: "bg-white/5" };
+              return (
+                <div key={r.id} className="flex items-center gap-3 p-3 rounded-xl border border-white/[0.06] bg-white/[0.01]">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${days < 0 ? "bg-red-dim text-cc-red" : days <= 3 ? "bg-amber/10 text-amber" : "bg-white/5 text-muted-foreground"}`}>
+                    <Clock className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-foreground truncate">{r.customer_name}</span>
+                      {r.client_code && <span className="text-[10px] text-muted-foreground font-mono">{r.client_code}</span>}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${badge.bg} ${badge.color}`}>{r.status}</span>
+                      <span className="text-[10px] text-muted-foreground">{r.plan_name} - {formatMoneyFull(r.plan_price)}</span>
+                    </div>
+                  </div>
+                  <div className="text-left shrink-0">
+                    <span className={`text-xs font-bold font-mono ${days < 0 ? "text-cc-red" : days <= 3 ? "text-amber" : "text-muted-foreground"}`}>
+                      {days < 0 ? `متأخر ${Math.abs(days)} يوم` : days === 0 ? "اليوم!" : `${days} يوم`}
+                    </span>
+                    {r.assigned_rep ? (
+                      <p className="text-[10px] text-muted-foreground">{r.assigned_rep}</p>
+                    ) : (
+                      <p className="text-[10px] text-cc-red">غير معيّن!</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      )}
+
+      {/* ═══ QUICK TIPS ═══ */}
+      <div className="cc-card rounded-[14px] border border-emerald-500/10 bg-gradient-to-l from-emerald-500/[0.03] to-transparent p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+            <Star className="w-4 h-4 text-emerald-400" />
+          </div>
+          <h2 className="text-sm font-bold text-foreground">نصائح ذهبية لرفع معدل التجديد</h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {[
-            { tip: "تواصل مع العميل قبل موعد التجديد بـ 30 يوم على الأقل — لا تنتظر اللحظة الأخيرة", icon: "📅" },
-            { tip: "استخدم اسم العميل في كل تواصل واذكر تفاصيل تخصه — يحس إنه مهم مو رقم", icon: "💬" },
-            { tip: "شارك قصص نجاح عملاء مشابهين — الدليل الاجتماعي أقوى من أي خصم", icon: "⭐" },
-            { tip: "إذا العميل رفض، اسأل: 'ايش نقدر نسوي عشان نخليك تستمر؟' — أحياناً الحل بسيط", icon: "🤝" },
-            { tip: "تابع كل عميل ألغى بعد شهر — ممكن يكون غيّر رأيه أو جرّب البديل وما عجبه", icon: "🔄" },
-            { tip: "اعمل تقرير أسبوعي للفريق يوضح التقدم والتحديات — الشفافية تحفّز المنافسة الإيجابية", icon: "📊" },
-          ].map((item, i) => (
-            <div key={i} className="flex items-start gap-2.5 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-              <span className="text-lg shrink-0 mt-0.5">{item.icon}</span>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">{item.tip}</p>
+            { title: "تواصل مبكر", desc: "ابدأ التواصل قبل 30 يوم من التجديد. كلما بدأت أبكر زادت فرص النجاح.", icon: "1" },
+            { title: "اسأل قبل ما تبيع", desc: "اسأل العميل عن تجربته أولاً. الاستماع يبني الثقة ويكشف المشاكل مبكراً.", icon: "2" },
+            { title: "أظهر القيمة", desc: "شارك العميل أرقام نجاحه: عدد الطلبات، المبيعات، التوفير. الأرقام تتكلم.", icon: "3" },
+            { title: "عروض محدودة", desc: "قدّم عرض خاص بمدة محدودة. الإلحاح يسرّع القرار.", icon: "4" },
+            { title: "تابع بذكاء", desc: "لا تكرر نفس الرسالة. غيّر القناة (مكالمة، واتساب، إيميل) والتوقيت.", icon: "5" },
+            { title: "احتفل بالنجاح", desc: "شارك قصص نجاح التجديد مع الفريق. التحفيز يرفع الأداء.", icon: "6" },
+          ].map((tip) => (
+            <div key={tip.icon} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className="w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center justify-center text-[10px] font-bold">
+                  {tip.icon}
+                </div>
+                <span className="text-xs font-bold text-foreground">{tip.title}</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">{tip.desc}</p>
             </div>
           ))}
         </div>
@@ -742,3 +759,4 @@ export default function RenewalBoostPage() {
     </div>
   );
 }
+
