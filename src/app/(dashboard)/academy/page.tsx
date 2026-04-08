@@ -14,8 +14,12 @@ import {
   deleteSalesMessage,
   addMessageRating,
   fetchMessageRatings,
+  fetchProductFeatures,
+  createProductFeature,
+  updateProductFeature,
+  deleteProductFeature,
 } from "@/lib/supabase/db";
-import type { AcademyContent, SalesMessage, SalesMessageRating } from "@/types";
+import type { AcademyContent, SalesMessage, SalesMessageRating, ProductFeature } from "@/types";
 
 import { TrainingSession } from "@/components/academy/TrainingSession";
 import { TrainingKnowledgeEditor } from "@/components/academy/TrainingKnowledgeEditor";
@@ -71,7 +75,25 @@ import {
   MessageSquare,
   PhoneCall,
   BrainCircuit,
+  Monitor,
+  CreditCard,
+  Receipt,
+  ClipboardList,
+  Layers,
+  Link,
+  Wifi,
+  type LucideIcon,
 } from "lucide-react";
+
+/* ------------------------------------------------------------------ */
+/*  Icon map for dynamic features                                       */
+/* ------------------------------------------------------------------ */
+const ICON_MAP: Record<string, LucideIcon> = {
+  QrCode, Smartphone, MessageCircle, Clock, CalendarCheck, Star, BarChart3, Globe,
+  Users, ShieldCheck, Monitor, CreditCard, Receipt, ClipboardList, Layers, Link,
+  Wifi, BookOpen, Sparkles, PhoneCall,
+};
+const ICON_OPTIONS = Object.keys(ICON_MAP);
 
 /* ------------------------------------------------------------------ */
 /*  Section config                                                      */
@@ -198,14 +220,22 @@ export default function AcademyPage() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  /* Product Features state */
+  const [dbFeatures, setDbFeatures] = useState<ProductFeature[]>([]);
+  const [featDialog, setFeatDialog] = useState(false);
+  const [editingFeat, setEditingFeat] = useState<ProductFeature | null>(null);
+  const [featForm, setFeatForm] = useState({ title: "", description: "", icon: "Star", category: "general" });
+
   useEffect(() => {
     setLoading(true);
     Promise.allSettled([
       fetchAcademyContent(),
       fetchSalesMessages(undefined, activeSection),
-    ]).then(([contentRes, msgRes]) => {
+      fetchProductFeatures(activeSection),
+    ]).then(([contentRes, msgRes, featRes]) => {
       if (contentRes.status === "fulfilled") setContents(contentRes.value);
       if (msgRes.status === "fulfilled") setMessages(msgRes.value);
+      if (featRes.status === "fulfilled") setDbFeatures(featRes.value);
       setLoading(false);
     });
   }, [orgId, activeSection]);
@@ -219,6 +249,80 @@ export default function AcademyPage() {
   const sectionConfig = SECTIONS[activeSection];
   const SectionIcon = sectionConfig.icon;
   const tips = SELLING_TIPS[activeSection];
+
+  // Combine hardcoded + DB features
+  const hardcodedFeats = sectionConfig.features.map((f, i) => ({
+    id: `hc-${i}`,
+    title: f.title,
+    description: f.desc,
+    icon: Object.entries(ICON_MAP).find(([, v]) => v === f.icon)?.[0] || "Star",
+    category: "general",
+    isHardcoded: true,
+  }));
+  const dynamicFeats = dbFeatures.map((f) => ({
+    id: f.id,
+    title: f.title,
+    description: f.description,
+    icon: f.icon,
+    category: f.category,
+    isHardcoded: false,
+  }));
+  // Show DB features if any exist, otherwise show hardcoded defaults
+  const allFeatures = dynamicFeats.length > 0 ? dynamicFeats : hardcodedFeats;
+
+  /* Feature handlers */
+  function openAddFeat() {
+    setEditingFeat(null);
+    setFeatForm({ title: "", description: "", icon: "Star", category: "general" });
+    setFeatDialog(true);
+  }
+  function openEditFeat(feat: ProductFeature) {
+    setEditingFeat(feat);
+    setFeatForm({ title: feat.title, description: feat.description, icon: feat.icon, category: feat.category });
+    setFeatDialog(true);
+  }
+  async function handleSaveFeat() {
+    if (!featForm.title.trim()) return;
+    setSaving(true);
+    try {
+      if (editingFeat) {
+        const updated = await updateProductFeature(editingFeat.id, {
+          title: featForm.title,
+          description: featForm.description,
+          icon: featForm.icon,
+          category: featForm.category,
+          updated_by: user?.name || "",
+        });
+        setDbFeatures((prev) => prev.map((f) => (f.id === editingFeat.id ? updated : f)));
+      } else {
+        const maxOrder = Math.max(0, ...dbFeatures.map((f) => f.sort_order));
+        const created = await createProductFeature({
+          org_id: orgId || "00000000-0000-0000-0000-000000000001",
+          section: activeSection,
+          category: featForm.category,
+          title: featForm.title,
+          description: featForm.description,
+          icon: featForm.icon,
+          sort_order: maxOrder + 1,
+          created_by: user?.name || "",
+        });
+        setDbFeatures((prev) => [...prev, created]);
+      }
+      setFeatDialog(false);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  }
+  async function handleDeleteFeat(id: string) {
+    try {
+      await deleteProductFeature(id);
+      setDbFeatures((prev) => prev.filter((f) => f.id !== id));
+    } catch (err) {
+      console.error(err);
+    }
+  }
 
   function openCreate() {
     setEditingId(null);
@@ -419,20 +523,47 @@ export default function AcademyPage() {
 
       {/* -------- Features Grid -------- */}
       <div>
-        <h3 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
-          <Sparkles className={`w-4 h-4 ${colors.text}`} />
-          مميزات المنتج
-        </h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+            <Sparkles className={`w-4 h-4 ${colors.text}`} />
+            مميزات المنتج
+          </h3>
+          {isSuperAdmin && (
+            <Button variant="outline" size="sm" onClick={openAddFeat} className="gap-1.5 text-xs">
+              <Plus className="w-3.5 h-3.5" />
+              إضافة ميزة
+            </Button>
+          )}
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {sectionConfig.features.map((feat, i) => {
-            const FeatIcon = feat.icon;
+          {allFeatures.map((feat) => {
+            const FeatIcon = ICON_MAP[feat.icon] || Star;
             return (
-              <div key={i} className="cc-card rounded-[14px] p-4 hover:bg-white/[0.06] transition-all">
+              <div key={feat.id} className="cc-card rounded-[14px] p-4 hover:bg-white/[0.06] transition-all group relative">
+                {isSuperAdmin && !feat.isHardcoded && (
+                  <div className="absolute top-2 left-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => openEditFeat(dbFeatures.find((f) => f.id === feat.id)!)}
+                      className="p-1 rounded-md hover:bg-white/10 text-muted-foreground hover:text-foreground"
+                    >
+                      <Pencil className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteFeat(feat.id)}
+                      className="p-1 rounded-md hover:bg-red-500/10 text-muted-foreground hover:text-red-400"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
                 <div className={`w-9 h-9 rounded-lg ${colors.iconBg} flex items-center justify-center mb-3`}>
                   <FeatIcon className={`w-4 h-4 ${colors.text}`} />
                 </div>
                 <h4 className="text-sm font-bold text-foreground">{feat.title}</h4>
-                <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">{feat.desc}</p>
+                <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">{feat.description}</p>
+                {!feat.isHardcoded && feat.category && feat.category !== "general" && (
+                  <span className="inline-block mt-2 text-[10px] px-2 py-0.5 rounded-full bg-white/[0.05] text-muted-foreground">{feat.category}</span>
+                )}
               </div>
             );
           })}
@@ -816,6 +947,73 @@ export default function AcademyPage() {
             <Button variant="outline" onClick={() => setDialogOpen(false)}>إلغاء</Button>
             <Button onClick={handleSave} disabled={saving || !formTitle.trim()}>
               {saving ? "جاري الحفظ..." : "حفظ"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Feature Add/Edit Dialog ─── */}
+      <Dialog open={featDialog} onOpenChange={setFeatDialog}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>{editingFeat ? "تعديل الميزة" : "إضافة ميزة جديدة"}</DialogTitle>
+            <DialogDescription>
+              {editingFeat ? "عدّل بيانات الميزة" : "أضف ميزة جديدة لمنتج " + sectionConfig.label}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>اسم الميزة</Label>
+              <Input
+                value={featForm.title}
+                onChange={(e) => setFeatForm({ ...featForm, title: e.target.value })}
+                placeholder="مثال: نظام الكاشير"
+              />
+            </div>
+            <div>
+              <Label>الوصف</Label>
+              <Textarea
+                value={featForm.description}
+                onChange={(e) => setFeatForm({ ...featForm, description: e.target.value })}
+                placeholder="وصف مختصر للميزة..."
+                rows={3}
+              />
+            </div>
+            <div>
+              <Label>التصنيف</Label>
+              <Input
+                value={featForm.category}
+                onChange={(e) => setFeatForm({ ...featForm, category: e.target.value })}
+                placeholder="مثال: كاشير، طلبات، عام"
+              />
+            </div>
+            <div>
+              <Label>الأيقونة</Label>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {ICON_OPTIONS.map((name) => {
+                  const Ic = ICON_MAP[name];
+                  const isActive = featForm.icon === name;
+                  return (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => setFeatForm({ ...featForm, icon: name })}
+                      className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-all ${
+                        isActive ? `${colors.iconBg} ${colors.text} border-current` : "border-border text-muted-foreground hover:text-foreground hover:border-white/20"
+                      }`}
+                      title={name}
+                    >
+                      <Ic className="w-4 h-4" />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setFeatDialog(false)}>إلغاء</Button>
+            <Button onClick={handleSaveFeat} disabled={saving || !featForm.title.trim()}>
+              {saving ? "جارٍ الحفظ..." : "حفظ"}
             </Button>
           </DialogFooter>
         </DialogContent>

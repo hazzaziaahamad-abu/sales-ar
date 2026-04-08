@@ -558,6 +558,21 @@ export interface AcademyContent {
   updated_at: string;
 }
 
+export interface ProductFeature {
+  id: string;
+  org_id: string;
+  section: "menu" | "reservations";
+  category: string;
+  title: string;
+  description: string;
+  icon: string;
+  sort_order: number;
+  created_by?: string;
+  updated_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface TrainingKnowledge {
   id: string;
   org_id: string;
