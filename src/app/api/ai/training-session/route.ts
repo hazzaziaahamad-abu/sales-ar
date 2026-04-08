@@ -1,5 +1,6 @@
 import { streamText, convertToModelMessages } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createClient } from "@/lib/supabase/client";
 
 const google = createGoogleGenerativeAI({
   apiKey: process.env.GEMINI_API_KEY!,
@@ -375,7 +376,32 @@ export async function POST(req: Request) {
       });
     }
 
-    const systemPrompt = `${topicConfig.prompt}\n\n${PRODUCT_KNOWLEDGE}\n\n${SYSTEM_WRAPPER}`;
+    // Fetch DB overrides for this topic + global settings
+    let dbTopicPrompt = "";
+    let dbProductKnowledge = "";
+    let dbSystemWrapper = "";
+    try {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("training_knowledge")
+        .select("topic_key, topic_prompt, product_knowledge, system_wrapper")
+        .in("topic_key", [topic, "_product_knowledge", "_system_wrapper"]);
+      if (data) {
+        for (const row of data) {
+          if (row.topic_key === topic && row.topic_prompt) dbTopicPrompt = row.topic_prompt;
+          if (row.topic_key === "_product_knowledge" && row.product_knowledge) dbProductKnowledge = row.product_knowledge;
+          if (row.topic_key === "_system_wrapper" && row.system_wrapper) dbSystemWrapper = row.system_wrapper;
+        }
+      }
+    } catch {
+      // Silently fall back to hardcoded content
+    }
+
+    const finalPrompt = dbTopicPrompt || topicConfig.prompt;
+    const finalProduct = dbProductKnowledge || PRODUCT_KNOWLEDGE;
+    const finalWrapper = dbSystemWrapper || SYSTEM_WRAPPER;
+
+    const systemPrompt = `${finalPrompt}\n\n${finalProduct}\n\n${finalWrapper}`;
     const modelMessages = await convertToModelMessages(messages);
 
     const result = streamText({

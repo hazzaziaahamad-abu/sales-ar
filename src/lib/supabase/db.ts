@@ -1,5 +1,5 @@
 import { createClient } from "./client";
-import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, MonthlyBudget, StartupCost, Marketer, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating, FollowUpNote, MentionNotification, PendingDeal, TargetClient, GiftOffer, EmployeeTask, Package, AcademyContent, LearningStage, LearningLesson, LearningQuiz, ActivityLog } from "@/types";
+import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, MonthlyBudget, StartupCost, Marketer, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating, FollowUpNote, MentionNotification, PendingDeal, TargetClient, GiftOffer, EmployeeTask, Package, AcademyContent, LearningStage, LearningLesson, LearningQuiz, ActivityLog, TrainingKnowledge } from "@/types";
 
 const DEFAULT_ORG = "00000000-0000-0000-0000-000000000001";
 
@@ -2428,4 +2428,41 @@ export async function fetchRecentUpdates(): Promise<RecentUpdateItem[]> {
 
   allItems.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   return allItems;
+}
+
+// ─── TRAINING KNOWLEDGE ────────────────────────────────────────────────────
+
+export async function fetchTrainingKnowledge(topicKey?: string): Promise<TrainingKnowledge[]> {
+  const supabase = createClient();
+  let query = supabase.from("training_knowledge").select("*").eq("org_id", getOrgId()).order("topic_key");
+  if (topicKey) query = query.eq("topic_key", topicKey);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []) as TrainingKnowledge[];
+}
+
+export async function upsertTrainingKnowledge(
+  topicKey: string,
+  updates: { topic_title?: string; topic_prompt?: string; product_knowledge?: string; system_wrapper?: string; updated_by?: string }
+): Promise<TrainingKnowledge> {
+  const supabase = createClient();
+  const orgId = getOrgId();
+  const now = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from("training_knowledge")
+    .upsert(
+      { org_id: orgId, topic_key: topicKey, ...updates, updated_at: now },
+      { onConflict: "org_id,topic_key" }
+    )
+    .select()
+    .single();
+  if (error) throw error;
+  return data as TrainingKnowledge;
+}
+
+export async function deleteTrainingKnowledge(id: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from("training_knowledge").delete().eq("id", id);
+  if (error) throw error;
 }

@@ -17,6 +17,7 @@ import {
 import type { AcademyContent, SalesMessage, SalesMessageRating } from "@/types";
 
 import { TrainingSession } from "@/components/academy/TrainingSession";
+import { TrainingKnowledgeEditor } from "@/components/academy/TrainingKnowledgeEditor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -68,6 +69,7 @@ import {
   Globe,
   MessageSquare,
   PhoneCall,
+  BrainCircuit,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -160,6 +162,7 @@ export default function AcademyPage() {
   const isSuperAdmin = user?.isSuperAdmin ?? false;
 
   const [showTraining, setShowTraining] = useState(false);
+  const [showKnowledgeEditor, setShowKnowledgeEditor] = useState(false);
   const [activeSection, setActiveSection] = useState<SectionKey>("menu");
   const [contents, setContents] = useState<AcademyContent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -350,6 +353,10 @@ export default function AcademyPage() {
     return <TrainingSession onBack={() => setShowTraining(false)} />;
   }
 
+  if (showKnowledgeEditor) {
+    return <TrainingKnowledgeEditor onBack={() => setShowKnowledgeEditor(false)} />;
+  }
+
   return (
     <div className="space-y-6">
       {/* -------- Header -------- */}
@@ -368,6 +375,12 @@ export default function AcademyPage() {
             <Sparkles className="w-4 h-4" />
             جلسة تدريبية
           </Button>
+          {isSuperAdmin && (
+            <Button variant="outline" onClick={() => setShowKnowledgeEditor(true)} className="gap-1.5 border-amber/30 text-amber hover:bg-amber/10">
+              <BrainCircuit className="w-4 h-4" />
+              تحرير المعرفة
+            </Button>
+          )}
           {isSuperAdmin && (
             <Button onClick={openCreate} className="gap-1.5">
               <Plus className="w-4 h-4" />

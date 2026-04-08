@@ -558,6 +558,19 @@ export interface AcademyContent {
   updated_at: string;
 }
 
+export interface TrainingKnowledge {
+  id: string;
+  org_id: string;
+  topic_key: string;
+  topic_title: string;
+  topic_prompt: string;
+  product_knowledge: string;
+  system_wrapper: string;
+  updated_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface LearningStage {
   id: string;
   org_id: string;
