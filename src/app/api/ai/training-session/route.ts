@@ -1,6 +1,6 @@
 import { streamText, convertToModelMessages } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { createClient } from "@/lib/supabase/client";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 const google = createGoogleGenerativeAI({
   apiKey: process.env.GEMINI_API_KEY!,
@@ -381,7 +381,7 @@ export async function POST(req: Request) {
     let dbProductKnowledge = "";
     let dbSystemWrapper = "";
     try {
-      const supabase = createClient();
+      const supabase = await createServerSupabaseClient();
       const { data } = await supabase
         .from("training_knowledge")
         .select("topic_key, topic_prompt, product_knowledge, system_wrapper")
