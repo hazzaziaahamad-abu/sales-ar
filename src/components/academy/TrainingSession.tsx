@@ -21,6 +21,7 @@ import {
   Phone,
   MessageCircle,
   BadgePercent,
+  Monitor,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -142,6 +143,15 @@ const TOPICS = [
     color: "text-lime-400",
     bg: "bg-lime-400/10 border-lime-400/20 hover:bg-lime-400/15",
     gradient: "from-lime-400/20 to-lime-400/5",
+  },
+  {
+    key: "cashier_pos",
+    title: "نظام الكاشير (POS)",
+    desc: "أتقن بيع باقة الكاشير وشرح مميزاتها للعميل",
+    icon: Monitor,
+    color: "text-teal-400",
+    bg: "bg-teal-400/10 border-teal-400/20 hover:bg-teal-400/15",
+    gradient: "from-teal-400/20 to-teal-400/5",
   },
 ];
 
