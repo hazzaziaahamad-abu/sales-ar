@@ -521,54 +521,70 @@ export default function AcademyPage() {
         </div>
       </div>
 
-      {/* -------- Features Grid -------- */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-            <Sparkles className={`w-4 h-4 ${colors.text}`} />
-            مميزات المنتج
-          </h3>
-          {isSuperAdmin && (
-            <Button variant="outline" size="sm" onClick={openAddFeat} className="gap-1.5 text-xs">
-              <Plus className="w-3.5 h-3.5" />
-              إضافة ميزة
-            </Button>
-          )}
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {allFeatures.map((feat) => {
-            const FeatIcon = ICON_MAP[feat.icon] || Star;
-            return (
-              <div key={feat.id} className="cc-card rounded-[14px] p-4 hover:bg-white/[0.06] transition-all group relative">
-                {isSuperAdmin && !feat.isHardcoded && (
-                  <div className="absolute top-2 left-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => openEditFeat(dbFeatures.find((f) => f.id === feat.id)!)}
-                      className="p-1 rounded-md hover:bg-white/10 text-muted-foreground hover:text-foreground"
-                    >
-                      <Pencil className="w-3 h-3" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteFeat(feat.id)}
-                      className="p-1 rounded-md hover:bg-red-500/10 text-muted-foreground hover:text-red-400"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                )}
-                <div className={`w-9 h-9 rounded-lg ${colors.iconBg} flex items-center justify-center mb-3`}>
-                  <FeatIcon className={`w-4 h-4 ${colors.text}`} />
-                </div>
-                <h4 className="text-sm font-bold text-foreground">{feat.title}</h4>
-                <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">{feat.description}</p>
-                {!feat.isHardcoded && feat.category && feat.category !== "general" && (
-                  <span className="inline-block mt-2 text-[10px] px-2 py-0.5 rounded-full bg-white/[0.05] text-muted-foreground">{feat.category}</span>
+      {/* -------- Features Grid (grouped by category) -------- */}
+      {(() => {
+        const grouped = new Map<string, typeof allFeatures>();
+        for (const feat of allFeatures) {
+          const cat = feat.category || "general";
+          if (!grouped.has(cat)) grouped.set(cat, []);
+          grouped.get(cat)!.push(feat);
+        }
+        const categoryLabels: Record<string, { title: string; icon: LucideIcon }> = {
+          "منيو": { title: "مميزات المنيو الإلكتروني", icon: UtensilsCrossed },
+          "كاشير": { title: "مميزات نظام الكاشير (POS)", icon: Monitor },
+          "حجوزات": { title: "مميزات نظام الحجوزات", icon: CalendarCheck },
+        };
+        return Array.from(grouped.entries()).map(([cat, feats]) => {
+          const label = categoryLabels[cat] || { title: `مميزات ${cat}`, icon: Sparkles };
+          const CatIcon = label.icon;
+          return (
+            <div key={cat}>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                  <CatIcon className={`w-4 h-4 ${colors.text}`} />
+                  {label.title}
+                </h3>
+                {isSuperAdmin && (
+                  <Button variant="outline" size="sm" onClick={openAddFeat} className="gap-1.5 text-xs">
+                    <Plus className="w-3.5 h-3.5" />
+                    إضافة ميزة
+                  </Button>
                 )}
               </div>
-            );
-          })}
-        </div>
-      </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {feats.map((feat) => {
+                  const FeatIcon = ICON_MAP[feat.icon] || Star;
+                  return (
+                    <div key={feat.id} className="cc-card rounded-[14px] p-4 hover:bg-white/[0.06] transition-all group relative">
+                      {isSuperAdmin && !feat.isHardcoded && (
+                        <div className="absolute top-2 left-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => openEditFeat(dbFeatures.find((f) => f.id === feat.id)!)}
+                            className="p-1 rounded-md hover:bg-white/10 text-muted-foreground hover:text-foreground"
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteFeat(feat.id)}
+                            className="p-1 rounded-md hover:bg-red-500/10 text-muted-foreground hover:text-red-400"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+                      <div className={`w-9 h-9 rounded-lg ${colors.iconBg} flex items-center justify-center mb-3`}>
+                        <FeatIcon className={`w-4 h-4 ${colors.text}`} />
+                      </div>
+                      <h4 className="text-sm font-bold text-foreground">{feat.title}</h4>
+                      <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">{feat.description}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        });
+      })()}
 
       {/* -------- Selling Tips -------- */}
       <div className="cc-card rounded-[14px] p-5">
