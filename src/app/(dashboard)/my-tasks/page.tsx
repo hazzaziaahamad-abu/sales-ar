@@ -52,6 +52,7 @@ import {
   Settings,
   Trash2,
   ChevronDown,
+  Hourglass,
 } from "lucide-react";
 import type { EmployeeTask } from "@/types";
 
@@ -178,6 +179,39 @@ const EMPTY_CLIENT_FORM = {
 
 type PageTab = "my-tasks" | "overview" | "settings";
 
+function getCountdown(dueDate?: string, dueTime?: string): { label: string; urgency: "passed" | "critical" | "warning" | "normal" | "none" } {
+  if (!dueDate) return { label: "", urgency: "none" };
+  const target = new Date(`${dueDate}T${dueTime ? dueTime.slice(0, 5) : "23:59"}:00`);
+  const now = new Date();
+  const diffMs = target.getTime() - now.getTime();
+
+  if (diffMs <= 0) {
+    const pastMs = Math.abs(diffMs);
+    const pastMins = Math.floor(pastMs / 60_000);
+    if (pastMins < 60) return { label: `متأخر ${pastMins} د`, urgency: "passed" };
+    const pastHrs = Math.floor(pastMins / 60);
+    if (pastHrs < 24) return { label: `متأخر ${pastHrs} س`, urgency: "passed" };
+    const pastDays = Math.floor(pastHrs / 24);
+    return { label: `متأخر ${pastDays} يوم`, urgency: "passed" };
+  }
+
+  const totalMins = Math.floor(diffMs / 60_000);
+  const hours = Math.floor(totalMins / 60);
+  const mins = totalMins % 60;
+  const days = Math.floor(hours / 24);
+  const remainingHrs = hours % 24;
+
+  if (days > 0) {
+    const label = remainingHrs > 0 ? `${days} يوم ${remainingHrs} س` : `${days} يوم`;
+    return { label: `متبقي ${label}`, urgency: days <= 1 ? "warning" : "normal" };
+  }
+  if (hours > 0) {
+    const label = mins > 0 ? `${hours} س ${mins} د` : `${hours} س`;
+    return { label: `متبقي ${label}`, urgency: hours <= 2 ? "critical" : "warning" };
+  }
+  return { label: `متبقي ${mins} د`, urgency: "critical" };
+}
+
 export default function MyTasksPage() {
   const { user } = useAuth();
   const isAdmin = user?.isSuperAdmin || user?.roleName === "admin" || user?.roleName === "مدير";
@@ -187,6 +221,12 @@ export default function MyTasksPage() {
   const [stats, setStats] = useState({ total: 0, completed: 0, pending: 0, in_progress: 0, overdue: 0 });
   const [myRank, setMyRank] = useState<{ rank: number; total: number; rate: number }>({ rank: 0, total: 0, rate: 0 });
   const [completionNote, setCompletionNote] = useState<{ taskId: string; note: string } | null>(null);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => setTick(t => t + 1), 30_000);
+    return () => clearInterval(interval);
+  }, []);
 
   /* Page tab (admin sees more tabs) */
   const [activeTab, setActiveTab] = useState<PageTab>("my-tasks");
@@ -1110,6 +1150,19 @@ export default function MyTasksPage() {
             const st = STATUSES[task.status] || STATUSES.pending;
             const pr = PRIORITIES[task.priority] || PRIORITIES.medium;
             const tt = TASK_TYPES[task.task_type] || TASK_TYPES.general;
+            const isActive = task.status !== "completed" && task.status !== "cancelled";
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+            const countdown = isActive ? getCountdown(task.due_date, task.due_time) : { label: "", urgency: "none" as const };
+            void tick;
+
+            const countdownColors: Record<string, string> = {
+              passed: "text-red-400 bg-red-500/10 border-red-500/20",
+              critical: "text-orange-400 bg-orange-500/10 border-orange-500/20",
+              warning: "text-amber-400 bg-amber-500/10 border-amber-500/20",
+              normal: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+              none: "",
+            };
+            const CountdownIcon = countdown.urgency === "passed" ? AlertTriangle : countdown.urgency === "critical" ? Timer : Hourglass;
 
             return (
               <div key={task.id} className={`glass-surface rounded-2xl p-5 border ${isOverdue ? "border-red-500/30 bg-red-500/[0.02]" : "border-white/[0.06]"} transition-all`}>
@@ -1143,6 +1196,14 @@ export default function MyTasksPage() {
                         <span className="px-2.5 py-1 rounded-full text-[11px] font-medium text-red-400 bg-red-500/10 animate-pulse">⚠️ متأخرة</span>
                       )}
                     </div>
+
+                    {/* Countdown Timer */}
+                    {countdown.urgency !== "none" && (
+                      <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border mb-2 ${countdownColors[countdown.urgency]} ${countdown.urgency === "passed" || countdown.urgency === "critical" ? "animate-pulse" : ""}`}>
+                        <CountdownIcon className="w-3.5 h-3.5" />
+                        {countdown.label}
+                      </div>
+                    )}
 
                     {task.description && (
                       <p className="text-gray-400 text-sm mb-2 leading-relaxed">{task.description}</p>
