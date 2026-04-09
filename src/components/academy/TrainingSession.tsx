@@ -1,7 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { DefaultChatTransport, type UIMessage } from "ai";
 import { useRef, useEffect, useState } from "react";
 import {
   GraduationCap,
@@ -200,6 +200,40 @@ const TOPICS = [
   },
 ];
 
+/* ─── Session Persistence ─── */
+const SESSION_KEY = "training_session";
+
+interface SavedSession {
+  topic: string;
+  platform: string;
+  messages: UIMessage[];
+  savedAt: number;
+}
+
+function saveSession(topic: string, platform: string, messages: UIMessage[]) {
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ topic, platform, messages, savedAt: Date.now() }));
+  } catch { /* quota exceeded — ignore */ }
+}
+
+function loadSession(): SavedSession | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as SavedSession;
+    // Expire after 24 hours
+    if (Date.now() - data.savedAt > 24 * 60 * 60 * 1000) {
+      localStorage.removeItem(SESSION_KEY);
+      return null;
+    }
+    return data;
+  } catch { return null; }
+}
+
+function clearSession() {
+  localStorage.removeItem(SESSION_KEY);
+}
+
 function formatMessage(text: string) {
   return text
     .replace(/\[✅ ([^\]]+)\]/g, '<span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-medium my-1">✅ $1</span>')
@@ -215,7 +249,7 @@ function formatMessage(text: string) {
 }
 
 // ── Chat sub-component (remounted per topic via key) ──
-function ChatSession({ topic, platform, onReset }: { topic: string; platform: "menu" | "reservations"; onReset: () => void }) {
+function ChatSession({ topic, platform, savedMessages, onReset }: { topic: string; platform: "menu" | "reservations"; savedMessages?: UIMessage[]; onReset: () => void }) {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -223,6 +257,7 @@ function ChatSession({ topic, platform, onReset }: { topic: string; platform: "m
   const platformLabel = platform === "reservations" ? "حجوزات (نظام إدارة الحجوزات)" : "Menus (قائمة الطلبات)";
 
   const { messages, sendMessage, status } = useChat({
+    messages: savedMessages,
     transport: new DefaultChatTransport({
       api: "/api/ai/training-session",
       body: { topic, platform },
@@ -231,11 +266,20 @@ function ChatSession({ topic, platform, onReset }: { topic: string; platform: "m
 
   const isLoading = status === "streaming" || status === "submitted";
 
-  // Auto-send initial message on mount
+  // Save messages to localStorage on change
   useEffect(() => {
-    sendMessage({
-      text: `مرحباً، أنا مندوب مبيعات في ${platformLabel}. أبي أتدرب على "${topicInfo.title}". ابدأ الجلسة.`,
-    });
+    if (messages.length > 0 && status === "ready") {
+      saveSession(topic, platform, messages);
+    }
+  }, [messages, status, topic, platform]);
+
+  // Auto-send initial message on mount (only if no saved messages)
+  useEffect(() => {
+    if (!savedMessages || savedMessages.length === 0) {
+      sendMessage({
+        text: `مرحباً، أنا مندوب مبيعات في ${platformLabel}. أبي أتدرب على "${topicInfo.title}". ابدأ الجلسة.`,
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -279,7 +323,7 @@ function ChatSession({ topic, platform, onReset }: { topic: string; platform: "m
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={onReset} className="text-xs text-muted-foreground gap-1.5">
+          <Button variant="ghost" size="sm" onClick={() => { clearSession(); onReset(); }} className="text-xs text-muted-foreground gap-1.5">
             <RotateCcw className="w-3 h-3" />
             موضوع آخر
           </Button>
@@ -382,10 +426,24 @@ interface TrainingSessionProps {
 
 export function TrainingSession({ onBack, platform = "menu" }: TrainingSessionProps) {
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
+  const [resumeMessages, setResumeMessages] = useState<UIMessage[] | undefined>(undefined);
+  const [sessionCleared, setSessionCleared] = useState(false);
   const filteredTopics = TOPICS.filter((t) => t.platform === "all" || t.platform === platform);
+
+  const saved = !sessionCleared && typeof window !== "undefined" ? loadSession() : null;
+  const hasSavedSession = saved && saved.platform === platform && saved.messages.length > 1;
+  const savedTopicInfo = hasSavedSession ? TOPICS.find((t) => t.key === saved.topic) : null;
 
   const resetSession = () => {
     setSelectedTopic(null);
+    setResumeMessages(undefined);
+  };
+
+  const resumeSavedSession = () => {
+    if (saved) {
+      setResumeMessages(saved.messages);
+      setSelectedTopic(saved.topic);
+    }
   };
 
   // ── Topic Selection Screen ──
@@ -408,6 +466,33 @@ export function TrainingSession({ onBack, platform = "menu" }: TrainingSessionPr
             رجوع للأكاديمية
           </Button>
         </div>
+
+        {/* Resume saved session */}
+        {hasSavedSession && savedTopicInfo && (
+          <div className="cc-card rounded-[14px] p-4 border border-amber/20 bg-gradient-to-l from-amber/[0.06] to-transparent">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center bg-gradient-to-br", savedTopicInfo.gradient)}>
+                  <savedTopicInfo.icon className={cn("w-4 h-4", savedTopicInfo.color)} />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-foreground">جلسة سابقة: {savedTopicInfo.title}</p>
+                  <p className="text-[10px] text-muted-foreground">{saved.messages.length} رسالة — {new Date(saved.savedAt).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => { clearSession(); setSessionCleared(true); }} className="text-xs gap-1">
+                  <RotateCcw className="w-3 h-3" />
+                  حذف
+                </Button>
+                <Button size="sm" onClick={resumeSavedSession} className="text-xs gap-1 bg-amber hover:bg-amber/80">
+                  <ArrowRight className="w-3 h-3 rotate-180" />
+                  استكمال الجلسة
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* How it works */}
         <div className="cc-card rounded-[14px] p-5 border border-cyan/10 bg-gradient-to-l from-cyan/[0.03] to-transparent">
@@ -459,5 +544,5 @@ export function TrainingSession({ onBack, platform = "menu" }: TrainingSessionPr
   }
 
   // ── Chat Session Screen (key forces remount per topic) ──
-  return <ChatSession key={selectedTopic} topic={selectedTopic} platform={platform} onReset={resetSession} />;
+  return <ChatSession key={`${selectedTopic}-${resumeMessages ? "resume" : "new"}`} topic={selectedTopic} platform={platform} savedMessages={resumeMessages} onReset={resetSession} />;
 }
