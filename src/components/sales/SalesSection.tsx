@@ -68,6 +68,7 @@ import {
   Download,
   Share2,
   UserPlus,
+  User,
 } from "lucide-react";
 
 /* ─── Stage badge color mapping ─── */
@@ -375,6 +376,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
   /* card filter */
   const [stageFilter, setStageFilter] = useState<string | null>(null);
   const [clientSearch, setClientSearch] = useState("");
+  const [repFilter, setRepFilter] = useState<string | null>(null);
 
   /* achievement summary filter */
   const [achieveFilter, setAchieveFilter] = useState<string | null>(null);
@@ -390,10 +392,13 @@ export function SalesSection({ salesType }: SalesPageProps) {
           return dt.getMonth() + 1 === activeMonthIndex.month && dt.getFullYear() === activeMonthIndex.year;
         })
       : deals;
-  const nonCompletedDeals = monthDeals.filter((d) => d.stage !== "مكتملة" && d.stage !== "مرفوض مع سبب");
+  const repFilteredDeals = repFilter
+    ? monthDeals.filter((d) => d.assigned_rep_name === repFilter)
+    : monthDeals;
+  const nonCompletedDeals = repFilteredDeals.filter((d) => d.stage !== "مكتملة" && d.stage !== "مرفوض مع سبب");
 
   /* Achievement summary items */
-  const achievementItems = useMemo(() => deals.map(d => ({
+  const achievementItems = useMemo(() => repFilteredDeals.map(d => ({
     id: d.id,
     updated_at: d.updated_at,
     value: d.deal_value,
@@ -401,12 +406,12 @@ export function SalesSection({ salesType }: SalesPageProps) {
     isCancelled: d.stage === "مرفوض مع سبب" || d.stage === "كنسل التجربة",
     isContacted: d.stage === "تواصل" || d.stage === "تفاوض" || d.stage === "انتظار الدفع",
     repName: d.assigned_rep_name || undefined,
-  })), [deals]);
+  })), [repFilteredDeals]);
 
   // Apply achievement filter or stage filter
   const baseFilteredDeals = achieveFilter
-    ? monthDeals.filter(d => achieveFilterIds.has(d.id))
-    : stageFilter ? monthDeals.filter((d) => d.stage === stageFilter) : monthDeals;
+    ? repFilteredDeals.filter(d => achieveFilterIds.has(d.id))
+    : stageFilter ? repFilteredDeals.filter((d) => d.stage === stageFilter) : repFilteredDeals;
   const filteredDeals = clientSearch
     ? baseFilteredDeals.filter((d) => d.client_name.toLowerCase().includes(clientSearch.toLowerCase()) || (d.client_code && d.client_code.toLowerCase().includes(clientSearch.toLowerCase())) || (d.client_phone && d.client_phone.includes(clientSearch)))
     : baseFilteredDeals;
@@ -423,27 +428,27 @@ export function SalesSection({ salesType }: SalesPageProps) {
   }, [orgId, salesType]);
 
   /* ─── Computed values ─── */
-  const totalDeals = monthDeals.length;
-  const totalValue = monthDeals.reduce((s, d) => s + d.deal_value, 0);
+  const totalDeals = repFilteredDeals.length;
+  const totalValue = repFilteredDeals.reduce((s, d) => s + d.deal_value, 0);
   const avgDealValue = totalDeals > 0 ? Math.round(totalValue / totalDeals) : 0;
 
-  const stageCounts = monthDeals.reduce<Record<string, { count: number; value: number }>>((acc, d) => {
+  const stageCounts = repFilteredDeals.reduce<Record<string, { count: number; value: number }>>((acc, d) => {
     if (!acc[d.stage]) acc[d.stage] = { count: 0, value: 0 };
     acc[d.stage].count++;
     acc[d.stage].value += d.deal_value;
     return acc;
   }, {});
 
-  const sourceCounts = monthDeals.reduce<Record<string, number>>((acc, d) => {
+  const sourceCounts = repFilteredDeals.reduce<Record<string, number>>((acc, d) => {
     if (d.source) acc[d.source] = (acc[d.source] || 0) + 1;
     return acc;
   }, {});
 
   /* KPI calculations */
-  const closedDeals = monthDeals.filter((d) => d.stage === "مكتملة").length;
+  const closedDeals = repFilteredDeals.filter((d) => d.stage === "مكتملة").length;
   const winRate = totalDeals > 0 ? Math.round((closedDeals / totalDeals) * 100) : 0;
-  const avgCycleDays = totalDeals > 0 ? Math.round(monthDeals.reduce((s, d) => s + d.cycle_days, 0) / totalDeals) : 0;
-  const pipelineValue = monthDeals.filter((d) => d.stage !== "مكتملة").reduce((s, d) => s + d.deal_value, 0);
+  const avgCycleDays = totalDeals > 0 ? Math.round(repFilteredDeals.reduce((s, d) => s + d.cycle_days, 0) / totalDeals) : 0;
+  const pipelineValue = repFilteredDeals.filter((d) => d.stage !== "مكتملة").reduce((s, d) => s + d.deal_value, 0);
 
   /* Rep performance */
   // Build price map from packages
@@ -461,7 +466,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
 
   const repPerformance = (() => {
     const repMap: Record<string, { deals: number; closed: number; value: number; cycleDays: number; plans: Record<string, number>; fullPrice: number; discounted: number; discountTotal: number }> = {};
-    monthDeals.forEach((d) => {
+    repFilteredDeals.forEach((d) => {
       const rep = d.assigned_rep_name || "غير محدد";
       if (!repMap[rep]) repMap[rep] = { deals: 0, closed: 0, value: 0, cycleDays: 0, plans: {}, fullPrice: 0, discounted: 0, discountTotal: 0 };
       repMap[rep].deals++;
@@ -499,7 +504,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
   })();
 
   /* Lost deals analysis — from real deals with stage "مرفوض مع سبب" */
-  const lostDeals = monthDeals.filter((d) => d.stage === "مرفوض مع سبب");
+  const lostDeals = repFilteredDeals.filter((d) => d.stage === "مرفوض مع سبب");
   const lostReasons = lostDeals.reduce<Record<string, { count: number; value: number }>>((acc, d) => {
     const reason = d.loss_reason || "أخرى";
     if (!acc[reason]) acc[reason] = { count: 0, value: 0 };
@@ -803,6 +808,37 @@ export function SalesSection({ salesType }: SalesPageProps) {
           <div className="cc-card rounded-2xl p-5 text-center" style={{ borderColor: "rgba(139,92,246,0.3)" }}>
             <p className="text-2xl font-extrabold text-cc-purple">{formatMoney(avgDealValue)}</p>
             <p className="text-xs text-muted-foreground mt-1">متوسط قيمة المبيع</p>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Employee Filter ─── */}
+      {!loading && (
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <User className="w-4 h-4" />
+            <span className="font-medium">الموظف:</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              onClick={() => setRepFilter(null)}
+              className={`px-3 py-1.5 rounded-xl text-xs transition-all border ${
+                !repFilter ? "bg-cyan/15 text-cyan font-medium border-cyan/30" : "text-muted-foreground hover:text-foreground border-border"
+              }`}
+            >
+              الكل
+            </button>
+            {[...new Set(monthDeals.map(d => d.assigned_rep_name).filter(Boolean))].map((name) => (
+              <button
+                key={name}
+                onClick={() => setRepFilter(repFilter === name ? null : name!)}
+                className={`px-3 py-1.5 rounded-xl text-xs transition-all border ${
+                  repFilter === name ? "bg-cyan/15 text-cyan font-medium border-cyan/30" : "text-muted-foreground hover:text-foreground border-border"
+                }`}
+              >
+                {name}
+              </button>
+            ))}
           </div>
         </div>
       )}
