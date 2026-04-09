@@ -459,7 +459,7 @@ export default function AcademyPage() {
   const colors = colorMap[sectionConfig.color];
 
   if (showTraining) {
-    return <TrainingSession onBack={() => setShowTraining(false)} />;
+    return <TrainingSession onBack={() => setShowTraining(false)} platform={activeSection} />;
   }
 
   if (showKnowledgeEditor) {

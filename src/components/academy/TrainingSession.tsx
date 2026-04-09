@@ -35,6 +35,7 @@ const TOPICS = [
     color: "text-cyan",
     bg: "bg-cyan/10 border-cyan/20 hover:bg-cyan/15",
     gradient: "from-cyan/20 to-cyan/5",
+    platform: "all" as const,
   },
   {
     key: "objections",
@@ -44,6 +45,7 @@ const TOPICS = [
     color: "text-amber",
     bg: "bg-amber/10 border-amber/20 hover:bg-amber/15",
     gradient: "from-amber/20 to-amber/5",
+    platform: "all" as const,
   },
   {
     key: "discovery",
@@ -53,6 +55,7 @@ const TOPICS = [
     color: "text-cc-green",
     bg: "bg-cc-green/10 border-cc-green/20 hover:bg-cc-green/15",
     gradient: "from-cc-green/20 to-cc-green/5",
+    platform: "all" as const,
   },
   {
     key: "angry_customer",
@@ -62,6 +65,7 @@ const TOPICS = [
     color: "text-cc-red",
     bg: "bg-cc-red/10 border-cc-red/20 hover:bg-cc-red/15",
     gradient: "from-cc-red/20 to-cc-red/5",
+    platform: "all" as const,
   },
   {
     key: "presentation",
@@ -71,6 +75,7 @@ const TOPICS = [
     color: "text-cc-purple",
     bg: "bg-cc-purple/10 border-cc-purple/20 hover:bg-cc-purple/15",
     gradient: "from-cc-purple/20 to-cc-purple/5",
+    platform: "all" as const,
   },
   {
     key: "negotiation",
@@ -80,6 +85,7 @@ const TOPICS = [
     color: "text-cc-blue",
     bg: "bg-cc-blue/10 border-cc-blue/20 hover:bg-cc-blue/15",
     gradient: "from-cc-blue/20 to-cc-blue/5",
+    platform: "all" as const,
   },
   {
     key: "renewal_no_use",
@@ -89,6 +95,7 @@ const TOPICS = [
     color: "text-orange-400",
     bg: "bg-orange-400/10 border-orange-400/20 hover:bg-orange-400/15",
     gradient: "from-orange-400/20 to-orange-400/5",
+    platform: "all" as const,
   },
   {
     key: "renewal_competitor",
@@ -98,6 +105,7 @@ const TOPICS = [
     color: "text-rose-400",
     bg: "bg-rose-400/10 border-rose-400/20 hover:bg-rose-400/15",
     gradient: "from-rose-400/20 to-rose-400/5",
+    platform: "all" as const,
   },
   {
     key: "renewal_management",
@@ -107,6 +115,7 @@ const TOPICS = [
     color: "text-slate-400",
     bg: "bg-slate-400/10 border-slate-400/20 hover:bg-slate-400/15",
     gradient: "from-slate-400/20 to-slate-400/5",
+    platform: "all" as const,
   },
   {
     key: "upsell",
@@ -116,6 +125,7 @@ const TOPICS = [
     color: "text-emerald-400",
     bg: "bg-emerald-400/10 border-emerald-400/20 hover:bg-emerald-400/15",
     gradient: "from-emerald-400/20 to-emerald-400/5",
+    platform: "all" as const,
   },
   {
     key: "cold_call",
@@ -125,6 +135,7 @@ const TOPICS = [
     color: "text-sky-400",
     bg: "bg-sky-400/10 border-sky-400/20 hover:bg-sky-400/15",
     gradient: "from-sky-400/20 to-sky-400/5",
+    platform: "all" as const,
   },
   {
     key: "followup",
@@ -134,6 +145,7 @@ const TOPICS = [
     color: "text-violet-400",
     bg: "bg-violet-400/10 border-violet-400/20 hover:bg-violet-400/15",
     gradient: "from-violet-400/20 to-violet-400/5",
+    platform: "all" as const,
   },
   {
     key: "discounts",
@@ -143,6 +155,7 @@ const TOPICS = [
     color: "text-lime-400",
     bg: "bg-lime-400/10 border-lime-400/20 hover:bg-lime-400/15",
     gradient: "from-lime-400/20 to-lime-400/5",
+    platform: "all" as const,
   },
   {
     key: "cashier_pos",
@@ -152,6 +165,38 @@ const TOPICS = [
     color: "text-teal-400",
     bg: "bg-teal-400/10 border-teal-400/20 hover:bg-teal-400/15",
     gradient: "from-teal-400/20 to-teal-400/5",
+    platform: "menu" as const,
+  },
+  // ── موضوعات خاصة بمنصة الحجوزات ──
+  {
+    key: "res_booking_system",
+    title: "شرح نظام الحجوزات",
+    desc: "أتقن عرض مميزات نظام إدارة الحجوزات للعميل",
+    icon: Target,
+    color: "text-teal-400",
+    bg: "bg-teal-400/10 border-teal-400/20 hover:bg-teal-400/15",
+    gradient: "from-teal-400/20 to-teal-400/5",
+    platform: "reservations" as const,
+  },
+  {
+    key: "res_no_show",
+    title: "مشكلة عدم الحضور (No-Show)",
+    desc: "تعامل مع عميل يعاني من حجوزات وهمية وعدم حضور",
+    icon: Ban,
+    color: "text-rose-400",
+    bg: "bg-rose-400/10 border-rose-400/20 hover:bg-rose-400/15",
+    gradient: "from-rose-400/20 to-rose-400/5",
+    platform: "reservations" as const,
+  },
+  {
+    key: "res_paper_to_digital",
+    title: "التحول من الدفتر للنظام",
+    desc: "أقنع عميل يستخدم دفتر ورقي بالتحول لنظام إلكتروني",
+    icon: Monitor,
+    color: "text-cyan-400",
+    bg: "bg-cyan-400/10 border-cyan-400/20 hover:bg-cyan-400/15",
+    gradient: "from-cyan-400/20 to-cyan-400/5",
+    platform: "reservations" as const,
   },
 ];
 
@@ -170,16 +215,17 @@ function formatMessage(text: string) {
 }
 
 // ── Chat sub-component (remounted per topic via key) ──
-function ChatSession({ topic, onReset }: { topic: string; onReset: () => void }) {
+function ChatSession({ topic, platform, onReset }: { topic: string; platform: "menu" | "reservations"; onReset: () => void }) {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const topicInfo = TOPICS.find((t) => t.key === topic)!;
+  const platformLabel = platform === "reservations" ? "حجوزات (نظام إدارة الحجوزات)" : "Menus (قائمة الطلبات)";
 
   const { messages, sendMessage, status } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/ai/training-session",
-      body: { topic },
+      body: { topic, platform },
     }),
   });
 
@@ -188,7 +234,7 @@ function ChatSession({ topic, onReset }: { topic: string; onReset: () => void })
   // Auto-send initial message on mount
   useEffect(() => {
     sendMessage({
-      text: `مرحباً، أنا مندوب مبيعات في Menus. أبي أتدرب على "${topicInfo.title}". ابدأ الجلسة.`,
+      text: `مرحباً، أنا مندوب مبيعات في ${platformLabel}. أبي أتدرب على "${topicInfo.title}". ابدأ الجلسة.`,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -331,10 +377,12 @@ function ChatSession({ topic, onReset }: { topic: string; onReset: () => void })
 // ── Main Component ──
 interface TrainingSessionProps {
   onBack: () => void;
+  platform?: "menu" | "reservations";
 }
 
-export function TrainingSession({ onBack }: TrainingSessionProps) {
+export function TrainingSession({ onBack, platform = "menu" }: TrainingSessionProps) {
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
+  const filteredTopics = TOPICS.filter((t) => t.platform === "all" || t.platform === platform);
 
   const resetSession = () => {
     setSelectedTopic(null);
@@ -384,7 +432,7 @@ export function TrainingSession({ onBack }: TrainingSessionProps) {
 
         {/* Topics Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {TOPICS.map((topic) => {
+          {filteredTopics.map((topic) => {
             const Icon = topic.icon;
             return (
               <button
@@ -411,5 +459,5 @@ export function TrainingSession({ onBack }: TrainingSessionProps) {
   }
 
   // ── Chat Session Screen (key forces remount per topic) ──
-  return <ChatSession key={selectedTopic} topic={selectedTopic} onReset={resetSession} />;
+  return <ChatSession key={selectedTopic} topic={selectedTopic} platform={platform} onReset={resetSession} />;
 }
