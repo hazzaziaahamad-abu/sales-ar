@@ -565,6 +565,7 @@ export interface ProductFeature {
   category: string;
   title: string;
   description: string;
+  marketing_text: string;
   icon: string;
   sort_order: number;
   created_by?: string;

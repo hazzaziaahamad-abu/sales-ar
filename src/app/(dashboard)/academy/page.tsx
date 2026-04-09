@@ -107,14 +107,54 @@ const SECTIONS = {
     link: "https://menus-sa.com/ar",
     description: "تعلّم كل شيء عن منصة المنيو الالكتروني وكيفية بيع الخدمة للعملاء",
     features: [
-      { icon: QrCode, title: "منيو رقمي بـ QR", desc: "إنشاء قائمة طعام إلكترونية جذابة يصل إليها العميل عبر مسح الباركود" },
-      { icon: Smartphone, title: "طلب من الطاولة", desc: "العميل يمسح باركود الطاولة ويطلب مباشرة برقم الطاولة" },
-      { icon: MessageCircle, title: "ربط واتساب", desc: "العميل يشارك طلبه عبر واتساب بعد إتمامه" },
-      { icon: Clock, title: "قائمة انتظار مطورة", desc: "إدارة قائمة الانتظار إلكترونياً مع إشعارات فورية للعميل عند وصول دوره" },
-      { icon: CalendarCheck, title: "حجز طاولة", desc: "إمكانية حجز الطاولات مسبقاً" },
-      { icon: Star, title: "تقييمات العملاء", desc: "نظام تقييمات يسمح للعملاء بمشاركة آرائهم" },
-      { icon: BarChart3, title: "إحصائيات متقدمة", desc: "لوحة تحليلات شاملة لتتبع الطلبات والأداء" },
-      { icon: Globe, title: "دعم متعدد الفروع", desc: "إدارة عدة فروع من لوحة تحكم واحدة" },
+      {
+        icon: QrCode,
+        title: "منيو رقمي بـ QR",
+        desc: "إنشاء قائمة طعام إلكترونية جذابة يصل إليها العميل عبر مسح الباركود",
+        marketing: "🔴 المشكلة: صاحب المطعم يصرف آلاف الريالات سنوياً على طباعة القوائم الورقية، وكل ما غيّر سعر أو أضاف صنف يحتاج يطبع من جديد — تكلفة مستمرة وتأخير.\n\n✅ الحل: المنيو الرقمي يخلّي العميل يمسح QR ويشوف القائمة كاملة بصور احترافية، وصاحب النشاط يعدّل الأسعار والأصناف لحظياً بدون أي تكلفة إضافية.\n\n💡 الفايدة: توفير تكاليف الطباعة + تحديث فوري + تجربة عصرية ترفع صورة المطعم عند العميل.",
+      },
+      {
+        icon: Smartphone,
+        title: "طلب من الطاولة",
+        desc: "العميل يمسح باركود الطاولة ويطلب مباشرة برقم الطاولة",
+        marketing: "🔴 المشكلة: العميل جالس ينتظر الويتر يجي ياخذ طلبه، والويتر مشغول بطاولات ثانية — النتيجة: تأخير وزعل العميل وضغط على الموظفين.\n\n✅ الحل: العميل يمسح الباركود على الطاولة ويطلب بنفسه مباشرة بدون ما ينتظر أحد. الطلب يوصل المطبخ تلقائي برقم الطاولة.\n\n💡 الفايدة: تقليل وقت الانتظار + زيادة عدد الطلبات + تقليل الحاجة لعدد كبير من الويترز = توفير رواتب.",
+      },
+      {
+        icon: MessageCircle,
+        title: "ربط واتساب",
+        desc: "العميل يشارك طلبه عبر واتساب بعد إتمامه",
+        marketing: "🔴 المشكلة: صاحب المطعم يحتاج قناة تواصل مباشرة مع عملائه، والاتصال التقليدي بطيء ويضيع طلبات.\n\n✅ الحل: بعد ما العميل يختار طلبه من المنيو، يقدر يرسله مباشرة عبر واتساب — أسرع وأسهل وما يحتاج تطبيق إضافي.\n\n💡 الفايدة: تسهيل الطلبات الخارجية (توصيل/استلام) + تواصل مباشر مع العميل + بدون عمولات منصات التوصيل.",
+      },
+      {
+        icon: Clock,
+        title: "قائمة انتظار مطورة",
+        desc: "إدارة قائمة الانتظار إلكترونياً مع إشعارات فورية للعميل عند وصول دوره",
+        marketing: "🔴 المشكلة: العملاء يزدحمون عند الباب وينتظرون بدون معرفة متى يجي دورهم — كثير منهم يمشون ويروحون لمنافس.\n\n✅ الحل: العميل يسجّل اسمه إلكترونياً ويطلع يتمشى، ولما يجي دوره يوصله إشعار فوري على جواله.\n\n💡 الفايدة: تقليل فقدان العملاء بسبب الانتظار + تجربة احترافية + تقليل الازدحام عند المدخل.",
+      },
+      {
+        icon: CalendarCheck,
+        title: "حجز طاولة",
+        desc: "إمكانية حجز الطاولات مسبقاً",
+        marketing: "🔴 المشكلة: العميل يروح المطعم ويلاقي زحمة وما يلاقي طاولة — يزعل ويروح مكان ثاني، وصاحب المطعم يخسر عميل.\n\n✅ الحل: العميل يحجز طاولته مسبقاً أونلاين ويوصل وطاولته جاهزة — بدون انتظار.\n\n💡 الفايدة: ضمان تجربة مريحة للعميل + تنظيم أفضل للطاولات + تقليل أوقات الفراغ في المطعم.",
+      },
+      {
+        icon: Star,
+        title: "تقييمات العملاء",
+        desc: "نظام تقييمات يسمح للعملاء بمشاركة آرائهم",
+        marketing: "🔴 المشكلة: صاحب المطعم ما يعرف رأي عملائه الحقيقي — إذا كان فيه مشكلة بالخدمة أو الطعام يفقد عملاء بدون ما يدري ليش.\n\n✅ الحل: بعد كل زيارة، العميل يقدر يقيّم تجربته مباشرة — التقييمات الإيجابية تنعرض والسلبية توصل صاحب المطعم بشكل خاص.\n\n💡 الفايدة: معرفة نقاط القوة والضعف + تحسين مستمر + بناء ثقة مع العملاء الجدد.",
+      },
+      {
+        icon: BarChart3,
+        title: "إحصائيات متقدمة",
+        desc: "لوحة تحليلات شاملة لتتبع الطلبات والأداء",
+        marketing: "🔴 المشكلة: صاحب المطعم يدير نشاطه بالإحساس — ما يعرف وش الأصناف اللي تنباع أكثر، أو وش أوقات الذروة، أو كم طلب يجيه يومياً.\n\n✅ الحل: لوحة تحليلات شاملة تعطيه أرقام دقيقة عن كل شيء: الأصناف الأكثر طلباً، أوقات الذروة، متوسط قيمة الطلب، وأداء كل فرع.\n\n💡 الفايدة: قرارات مبنية على بيانات حقيقية + معرفة وش يشتغل ووش يحتاج تحسين + زيادة الأرباح.",
+      },
+      {
+        icon: Globe,
+        title: "دعم متعدد الفروع",
+        desc: "إدارة عدة فروع من لوحة تحكم واحدة",
+        marketing: "🔴 المشكلة: صاحب السلسلة عنده 3-4 فروع وكل فرع يُدار بشكل مستقل — صعوبة في توحيد القوائم والأسعار ومتابعة الأداء.\n\n✅ الحل: لوحة تحكم مركزية واحدة تدير جميع الفروع — تحديث القائمة مرة وحدة وينطبق على الكل، مع تقارير مقارنة بين الفروع.\n\n💡 الفايدة: توفير وقت الإدارة + توحيد الجودة + سهولة التوسع وفتح فروع جديدة.",
+      },
     ],
   },
   reservations: {
@@ -125,14 +165,54 @@ const SECTIONS = {
     link: "https://nehgz.com/ar",
     description: "تعلّم كل شيء عن نظام إدارة الحجوزات وكيفية تسويقه للعملاء",
     features: [
-      { icon: CalendarCheck, title: "حجز أونلاين", desc: "نظام حجز إلكتروني يتيح للعملاء الحجز في أي وقت ومن أي مكان" },
-      { icon: Users, title: "إدارة العملاء", desc: "قاعدة بيانات شاملة للعملاء مع سجل الحجوزات والتفضيلات" },
-      { icon: Clock, title: "إدارة المواعيد", desc: "تنظيم المواعيد وتجنب التعارضات مع تذكيرات تلقائية" },
-      { icon: MessageCircle, title: "إشعارات تلقائية", desc: "تأكيد الحجز وتذكيرات عبر واتساب والرسائل النصية" },
-      { icon: BarChart3, title: "تقارير وإحصائيات", desc: "تحليل أنماط الحجز وأوقات الذروة والإيرادات" },
-      { icon: ShieldCheck, title: "إدارة الإلغاء", desc: "سياسات إلغاء مرنة مع حماية من عدم الحضور" },
-      { icon: Smartphone, title: "تطبيق جوال", desc: "إدارة الحجوزات من الجوال مع إشعارات فورية" },
-      { icon: Globe, title: "صفحة حجز مخصصة", desc: "رابط حجز مخصص لكل نشاط تجاري بتصميم احترافي" },
+      {
+        icon: CalendarCheck,
+        title: "حجز أونلاين",
+        desc: "نظام حجز إلكتروني يتيح للعملاء الحجز في أي وقت ومن أي مكان",
+        marketing: "🔴 المشكلة: العميل يتصل يبي يحجز والخط مشغول أو بعد الدوام — يزهق ويحجز عند المنافس. وصاحب النشاط يضيع حجوزات كثيرة بسبب عدم الرد.\n\n✅ الحل: نظام حجز إلكتروني ٢٤/٧ — العميل يدخل الرابط ويحجز بنفسه في أي وقت بدون ما يحتاج يتصل.\n\n💡 الفايدة: عدم فقدان أي حجز + راحة العميل + تقليل الضغط على موظفي الاستقبال.",
+      },
+      {
+        icon: Users,
+        title: "إدارة العملاء",
+        desc: "قاعدة بيانات شاملة للعملاء مع سجل الحجوزات والتفضيلات",
+        marketing: "🔴 المشكلة: صاحب النشاط ما يعرف عملائه المتكررين ولا تفضيلاتهم — كل زيارة تبدأ من الصفر وما فيه تجربة شخصية.\n\n✅ الحل: قاعدة بيانات تحفظ كل عميل: عدد الزيارات، التفضيلات، المناسبات الخاصة — تقدر تستخدمها لتقديم خدمة مميزة.\n\n💡 الفايدة: بناء علاقة شخصية مع العميل + زيادة الولاء + فرص تسويقية مستهدفة (عروض خاصة للعملاء المميزين).",
+      },
+      {
+        icon: Clock,
+        title: "إدارة المواعيد",
+        desc: "تنظيم المواعيد وتجنب التعارضات مع تذكيرات تلقائية",
+        marketing: "🔴 المشكلة: حجوزات متداخلة وتعارضات — عميلين يجون نفس الوقت وما فيه مكان، ينتج عنه إحراج وخسارة عملاء.\n\n✅ الحل: النظام يمنع التعارضات تلقائياً ويرسل تذكيرات قبل الموعد — ما يصير حجزين على نفس المكان أبداً.\n\n💡 الفايدة: صفر تعارضات + تقليل حالات عدم الحضور بنسبة ٤٠٪ بفضل التذكيرات + تنظيم أفضل للجدول اليومي.",
+      },
+      {
+        icon: MessageCircle,
+        title: "إشعارات تلقائية",
+        desc: "تأكيد الحجز وتذكيرات عبر واتساب والرسائل النصية",
+        marketing: "🔴 المشكلة: العميل يحجز وينسى، أو ما يجي ولا يلغي — صاحب النشاط يخسر الموعد ويخسر عميل ثاني كان ممكن يحجز مكانه.\n\n✅ الحل: إشعار تأكيد فوري عند الحجز + تذكير قبل الموعد بـ ٢٤ ساعة عبر واتساب — تلقائي بالكامل بدون تدخل.\n\n💡 الفايدة: تقليل حالات عدم الحضور (No-shows) + العميل يحس باحترافية + لو ما يقدر يجي يلغي بدري وتقدر تفتح الموعد لغيره.",
+      },
+      {
+        icon: BarChart3,
+        title: "تقارير وإحصائيات",
+        desc: "تحليل أنماط الحجز وأوقات الذروة والإيرادات",
+        marketing: "🔴 المشكلة: صاحب النشاط ما يعرف متى أوقات الذروة ومتى أوقات الفراغ — ما يقدر يخطط عروض أو يوزع الموظفين بشكل صحيح.\n\n✅ الحل: تقارير مفصّلة توضح أنماط الحجز: أيام الذروة، أوقات الفراغ، معدل الإلغاء، والإيرادات الشهرية.\n\n💡 الفايدة: قرارات ذكية مبنية على أرقام + تقدر تسوي عروض في أوقات الفراغ لزيادة الإشغال + تخطيط أفضل للموظفين.",
+      },
+      {
+        icon: ShieldCheck,
+        title: "إدارة الإلغاء",
+        desc: "سياسات إلغاء مرنة مع حماية من عدم الحضور",
+        marketing: "🔴 المشكلة: عملاء يحجزون ولا يجون — صاحب النشاط يخسر الموعد والمكان كان ممكن ينباع لعميل ثاني.\n\n✅ الحل: سياسات إلغاء مرنة تقدر تخصصها: إلغاء مجاني قبل ٢٤ ساعة مثلاً، أو طلب دفعة مقدمة للحجوزات الكبيرة.\n\n💡 الفايدة: حماية من خسائر عدم الحضور + مرونة في التعامل مع العملاء + إمكانية فتح الموعد للغير عند الإلغاء المبكر.",
+      },
+      {
+        icon: Smartphone,
+        title: "تطبيق جوال",
+        desc: "إدارة الحجوزات من الجوال مع إشعارات فورية",
+        marketing: "🔴 المشكلة: صاحب النشاط يحتاج يكون في المكتب عشان يشوف الحجوزات ويدير الجدول — ما يقدر يتابع وهو برا.\n\n✅ الحل: كل شيء على جواله — يشوف الحجوزات الجديدة، يوافق أو يرفض، يتواصل مع العملاء، كله من الجوال.\n\n💡 الفايدة: إدارة النشاط من أي مكان + إشعارات فورية لكل حجز جديد + ما يفوته شيء حتى لو مو في الموقع.",
+      },
+      {
+        icon: Globe,
+        title: "صفحة حجز مخصصة",
+        desc: "رابط حجز مخصص لكل نشاط تجاري بتصميم احترافي",
+        marketing: "🔴 المشكلة: صاحب النشاط يبي يسوّق لخدمة الحجز بس ما عنده صفحة احترافية يرسلها للعملاء — يعتمد على الاتصال بس.\n\n✅ الحل: صفحة حجز بتصميم احترافي باسم النشاط ولوقو الخاصة — رابط واحد يرسله في السوشال ميديا والواتساب والقوقل.\n\n💡 الفايدة: صورة احترافية للنشاط + سهولة مشاركة رابط الحجز في كل مكان + زيادة الحجوزات من السوشال ميديا.",
+      },
     ],
   },
 } as const;
@@ -224,7 +304,7 @@ export default function AcademyPage() {
   const [dbFeatures, setDbFeatures] = useState<ProductFeature[]>([]);
   const [featDialog, setFeatDialog] = useState(false);
   const [editingFeat, setEditingFeat] = useState<ProductFeature | null>(null);
-  const [featForm, setFeatForm] = useState({ title: "", description: "", icon: "Star", category: "general" });
+  const [featForm, setFeatForm] = useState({ title: "", description: "", marketing_text: "", icon: "Star", category: "general" });
 
   useEffect(() => {
     setLoading(true);
@@ -255,6 +335,7 @@ export default function AcademyPage() {
     id: `hc-${i}`,
     title: f.title,
     description: f.desc,
+    marketing_text: f.marketing,
     icon: Object.entries(ICON_MAP).find(([, v]) => v === f.icon)?.[0] || "Star",
     category: "general",
     isHardcoded: true,
@@ -263,22 +344,24 @@ export default function AcademyPage() {
     id: f.id,
     title: f.title,
     description: f.description,
+    marketing_text: f.marketing_text || "",
     icon: f.icon,
     category: f.category,
     isHardcoded: false,
   }));
   // Show DB features if any exist, otherwise show hardcoded defaults
   const allFeatures = dynamicFeats.length > 0 ? dynamicFeats : hardcodedFeats;
+  const [expandedFeat, setExpandedFeat] = useState<string | null>(null);
 
   /* Feature handlers */
   function openAddFeat() {
     setEditingFeat(null);
-    setFeatForm({ title: "", description: "", icon: "Star", category: "general" });
+    setFeatForm({ title: "", description: "", marketing_text: "", icon: "Star", category: "general" });
     setFeatDialog(true);
   }
   function openEditFeat(feat: ProductFeature) {
     setEditingFeat(feat);
-    setFeatForm({ title: feat.title, description: feat.description, icon: feat.icon, category: feat.category });
+    setFeatForm({ title: feat.title, description: feat.description, marketing_text: feat.marketing_text || "", icon: feat.icon, category: feat.category });
     setFeatDialog(true);
   }
   async function handleSaveFeat() {
@@ -289,6 +372,7 @@ export default function AcademyPage() {
         const updated = await updateProductFeature(editingFeat.id, {
           title: featForm.title,
           description: featForm.description,
+          marketing_text: featForm.marketing_text,
           icon: featForm.icon,
           category: featForm.category,
           updated_by: user?.name || "",
@@ -302,6 +386,7 @@ export default function AcademyPage() {
           category: featForm.category,
           title: featForm.title,
           description: featForm.description,
+          marketing_text: featForm.marketing_text,
           icon: featForm.icon,
           sort_order: maxOrder + 1,
           created_by: user?.name || "",
@@ -554,29 +639,54 @@ export default function AcademyPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {feats.map((feat) => {
                   const FeatIcon = ICON_MAP[feat.icon] || Star;
+                  const isExpanded = expandedFeat === feat.id;
                   return (
-                    <div key={feat.id} className="cc-card rounded-[14px] p-4 hover:bg-white/[0.06] transition-all group relative">
+                    <div
+                      key={feat.id}
+                      className={`cc-card rounded-[14px] p-4 hover:bg-white/[0.06] transition-all group relative cursor-pointer ${isExpanded ? "col-span-1 sm:col-span-2 lg:col-span-4 ring-1 ring-white/10" : ""}`}
+                      onClick={() => setExpandedFeat(isExpanded ? null : feat.id)}
+                    >
                       {isSuperAdmin && !feat.isHardcoded && (
                         <div className="absolute top-2 left-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
-                            onClick={() => openEditFeat(dbFeatures.find((f) => f.id === feat.id)!)}
+                            onClick={(e) => { e.stopPropagation(); openEditFeat(dbFeatures.find((f) => f.id === feat.id)!); }}
                             className="p-1 rounded-md hover:bg-white/10 text-muted-foreground hover:text-foreground"
                           >
                             <Pencil className="w-3 h-3" />
                           </button>
                           <button
-                            onClick={() => handleDeleteFeat(feat.id)}
+                            onClick={(e) => { e.stopPropagation(); handleDeleteFeat(feat.id); }}
                             className="p-1 rounded-md hover:bg-red-500/10 text-muted-foreground hover:text-red-400"
                           >
                             <Trash2 className="w-3 h-3" />
                           </button>
                         </div>
                       )}
-                      <div className={`w-9 h-9 rounded-lg ${colors.iconBg} flex items-center justify-center mb-3`}>
-                        <FeatIcon className={`w-4 h-4 ${colors.text}`} />
+                      <div className="flex items-start gap-3">
+                        <div className={`w-9 h-9 rounded-lg ${colors.iconBg} flex items-center justify-center shrink-0`}>
+                          <FeatIcon className={`w-4 h-4 ${colors.text}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-bold text-foreground">{feat.title}</h4>
+                            {feat.marketing_text && (
+                              <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                            )}
+                          </div>
+                          <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">{feat.description}</p>
+                        </div>
                       </div>
-                      <h4 className="text-sm font-bold text-foreground">{feat.title}</h4>
-                      <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">{feat.description}</p>
+                      {isExpanded && feat.marketing_text && (
+                        <div className="mt-4 pt-4 border-t border-white/[0.06]">
+                          <div className="space-y-3">
+                            {feat.marketing_text.split("\n\n").map((block, idx) => (
+                              <p key={idx} className="text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">
+                                {block}
+                              </p>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -970,11 +1080,11 @@ export default function AcademyPage() {
 
       {/* ─── Feature Add/Edit Dialog ─── */}
       <Dialog open={featDialog} onOpenChange={setFeatDialog}>
-        <DialogContent className="sm:max-w-[480px]">
+        <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingFeat ? "تعديل الميزة" : "إضافة ميزة جديدة"}</DialogTitle>
             <DialogDescription>
-              {editingFeat ? "عدّل بيانات الميزة" : "أضف ميزة جديدة لمنتج " + sectionConfig.label}
+              {editingFeat ? "عدّل بيانات الميزة والمحتوى التسويقي" : "أضف ميزة جديدة لمنتج " + sectionConfig.label}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -987,12 +1097,23 @@ export default function AcademyPage() {
               />
             </div>
             <div>
-              <Label>الوصف</Label>
+              <Label>الوصف المختصر</Label>
               <Textarea
                 value={featForm.description}
                 onChange={(e) => setFeatForm({ ...featForm, description: e.target.value })}
-                placeholder="وصف مختصر للميزة..."
-                rows={3}
+                placeholder="وصف مختصر للميزة يظهر في الكرت..."
+                rows={2}
+              />
+            </div>
+            <div>
+              <Label>المحتوى التسويقي</Label>
+              <p className="text-[11px] text-muted-foreground mb-1.5">اكتب المشكلة + الحل + الفايدة — يظهر عند الضغط على الميزة</p>
+              <Textarea
+                value={featForm.marketing_text}
+                onChange={(e) => setFeatForm({ ...featForm, marketing_text: e.target.value })}
+                placeholder={"🔴 المشكلة: ...\n\n✅ الحل: ...\n\n💡 الفايدة: ..."}
+                rows={8}
+                dir="rtl"
               />
             </div>
             <div>

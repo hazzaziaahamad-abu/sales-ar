@@ -1,0 +1,1 @@
+ALTER TABLE product_features ADD COLUMN IF NOT EXISTS marketing_text TEXT NOT NULL DEFAULT '';
