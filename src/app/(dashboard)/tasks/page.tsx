@@ -35,6 +35,12 @@ import {
   MessageCircle,
   Timer,
   Hourglass,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Video,
+  FileText,
+  MapPin,
 } from "lucide-react";
 
 const TASK_TYPES: Record<string, { label: string; emoji: string }> = {
@@ -93,8 +99,27 @@ function getCountdown(dueDate?: string, dueTime?: string): { label: string; urge
   return { label: `متبقي ${mins} د`, urgency: "critical" };
 }
 
+type PageTab = "tasks" | "meetings";
+type CalendarView = "day" | "week";
+
+function getWeekDays(baseDate: Date): Date[] {
+  const d = new Date(baseDate);
+  const day = d.getDay();
+  const sun = new Date(d);
+  sun.setDate(d.getDate() - day);
+  return Array.from({ length: 7 }, (_, i) => {
+    const dd = new Date(sun);
+    dd.setDate(sun.getDate() + i);
+    return dd;
+  });
+}
+
+const DAY_NAMES = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+const HOURS = Array.from({ length: 14 }, (_, i) => i + 7); // 7am to 8pm
+
 export default function TasksPage() {
   const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<PageTab>("tasks");
   const [tasks, setTasks] = useState<EmployeeTask[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [teamStats, setTeamStats] = useState<{ employee_name: string; employee_id: string; total: number; completed: number; pending: number; completion_rate: number }[]>([]);
@@ -108,6 +133,17 @@ export default function TasksPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [shareMenuId, setShareMenuId] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+
+  // Meetings state
+  const [calendarView, setCalendarView] = useState<CalendarView>("week");
+  const [calendarDate, setCalendarDate] = useState(new Date());
+  const [showMeetingForm, setShowMeetingForm] = useState(false);
+  const [meetingForm, setMeetingForm] = useState({
+    title: "", description: "", assigned_to: "", assigned_to_name: "",
+    due_date: "", due_time: "", priority: "medium", notes: "",
+    location: "", agenda: "",
+  });
+  const [editingMeeting, setEditingMeeting] = useState<EmployeeTask | null>(null);
 
   // Tick every 30 seconds to update countdowns
   useEffect(() => {
@@ -241,6 +277,104 @@ export default function TasksPage() {
     loadData();
   };
 
+  // ── Meeting handlers ──
+  const meetings = useMemo(() => tasks.filter(t => t.task_type === "meeting"), [tasks]);
+
+  const resetMeetingForm = () => {
+    setMeetingForm({ title: "", description: "", assigned_to: "", assigned_to_name: "", due_date: "", due_time: "", priority: "medium", notes: "", location: "", agenda: "" });
+    setEditingMeeting(null);
+    setShowMeetingForm(false);
+  };
+
+  const openNewMeeting = (date?: string, time?: string) => {
+    resetMeetingForm();
+    setMeetingForm(f => ({ ...f, due_date: date || today, due_time: time || "09:00" }));
+    setShowMeetingForm(true);
+  };
+
+  const openEditMeeting = (task: EmployeeTask) => {
+    setMeetingForm({
+      title: task.title,
+      description: task.description || "",
+      assigned_to: task.assigned_to,
+      assigned_to_name: task.assigned_to_name,
+      due_date: task.due_date || "",
+      due_time: task.due_time || "",
+      priority: task.priority,
+      notes: task.notes || "",
+      location: task.client_name || "",
+      agenda: task.completion_notes || "",
+    });
+    setEditingMeeting(task);
+    setShowMeetingForm(true);
+  };
+
+  const handleMeetingSubmit = async () => {
+    if (!meetingForm.title || !meetingForm.due_date) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      if (editingMeeting) {
+        await updateEmployeeTask(editingMeeting.id, {
+          title: meetingForm.title,
+          description: meetingForm.description || undefined,
+          assigned_to: meetingForm.assigned_to || undefined,
+          assigned_to_name: meetingForm.assigned_to_name || undefined,
+          due_date: meetingForm.due_date || undefined,
+          due_time: meetingForm.due_time || undefined,
+          priority: meetingForm.priority as EmployeeTask["priority"],
+          notes: meetingForm.notes || undefined,
+          client_name: meetingForm.location || undefined,
+          completion_notes: meetingForm.agenda || undefined,
+        });
+      } else {
+        const { createClient } = await import("@/lib/supabase/client");
+        const supabase = createClient();
+        const taskData: Record<string, unknown> = {
+          title: meetingForm.title,
+          task_type: "meeting",
+          priority: meetingForm.priority,
+          status: "pending",
+          assigned_to: meetingForm.assigned_to || user?.id,
+          assigned_to_name: meetingForm.assigned_to_name || user?.name || "",
+          org_id: (await import("@/lib/supabase/db")).getOrgId(),
+          due_date: meetingForm.due_date,
+        };
+        if (meetingForm.description) taskData.description = meetingForm.description;
+        if (meetingForm.due_time) taskData.due_time = meetingForm.due_time;
+        if (meetingForm.notes) taskData.notes = meetingForm.notes;
+        if (meetingForm.location) taskData.client_name = meetingForm.location;
+        if (meetingForm.agenda) taskData.completion_notes = meetingForm.agenda;
+        if (user?.id) taskData.assigned_by = user.id;
+        if (user?.name) taskData.assigned_by_name = user.name;
+        const { error } = await supabase.from("employee_tasks").insert(taskData).select().single();
+        if (error) throw error;
+      }
+      resetMeetingForm();
+      loadData();
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      setSubmitError(err?.message || "حدث خطأ");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const calendarDateStr = calendarDate.toISOString().slice(0, 10);
+  const weekDays = useMemo(() => getWeekDays(calendarDate), [calendarDate]);
+
+  const getMeetingsForDate = useCallback((dateStr: string) => {
+    return meetings.filter(m => m.due_date === dateStr).sort((a, b) => (a.due_time || "00:00").localeCompare(b.due_time || "00:00"));
+  }, [meetings]);
+
+  const navigateCalendar = (dir: number) => {
+    const d = new Date(calendarDate);
+    d.setDate(d.getDate() + (calendarView === "week" ? dir * 7 : dir));
+    setCalendarDate(d);
+  };
+
+  const goToday = () => setCalendarDate(new Date());
+
   const buildShareText = (task: EmployeeTask) => {
     const tt = TASK_TYPES[task.task_type] || TASK_TYPES.general;
     const pr = PRIORITIES[task.priority] || PRIORITIES.medium;
@@ -310,13 +444,39 @@ export default function TasksPage() {
           <p className="text-gray-400 text-sm mt-1">إنشاء وتوزيع المهام على الفريق ومتابعة الإنجاز</p>
         </div>
         <button
-          onClick={() => { resetForm(); setShowForm(true); }}
+          onClick={() => activeTab === "meetings" ? openNewMeeting() : (() => { resetForm(); setShowForm(true); })()}
           className="flex items-center gap-2 px-5 py-2.5 rounded-[14px] bg-indigo-500 hover:bg-indigo-600 text-white font-medium transition-all"
         >
-          <Plus className="w-5 h-5" /> مهمة جديدة
+          <Plus className="w-5 h-5" /> {activeTab === "meetings" ? "اجتماع جديد" : "مهمة جديدة"}
         </button>
       </div>
 
+      {/* Tabs */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setActiveTab("tasks")}
+          className={`flex items-center gap-2 rounded-[14px] px-5 py-2.5 text-sm font-bold transition-all ${
+            activeTab === "tasks" ? "bg-indigo-500/15 text-indigo-400 border border-indigo-500/20" : "glass-surface text-gray-400 hover:text-white border border-transparent"
+          }`}
+        >
+          <Target className="w-4 h-4" />
+          المهام
+          <span className="text-[10px] bg-white/[0.06] rounded-full px-2 py-0.5">{tasks.filter(t => t.task_type !== "meeting").length}</span>
+        </button>
+        <button
+          onClick={() => setActiveTab("meetings")}
+          className={`flex items-center gap-2 rounded-[14px] px-5 py-2.5 text-sm font-bold transition-all ${
+            activeTab === "meetings" ? "bg-violet-500/15 text-violet-400 border border-violet-500/20" : "glass-surface text-gray-400 hover:text-white border border-transparent"
+          }`}
+        >
+          <Video className="w-4 h-4" />
+          الاجتماعات
+          <span className="text-[10px] bg-white/[0.06] rounded-full px-2 py-0.5">{meetings.length}</span>
+        </button>
+      </div>
+
+      {/* ═══════ TASKS TAB ═══════ */}
+      {activeTab === "tasks" && (<>
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
@@ -537,6 +697,297 @@ export default function TasksPage() {
           })
         )}
       </div>
+
+      </>)}
+
+      {/* ═══════ MEETINGS TAB ═══════ */}
+      {activeTab === "meetings" && (
+        <>
+          {/* Calendar Navigation */}
+          <div className="glass-surface rounded-2xl p-4 border border-white/[0.06]">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <button onClick={() => navigateCalendar(-1)} className="p-2 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-colors">
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+                <button onClick={goToday} className="px-3 py-1.5 rounded-lg bg-indigo-500/15 text-indigo-400 text-xs font-bold hover:bg-indigo-500/25 transition-colors">اليوم</button>
+                <button onClick={() => navigateCalendar(1)} className="p-2 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-colors">
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <h2 className="text-lg font-bold text-white">
+                  {calendarView === "day"
+                    ? calendarDate.toLocaleDateString("ar-SA", { weekday: "long", year: "numeric", month: "long", day: "numeric" })
+                    : `${weekDays[0].toLocaleDateString("ar-SA", { month: "short", day: "numeric" })} — ${weekDays[6].toLocaleDateString("ar-SA", { month: "short", day: "numeric", year: "numeric" })}`
+                  }
+                </h2>
+              </div>
+              <div className="flex gap-1 bg-white/[0.04] rounded-lg p-1">
+                <button onClick={() => setCalendarView("day")} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${calendarView === "day" ? "bg-indigo-500/20 text-indigo-400" : "text-gray-400 hover:text-white"}`}>
+                  يومي
+                </button>
+                <button onClick={() => setCalendarView("week")} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${calendarView === "week" ? "bg-indigo-500/20 text-indigo-400" : "text-gray-400 hover:text-white"}`}>
+                  أسبوعي
+                </button>
+              </div>
+            </div>
+
+            {/* ── Weekly View ── */}
+            {calendarView === "week" && (
+              <div className="grid grid-cols-7 gap-2">
+                {weekDays.map((day) => {
+                  const dateStr = day.toISOString().slice(0, 10);
+                  const dayMeetings = getMeetingsForDate(dateStr);
+                  const isToday = dateStr === today;
+                  return (
+                    <div key={dateStr} className={`rounded-xl p-3 min-h-[160px] border transition-all ${isToday ? "bg-indigo-500/[0.08] border-indigo-500/30" : "bg-white/[0.02] border-white/[0.04]"}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <p className={`text-[10px] font-medium ${isToday ? "text-indigo-400" : "text-gray-500"}`}>{DAY_NAMES[day.getDay()]}</p>
+                          <p className={`text-sm font-bold ${isToday ? "text-indigo-400" : "text-white"}`}>{day.getDate()}</p>
+                        </div>
+                        <button onClick={() => openNewMeeting(dateStr)} className="p-1 rounded-md hover:bg-white/10 text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition-all">
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <div className="space-y-1">
+                        {dayMeetings.map((m) => {
+                          const cd = m.status !== "completed" ? getCountdown(m.due_date, m.due_time) : { urgency: "none" as const };
+                          return (
+                            <button key={m.id} onClick={() => openEditMeeting(m)} className={`w-full text-right rounded-lg p-2 transition-all hover:ring-1 hover:ring-white/20 ${
+                              m.status === "completed" ? "bg-emerald-500/10 opacity-60" : cd.urgency === "passed" ? "bg-red-500/10" : "bg-violet-500/10"
+                            }`}>
+                              <p className="text-[11px] font-bold text-white truncate">{m.title}</p>
+                              {m.due_time && <p className="text-[10px] text-gray-400 mt-0.5">{m.due_time.slice(0, 5)}</p>}
+                              {m.assigned_to_name && <p className="text-[9px] text-gray-500 truncate">{m.assigned_to_name}</p>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* ── Daily View ── */}
+            {calendarView === "day" && (
+              <div className="space-y-0">
+                {HOURS.map((hour) => {
+                  const hourMeetings = getMeetingsForDate(calendarDateStr).filter((m) => {
+                    const h = parseInt(m.due_time?.slice(0, 2) || "0", 10);
+                    return h === hour;
+                  });
+                  return (
+                    <div key={hour} className="flex border-t border-white/[0.04] min-h-[60px]">
+                      <div className="w-16 py-2 text-xs text-gray-500 text-left shrink-0 font-mono">
+                        {hour.toString().padStart(2, "0")}:00
+                      </div>
+                      <div className="flex-1 py-1 pr-2">
+                        {hourMeetings.length > 0 ? (
+                          <div className="space-y-1">
+                            {hourMeetings.map((m) => {
+                              const cd = m.status !== "completed" ? getCountdown(m.due_date, m.due_time) : { label: "", urgency: "none" as const };
+                              const CdIcon = cd.urgency === "passed" ? AlertTriangle : cd.urgency === "critical" ? Timer : Hourglass;
+                              return (
+                                <button key={m.id} onClick={() => openEditMeeting(m)} className={`w-full text-right rounded-xl p-3 transition-all hover:ring-1 hover:ring-white/20 ${
+                                  m.status === "completed" ? "bg-emerald-500/10" : "bg-violet-500/10 border border-violet-500/20"
+                                }`}>
+                                  <div className="flex items-center gap-2">
+                                    <Video className="w-3.5 h-3.5 text-violet-400 shrink-0" />
+                                    <span className="text-sm font-bold text-white flex-1 truncate">{m.title}</span>
+                                    {m.due_time && <span className="text-[11px] text-gray-400">{m.due_time.slice(0, 5)}</span>}
+                                    {m.status === "completed" && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
+                                  </div>
+                                  <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                                    {m.assigned_to_name && (
+                                      <span className="text-[11px] text-gray-400 flex items-center gap-1"><User className="w-3 h-3" />{m.assigned_to_name}</span>
+                                    )}
+                                    {m.client_name && (
+                                      <span className="text-[11px] text-gray-400 flex items-center gap-1"><MapPin className="w-3 h-3" />{m.client_name}</span>
+                                    )}
+                                    {cd.urgency !== "none" && (
+                                      <span className={`text-[10px] font-bold flex items-center gap-1 ${cd.urgency === "passed" ? "text-red-400" : cd.urgency === "critical" ? "text-orange-400" : cd.urgency === "warning" ? "text-amber-400" : "text-emerald-400"}`}>
+                                        <CdIcon className="w-3 h-3" />{cd.label}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {m.completion_notes && (
+                                    <div className="mt-2 pt-2 border-t border-white/[0.06]">
+                                      <p className="text-[10px] text-gray-500 flex items-center gap-1 mb-1"><FileText className="w-3 h-3" />الأجندة</p>
+                                      <p className="text-[11px] text-gray-400 whitespace-pre-wrap leading-relaxed">{m.completion_notes}</p>
+                                    </div>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <button onClick={() => openNewMeeting(calendarDateStr, `${hour.toString().padStart(2, "0")}:00`)} className="w-full h-full min-h-[44px] rounded-lg hover:bg-white/[0.03] transition-all" />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Upcoming Meetings List */}
+          <div className="glass-surface rounded-2xl p-5 border border-white/[0.06]">
+            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+              <CalendarDays className="w-5 h-5 text-violet-400" />
+              الاجتماعات القادمة
+              <span className="text-xs text-gray-500 font-normal">({meetings.filter(m => m.status !== "completed" && m.status !== "cancelled").length})</span>
+            </h2>
+            <div className="space-y-2">
+              {meetings.filter(m => m.status !== "completed" && m.status !== "cancelled" && m.due_date && m.due_date >= today).length === 0 ? (
+                <div className="text-center py-8">
+                  <Video className="w-10 h-10 text-gray-600 mx-auto mb-2" />
+                  <p className="text-gray-400 text-sm">لا توجد اجتماعات قادمة</p>
+                </div>
+              ) : (
+                meetings
+                  .filter(m => m.status !== "completed" && m.status !== "cancelled" && m.due_date && m.due_date >= today)
+                  .sort((a, b) => `${a.due_date}${a.due_time || ""}`.localeCompare(`${b.due_date}${b.due_time || ""}`))
+                  .map((m) => {
+                    const cd = getCountdown(m.due_date, m.due_time);
+                    void tick;
+                    return (
+                      <div key={m.id} className="bg-white/[0.04] rounded-xl p-4 border border-white/[0.06] hover:border-violet-500/20 transition-all">
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-violet-500/15 flex items-center justify-center shrink-0">
+                            <Video className="w-5 h-5 text-violet-400" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-bold text-white">{m.title}</h3>
+                            <div className="flex items-center gap-3 mt-1 text-xs text-gray-400 flex-wrap">
+                              <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{m.due_date}{m.due_time && ` — ${m.due_time.slice(0, 5)}`}</span>
+                              {m.assigned_to_name && <span className="flex items-center gap-1"><User className="w-3 h-3" />{m.assigned_to_name}</span>}
+                              {m.client_name && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{m.client_name}</span>}
+                            </div>
+                            {cd.urgency !== "none" && (
+                              <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border mt-2 ${
+                                cd.urgency === "passed" ? "text-red-400 bg-red-500/10 border-red-500/20" :
+                                cd.urgency === "critical" ? "text-orange-400 bg-orange-500/10 border-orange-500/20 animate-pulse" :
+                                cd.urgency === "warning" ? "text-amber-400 bg-amber-500/10 border-amber-500/20" :
+                                "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+                              }`}>
+                                <Timer className="w-3.5 h-3.5" />{cd.label}
+                              </div>
+                            )}
+                            {m.description && <p className="text-sm text-gray-400 mt-2">{m.description}</p>}
+                            {m.completion_notes && (
+                              <div className="mt-2 p-3 bg-white/[0.03] rounded-lg border border-white/[0.04]">
+                                <p className="text-[11px] text-violet-400 font-bold flex items-center gap-1 mb-1"><FileText className="w-3 h-3" />الأجندة</p>
+                                <p className="text-xs text-gray-400 whitespace-pre-wrap leading-relaxed">{m.completion_notes}</p>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <select
+                              value={m.status}
+                              onChange={(e) => handleStatusChange(m, e.target.value)}
+                              className="px-2 py-1 rounded-lg bg-white/[0.04] border border-white/10 text-white text-xs focus:outline-none"
+                            >
+                              {Object.entries(STATUSES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                            </select>
+                            <button onClick={() => openEditMeeting(m)} className="p-2 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white">
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => handleDelete(m.id)} className="p-2 rounded-lg hover:bg-red-500/10 text-gray-400 hover:text-red-400">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ═══ Meeting Form Modal ═══ */}
+      {showMeetingForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" dir="rtl">
+          <div className="bg-card rounded-2xl border border-border w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2"><Video className="w-5 h-5 text-violet-400" />{editingMeeting ? "تعديل الاجتماع" : "اجتماع جديد"}</h2>
+              <button onClick={resetMeetingForm} className="p-2 rounded-lg hover:bg-white/10 text-gray-400"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm text-gray-400 mb-1 block">عنوان الاجتماع *</label>
+                <input type="text" value={meetingForm.title} onChange={(e) => setMeetingForm(f => ({ ...f, title: e.target.value }))}
+                  className="w-full px-4 py-2.5 rounded-[14px] bg-white/[0.04] border border-white/10 text-white text-sm focus:outline-none focus:border-violet-500/50"
+                  placeholder="مثال: اجتماع مراجعة الأداء الأسبوعي" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm text-gray-400 mb-1 block">التاريخ *</label>
+                  <input type="date" value={meetingForm.due_date} onChange={(e) => setMeetingForm(f => ({ ...f, due_date: e.target.value }))}
+                    className="w-full px-4 py-2.5 rounded-[14px] bg-white/[0.04] border border-white/10 text-white text-sm focus:outline-none" />
+                </div>
+                <div>
+                  <label className="text-sm text-gray-400 mb-1 block">الوقت</label>
+                  <input type="time" value={meetingForm.due_time} onChange={(e) => setMeetingForm(f => ({ ...f, due_time: e.target.value }))}
+                    className="w-full px-4 py-2.5 rounded-[14px] bg-white/[0.04] border border-white/10 text-white text-sm focus:outline-none" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm text-gray-400 mb-1 block">المسؤول</label>
+                  <select value={meetingForm.assigned_to} onChange={(e) => {
+                    const emp = employees.find(em => em.id === e.target.value);
+                    setMeetingForm(f => ({ ...f, assigned_to: e.target.value, assigned_to_name: emp?.name || "" }));
+                  }} className="w-full px-4 py-2.5 rounded-[14px] bg-white/[0.04] border border-white/10 text-white text-sm focus:outline-none">
+                    <option value="">اختر الموظف</option>
+                    {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm text-gray-400 mb-1 block">الأولوية</label>
+                  <select value={meetingForm.priority} onChange={(e) => setMeetingForm(f => ({ ...f, priority: e.target.value }))}
+                    className="w-full px-4 py-2.5 rounded-[14px] bg-white/[0.04] border border-white/10 text-white text-sm focus:outline-none">
+                    {Object.entries(PRIORITIES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-sm text-gray-400 mb-1 block flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />المكان</label>
+                <input type="text" value={meetingForm.location} onChange={(e) => setMeetingForm(f => ({ ...f, location: e.target.value }))}
+                  className="w-full px-4 py-2.5 rounded-[14px] bg-white/[0.04] border border-white/10 text-white text-sm focus:outline-none"
+                  placeholder="مثال: قاعة الاجتماعات / رابط Zoom" />
+              </div>
+              <div>
+                <label className="text-sm text-gray-400 mb-1 block">وصف الاجتماع</label>
+                <textarea value={meetingForm.description} onChange={(e) => setMeetingForm(f => ({ ...f, description: e.target.value }))}
+                  className="w-full px-4 py-2.5 rounded-[14px] bg-white/[0.04] border border-white/10 text-white text-sm focus:outline-none resize-none" rows={2}
+                  placeholder="ملخص قصير عن الهدف من الاجتماع..." />
+              </div>
+              <div>
+                <label className="text-sm text-gray-400 mb-1 block flex items-center gap-1"><FileText className="w-3.5 h-3.5 text-violet-400" />الأجندة</label>
+                <textarea value={meetingForm.agenda} onChange={(e) => setMeetingForm(f => ({ ...f, agenda: e.target.value }))}
+                  className="w-full px-4 py-2.5 rounded-[14px] bg-white/[0.04] border border-violet-500/20 text-white text-sm focus:outline-none focus:border-violet-500/50 resize-none" rows={5}
+                  placeholder={"1. مراجعة إنجازات الأسبوع\n2. مناقشة التحديات\n3. توزيع المهام الجديدة\n4. موعد الاجتماع القادم"} dir="rtl" />
+              </div>
+              <div>
+                <label className="text-sm text-gray-400 mb-1 block">ملاحظات</label>
+                <textarea value={meetingForm.notes} onChange={(e) => setMeetingForm(f => ({ ...f, notes: e.target.value }))}
+                  className="w-full px-4 py-2.5 rounded-[14px] bg-white/[0.04] border border-white/10 text-white text-sm focus:outline-none resize-none" rows={2} />
+              </div>
+              {submitError && (
+                <div className="rounded-[10px] border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-400">{submitError}</div>
+              )}
+              <button onClick={handleMeetingSubmit} disabled={!meetingForm.title || !meetingForm.due_date || submitting}
+                className="w-full py-3 rounded-[14px] bg-violet-500 hover:bg-violet-600 disabled:opacity-40 text-white font-medium transition-all">
+                {submitting ? "جاري الحفظ..." : editingMeeting ? "حفظ التعديلات" : "إنشاء الاجتماع"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Create/Edit Modal */}
       {showForm && (
