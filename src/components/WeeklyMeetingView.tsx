@@ -1090,6 +1090,7 @@ function Tab6MeetingCalendar({ meetings, onRefresh }: { meetings: EmployeeTask[]
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [tick, setTick] = useState(0);
+  const [copied, setCopied] = useState<string | null>(null);
   const [form, setForm] = useState({ title: "", description: "", assigned_to: "", assigned_to_name: "", due_date: "", due_time: "", priority: "medium", notes: "", location: "", agenda: "" });
 
   useEffect(() => { fetchEmployees().then(e => setEmployees(e.filter(x => x.status === "نشط"))).catch(console.error); }, []);
@@ -1183,12 +1184,9 @@ function Tab6MeetingCalendar({ meetings, onRefresh }: { meetings: EmployeeTask[]
     if (m.completion_notes) text += `\n📋 الأجندة:\n${m.completion_notes}\n`;
     if (m.notes) text += `\n💬 ملاحظات:\n${m.notes}\n`;
 
-    if (navigator.share) {
-      try { await navigator.share({ title: m.title, text }); return; }
-      catch { /* fallback below */ }
-    }
     await navigator.clipboard.writeText(text);
-    alert("تم نسخ تفاصيل الاجتماع!");
+    setCopied(m.title);
+    setTimeout(() => setCopied(null), 2000);
   };
 
   const shareFromForm = () => {
@@ -1388,7 +1386,10 @@ function Tab6MeetingCalendar({ meetings, onRefresh }: { meetings: EmployeeTask[]
                         style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, color: T.text, fontSize: 11, padding: "4px 6px", cursor: "pointer", outline: "none" }}>
                         {Object.entries(STATUSES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                       </select>
-                      <button onClick={() => shareMeeting({ title: m.title, due_date: m.due_date, due_time: m.due_time, assigned_to_name: m.assigned_to_name, client_name: m.client_name, description: m.description, completion_notes: m.completion_notes, notes: m.notes, priority: m.priority })} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 14, padding: 4, color: T.teal }} title="مشاركة">📤</button>
+                      <button onClick={() => shareMeeting({ title: m.title, due_date: m.due_date, due_time: m.due_time, assigned_to_name: m.assigned_to_name, client_name: m.client_name, description: m.description, completion_notes: m.completion_notes, notes: m.notes, priority: m.priority })}
+                        style={{ background: copied === m.title ? `${T.green}20` : `${T.teal}15`, border: `1px solid ${copied === m.title ? T.green + "40" : T.teal + "30"}`, borderRadius: 8, cursor: "pointer", fontSize: 11, padding: "4px 10px", color: copied === m.title ? T.green : T.teal, fontWeight: 600, fontFamily: "inherit", transition: "all 0.2s" }}>
+                        {copied === m.title ? "✅ تم النسخ" : "📋 نسخ"}
+                      </button>
                       <button onClick={() => openEdit(m)} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 14, padding: 4, color: T.mid }}>✏️</button>
                       <button onClick={() => handleDelete(m.id)} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 14, padding: 4, color: T.red }}>🗑️</button>
                     </div>
@@ -1472,12 +1473,12 @@ function Tab6MeetingCalendar({ meetings, onRefresh }: { meetings: EmployeeTask[]
                 {form.title && (
                   <button onClick={shareFromForm}
                     style={{
-                      padding: "10px 16px", borderRadius: 12, border: `1px solid ${T.teal}40`,
-                      background: `${T.teal}15`, color: T.teal, fontSize: 14, fontWeight: 700,
-                      fontFamily: "inherit", cursor: "pointer", transition: "all 0.2s",
-                    }}
-                    title="مشاركة تفاصيل الاجتماع">
-                    📤
+                      padding: "10px 16px", borderRadius: 12, border: `1px solid ${copied ? T.green + "40" : T.teal + "40"}`,
+                      background: copied ? `${T.green}15` : `${T.teal}15`, color: copied ? T.green : T.teal,
+                      fontSize: 13, fontWeight: 700, fontFamily: "inherit", cursor: "pointer", transition: "all 0.2s",
+                      display: "flex", alignItems: "center", gap: 6,
+                    }}>
+                    {copied ? "✅" : "📋"} {copied ? "تم" : "نسخ"}
                   </button>
                 )}
               </div>
