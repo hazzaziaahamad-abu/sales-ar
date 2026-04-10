@@ -75,6 +75,8 @@ import {
 /* ─── Stage badge color mapping ─── */
 const STAGE_BADGE_COLOR: Record<string, "green" | "amber" | "purple" | "cyan" | "red" | "blue"> = {
   "تواصل": "green",
+  "قيد التواصل": "cyan",
+  "عميل جديد": "blue",
   "تفاوض": "purple",
   "تجهيز": "cyan",
   "انتظار الدفع": "amber",
