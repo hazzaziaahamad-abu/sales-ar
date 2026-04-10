@@ -307,21 +307,31 @@ export default function RecentUpdatesPage() {
     if (employees.length === 0) return [];
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    // Collect all active user names from recent updates and activity logs
-    const activeNames = new Set<string>();
+    // Collect all text fragments that indicate a user was active
+    const activeFragments: string[] = [];
     for (const item of items) {
       if (new Date(item.timestamp) >= cutoff) {
-        if (item.user_name) activeNames.add(item.user_name.trim());
-        if (item.modified_by) activeNames.add(item.modified_by.trim());
+        if (item.user_name) activeFragments.push(item.user_name.trim());
+        if (item.modified_by) activeFragments.push(item.modified_by.trim());
+        if (item.subtitle) activeFragments.push(item.subtitle.trim());
       }
     }
     for (const log of logs) {
       if (new Date(log.created_at) >= cutoff) {
-        if (log.user_name) activeNames.add(log.user_name.trim());
+        if (log.user_name) activeFragments.push(log.user_name.trim());
+        if (log.entity_title) activeFragments.push(log.entity_title.trim());
+        if (log.details) activeFragments.push(log.details.trim());
       }
     }
 
-    return employees.filter(emp => !activeNames.has(emp.name.trim()));
+    // Join all fragments for partial matching
+    const activeText = activeFragments.join(" ").toLowerCase();
+
+    return employees.filter(emp => {
+      const name = emp.name.trim().toLowerCase();
+      // Check exact match or partial (name appears in any activity text)
+      return !activeText.includes(name);
+    });
   }, [employees, items, logs]);
 
   return (
