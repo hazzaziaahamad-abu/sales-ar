@@ -1167,6 +1167,38 @@ function Tab6MeetingCalendar({ meetings, onRefresh }: { meetings: EmployeeTask[]
     onRefresh();
   };
 
+  const shareMeeting = async (m: { title: string; due_date?: string; due_time?: string; assigned_to_name?: string; client_name?: string; description?: string; completion_notes?: string; notes?: string; priority?: string }) => {
+    const priorityLabel = m.priority ? (PRIORITIES as Record<string, { label: string }>)[m.priority]?.label || m.priority : "";
+    const dateStr = m.due_date ? new Date(m.due_date).toLocaleDateString("ar-SA", { weekday: "long", year: "numeric", month: "long", day: "numeric" }) : "";
+
+    let text = `🤝 *${m.title}*\n`;
+    text += `${"─".repeat(30)}\n`;
+    if (dateStr) text += `📅 التاريخ: ${dateStr}`;
+    if (m.due_time) text += ` — ${m.due_time.slice(0, 5)}`;
+    text += "\n";
+    if (priorityLabel) text += `⚡ الأولوية: ${priorityLabel}\n`;
+    if (m.assigned_to_name) text += `👤 المسؤول: ${m.assigned_to_name}\n`;
+    if (m.client_name) text += `📍 المكان: ${m.client_name}\n`;
+    if (m.description) text += `\n📝 الوصف:\n${m.description}\n`;
+    if (m.completion_notes) text += `\n📋 الأجندة:\n${m.completion_notes}\n`;
+    if (m.notes) text += `\n💬 ملاحظات:\n${m.notes}\n`;
+
+    if (navigator.share) {
+      try { await navigator.share({ title: m.title, text }); return; }
+      catch { /* fallback below */ }
+    }
+    await navigator.clipboard.writeText(text);
+    alert("تم نسخ تفاصيل الاجتماع!");
+  };
+
+  const shareFromForm = () => {
+    shareMeeting({
+      title: form.title, due_date: form.due_date, due_time: form.due_time,
+      assigned_to_name: form.assigned_to_name, client_name: form.location,
+      description: form.description, completion_notes: form.agenda, notes: form.notes, priority: form.priority,
+    });
+  };
+
   const inputStyle: React.CSSProperties = {
     background: `${T.surface}`, border: `1px solid ${T.border}`, borderRadius: 10,
     color: T.text, fontSize: 13, padding: "8px 12px", width: "100%", outline: "none", fontFamily: "inherit", direction: "rtl",
@@ -1356,6 +1388,7 @@ function Tab6MeetingCalendar({ meetings, onRefresh }: { meetings: EmployeeTask[]
                         style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, color: T.text, fontSize: 11, padding: "4px 6px", cursor: "pointer", outline: "none" }}>
                         {Object.entries(STATUSES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                       </select>
+                      <button onClick={() => shareMeeting({ title: m.title, due_date: m.due_date, due_time: m.due_time, assigned_to_name: m.assigned_to_name, client_name: m.client_name, description: m.description, completion_notes: m.completion_notes, notes: m.notes, priority: m.priority })} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 14, padding: 4, color: T.teal }} title="مشاركة">📤</button>
                       <button onClick={() => openEdit(m)} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 14, padding: 4, color: T.mid }}>✏️</button>
                       <button onClick={() => handleDelete(m.id)} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 14, padding: 4, color: T.red }}>🗑️</button>
                     </div>
@@ -1427,14 +1460,27 @@ function Tab6MeetingCalendar({ meetings, onRefresh }: { meetings: EmployeeTask[]
                 <label style={labelStyle}>ملاحظات</label>
                 <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} style={{ ...inputStyle, minHeight: 40, resize: "vertical" as const }} rows={2} />
               </div>
-              <button onClick={handleSubmit} disabled={!form.title || !form.due_date || submitting}
-                style={{
-                  width: "100%", padding: "10px 0", borderRadius: 12, border: "none", cursor: !form.title || !form.due_date || submitting ? "default" : "pointer",
-                  background: T.purple, color: "#fff", fontSize: 14, fontWeight: 700, fontFamily: "inherit",
-                  opacity: !form.title || !form.due_date || submitting ? 0.4 : 1, transition: "all 0.2s",
-                }}>
-                {submitting ? "جاري الحفظ..." : editing ? "حفظ التعديلات" : "إنشاء الاجتماع"}
-              </button>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={handleSubmit} disabled={!form.title || !form.due_date || submitting}
+                  style={{
+                    flex: 1, padding: "10px 0", borderRadius: 12, border: "none", cursor: !form.title || !form.due_date || submitting ? "default" : "pointer",
+                    background: T.purple, color: "#fff", fontSize: 14, fontWeight: 700, fontFamily: "inherit",
+                    opacity: !form.title || !form.due_date || submitting ? 0.4 : 1, transition: "all 0.2s",
+                  }}>
+                  {submitting ? "جاري الحفظ..." : editing ? "حفظ التعديلات" : "إنشاء الاجتماع"}
+                </button>
+                {form.title && (
+                  <button onClick={shareFromForm}
+                    style={{
+                      padding: "10px 16px", borderRadius: 12, border: `1px solid ${T.teal}40`,
+                      background: `${T.teal}15`, color: T.teal, fontSize: 14, fontWeight: 700,
+                      fontFamily: "inherit", cursor: "pointer", transition: "all 0.2s",
+                    }}
+                    title="مشاركة تفاصيل الاجتماع">
+                    📤
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
