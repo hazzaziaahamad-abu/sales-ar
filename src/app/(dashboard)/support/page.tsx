@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   fetchTickets, createTicket, updateTicket, deleteTicket,
   fetchEmployees, fetchActivityLogs,
@@ -66,6 +66,9 @@ import {
   Phone,
   Search,
   ThumbsUp,
+  Share2,
+  Loader2,
+  Download,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -209,6 +212,39 @@ export default function SupportPage() {
   // Achievement summary
   const [achieveFilter, setAchieveFilter] = useState<string | null>(null);
   const [achieveFilterIds, setAchieveFilterIds] = useState<Set<string>>(new Set());
+
+  // Table share
+  const tableRef = useRef<HTMLDivElement>(null);
+  const [isTableExporting, setIsTableExporting] = useState(false);
+
+  const handleShareTable = useCallback(async () => {
+    if (!tableRef.current || isTableExporting) return;
+    setIsTableExporting(true);
+    try {
+      const { toPng } = await import("html-to-image");
+      const dataUrl = await toPng(tableRef.current, {
+        backgroundColor: "#0c0e14",
+        pixelRatio: 2,
+        style: { borderRadius: "0" },
+      });
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const file = new File([blob], "support-tickets.png", { type: "image/png" });
+
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ title: "جدول تذاكر الدعم", files: [file] });
+      } else {
+        const link = document.createElement("a");
+        link.href = dataUrl;
+        link.download = "support-tickets.png";
+        link.click();
+      }
+    } catch {
+      // User cancelled or error
+    } finally {
+      setIsTableExporting(false);
+    }
+  }, [isTableExporting]);
 
   const agentFilteredTickets = agentFilter
     ? monthTickets.filter((t) => t.assigned_agent_name === agentFilter)
@@ -911,9 +947,9 @@ export default function SupportPage() {
       )}
 
       {/* -------- Tickets Table -------- */}
-      <div id="tickets-table" className="cc-card rounded-[14px] overflow-x-auto">
+      <div id="tickets-table" ref={tableRef} className="cc-card rounded-[14px] overflow-x-auto">
         <div className="p-4 pb-0 space-y-3">
-          {/* Status filter pills */}
+          {/* Status filter pills + share button */}
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-muted-foreground font-medium ml-1">الحالة:</span>
             <button
@@ -969,6 +1005,20 @@ export default function SupportPage() {
             >
               <span className="w-2 h-2 rounded-full bg-orange-400" />
               عاجل <span className="font-mono mr-1 opacity-70">{countUrgent}</span>
+            </button>
+            {/* Share button */}
+            <button
+              onClick={handleShareTable}
+              disabled={isTableExporting}
+              className="mr-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-muted-foreground hover:text-cyan hover:bg-cyan/10 transition-colors disabled:opacity-50 border border-transparent hover:border-cyan/20"
+              title="مشاركة الجدول كصورة"
+            >
+              {isTableExporting ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Share2 className="w-3.5 h-3.5" />
+              )}
+              مشاركة
             </button>
           </div>
           {/* Active category filter indicator */}
