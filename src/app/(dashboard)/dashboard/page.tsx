@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { useTopbarControls } from "@/components/layout/topbar-context";
 import { formatMoney, formatDate } from "@/lib/utils/format";
 import { AlertCircle, ArrowUpLeft, Ticket as TicketIcon, TrendingUp, DollarSign, Users, Heart, FolderOpen, Award } from "lucide-react";
+import { StarEmployeeCard, Leaderboard } from "@/components/star-employee";
 
 const STAGE_COLORS: Record<string, string> = {
   "تواصل": "#10B981",
@@ -219,6 +220,14 @@ export default function DashboardPage() {
               <p className="text-[10px] text-muted-foreground">تذاكر محلولة</p>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── Star Employee + Leaderboard ── */}
+      {!isLoading && deals.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <StarEmployeeCard deals={deals} />
+          <Leaderboard deals={deals} />
         </div>
       )}
 

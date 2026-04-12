@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { Deal, Marketer, Package, Employee, EmployeeTask } from "@/types";
 import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createFollowUpNote, fetchRecentFollowUpNotes, fetchPackages, fetchQuoteCommitments, addQuoteCommitment, removeQuoteCommitment, fetchEmployees, fetchEmployeeTasks, createEmployeeTask, createRenewal } from "@/lib/supabase/db";
 import { checkDealsForFollowUp, buildFollowUpTask, type FollowUpAction } from "@/lib/auto-followup";
+import { StarEmployeeCard, Leaderboard } from "@/components/star-employee";
 import { AssignTaskModal } from "@/components/tasks/AssignTaskModal";
 import { useAuth } from "@/lib/auth-context";
 import { useTopbarControls } from "@/components/layout/topbar-context";
@@ -1631,6 +1632,14 @@ export function SalesSection({ salesType }: SalesPageProps) {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* ─── Star Employee + Leaderboard ─── */}
+      {!loading && repFilteredDeals.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <StarEmployeeCard deals={repFilteredDeals} />
+          <Leaderboard deals={repFilteredDeals} />
         </div>
       )}
 
