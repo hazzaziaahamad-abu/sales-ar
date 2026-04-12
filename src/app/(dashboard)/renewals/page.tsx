@@ -453,22 +453,33 @@ export default function RenewalsPage() {
       startDate = new Date(now);
       startDate.setDate(now.getDate() - now.getDay());
       startDate.setHours(0, 0, 0, 0);
+      // End of week (Saturday)
+      endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 6);
+      endDate.setHours(23, 59, 59, 999);
     } else if (summaryPeriod === "month") {
       startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      endDate.setHours(23, 59, 59, 999);
     } else if (summaryPeriod === "quarter") {
       const qMonth = Math.floor(now.getMonth() / 3) * 3;
       startDate = new Date(now.getFullYear(), qMonth, 1);
+      endDate = new Date(now.getFullYear(), qMonth + 3, 0);
+      endDate.setHours(23, 59, 59, 999);
     } else {
       // custom
       startDate = customRange.from ? new Date(customRange.from) : new Date(now.getFullYear(), now.getMonth(), 1);
       if (customRange.to) endDate = new Date(customRange.to + "T23:59:59");
     }
 
-    // Filter renewals that were updated/completed in the period
-    const periodRenewals = renewals.filter(r => {
-      const updated = new Date(r.updated_at);
-      return updated >= startDate && updated <= endDate;
-    });
+    // Filter renewals by renewal_date (due date) within the period
+    const pad2 = (n: number) => String(n).padStart(2, "0");
+    const fmtDate = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+    const startStr = fmtDate(startDate);
+    const endStr = fmtDate(endDate);
+    const periodRenewals = renewals.filter(r =>
+      r.renewal_date >= startStr && r.renewal_date <= endStr
+    );
 
     const completed = periodRenewals.filter(r => r.status === "مكتمل");
     const cancelled = periodRenewals.filter(r => r.status === "ملغي بسبب");
