@@ -30,6 +30,7 @@ interface AchievementItem {
 
 interface AchievementSummaryProps {
   items: AchievementItem[];
+  allPlans?: string[];
   labels?: {
     completed?: string;
     revenue?: string;
@@ -46,6 +47,7 @@ interface AchievementSummaryProps {
 
 export function AchievementSummary({
   items,
+  allPlans,
   labels,
   onFilterChange,
   activeFilter,
@@ -145,6 +147,23 @@ export function AchievementSummary({
       .map(([plan, data]) => ({ plan, ...data }))
       .sort((a, b) => b.count - a.count);
 
+    // Generate recommendations
+    const recommendations: string[] = [];
+    if (allPlans && allPlans.length > 0 && completed.length > 0) {
+      const completedPlanNames = new Set(Object.keys(planMap));
+      const missingPlans = allPlans.filter(p => !completedPlanNames.has(p));
+      if (missingPlans.length > 0) {
+        recommendations.push(`💡 لم يتحقق أي إنجاز في: ${missingPlans.join("، ")} — ركّز على عرضها للعملاء`);
+      }
+      const maxCount = Math.max(...planBreakdown.map(p => p.count));
+      const weakPlans = planBreakdown.filter(p => p.count > 0 && p.count <= maxCount * 0.3);
+      if (weakPlans.length > 0 && missingPlans.length === 0) {
+        recommendations.push(`📊 باقات تحتاج تركيز أكثر: ${weakPlans.map(p => p.plan).join("، ")}`);
+      }
+    } else if (allPlans && allPlans.length > 0 && completed.length === 0 && periodItems.length > 0) {
+      recommendations.push(`⚠️ لا يوجد إنجاز في هذه الفترة — حاول إغلاق صفقة واحدة على الأقل`);
+    }
+
     return {
       total: periodItems.length,
       completed: completed.length,
@@ -156,6 +175,7 @@ export function AchievementSummary({
       successRate,
       topRep: topRep ? { name: topRep[0], count: topRep[1] } : null,
       planBreakdown,
+      recommendations,
       completedIds: new Set(completed.map(i => i.id)),
       cancelledIds: new Set(cancelled.map(i => i.id)),
       contactedIds: new Set(contacted.map(i => i.id)),
@@ -380,6 +400,17 @@ export function AchievementSummary({
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Recommendations */}
+      {summary.recommendations.length > 0 && (
+        <div className="mt-3 space-y-1.5">
+          {summary.recommendations.map((rec, i) => (
+            <div key={i} className="px-3 py-2 rounded-lg bg-amber/[0.06] border border-amber/15 text-xs text-amber">
+              {rec}
+            </div>
+          ))}
         </div>
       )}
     </div>

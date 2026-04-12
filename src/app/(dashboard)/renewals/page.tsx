@@ -521,6 +521,23 @@ export default function RenewalsPage() {
       .map(([plan, data]) => ({ plan, ...data }))
       .sort((a, b) => b.count - a.count);
 
+    // Generate recommendations
+    const recommendations: string[] = [];
+    if (completed.length > 0) {
+      const completedPlanNames = new Set(Object.keys(planMap));
+      const missingPlans = [...PLANS].filter(p => !completedPlanNames.has(p));
+      if (missingPlans.length > 0) {
+        recommendations.push(`💡 لم يتحقق أي تجديد في: ${missingPlans.join("، ")} — ركّز على التواصل مع عملاء هذه الباقات`);
+      }
+      const maxCount = Math.max(...planBreakdown.map(p => p.count));
+      const weakPlans = planBreakdown.filter(p => p.count > 0 && p.count <= maxCount * 0.3);
+      if (weakPlans.length > 0 && missingPlans.length === 0) {
+        recommendations.push(`📊 باقات تحتاج تركيز أكثر: ${weakPlans.map(p => p.plan).join("، ")}`);
+      }
+    } else if (periodRenewals.length > 0) {
+      recommendations.push(`⚠️ لا يوجد تجديد مكتمل في هذه الفترة — حاول إغلاق تجديد واحد على الأقل`);
+    }
+
     return {
       periodRenewals: periodRenewals.length,
       completed: completed.length,
@@ -532,6 +549,7 @@ export default function RenewalsPage() {
       successRate,
       topRep: topRep ? { name: topRep[0], count: topRep[1] } : null,
       planBreakdown,
+      recommendations,
       // Store IDs for filtering
       completedIds: new Set(completed.map(r => r.id)),
       cancelledIds: new Set(cancelled.map(r => r.id)),
@@ -926,6 +944,17 @@ export default function RenewalsPage() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Recommendations */}
+          {achievementSummary.recommendations.length > 0 && (
+            <div className="mt-3 space-y-1.5">
+              {achievementSummary.recommendations.map((rec, i) => (
+                <div key={i} className="px-3 py-2 rounded-lg bg-amber/[0.06] border border-amber/15 text-xs text-amber">
+                  {rec}
+                </div>
+              ))}
             </div>
           )}
         </div>

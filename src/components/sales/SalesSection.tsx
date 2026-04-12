@@ -1073,6 +1073,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
       {!loading && (
         <AchievementSummary
           items={achievementItems}
+          allPlans={[...PLANS]}
           labels={{
             completed: "صفقة مكتملة",
             revenue: "إيرادات محققة",
