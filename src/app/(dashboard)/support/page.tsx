@@ -894,7 +894,66 @@ export default function SupportPage() {
 
       {/* -------- Tickets Table -------- */}
       <div id="tickets-table" className="cc-card rounded-[14px] overflow-x-auto">
-        <div className="p-4 pb-0">
+        <div className="p-4 pb-0 space-y-3">
+          {/* Status filter pills */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-muted-foreground font-medium ml-1">الحالة:</span>
+            <button
+              onClick={() => { setCardFilter(null); setAchieveFilter(null); }}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${
+                !cardFilter && !achieveFilter
+                  ? "bg-foreground/10 text-foreground border-foreground/20"
+                  : "bg-white/[0.04] text-muted-foreground hover:bg-white/[0.08] border-transparent"
+              }`}
+            >
+              الكل <span className="font-mono mr-1 opacity-70">{agentFilteredTickets.length}</span>
+            </button>
+            <button
+              onClick={() => { setCardFilter(cardFilter === "مفتوح" ? null : "مفتوح"); setAchieveFilter(null); }}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border flex items-center gap-1.5 ${
+                cardFilter === "مفتوح"
+                  ? "bg-cc-red/15 text-cc-red border-cc-red/30 ring-1 ring-cc-red/20"
+                  : "bg-white/[0.04] text-muted-foreground hover:bg-white/[0.08] border-transparent"
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-cc-red" />
+              مفتوح <span className="font-mono mr-1 opacity-70">{countOpen}</span>
+            </button>
+            <button
+              onClick={() => { setCardFilter(cardFilter === "قيد الحل" ? null : "قيد الحل"); setAchieveFilter(null); }}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border flex items-center gap-1.5 ${
+                cardFilter === "قيد الحل"
+                  ? "bg-amber/15 text-amber border-amber/30 ring-1 ring-amber/20"
+                  : "bg-white/[0.04] text-muted-foreground hover:bg-white/[0.08] border-transparent"
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-amber" />
+              قيد الحل <span className="font-mono mr-1 opacity-70">{countInProgress}</span>
+            </button>
+            <button
+              onClick={() => { setCardFilter(cardFilter === "محلول" ? null : "محلول"); setAchieveFilter(null); }}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border flex items-center gap-1.5 ${
+                cardFilter === "محلول"
+                  ? "bg-cc-green/15 text-cc-green border-cc-green/30 ring-1 ring-cc-green/20"
+                  : "bg-white/[0.04] text-muted-foreground hover:bg-white/[0.08] border-transparent"
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-cc-green" />
+              محلول <span className="font-mono mr-1 opacity-70">{countResolved}</span>
+            </button>
+            <button
+              onClick={() => { setCardFilter(cardFilter === "عاجل" ? null : "عاجل"); setAchieveFilter(null); }}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border flex items-center gap-1.5 ${
+                cardFilter === "عاجل"
+                  ? "bg-orange-500/15 text-orange-400 border-orange-400/30 ring-1 ring-orange-400/20"
+                  : "bg-white/[0.04] text-muted-foreground hover:bg-white/[0.08] border-transparent"
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-orange-400" />
+              عاجل <span className="font-mono mr-1 opacity-70">{countUrgent}</span>
+            </button>
+          </div>
+          {/* Search */}
           <div className="relative max-w-sm">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
             <Input
