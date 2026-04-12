@@ -83,7 +83,17 @@ import {
   Bell,
   AlertTriangle,
   User,
+  Archive,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
+
+/* ─── Permanently closed cancel reasons — excluded from main list ─── */
+const CLOSED_FOREVER_REASONS = new Set(["اغلاق المحل", "مو حاب يجدد بدون سبب", "الادارة رفضت"]);
+
+function isClosedForever(r: Renewal): boolean {
+  return r.status === "ملغي بسبب" && CLOSED_FOREVER_REASONS.has(r.cancel_reason || "");
+}
 
 /* ─── Status badge color mapping ─── */
 const STATUS_BADGE: Record<string, { text: string; color: string; bg: string }> = {
@@ -307,7 +317,7 @@ export default function RenewalsPage() {
 
   /* month filter — by month only (ignoring year) based on renewal_date */
   const { activeMonthIndex, filterCutoff } = useTopbarControls();
-  const monthRenewals = filterCutoff
+  const allMonthRenewals = filterCutoff
     ? renewals.filter((r) => new Date(r.renewal_date) >= filterCutoff)
     : activeMonthIndex
       ? renewals.filter((r) => {
@@ -316,10 +326,15 @@ export default function RenewalsPage() {
         })
       : renewals;
 
+  // Separate closed-forever from active renewals
+  const closedForeverRenewals = allMonthRenewals.filter(isClosedForever);
+  const monthRenewals = allMonthRenewals.filter((r) => !isClosedForever(r));
+
   /* card filter */
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [clientSearch, setClientSearch] = useState("");
   const [repFilter, setRepFilter] = useState<string | null>(null);
+  const [showClosed, setShowClosed] = useState(false);
   const PENDING_STATUSES = new Set(["مجدول", "جاري المتابعة", "انتظار الدفع"]);
   const repFilteredRenewals = repFilter
     ? monthRenewals.filter((r) => r.assigned_rep === repFilter)
@@ -1524,6 +1539,76 @@ export default function RenewalsPage() {
             </p>
           </div>
           <LineChart data={analytics.monthlyTrend} showArea height={200} />
+        </div>
+      )}
+
+      {/* ─── Closed Forever Section ─── */}
+      {!loading && closedForeverRenewals.length > 0 && (
+        <div className="cc-card rounded-xl overflow-hidden">
+          <button
+            onClick={() => setShowClosed(!showClosed)}
+            className="w-full flex items-center justify-between p-4 hover:bg-white/[0.02] transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Archive className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm font-bold text-muted-foreground">التجديدات المغلقة نهائياً</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted/30 text-muted-foreground font-medium">
+                {closedForeverRenewals.length}
+              </span>
+            </div>
+            {showClosed ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+          </button>
+          {showClosed && (
+            <div className="border-t border-border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>العميل</TableHead>
+                    <TableHead>الجوال</TableHead>
+                    <TableHead>الخطة</TableHead>
+                    <TableHead>السعر</TableHead>
+                    <TableHead>تاريخ التجديد</TableHead>
+                    <TableHead>سبب الإغلاق</TableHead>
+                    <TableHead>المسؤول</TableHead>
+                    <TableHead className="text-center">إجراءات</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {closedForeverRenewals.map((renewal) => {
+                    const badge = STATUS_BADGE[renewal.status] || STATUS_BADGE["مجدول"];
+                    return (
+                      <TableRow key={renewal.id} className="opacity-70 hover:opacity-100 transition-opacity">
+                        <TableCell className="font-medium text-foreground">{renewal.customer_name}</TableCell>
+                        <TableCell className="text-muted-foreground text-xs font-mono" dir="ltr">
+                          {renewal.customer_phone ? formatPhone(renewal.customer_phone) : "—"}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-xs">{renewal.plan_name}</TableCell>
+                        <TableCell className="font-bold text-cc-red text-xs">{formatMoneyFull(renewal.plan_price)}</TableCell>
+                        <TableCell className="text-muted-foreground text-xs">{formatDate(renewal.renewal_date)}</TableCell>
+                        <TableCell>
+                          <span className="inline-block px-2.5 py-1 rounded-full text-[10px] font-medium bg-red-dim text-cc-red">
+                            {renewal.cancel_reason || "ملغي"}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-xs">{renewal.assigned_rep || "—"}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center justify-center gap-1">
+                            <FollowUpLogButton entityType="renewal" entityId={renewal.id} entityName={renewal.customer_name} />
+                            <Button variant="ghost" size="icon-xs" onClick={() => openEditModal(renewal)} title="تعديل">
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button variant="destructive" size="icon-xs" onClick={() => confirmDelete(renewal.id)} title="حذف">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </div>
       )}
 
