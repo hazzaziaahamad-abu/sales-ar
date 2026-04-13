@@ -334,7 +334,7 @@ export default function AgentPage() {
                           {msg.role === "user" ? "أنت" : "المساعد الذكي"}
                         </span>
                         <span className="text-[10px] text-muted-foreground">
-                          {new Date().toLocaleTimeString("ar-SA", {
+                          {new Date().toLocaleTimeString("ar-SA-u-ca-gregory", {
                             hour: "2-digit",
                             minute: "2-digit",
                           })}

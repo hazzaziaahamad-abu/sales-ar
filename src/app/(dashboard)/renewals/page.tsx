@@ -224,7 +224,7 @@ export default function RenewalsPage() {
     const remaining = targetRenewals.filter((r) => r.status !== "مكتمل");
     const total = targetRenewals.length;
     const rate = total > 0 ? Math.round((completed.length / total) * 100) : 0;
-    const todayStr = new Date().toLocaleDateString("ar-SA", {
+    const todayStr = new Date().toLocaleDateString("ar-SA-u-ca-gregory", {
       weekday: "long",
       year: "numeric",
       month: "long",
@@ -301,7 +301,7 @@ export default function RenewalsPage() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `تقرير الهدف اليومي — ${new Date().toLocaleDateString("ar-SA")}`,
+          title: `تقرير الهدف اليومي — ${new Date().toLocaleDateString("ar-SA-u-ca-gregory")}`,
           text: report,
         });
       } catch {
@@ -1220,7 +1220,7 @@ export default function RenewalsPage() {
                 <div>
                   <h3 className="text-sm font-bold text-foreground">الهدف اليومي</h3>
                   <span className="text-[10px] text-muted-foreground">
-                    {new Date().toLocaleDateString("ar-SA", { weekday: "long", day: "numeric", month: "short" })}
+                    {new Date().toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "long", day: "numeric", month: "short" })}
                   </span>
                 </div>
               </div>

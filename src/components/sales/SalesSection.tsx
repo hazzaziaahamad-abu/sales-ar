@@ -267,7 +267,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
 
   function buildFollowUpReport() {
     const followUpDeals = deals.filter((d) => followUpIds.has(d.id));
-    const todayStr = new Date().toLocaleDateString("ar-SA", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+    const todayStr = new Date().toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
     let report = `📋 قائمة متابعة العملاء\n`;
     report += `📅 ${todayStr}\n`;
     report += `${"─".repeat(35)}\n`;
@@ -302,7 +302,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
     const total = targetDeals.length;
     const rate = total > 0 ? Math.round((closed.length / total) * 100) : 0;
     const totalValue = closed.reduce((s, d) => s + d.deal_value, 0);
-    const todayStr = new Date().toLocaleDateString("ar-SA", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+    const todayStr = new Date().toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
     // Fetch latest follow-up notes for all target deals
     const latestNotes: Record<string, string> = {};
@@ -1247,7 +1247,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
                 <div>
                   <h3 className="text-sm font-bold text-foreground">هدف {pageTitle} اليومي</h3>
                   <span className="text-[10px] text-muted-foreground">
-                    {new Date().toLocaleDateString("ar-SA", { weekday: "long", day: "numeric", month: "short" })}
+                    {new Date().toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "long", day: "numeric", month: "short" })}
                   </span>
                 </div>
               </div>

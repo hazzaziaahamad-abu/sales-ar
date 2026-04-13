@@ -1323,7 +1323,7 @@ export default function SupportPage() {
                           const ActionIcon = config.icon;
                           const logDate = new Date(log.created_at);
                           const dateStr = formatDate(logDate.toISOString().slice(0, 10));
-                          const timeStr = logDate.toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" });
+                          const timeStr = logDate.toLocaleTimeString("ar-SA-u-ca-gregory", { hour: "2-digit", minute: "2-digit" });
 
                           return (
                             <TableRow key={log.id}>

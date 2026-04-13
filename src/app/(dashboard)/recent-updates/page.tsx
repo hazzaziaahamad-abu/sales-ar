@@ -118,12 +118,12 @@ function formatTime(dateStr: string): string {
   if (diffDays === 1) return "أمس";
   if (diffDays < 7) return `منذ ${diffDays} أيام`;
 
-  return d.toLocaleDateString("ar-SA", { month: "short", day: "numeric" });
+  return d.toLocaleDateString("ar-SA-u-ca-gregory", { month: "short", day: "numeric" });
 }
 
 function formatFullTime(dateStr: string): string {
   const d = new Date(dateStr);
-  return d.toLocaleDateString("ar-SA", {
+  return d.toLocaleDateString("ar-SA-u-ca-gregory", {
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -147,7 +147,7 @@ function formatDateGroup(dateStr: string): string {
     return "أمس";
   }
 
-  return d.toLocaleDateString("ar-SA", {
+  return d.toLocaleDateString("ar-SA-u-ca-gregory", {
     weekday: "long",
     month: "short",
     day: "numeric",
@@ -817,7 +817,7 @@ export default function RecentUpdatesPage() {
         const grouped = new Map<string, TrainingSessionLog[]>();
         for (const s of filteredSessions) {
           const d = new Date(s.started_at);
-          const key = d.toLocaleDateString("ar-SA", { year: "numeric", month: "long", day: "numeric" });
+          const key = d.toLocaleDateString("ar-SA-u-ca-gregory", { year: "numeric", month: "long", day: "numeric" });
           if (!grouped.has(key)) grouped.set(key, []);
           grouped.get(key)!.push(s);
         }

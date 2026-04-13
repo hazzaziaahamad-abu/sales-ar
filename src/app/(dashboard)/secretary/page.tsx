@@ -47,7 +47,7 @@ function daysAgo(dateStr: string) {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24));
 }
 function getDayName() {
-  return new Date().toLocaleDateString("ar-SA", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  return new Date().toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 }
 function getGreeting() {
   const h = new Date().getHours();
@@ -464,7 +464,7 @@ export default function SecretaryPage() {
                     className="px-2 py-1 rounded-lg bg-white/[0.04] border border-white/[0.08] text-foreground text-xs focus:outline-none focus:border-cyan-500/50"
                   >
                     {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => (
-                      <option key={m} value={m}>{new Date(2000, m - 1).toLocaleDateString("ar-SA", { month: "long" })}</option>
+                      <option key={m} value={m}>{new Date(2000, m - 1).toLocaleDateString("ar-SA-u-ca-gregory", { month: "long" })}</option>
                     ))}
                   </select>
                   <select

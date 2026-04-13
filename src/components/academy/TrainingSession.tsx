@@ -504,7 +504,7 @@ export function TrainingSession({ onBack, platform = "menu" }: TrainingSessionPr
                 </div>
                 <div>
                   <p className="text-sm font-bold text-foreground">جلسة سابقة: {savedTopicInfo.title}</p>
-                  <p className="text-[10px] text-muted-foreground">{saved.messages.length} رسالة — {new Date(saved.savedAt).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}</p>
+                  <p className="text-[10px] text-muted-foreground">{saved.messages.length} رسالة — {new Date(saved.savedAt).toLocaleTimeString("ar-SA-u-ca-gregory", { hour: "2-digit", minute: "2-digit" })}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">

@@ -436,9 +436,9 @@ export default function GiftsPage() {
                 )}
 
                 <div className="text-[10px] text-muted-foreground">
-                  {offer.entity_type === "renewal" ? "تجديد" : "صفقة"} — {new Date(offer.created_at).toLocaleDateString("ar-SA")}
+                  {offer.entity_type === "renewal" ? "تجديد" : "صفقة"} — {new Date(offer.created_at).toLocaleDateString("ar-SA-u-ca-gregory")}
                   {offer.accepted_at && (
-                    <span className="text-emerald-400 mr-2">قبل في {new Date(offer.accepted_at).toLocaleDateString("ar-SA")}</span>
+                    <span className="text-emerald-400 mr-2">قبل في {new Date(offer.accepted_at).toLocaleDateString("ar-SA-u-ca-gregory")}</span>
                   )}
                 </div>
 
