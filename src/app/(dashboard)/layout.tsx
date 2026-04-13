@@ -30,6 +30,7 @@ const PAGE_SLUG_MAP: Record<string, string> = {
   "/users": "users",
   "/weekly": "weekly",
   "/academy": "academy",
+  "/secretary": "secretary",
 };
 
 function MentionNotifLoader({ onLoad }: { onLoad: (n: AppNotification[]) => void }) {
