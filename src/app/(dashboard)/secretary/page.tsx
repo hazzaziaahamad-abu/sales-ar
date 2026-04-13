@@ -251,36 +251,50 @@ export default function SecretaryPage() {
     return { total, pct, remaining, daysLeft: Math.max(daysLeft, 0), closedDeals: closed.length };
   }, [deals, renewals]);
 
-  // Briefing stats — filtered by selected month
+  // Briefing stats — filtered by selected month, split by type
   const briefingStats = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
 
-    // Monthly stats (based on selected filter)
-    const monthDeals = deals.filter(d => d.month === selectedMonth && d.year === selectedYear);
-    const closedMonth = monthDeals.filter(d => d.stage === "مكتملة");
-    const revenueMonth = closedMonth.reduce((s, d) => s + d.deal_value, 0);
-    const pipeline = monthDeals.filter(d => d.stage !== "مكتملة" && d.stage !== "مرفوض مع سبب");
-    const pipelineValue = pipeline.reduce((s, d) => s + d.deal_value, 0);
+    // Split deals by sales_type
+    const officeDeals = deals.filter(d => d.sales_type === "office" || !d.sales_type);
+    const supportDeals = deals.filter(d => d.sales_type === "support");
 
-    // Renewals for selected month
+    // ── Monthly stats (based on selected filter) ──
+    const monthOffice = officeDeals.filter(d => d.month === selectedMonth && d.year === selectedYear);
+    const monthSupport = supportDeals.filter(d => d.month === selectedMonth && d.year === selectedYear);
     const monthRenewals = renewals.filter(r => {
       const rd = new Date(r.renewal_date);
       return rd.getMonth() + 1 === selectedMonth && rd.getFullYear() === selectedYear;
     });
-    const pendingRenewals = monthRenewals.filter(r => r.status !== "مكتمل" && r.status !== "ملغي بسبب").length;
-    const completedRenewals = monthRenewals.filter(r => r.status === "مكتمل").length;
-    const renewalRevenue = monthRenewals.filter(r => r.status === "مكتمل").reduce((s, r) => s + r.plan_price, 0);
 
-    // Today's stats
-    const todayDeals = deals.filter(d => d.close_date === today || (d.created_at && d.created_at.startsWith(today)));
-    const todayClosed = todayDeals.filter(d => d.stage === "مكتملة");
-    const todayRevenue = todayClosed.reduce((s, d) => s + d.deal_value, 0);
-    const todayNew = deals.filter(d => d.created_at && d.created_at.startsWith(today)).length;
+    const closedOffice = monthOffice.filter(d => d.stage === "مكتملة");
+    const closedSupport = monthSupport.filter(d => d.stage === "مكتملة");
+    const revenueOffice = closedOffice.reduce((s, d) => s + d.deal_value, 0);
+    const revenueSupport = closedSupport.reduce((s, d) => s + d.deal_value, 0);
+    const pipeline = [...monthOffice, ...monthSupport].filter(d => d.stage !== "مكتملة" && d.stage !== "مرفوض مع سبب");
+    const completedRenewals = monthRenewals.filter(r => r.status === "مكتمل");
+    const renewalRevenue = completedRenewals.reduce((s, r) => s + r.plan_price, 0);
+    const pendingRenewals = monthRenewals.filter(r => r.status !== "مكتمل" && r.status !== "ملغي بسبب").length;
+
+    // ── Today's stats ──
+    const todayOffice = officeDeals.filter(d => (d.close_date === today || d.created_at?.startsWith(today)) && d.stage === "مكتملة");
+    const todaySupport = supportDeals.filter(d => (d.close_date === today || d.created_at?.startsWith(today)) && d.stage === "مكتملة");
+    const todayRenewals = renewals.filter(r => r.status === "مكتمل" && r.updated_at?.startsWith(today));
+    const todayNew = deals.filter(d => d.created_at?.startsWith(today)).length;
 
     return {
-      closedMonth: closedMonth.length, revenueMonth, pipelineCount: pipeline.length, pipelineValue,
-      pendingRenewals, completedRenewals, renewalRevenue,
-      todayClosed: todayClosed.length, todayRevenue, todayNew,
+      // Monthly
+      closedOffice: closedOffice.length, revenueOffice,
+      closedSupport: closedSupport.length, revenueSupport,
+      pipelineCount: pipeline.length,
+      completedRenewals: completedRenewals.length, renewalRevenue, pendingRenewals,
+      totalRevenueMonth: revenueOffice + revenueSupport + renewalRevenue,
+      // Today
+      todayOffice: todayOffice.length, todayOfficeRev: todayOffice.reduce((s, d) => s + d.deal_value, 0),
+      todaySupport: todaySupport.length, todaySupportRev: todaySupport.reduce((s, d) => s + d.deal_value, 0),
+      todayRenewals: todayRenewals.length, todayRenewalRev: todayRenewals.reduce((s, r) => s + r.plan_price, 0),
+      todayNew,
+      todayTotalRev: todayOffice.reduce((s, d) => s + d.deal_value, 0) + todaySupport.reduce((s, d) => s + d.deal_value, 0) + todayRenewals.reduce((s, r) => s + r.plan_price, 0),
     };
   }, [deals, renewals, selectedMonth, selectedYear]);
 
@@ -406,82 +420,116 @@ export default function SecretaryPage() {
             {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-xl" />)}
           </div>
         ) : (
-          <div className="space-y-4">
-            {/* Today's quick stats */}
+          <div className="space-y-5">
+            {/* ── Today's stats split by type ── */}
             <div>
-              <p className="text-xs font-bold text-amber-400 mb-2 flex items-center gap-1.5"><Sun className="w-3.5 h-3.5" /> إحصائيات اليوم</p>
-              <div className="grid grid-cols-3 gap-3">
+              <p className="text-xs font-bold text-amber-400 mb-3 flex items-center gap-1.5"><Sun className="w-3.5 h-3.5" /> إحصائيات اليوم</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
-                  <p className="text-xl font-bold text-emerald-400">{briefingStats.todayClosed}</p>
-                  <p className="text-[10px] text-muted-foreground">مغلقة اليوم</p>
+                  <TrendingUp className="w-4 h-4 text-emerald-400 mx-auto mb-1" />
+                  <p className="text-xl font-bold text-emerald-400">{briefingStats.todayOffice}</p>
+                  <p className="text-[10px] text-muted-foreground">مبيعات المكتب</p>
+                  {briefingStats.todayOfficeRev > 0 && <p className="text-[10px] text-emerald-400/70 mt-0.5">{formatMoneyFull(briefingStats.todayOfficeRev)}</p>}
+                </div>
+                <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/20 text-center">
+                  <TrendingUp className="w-4 h-4 text-orange-400 mx-auto mb-1" />
+                  <p className="text-xl font-bold text-orange-400">{briefingStats.todaySupport}</p>
+                  <p className="text-[10px] text-muted-foreground">مبيعات الدعم</p>
+                  {briefingStats.todaySupportRev > 0 && <p className="text-[10px] text-orange-400/70 mt-0.5">{formatMoneyFull(briefingStats.todaySupportRev)}</p>}
+                </div>
+                <div className="p-3 rounded-xl bg-sky-500/10 border border-sky-500/20 text-center">
+                  <RefreshCw className="w-4 h-4 text-sky-400 mx-auto mb-1" />
+                  <p className="text-xl font-bold text-sky-400">{briefingStats.todayRenewals}</p>
+                  <p className="text-[10px] text-muted-foreground">تجديدات مكتملة</p>
+                  {briefingStats.todayRenewalRev > 0 && <p className="text-[10px] text-sky-400/70 mt-0.5">{formatMoneyFull(briefingStats.todayRenewalRev)}</p>}
                 </div>
                 <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-center">
-                  <p className="text-xl font-bold text-cyan-400">{formatMoneyFull(briefingStats.todayRevenue)}</p>
-                  <p className="text-[10px] text-muted-foreground">إيرادات اليوم</p>
-                </div>
-                <div className="p-3 rounded-xl bg-violet-500/10 border border-violet-500/20 text-center">
-                  <p className="text-xl font-bold text-violet-400">{briefingStats.todayNew}</p>
-                  <p className="text-[10px] text-muted-foreground">صفقة جديدة اليوم</p>
+                  <Banknote className="w-4 h-4 text-cyan-400 mx-auto mb-1" />
+                  <p className="text-xl font-bold text-cyan-400">{formatMoneyFull(briefingStats.todayTotalRev)}</p>
+                  <p className="text-[10px] text-muted-foreground">إجمالي إيرادات اليوم</p>
                 </div>
               </div>
             </div>
 
-            {/* Month filter */}
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-bold text-cyan-400 flex items-center gap-1.5"><BarChart3 className="w-3.5 h-3.5" /> إحصائيات الشهر</p>
-              <div className="flex items-center gap-2">
-                <select
-                  value={selectedMonth}
-                  onChange={e => setSelectedMonth(Number(e.target.value))}
-                  className="px-2 py-1 rounded-lg bg-white/[0.04] border border-white/[0.08] text-foreground text-xs focus:outline-none focus:border-cyan-500/50"
-                >
-                  {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => (
-                    <option key={m} value={m}>{new Date(2000, m - 1).toLocaleDateString("ar-SA", { month: "long" })}</option>
-                  ))}
-                </select>
-                <select
-                  value={selectedYear}
-                  onChange={e => setSelectedYear(Number(e.target.value))}
-                  className="px-2 py-1 rounded-lg bg-white/[0.04] border border-white/[0.08] text-foreground text-xs focus:outline-none focus:border-cyan-500/50"
-                >
-                  {[2024, 2025, 2026].map(y => (
-                    <option key={y} value={y}>{y}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
+            <div className="border-t border-border" />
 
-            {/* Monthly stats grid */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
-                <TrendingUp className="w-4 h-4 text-emerald-400 mx-auto mb-1" />
-                <p className="text-xl font-bold text-emerald-400">{briefingStats.closedMonth}</p>
-                <p className="text-[10px] text-muted-foreground">صفقة مكتملة</p>
+            {/* ── Monthly stats with filter ── */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-bold text-cyan-400 flex items-center gap-1.5"><BarChart3 className="w-3.5 h-3.5" /> إحصائيات الشهر</p>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedMonth}
+                    onChange={e => setSelectedMonth(Number(e.target.value))}
+                    className="px-2 py-1 rounded-lg bg-white/[0.04] border border-white/[0.08] text-foreground text-xs focus:outline-none focus:border-cyan-500/50"
+                  >
+                    {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => (
+                      <option key={m} value={m}>{new Date(2000, m - 1).toLocaleDateString("ar-SA", { month: "long" })}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={selectedYear}
+                    onChange={e => setSelectedYear(Number(e.target.value))}
+                    className="px-2 py-1 rounded-lg bg-white/[0.04] border border-white/[0.08] text-foreground text-xs focus:outline-none focus:border-cyan-500/50"
+                  >
+                    {[2024, 2025, 2026].map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
+
+              {/* Office Sales */}
+              <p className="text-[10px] font-bold text-emerald-400 mb-1.5">مبيعات المكتب</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
+                <div className="p-2.5 rounded-xl bg-emerald-500/[0.06] border border-emerald-500/15 text-center">
+                  <p className="text-lg font-bold text-emerald-400">{briefingStats.closedOffice}</p>
+                  <p className="text-[10px] text-muted-foreground">مكتملة</p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-emerald-500/[0.06] border border-emerald-500/15 text-center">
+                  <p className="text-lg font-bold text-emerald-400">{formatMoneyFull(briefingStats.revenueOffice)}</p>
+                  <p className="text-[10px] text-muted-foreground">الإيرادات</p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-violet-500/[0.06] border border-violet-500/15 text-center">
+                  <p className="text-lg font-bold text-violet-400">{briefingStats.pipelineCount}</p>
+                  <p className="text-[10px] text-muted-foreground">في خط الأنابيب</p>
+                </div>
+              </div>
+
+              {/* Support Sales */}
+              <p className="text-[10px] font-bold text-orange-400 mb-1.5">مبيعات الدعم</p>
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div className="p-2.5 rounded-xl bg-orange-500/[0.06] border border-orange-500/15 text-center">
+                  <p className="text-lg font-bold text-orange-400">{briefingStats.closedSupport}</p>
+                  <p className="text-[10px] text-muted-foreground">مكتملة</p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-orange-500/[0.06] border border-orange-500/15 text-center">
+                  <p className="text-lg font-bold text-orange-400">{formatMoneyFull(briefingStats.revenueSupport)}</p>
+                  <p className="text-[10px] text-muted-foreground">الإيرادات</p>
+                </div>
+              </div>
+
+              {/* Renewals */}
+              <p className="text-[10px] font-bold text-sky-400 mb-1.5">التجديدات</p>
+              <div className="grid grid-cols-3 gap-3 mb-3">
+                <div className="p-2.5 rounded-xl bg-sky-500/[0.06] border border-sky-500/15 text-center">
+                  <p className="text-lg font-bold text-sky-400">{briefingStats.completedRenewals}</p>
+                  <p className="text-[10px] text-muted-foreground">مكتمل</p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-amber-500/[0.06] border border-amber-500/15 text-center">
+                  <p className="text-lg font-bold text-amber-400">{briefingStats.pendingRenewals}</p>
+                  <p className="text-[10px] text-muted-foreground">معلّق</p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-sky-500/[0.06] border border-sky-500/15 text-center">
+                  <p className="text-lg font-bold text-sky-400">{formatMoneyFull(briefingStats.renewalRevenue)}</p>
+                  <p className="text-[10px] text-muted-foreground">الإيرادات</p>
+                </div>
+              </div>
+
+              {/* Total */}
               <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-center">
-                <Banknote className="w-4 h-4 text-cyan-400 mx-auto mb-1" />
-                <p className="text-xl font-bold text-cyan-400">{formatMoneyFull(briefingStats.revenueMonth)}</p>
-                <p className="text-[10px] text-muted-foreground">إيرادات المبيعات</p>
-              </div>
-              <div className="p-3 rounded-xl bg-violet-500/10 border border-violet-500/20 text-center">
-                <BarChart3 className="w-4 h-4 text-violet-400 mx-auto mb-1" />
-                <p className="text-xl font-bold text-violet-400">{briefingStats.pipelineCount}</p>
-                <p className="text-[10px] text-muted-foreground">في خط الأنابيب</p>
-              </div>
-              <div className="p-3 rounded-xl bg-sky-500/10 border border-sky-500/20 text-center">
-                <RefreshCw className="w-4 h-4 text-sky-400 mx-auto mb-1" />
-                <p className="text-xl font-bold text-sky-400">{briefingStats.completedRenewals}</p>
-                <p className="text-[10px] text-muted-foreground">تجديد مكتمل</p>
-              </div>
-              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center">
-                <AlertTriangle className="w-4 h-4 text-amber-400 mx-auto mb-1" />
-                <p className="text-xl font-bold text-amber-400">{briefingStats.pendingRenewals}</p>
-                <p className="text-[10px] text-muted-foreground">تجديد معلّق</p>
-              </div>
-              <div className="p-3 rounded-xl bg-lime-500/10 border border-lime-500/20 text-center">
-                <Banknote className="w-4 h-4 text-lime-400 mx-auto mb-1" />
-                <p className="text-xl font-bold text-lime-400">{formatMoneyFull(briefingStats.renewalRevenue)}</p>
-                <p className="text-[10px] text-muted-foreground">إيرادات التجديدات</p>
+                <p className="text-xl font-bold text-cyan-400">{formatMoneyFull(briefingStats.totalRevenueMonth)}</p>
+                <p className="text-[10px] text-muted-foreground">إجمالي إيرادات الشهر (مبيعات + تجديدات)</p>
               </div>
             </div>
           </div>
