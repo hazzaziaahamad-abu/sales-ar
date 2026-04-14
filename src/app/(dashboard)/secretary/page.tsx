@@ -321,6 +321,7 @@ export default function SecretaryPage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedPeriod, setSelectedPeriod] = useState<"today" | "yesterday" | "week" | "month">("today");
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     briefing: true, meetings: true, hotCold: true, supportHealth: true, renewalHealth: true, priorities: true,
     goal90: true, quickTasks: true, tasks: true,
@@ -584,52 +585,96 @@ export default function SecretaryPage() {
     return { total, pct, remaining, daysLeft: Math.max(daysLeft, 0), closedDeals: closed.length };
   }, [deals, renewals]);
 
-  // Briefing stats — filtered by selected month, split by type
+  // Briefing stats — summaries for today / yesterday / week / month
   const briefingStats = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const yesterdayStr = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    // Week range: last 7 days inclusive (today ... today - 6)
+    const weekStart = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
     // Split deals by sales_type
     const officeDeals = deals.filter(d => d.sales_type === "office" || !d.sales_type);
     const supportDeals = deals.filter(d => d.sales_type === "support");
 
-    // ── Monthly stats (based on selected filter) ──
+    // Helper: check if a YYYY-MM-DD string falls within [start, end] inclusive
+    const inDayRange = (dateStr: string | undefined, start: string, end: string) =>
+      !!dateStr && dateStr.slice(0, 10) >= start && dateStr.slice(0, 10) <= end;
+
+    const inMonth = (dateStr: string | undefined) => {
+      if (!dateStr) return false;
+      const d = new Date(dateStr);
+      return d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear;
+    };
+
+    function statsForRange(label: "today" | "yesterday" | "week" | "month", start: string, end: string) {
+      const useMonth = label === "month";
+      const dealMatches = (d: Deal) => {
+        if (d.stage !== "مكتملة") return false;
+        const key = d.close_date || d.created_at;
+        return useMonth ? inMonth(key) : inDayRange(key, start, end);
+      };
+      const renewalMatches = (r: Renewal) =>
+        r.status === "مكتمل" && (useMonth ? inMonth(r.updated_at) : inDayRange(r.updated_at, start, end));
+      const ticketCreatedInRange = (t: Ticket) =>
+        useMonth ? inMonth(t.created_at) : inDayRange(t.created_at, start, end);
+      const ticketResolvedInRange = (t: Ticket) => {
+        if (t.status !== "محلول") return false;
+        const key = t.resolved_date || t.updated_at;
+        return useMonth ? inMonth(key) : inDayRange(key, start, end);
+      };
+
+      const office = officeDeals.filter(dealMatches);
+      const support = supportDeals.filter(dealMatches);
+      const rens = renewals.filter(renewalMatches);
+      const tNew = tickets.filter(ticketCreatedInRange);
+      const tResolved = tickets.filter(ticketResolvedInRange);
+
+      const officeRev = office.reduce((s, d) => s + d.deal_value, 0);
+      const supportRev = support.reduce((s, d) => s + d.deal_value, 0);
+      const renewalRev = rens.reduce((s, r) => s + r.plan_price, 0);
+
+      return {
+        office: office.length, officeRev,
+        support: support.length, supportRev,
+        renewals: rens.length, renewalRev,
+        ticketsNew: tNew.length,
+        ticketsResolved: tResolved.length,
+        totalRev: officeRev + supportRev + renewalRev,
+      };
+    }
+
+    const today = statsForRange("today", todayStr, todayStr);
+    const yesterday = statsForRange("yesterday", yesterdayStr, yesterdayStr);
+    const week = statsForRange("week", weekStart, todayStr);
+    const month = statsForRange("month", "", ""); // args ignored when useMonth
+
+    // Monthly richer metrics (for the existing detailed section)
     const monthOffice = officeDeals.filter(d => d.month === selectedMonth && d.year === selectedYear);
     const monthSupport = supportDeals.filter(d => d.month === selectedMonth && d.year === selectedYear);
     const monthRenewals = renewals.filter(r => {
       const rd = new Date(r.renewal_date);
       return rd.getMonth() + 1 === selectedMonth && rd.getFullYear() === selectedYear;
     });
-
-    const closedOffice = monthOffice.filter(d => d.stage === "مكتملة");
-    const closedSupport = monthSupport.filter(d => d.stage === "مكتملة");
-    const revenueOffice = closedOffice.reduce((s, d) => s + d.deal_value, 0);
-    const revenueSupport = closedSupport.reduce((s, d) => s + d.deal_value, 0);
     const pipeline = [...monthOffice, ...monthSupport].filter(d => d.stage !== "مكتملة" && d.stage !== "مرفوض مع سبب");
-    const completedRenewals = monthRenewals.filter(r => r.status === "مكتمل");
-    const renewalRevenue = completedRenewals.reduce((s, r) => s + r.plan_price, 0);
     const pendingRenewals = monthRenewals.filter(r => r.status !== "مكتمل" && r.status !== "ملغي بسبب").length;
 
-    // ── Today's stats ──
-    const todayOffice = officeDeals.filter(d => (d.close_date === today || d.created_at?.startsWith(today)) && d.stage === "مكتملة");
-    const todaySupport = supportDeals.filter(d => (d.close_date === today || d.created_at?.startsWith(today)) && d.stage === "مكتملة");
-    const todayRenewals = renewals.filter(r => r.status === "مكتمل" && r.updated_at?.startsWith(today));
-    const todayNew = deals.filter(d => d.created_at?.startsWith(today)).length;
-
     return {
-      // Monthly
-      closedOffice: closedOffice.length, revenueOffice,
-      closedSupport: closedSupport.length, revenueSupport,
+      periods: { today, yesterday, week, month },
+      // Monthly (legacy fields — consumed by existing monthly section + AI)
+      closedOffice: month.office, revenueOffice: month.officeRev,
+      closedSupport: month.support, revenueSupport: month.supportRev,
       pipelineCount: pipeline.length,
-      completedRenewals: completedRenewals.length, renewalRevenue, pendingRenewals,
-      totalRevenueMonth: revenueOffice + revenueSupport + renewalRevenue,
-      // Today
-      todayOffice: todayOffice.length, todayOfficeRev: todayOffice.reduce((s, d) => s + d.deal_value, 0),
-      todaySupport: todaySupport.length, todaySupportRev: todaySupport.reduce((s, d) => s + d.deal_value, 0),
-      todayRenewals: todayRenewals.length, todayRenewalRev: todayRenewals.reduce((s, r) => s + r.plan_price, 0),
-      todayNew,
-      todayTotalRev: todayOffice.reduce((s, d) => s + d.deal_value, 0) + todaySupport.reduce((s, d) => s + d.deal_value, 0) + todayRenewals.reduce((s, r) => s + r.plan_price, 0),
+      completedRenewals: month.renewals, renewalRevenue: month.renewalRev, pendingRenewals,
+      totalRevenueMonth: month.totalRev,
+      // Today (legacy fields kept for compatibility)
+      todayOffice: today.office, todayOfficeRev: today.officeRev,
+      todaySupport: today.support, todaySupportRev: today.supportRev,
+      todayRenewals: today.renewals, todayRenewalRev: today.renewalRev,
+      todayNew: 0,
+      todayTotalRev: today.totalRev,
     };
-  }, [deals, renewals, selectedMonth, selectedYear]);
+  }, [deals, renewals, tickets, selectedMonth, selectedYear]);
 
   // Task management
   function addTask() {
@@ -772,34 +817,73 @@ export default function SecretaryPage() {
           </div>
         ) : (
           <div className="space-y-5">
-            {/* ── Today's stats split by type ── */}
+            {/* ── Multi-period stats (today / yesterday / week / month) ── */}
             <div>
-              <p className="text-xs font-bold text-amber-400 mb-3 flex items-center gap-1.5"><Sun className="w-3.5 h-3.5" /> إحصائيات اليوم</p>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
-                  <TrendingUp className="w-4 h-4 text-emerald-400 mx-auto mb-1" />
-                  <p className="text-xl font-bold text-emerald-400">{briefingStats.todayOffice}</p>
-                  <p className="text-[10px] text-muted-foreground">مبيعات المكتب</p>
-                  {briefingStats.todayOfficeRev > 0 && <p className="text-[10px] text-emerald-400/70 mt-0.5">{formatMoneyFull(briefingStats.todayOfficeRev)}</p>}
-                </div>
-                <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/20 text-center">
-                  <TrendingUp className="w-4 h-4 text-orange-400 mx-auto mb-1" />
-                  <p className="text-xl font-bold text-orange-400">{briefingStats.todaySupport}</p>
-                  <p className="text-[10px] text-muted-foreground">مبيعات الدعم</p>
-                  {briefingStats.todaySupportRev > 0 && <p className="text-[10px] text-orange-400/70 mt-0.5">{formatMoneyFull(briefingStats.todaySupportRev)}</p>}
-                </div>
-                <div className="p-3 rounded-xl bg-sky-500/10 border border-sky-500/20 text-center">
-                  <RefreshCw className="w-4 h-4 text-sky-400 mx-auto mb-1" />
-                  <p className="text-xl font-bold text-sky-400">{briefingStats.todayRenewals}</p>
-                  <p className="text-[10px] text-muted-foreground">تجديدات مكتملة</p>
-                  {briefingStats.todayRenewalRev > 0 && <p className="text-[10px] text-sky-400/70 mt-0.5">{formatMoneyFull(briefingStats.todayRenewalRev)}</p>}
-                </div>
-                <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-center">
-                  <Banknote className="w-4 h-4 text-cyan-400 mx-auto mb-1" />
-                  <p className="text-xl font-bold text-cyan-400">{formatMoneyFull(briefingStats.todayTotalRev)}</p>
-                  <p className="text-[10px] text-muted-foreground">إجمالي إيرادات اليوم</p>
+              <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+                <p className="text-xs font-bold text-amber-400 flex items-center gap-1.5"><Sun className="w-3.5 h-3.5" /> ملخص الأداء</p>
+                <div className="flex items-center gap-1 p-1 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                  {([
+                    { key: "today", label: "اليوم" },
+                    { key: "yesterday", label: "أمس" },
+                    { key: "week", label: "الأسبوع" },
+                    { key: "month", label: "الشهر" },
+                  ] as const).map(tab => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setSelectedPeriod(tab.key)}
+                      className={`text-[11px] px-3 py-1 rounded-lg transition-colors ${
+                        selectedPeriod === tab.key
+                          ? "bg-amber-500/20 text-amber-300 font-bold"
+                          : "text-muted-foreground hover:text-foreground hover:bg-white/[0.04]"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
                 </div>
               </div>
+              {(() => {
+                const s = briefingStats.periods[selectedPeriod];
+                return (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
+                      <TrendingUp className="w-4 h-4 text-emerald-400 mx-auto mb-1" />
+                      <p className="text-xl font-bold text-emerald-400">{s.office}</p>
+                      <p className="text-[10px] text-muted-foreground">مبيعات المكتب</p>
+                      {s.officeRev > 0 && <p className="text-[10px] text-emerald-400/70 mt-0.5">{formatMoneyFull(s.officeRev)}</p>}
+                    </div>
+                    <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/20 text-center">
+                      <TrendingUp className="w-4 h-4 text-orange-400 mx-auto mb-1" />
+                      <p className="text-xl font-bold text-orange-400">{s.support}</p>
+                      <p className="text-[10px] text-muted-foreground">مبيعات الدعم</p>
+                      {s.supportRev > 0 && <p className="text-[10px] text-orange-400/70 mt-0.5">{formatMoneyFull(s.supportRev)}</p>}
+                    </div>
+                    <div className="p-3 rounded-xl bg-sky-500/10 border border-sky-500/20 text-center">
+                      <RefreshCw className="w-4 h-4 text-sky-400 mx-auto mb-1" />
+                      <p className="text-xl font-bold text-sky-400">{s.renewals}</p>
+                      <p className="text-[10px] text-muted-foreground">تجديدات مكتملة</p>
+                      {s.renewalRev > 0 && <p className="text-[10px] text-sky-400/70 mt-0.5">{formatMoneyFull(s.renewalRev)}</p>}
+                    </div>
+                    <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-center">
+                      <Headphones className="w-4 h-4 text-rose-400 mx-auto mb-1" />
+                      <p className="text-xl font-bold text-rose-400">{s.ticketsNew}</p>
+                      <p className="text-[10px] text-muted-foreground">تذاكر جديدة</p>
+                      {selectedPeriod === "today" && supportHealth.urgentCount > 0 && <p className="text-[10px] text-red-400/80 mt-0.5">🚨 {supportHealth.urgentCount} عاجلة</p>}
+                    </div>
+                    <div className="p-3 rounded-xl bg-teal-500/10 border border-teal-500/20 text-center">
+                      <CheckSquare className="w-4 h-4 text-teal-400 mx-auto mb-1" />
+                      <p className="text-xl font-bold text-teal-400">{s.ticketsResolved}</p>
+                      <p className="text-[10px] text-muted-foreground">تذاكر محلولة</p>
+                      {selectedPeriod === "today" && supportHealth.avgResponse > 0 && <p className="text-[10px] text-teal-400/70 mt-0.5">⏱ {supportHealth.avgResponse}د</p>}
+                    </div>
+                    <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-center">
+                      <Banknote className="w-4 h-4 text-cyan-400 mx-auto mb-1" />
+                      <p className="text-xl font-bold text-cyan-400">{formatMoneyFull(s.totalRev)}</p>
+                      <p className="text-[10px] text-muted-foreground">إجمالي الإيرادات</p>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="border-t border-border" />
