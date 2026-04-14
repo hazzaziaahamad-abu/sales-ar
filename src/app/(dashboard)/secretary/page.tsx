@@ -8,13 +8,14 @@ import {
   AlertTriangle, ChevronDown, ChevronUp, RefreshCw, Loader2,
   Users, Banknote, BarChart3, Phone, ArrowLeft, ArrowRight,
   MessageCircle, Bell, ExternalLink, Zap, CloudSun, Thermometer,
+  Headphones, UserX, Timer,
 } from "lucide-react";
-import { fetchDeals, fetchRenewals, fetchEmployees, fetchRecentFollowUpNotes, upsertSalesGuideSetting, fetchSalesGuideSettings } from "@/lib/supabase/db";
+import { fetchDeals, fetchRenewals, fetchEmployees, fetchRecentFollowUpNotes, upsertSalesGuideSetting, fetchSalesGuideSettings, fetchTickets } from "@/lib/supabase/db";
 import { useAuth } from "@/lib/auth-context";
 import { formatMoneyFull } from "@/lib/utils/format";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { Deal, Renewal, Employee } from "@/types";
+import type { Deal, Renewal, Employee, Ticket } from "@/types";
 
 /* ─── Constants ─── */
 const GOAL_90DAY = 70000;
@@ -312,6 +313,7 @@ export default function SecretaryPage() {
   const { user } = useAuth();
   const [deals, setDeals] = useState<Deal[]>([]);
   const [renewals, setRenewals] = useState<Renewal[]>([]);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [recentNotes, setRecentNotes] = useState<{ entity_id: string; note: string; author_name: string; created_at: string; entity_name?: string; entity_type: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -320,7 +322,7 @@ export default function SecretaryPage() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    briefing: true, meetings: true, hotCold: true, renewalHealth: true, priorities: true,
+    briefing: true, meetings: true, hotCold: true, supportHealth: true, renewalHealth: true, priorities: true,
     goal90: true, quickTasks: true, tasks: true,
   });
 
@@ -364,9 +366,9 @@ export default function SecretaryPage() {
   // Load data
   useEffect(() => {
     setLoading(true);
-    Promise.all([fetchDeals(), fetchRenewals(), fetchEmployees(), fetchRecentFollowUpNotes(50), fetchSalesGuideSettings()])
-      .then(([d, r, e, n, settings]) => {
-        setDeals(d); setRenewals(r); setEmployees(e); setRecentNotes(n);
+    Promise.all([fetchDeals(), fetchRenewals(), fetchEmployees(), fetchRecentFollowUpNotes(50), fetchSalesGuideSettings(), fetchTickets()])
+      .then(([d, r, e, n, settings, t]) => {
+        setDeals(d); setRenewals(r); setEmployees(e); setRecentNotes(n); setTickets(t);
         // Restore secretary tasks/meetings/quickTasks from database
         const loadSetting = (key: string) => {
           const row = settings.find((s: { setting_key: string }) => s.setting_key === key);
@@ -440,6 +442,67 @@ export default function SecretaryPage() {
     return Array.from(map.entries()).filter(([, n]) => n >= 3).sort((a, b) => b[1] - a[1]);
   }, [dealsWithIntel]);
 
+  // Support health (tickets)
+  const supportHealth = useMemo(() => {
+    const now = Date.now();
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const isOpen = (t: Ticket) => t.status !== "محلول";
+    const openTickets = tickets.filter(isOpen);
+    const urgentOpen = openTickets.filter(t => t.priority === "عاجل");
+    const overdue = openTickets.filter(t => {
+      const created = new Date(t.created_at).getTime();
+      return (now - created) / (1000 * 60 * 60 * 24) > 3;
+    });
+    const unassigned = openTickets.filter(t => !t.assigned_agent_name || !t.assigned_agent_name.trim());
+    const newToday = tickets.filter(t => t.created_at.slice(0, 10) === todayStr);
+    const resolvedToday = tickets.filter(t => t.status === "محلول" && (t.resolved_date === todayStr || (t.updated_at ?? "").slice(0, 10) === todayStr));
+
+    // Avg response time today (minutes)
+    const responded = resolvedToday.filter(t => typeof t.response_time_minutes === "number");
+    const avgResponse = responded.length > 0
+      ? Math.round(responded.reduce((s, t) => s + (t.response_time_minutes || 0), 0) / responded.length)
+      : 0;
+
+    // Agent workload escalation: agent with 5+ open tickets
+    const agentLoad = new Map<string, number>();
+    for (const t of openTickets) {
+      const k = t.assigned_agent_name?.trim() || "بلا مسؤول";
+      agentLoad.set(k, (agentLoad.get(k) || 0) + 1);
+    }
+    const overloadedAgents = Array.from(agentLoad.entries()).filter(([, n]) => n >= 5).sort((a, b) => b[1] - a[1]);
+
+    // Priority attention list
+    const attention: { ticket: Ticket; reason: string; severity: "high" | "medium" }[] = [];
+    for (const t of urgentOpen) {
+      const hoursOpen = (now - new Date(t.created_at).getTime()) / (1000 * 60 * 60);
+      if (hoursOpen >= 24) attention.push({ ticket: t, reason: `عاجلة مفتوحة منذ ${Math.floor(hoursOpen)} ساعة`, severity: "high" });
+    }
+    for (const t of overdue) {
+      if (!attention.find(a => a.ticket.id === t.id)) {
+        const days = Math.floor((now - new Date(t.created_at).getTime()) / (1000 * 60 * 60 * 24));
+        attention.push({ ticket: t, reason: `متأخرة ${days} يوم`, severity: "high" });
+      }
+    }
+    for (const t of unassigned) {
+      if (!attention.find(a => a.ticket.id === t.id)) {
+        const hoursOpen = (now - new Date(t.created_at).getTime()) / (1000 * 60 * 60);
+        if (hoursOpen >= 2) attention.push({ ticket: t, reason: `بلا مسؤول منذ ${Math.floor(hoursOpen)} ساعة`, severity: "medium" });
+      }
+    }
+
+    return {
+      openCount: openTickets.length,
+      urgentCount: urgentOpen.length,
+      overdueCount: overdue.length,
+      unassignedCount: unassigned.length,
+      newToday: newToday.length,
+      resolvedToday: resolvedToday.length,
+      avgResponse,
+      attention: attention.sort((a, b) => (a.severity === b.severity ? 0 : a.severity === "high" ? -1 : 1)),
+      overloadedAgents,
+    };
+  }, [tickets]);
+
   // Renewal health
   const renewalHealth = useMemo(() => {
     const now = new Date();
@@ -490,11 +553,21 @@ export default function SecretaryPage() {
       p.push({ icon: "📵", title: `بدون تجاوب: ${r.customer_name}`, detail: r.plan_name, urgency: "low", section: "renewals" });
     });
 
+    // Urgent support tickets needing attention
+    supportHealth.attention.filter(a => a.severity === "high").slice(0, 3).forEach(({ ticket: t, reason }) => {
+      p.push({ icon: "🚨", title: `تذكرة ${t.priority}: ${t.client_name}`, detail: `${t.issue.slice(0, 50)}${t.issue.length > 50 ? "..." : ""} — ${reason}`, urgency: "high", section: "support" });
+    });
+
+    // Unassigned tickets
+    supportHealth.attention.filter(a => a.severity === "medium").slice(0, 2).forEach(({ ticket: t, reason }) => {
+      p.push({ icon: "👤", title: `تذكرة بلا مسؤول: ${t.client_name}`, detail: `${t.issue.slice(0, 50)} — ${reason}`, urgency: "medium", section: "support" });
+    });
+
     return p.sort((a, b) => {
       const order = { high: 0, medium: 1, low: 2 };
       return order[a.urgency] - order[b.urgency];
     });
-  }, [hotDeals, coldDeals, renewalHealth]);
+  }, [hotDeals, coldDeals, renewalHealth, supportHealth]);
 
   // 90-day goal
   const goal90 = useMemo(() => {
@@ -619,6 +692,13 @@ export default function SecretaryPage() {
         hot_deals: hotDeals.length,
         warm_deals: warmDeals.length,
         needs_attention: ownerAttention.length,
+        tickets_open: supportHealth.openCount,
+        tickets_urgent: supportHealth.urgentCount,
+        tickets_overdue: supportHealth.overdueCount,
+        tickets_unassigned: supportHealth.unassignedCount,
+        tickets_new_today: supportHealth.newToday,
+        tickets_resolved_today: supportHealth.resolvedToday,
+        avg_response_minutes: supportHealth.avgResponse,
         renewals_total: renewals.length,
         renewals_completed: renewalHealth.completed,
         renewals_cancelled: renewalHealth.cancelled,
@@ -958,6 +1038,137 @@ export default function SecretaryPage() {
                     <DealRow key={d.id} deal={d} intel={intel} variant="cold" onRemind={remindTomorrow} />
                   ))}
                   {coldDeals.length > 5 && <p className="text-[10px] text-muted-foreground text-center pt-1">و {coldDeals.length - 5} أخرى — <Link href="/sales" className="text-blue-400 hover:underline">عرض الكل</Link></p>}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </Section>
+
+      {/* ─── 3b. Support Health (Tickets) ─── */}
+      <Section
+        id="supportHealth"
+        title="صحة الدعم"
+        icon={<Headphones className="w-5 h-5 text-orange-400" />}
+        badge={!loading ? (
+          <span className="flex items-center gap-1">
+            {supportHealth.urgentCount > 0 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/15 text-red-400">🚨 {supportHealth.urgentCount}</span>}
+            {supportHealth.overdueCount > 0 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">⏰ {supportHealth.overdueCount}</span>}
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-400">{supportHealth.openCount} مفتوحة</span>
+          </span>
+        ) : undefined}
+        isOpen={expandedSections.supportHealth !== false} onToggle={toggleSection}
+      >
+        {loading ? <Skeleton className="h-32 rounded-xl" /> : (
+          <div className="space-y-4">
+            {/* Stat cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-center">
+                <AlertTriangle className="w-4 h-4 text-red-400 mx-auto mb-1" />
+                <p className="text-xl font-bold text-red-400">{supportHealth.urgentCount}</p>
+                <p className="text-[10px] text-muted-foreground">عاجلة مفتوحة</p>
+              </div>
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center">
+                <Clock className="w-4 h-4 text-amber-400 mx-auto mb-1" />
+                <p className="text-xl font-bold text-amber-400">{supportHealth.overdueCount}</p>
+                <p className="text-[10px] text-muted-foreground">متأخرة &gt; 3 أيام</p>
+              </div>
+              <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-center">
+                <UserX className="w-4 h-4 text-purple-400 mx-auto mb-1" />
+                <p className="text-xl font-bold text-purple-400">{supportHealth.unassignedCount}</p>
+                <p className="text-[10px] text-muted-foreground">بلا مسؤول</p>
+              </div>
+              <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-center">
+                <Timer className="w-4 h-4 text-cyan-400 mx-auto mb-1" />
+                <p className="text-xl font-bold text-cyan-400">{supportHealth.avgResponse > 0 ? `${supportHealth.avgResponse}د` : "—"}</p>
+                <p className="text-[10px] text-muted-foreground">متوسط الاستجابة</p>
+              </div>
+            </div>
+
+            {/* Today mini-stats */}
+            <div className="flex items-center gap-4 text-[11px] text-muted-foreground border-y border-white/[0.04] py-2">
+              <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-orange-400" /> جديد اليوم: <span className="font-bold text-foreground">{supportHealth.newToday}</span></span>
+              <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> محلول اليوم: <span className="font-bold text-foreground">{supportHealth.resolvedToday}</span></span>
+              <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-blue-400" /> إجمالي مفتوح: <span className="font-bold text-foreground">{supportHealth.openCount}</span></span>
+            </div>
+
+            {/* Overloaded agents */}
+            {supportHealth.overloadedAgents.length > 0 && (
+              <div className="rounded-xl bg-red-500/[0.05] border border-red-500/20 p-3">
+                <p className="text-xs font-bold text-red-400 mb-2 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> وكلاء بحمل زائد</p>
+                <div className="space-y-1">
+                  {supportHealth.overloadedAgents.map(([agent, count]) => (
+                    <div key={agent} className="flex items-center justify-between px-2 py-1 rounded-lg bg-white/[0.02]">
+                      <span className="text-[11px] text-foreground">{agent}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-300 font-bold">{count} تذاكر مفتوحة</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Attention list */}
+            <div>
+              <p className="text-xs font-bold text-orange-400 mb-2 flex items-center gap-1.5"><Zap className="w-3.5 h-3.5" /> تذاكر تحتاج تدخّل</p>
+              {supportHealth.attention.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground px-2 py-2">لا توجد تذاكر حرجة — الوضع ممتاز 👌</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {supportHealth.attention.slice(0, 6).map(({ ticket: t, reason, severity }) => {
+                    const phone = sanitizePhone(t.client_phone);
+                    const borderClr = severity === "high" ? "border-red-500/25 bg-red-500/[0.05]" : "border-amber-500/25 bg-amber-500/[0.04]";
+                    const labelClr = severity === "high" ? "text-red-300" : "text-amber-300";
+                    return (
+                      <div key={t.id} className={`rounded-lg ${borderClr} border px-3 py-2.5`}>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-xs font-bold text-foreground truncate">{t.client_name}</p>
+                              <span className={`text-[9px] px-1.5 py-0.5 rounded-full bg-white/[0.05] ${labelClr}`}>{t.priority}</span>
+                              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-white/[0.03] text-muted-foreground">{t.status}</span>
+                            </div>
+                            <p className="text-[11px] text-foreground/85 mt-1 line-clamp-2">{t.issue}</p>
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                              <span className="text-[10px] text-muted-foreground">{t.assigned_agent_name || "بلا مسؤول"}</span>
+                              <span className="text-[10px] text-muted-foreground">•</span>
+                              <span className={`text-[10px] ${labelClr}`}>{reason}</span>
+                            </div>
+                          </div>
+                        </div>
+                        {/* Quick actions */}
+                        <div className="flex items-center gap-1 mt-2 pt-2 border-t border-white/[0.04]">
+                          {phone ? (
+                            <a href={`tel:${phone}`} className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 transition-colors">
+                              <Phone className="w-3 h-3" /> اتصل
+                            </a>
+                          ) : (
+                            <span className="text-[10px] px-2 py-1 rounded-md bg-white/[0.03] text-muted-foreground/60 border border-white/[0.04]">بلا رقم</span>
+                          )}
+                          {phone && (
+                            <a
+                              href={whatsappLink(phone, `مرحبًا ${t.client_name}، بخصوص طلبكم لدى الدعم — نتابع معكم لحلّه بأسرع وقت.`)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/20 transition-colors"
+                            >
+                              <MessageCircle className="w-3 h-3" /> واتساب
+                            </a>
+                          )}
+                          <Link
+                            href="/support"
+                            className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/[0.04] hover:bg-white/[0.08] text-muted-foreground border border-white/[0.06] transition-colors mr-auto"
+                          >
+                            <ExternalLink className="w-3 h-3" /> فتح
+                          </Link>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {supportHealth.attention.length > 6 && (
+                    <p className="text-[10px] text-muted-foreground text-center pt-1">
+                      و {supportHealth.attention.length - 6} أخرى — <Link href="/support" className="text-orange-400 hover:underline">عرض الكل</Link>
+                    </p>
+                  )}
                 </div>
               )}
             </div>
