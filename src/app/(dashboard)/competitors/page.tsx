@@ -5,6 +5,7 @@ import {
   Radar, Plus, Pencil, Trash2, ChevronDown, ChevronUp,
   Globe, Tag, Zap, TrendingUp, DollarSign, Megaphone,
   FileText, ExternalLink, Calendar, Search, X, Eye,
+  Sparkles, Loader2, BrainCircuit,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -93,6 +94,8 @@ export default function CompetitorsPage() {
   const [showAddOffer, setShowAddOffer] = useState(false);
   const [showAddUpdate, setShowAddUpdate] = useState(false);
   const [editingCompetitor, setEditingCompetitor] = useState<Competitor | null>(null);
+  const [aiAnalysis, setAiAnalysis] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
 
   // Forms
   const emptyComp = { name: "", category: CATEGORIES[0], website: "", strengths: "", weaknesses: "", notes: "" };
@@ -182,6 +185,66 @@ export default function CompetitorsPage() {
     return competitors.flatMap(c => c.plans.map(p => ({ ...p, competitorName: c.name })));
   }, [competitors]);
 
+  // ── AI Analysis ──
+  async function runAiAnalysis() {
+    if (competitors.length === 0) return;
+    setAiLoading(true);
+    setAiAnalysis("");
+    try {
+      const context = competitors.map(c => ({
+        name: c.name,
+        category: c.category,
+        strengths: c.strengths,
+        weaknesses: c.weaknesses,
+        plans: c.plans.map(p => ({ name: p.name, price: p.price, billing: BILLING_LABELS[p.billing], features: p.features })),
+        active_offers: c.offers.filter(o => {
+          const now = new Date().toISOString().slice(0, 10);
+          return (!o.end_date || o.end_date >= now) && (!o.start_date || o.start_date <= now);
+        }).map(o => ({ title: o.title, description: o.description })),
+        recent_updates: c.updates.slice(0, 5).map(u => ({ title: u.title, type: UPDATE_TYPES[u.type]?.label, date: u.date, description: u.description })),
+      }));
+
+      const res = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: `أنت محلل استراتيجي متخصص في تحليل المنافسين لشركة RESTAVO (شركة أتمتة مطاعم سعودية). حلل بيانات المنافسين التالية وقدم:
+
+1. **ملخص المشهد التنافسي**: من هو الأقوى ولماذا؟
+2. **تحليل الأسعار**: هل أسعارنا تنافسية؟ أين الفجوة؟
+3. **فرص يمكن استغلالها**: بناءً على نقاط ضعف المنافسين
+4. **تهديدات يجب الانتباه لها**: عروض أو تطويرات خطيرة
+5. **توصيات فورية**: 3-5 إجراءات عملية يمكن تنفيذها الحين
+
+بيانات المنافسين:
+${JSON.stringify(context, null, 2)}`,
+        }),
+      });
+      if (!res.ok) throw new Error("AI request failed");
+
+      const reader = res.body?.getReader();
+      if (!reader) return;
+      const decoder = new TextDecoder();
+      let full = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value);
+        const lines = chunk.split("\n").filter(l => l.startsWith("data: "));
+        for (const line of lines) {
+          try {
+            const parsed = JSON.parse(line.slice(6));
+            if (parsed.text) { full += parsed.text; setAiAnalysis(full); }
+          } catch { /* skip */ }
+        }
+      }
+      if (!full) setAiAnalysis("تم التحليل. أضف المزيد من البيانات عن المنافسين للحصول على تحليل أعمق.");
+    } catch {
+      setAiAnalysis("تعذر الاتصال بالذكاء الاصطناعي. تأكد من إعدادات API.");
+    }
+    setAiLoading(false);
+  }
+
   /* ═══════════════ RENDER ═══════════════ */
   return (
     <div className="space-y-5">
@@ -196,9 +259,15 @@ export default function CompetitorsPage() {
             <p className="text-xs text-muted-foreground">{competitors.length} منافس مسجّل</p>
           </div>
         </div>
-        <Button onClick={() => { setCompForm(emptyComp); setEditingCompetitor(null); setShowAddDialog(true); }} className="gap-2 bg-gradient-to-l from-rose-600 to-orange-600 hover:from-rose-500 hover:to-orange-500 border-0">
-          <Plus className="w-4 h-4" /> إضافة منافس
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={runAiAnalysis} disabled={aiLoading || competitors.length === 0} className="gap-2 bg-gradient-to-l from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 border-0">
+            {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <BrainCircuit className="w-4 h-4" />}
+            تحليل ذكي
+          </Button>
+          <Button onClick={() => { setCompForm(emptyComp); setEditingCompetitor(null); setShowAddDialog(true); }} className="gap-2 bg-gradient-to-l from-rose-600 to-orange-600 hover:from-rose-500 hover:to-orange-500 border-0">
+            <Plus className="w-4 h-4" /> إضافة منافس
+          </Button>
+        </div>
       </div>
 
       {/* Search */}
@@ -486,6 +555,20 @@ export default function CompetitorsPage() {
               )}
             </div>
           </Section>
+        </div>
+      )}
+
+      {/* ── AI Analysis Result ── */}
+      {(aiAnalysis || aiLoading) && (
+        <div className="cc-card rounded-xl p-5 border border-violet-500/20 bg-gradient-to-l from-violet-500/[0.04] to-transparent">
+          <div className="flex items-center gap-2 mb-3">
+            <BrainCircuit className="w-5 h-5 text-violet-400" />
+            <h3 className="text-sm font-bold text-foreground">التحليل التنافسي الذكي</h3>
+            {aiLoading && <Loader2 className="w-4 h-4 text-violet-400 animate-spin" />}
+          </div>
+          <div className="text-xs text-foreground/90 leading-relaxed whitespace-pre-wrap">
+            {aiAnalysis || "جاري تحليل بيانات المنافسين..."}
+          </div>
         </div>
       )}
 
