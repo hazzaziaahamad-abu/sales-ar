@@ -280,6 +280,66 @@ function DealRow({
   );
 }
 
+/* ─── PerformerCard: top/bottom per department ─── */
+const ACCENT_STYLES: Record<string, { border: string; bg: string; text: string }> = {
+  emerald: { border: "border-emerald-500/20", bg: "bg-emerald-500/[0.05]", text: "text-emerald-400" },
+  orange: { border: "border-orange-500/20", bg: "bg-orange-500/[0.05]", text: "text-orange-400" },
+  rose: { border: "border-rose-500/20", bg: "bg-rose-500/[0.05]", text: "text-rose-400" },
+  sky: { border: "border-sky-500/20", bg: "bg-sky-500/[0.05]", text: "text-sky-400" },
+};
+
+function PerformerCard({
+  title,
+  accent,
+  unit,
+  data,
+}: {
+  title: string;
+  accent: "emerald" | "orange" | "rose" | "sky";
+  unit: string;
+  data: { top?: { name: string; value: number; subValue?: string }; bottom?: { name: string; value: number; subValue?: string }; total: number };
+}) {
+  const s = ACCENT_STYLES[accent];
+  return (
+    <div className={`rounded-xl ${s.bg} border ${s.border} p-3`}>
+      <div className="flex items-center justify-between mb-2">
+        <p className={`text-[11px] font-bold ${s.text}`}>{title}</p>
+        <span className="text-[9px] text-muted-foreground">{data.total} موظف</span>
+      </div>
+      {!data.top && !data.bottom ? (
+        <p className="text-[10px] text-muted-foreground py-2 text-center">لا توجد بيانات</p>
+      ) : (
+        <div className="space-y-1.5">
+          {data.top && (
+            <div className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg bg-emerald-500/[0.08] border border-emerald-500/15">
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] text-emerald-400 flex items-center gap-1">🏆 الأفضل</p>
+                <p className="text-[11px] font-bold text-foreground truncate">{data.top.name}</p>
+              </div>
+              <div className="text-left shrink-0">
+                <p className={`text-sm font-bold ${s.text}`}>{data.top.value}</p>
+                <p className="text-[9px] text-muted-foreground">{data.top.subValue || unit}</p>
+              </div>
+            </div>
+          )}
+          {data.bottom && data.bottom.name !== data.top?.name && (
+            <div className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg bg-red-500/[0.06] border border-red-500/15">
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] text-red-400 flex items-center gap-1">📉 الأقل</p>
+                <p className="text-[11px] font-bold text-foreground truncate">{data.bottom.name}</p>
+              </div>
+              <div className="text-left shrink-0">
+                <p className="text-sm font-bold text-red-400">{data.bottom.value}</p>
+                <p className="text-[9px] text-muted-foreground">{data.bottom.subValue || unit}</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─── Types ─── */
 interface Priority {
   icon: string;
@@ -676,6 +736,113 @@ export default function SecretaryPage() {
     };
   }, [deals, renewals, tickets, selectedMonth, selectedYear]);
 
+  // Performers — top/bottom per department for the selected period
+  const performers = useMemo(() => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const yesterdayStr = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const weekStart = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const inRange = (dateStr: string | undefined, start: string, end: string) =>
+      !!dateStr && dateStr.slice(0, 10) >= start && dateStr.slice(0, 10) <= end;
+    const inMonth = (dateStr: string | undefined) => {
+      if (!dateStr) return false;
+      const d = new Date(dateStr);
+      return d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear;
+    };
+
+    let start: string, end: string;
+    const useMonth = selectedPeriod === "month";
+    if (selectedPeriod === "today") { start = todayStr; end = todayStr; }
+    else if (selectedPeriod === "yesterday") { start = yesterdayStr; end = yesterdayStr; }
+    else if (selectedPeriod === "week") { start = weekStart; end = todayStr; }
+    else { start = ""; end = ""; }
+
+    const matchDate = (dateStr: string | undefined) => useMonth ? inMonth(dateStr) : inRange(dateStr, start, end);
+
+    // Sales reps (office + support, closed deals)
+    const officeRepMap = new Map<string, { count: number; rev: number }>();
+    const supportRepMap = new Map<string, { count: number; rev: number }>();
+    for (const d of deals) {
+      if (d.stage !== "مكتملة") continue;
+      if (!matchDate(d.close_date || d.created_at)) continue;
+      const name = d.assigned_rep_name?.trim() || "بلا مسؤول";
+      const target = (d.sales_type === "support") ? supportRepMap : officeRepMap;
+      const cur = target.get(name) || { count: 0, rev: 0 };
+      cur.count += 1; cur.rev += d.deal_value;
+      target.set(name, cur);
+    }
+
+    // Ticket agents — resolved count + avg response time
+    const agentMap = new Map<string, { resolved: number; totalResp: number; withResp: number }>();
+    for (const t of tickets) {
+      if (t.status !== "محلول") continue;
+      if (!matchDate(t.resolved_date || t.updated_at)) continue;
+      const name = t.assigned_agent_name?.trim() || "بلا مسؤول";
+      const cur = agentMap.get(name) || { resolved: 0, totalResp: 0, withResp: 0 };
+      cur.resolved += 1;
+      if (typeof t.response_time_minutes === "number") {
+        cur.totalResp += t.response_time_minutes;
+        cur.withResp += 1;
+      }
+      agentMap.set(name, cur);
+    }
+
+    // Renewal reps
+    const renewalRepMap = new Map<string, { count: number; rev: number }>();
+    for (const r of renewals) {
+      if (r.status !== "مكتمل") continue;
+      if (!matchDate(r.updated_at)) continue;
+      const name = r.assigned_rep?.trim() || "بلا مسؤول";
+      const cur = renewalRepMap.get(name) || { count: 0, rev: 0 };
+      cur.count += 1; cur.rev += r.plan_price;
+      renewalRepMap.set(name, cur);
+    }
+
+    type RankEntry = { name: string; value: number; subValue?: string };
+
+    function rankByCount(map: Map<string, { count: number; rev: number }>) {
+      const entries = Array.from(map.entries())
+        .filter(([name]) => name !== "بلا مسؤول")
+        .map(([name, v]) => ({ name, value: v.count, subValue: v.rev > 0 ? formatMoneyFull(v.rev) : undefined }));
+      const sorted = [...entries].sort((a, b) => b.value - a.value);
+      return {
+        top: sorted[0],
+        bottom: sorted.length > 1 ? sorted[sorted.length - 1] : undefined,
+        total: entries.length,
+      };
+    }
+
+    function rankAgents() {
+      const entries = Array.from(agentMap.entries())
+        .filter(([name]) => name !== "بلا مسؤول")
+        .map(([name, v]) => {
+          const avg = v.withResp > 0 ? Math.round(v.totalResp / v.withResp) : 0;
+          return { name, value: v.resolved, subValue: avg > 0 ? `⏱ ${avg}د` : undefined, avg };
+        });
+      const sortedTop = [...entries].sort((a, b) => b.value - a.value || a.avg - b.avg);
+      // Bottom = slowest agent (highest avg response) among those with response data
+      const withResp = entries.filter(e => e.avg > 0);
+      const sortedBottom = [...withResp].sort((a, b) => b.avg - a.avg);
+      return {
+        top: sortedTop[0],
+        bottom: sortedBottom.length > 1 ? { ...sortedBottom[0], subValue: `⏱ ${sortedBottom[0].avg}د (أبطأ)` } : undefined,
+        total: entries.length,
+      };
+    }
+
+    const officeRank = rankByCount(officeRepMap);
+    const supportRank = rankByCount(supportRepMap);
+    const renewalRank = rankByCount(renewalRepMap);
+    const ticketRank = rankAgents();
+
+    return {
+      office: officeRank as { top?: RankEntry; bottom?: RankEntry; total: number },
+      support: supportRank as { top?: RankEntry; bottom?: RankEntry; total: number },
+      tickets: ticketRank,
+      renewals: renewalRank as { top?: RankEntry; bottom?: RankEntry; total: number },
+    };
+  }, [deals, renewals, tickets, selectedPeriod, selectedMonth, selectedYear]);
+
   // Task management
   function addTask() {
     if (!newTask.trim()) return;
@@ -884,6 +1051,39 @@ export default function SecretaryPage() {
                   </div>
                 );
               })()}
+
+              {/* ── Top/Bottom Performers per department ── */}
+              <div className="mt-4">
+                <p className="text-[11px] font-bold text-muted-foreground mb-2 flex items-center gap-1.5">
+                  <Users className="w-3 h-3" /> أفضل وأقل أداء ({selectedPeriod === "today" ? "اليوم" : selectedPeriod === "yesterday" ? "أمس" : selectedPeriod === "week" ? "الأسبوع" : "الشهر"})
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                  <PerformerCard
+                    title="مبيعات المكتب"
+                    accent="emerald"
+                    unit="صفقة"
+                    data={performers.office}
+                  />
+                  <PerformerCard
+                    title="مبيعات الدعم"
+                    accent="orange"
+                    unit="صفقة"
+                    data={performers.support}
+                  />
+                  <PerformerCard
+                    title="الدعم الفني"
+                    accent="rose"
+                    unit="تذكرة"
+                    data={performers.tickets}
+                  />
+                  <PerformerCard
+                    title="التجديدات"
+                    accent="sky"
+                    unit="تجديد"
+                    data={performers.renewals}
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="border-t border-border" />
