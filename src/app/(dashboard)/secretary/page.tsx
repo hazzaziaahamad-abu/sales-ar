@@ -424,6 +424,9 @@ export default function SecretaryPage() {
     if (dbLoaded.current) saveToDb("secretary_quick", quickTasks);
   }, [quickTasks, saveToDb]);
 
+  // Auto-schedule a 9 PM performance review meeting for each weak department (once per session)
+  const autoScheduledRef = useRef(false);
+
   // Load data
   useEffect(() => {
     setLoading(true);
@@ -843,6 +846,75 @@ export default function SecretaryPage() {
     };
   }, [deals, renewals, tickets, selectedPeriod, selectedMonth, selectedYear]);
 
+  // Weak departments today — used to auto-schedule a 9 PM review meeting
+  const weakDepartments = useMemo(() => {
+    const now = new Date();
+    // Only flag departments as weak after 3 PM (end-of-day review window)
+    if (now.getHours() < 15) return [];
+
+    const todayStr = now.toISOString().slice(0, 10);
+    const inToday = (s?: string) => !!s && s.slice(0, 10) === todayStr;
+    const weak: { key: string; label: string; attendees: string; reason: string }[] = [];
+
+    const officeCount = deals.filter(d =>
+      (d.sales_type === "office" || !d.sales_type) &&
+      d.stage === "مكتملة" &&
+      inToday(d.close_date || d.created_at)
+    ).length;
+    if (officeCount === 0) weak.push({ key: "office", label: "مبيعات المكتب", attendees: "فريق مبيعات المكتب", reason: "لا صفقات مغلقة اليوم" });
+
+    const supportCount = deals.filter(d =>
+      d.sales_type === "support" &&
+      d.stage === "مكتملة" &&
+      inToday(d.close_date || d.created_at)
+    ).length;
+    if (supportCount === 0) weak.push({ key: "support", label: "مبيعات الدعم", attendees: "فريق مبيعات الدعم", reason: "لا صفقات مغلقة اليوم" });
+
+    const resolvedCount = tickets.filter(t =>
+      t.status === "محلول" && inToday(t.resolved_date || t.updated_at)
+    ).length;
+    if (resolvedCount === 0) {
+      weak.push({ key: "tickets", label: "الدعم الفني", attendees: "فريق الدعم", reason: "لا تذاكر محلولة اليوم" });
+    } else if (supportHealth.avgResponse > 45) {
+      weak.push({ key: "tickets", label: "الدعم الفني", attendees: "فريق الدعم", reason: `متوسط استجابة ${supportHealth.avgResponse} دقيقة — بطيء` });
+    }
+
+    const renewCount = renewals.filter(r =>
+      r.status === "مكتمل" && inToday(r.updated_at)
+    ).length;
+    if (renewCount === 0) weak.push({ key: "renewals", label: "التجديدات", attendees: "فريق التجديدات", reason: "لا تجديدات مكتملة اليوم" });
+
+    return weak;
+  }, [deals, tickets, renewals, supportHealth.avgResponse]);
+
+  // Auto-schedule 9 PM review meeting for each weak department (once, after data loads)
+  useEffect(() => {
+    if (loading || !dbLoaded.current || autoScheduledRef.current) return;
+    if (weakDepartments.length === 0) return;
+
+    const toAdd: MeetingItem[] = [];
+    for (const dept of weakDepartments) {
+      const title = `مراجعة أداء ${dept.label} — ${dept.reason}`;
+      const shortTitle = `مراجعة أداء ${dept.label}`;
+      // Dedup: don't add if a meeting with this label (either short or full) already exists for today
+      const exists = meetings.some(m => m.title === title || m.title === shortTitle || m.id === `auto-${dept.key}-${todayKey}`);
+      if (!exists) {
+        toAdd.push({
+          id: `auto-${dept.key}-${todayKey}`,
+          title,
+          time: "21:00",
+          attendees: dept.attendees,
+          done: false,
+        });
+      }
+    }
+    if (toAdd.length > 0) {
+      setMeetings(prev => [...prev, ...toAdd]);
+      setExpandedSections(prev => ({ ...prev, meetings: true }));
+    }
+    autoScheduledRef.current = true;
+  }, [loading, weakDepartments, meetings, todayKey]);
+
   // Task management
   function addTask() {
     if (!newTask.trim()) return;
@@ -1226,7 +1298,14 @@ export default function SecretaryPage() {
                       {isUpcoming && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-400 animate-pulse">خلال {diffMin} د</span>}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className={`text-xs font-medium ${m.done ? "line-through text-muted-foreground" : "text-foreground"}`}>{m.title}</p>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className={`text-xs font-medium ${m.done ? "line-through text-muted-foreground" : "text-foreground"}`}>{m.title}</p>
+                        {m.id.startsWith("auto-") && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 flex items-center gap-0.5" title="اجتماع مُجدول تلقائياً لأداء ضعيف">
+                            <Sparkles className="w-2.5 h-2.5" /> تلقائي
+                          </span>
+                        )}
+                      </div>
                       {m.attendees && <p className="text-[10px] text-muted-foreground">{m.attendees}</p>}
                     </div>
                     <button onClick={() => removeMeeting(m.id)} className="text-muted-foreground hover:text-red-400 text-xs transition-colors shrink-0">✕</button>
