@@ -8,7 +8,7 @@ import {
   AlertTriangle, ChevronDown, ChevronUp, RefreshCw, Loader2,
   Users, Banknote, BarChart3, Phone, ArrowLeft, ArrowRight,
   MessageCircle, Bell, ExternalLink, Zap, CloudSun, Thermometer,
-  Headphones, UserX, Timer,
+  Headphones, UserX, Timer, Share2,
 } from "lucide-react";
 import { fetchDeals, fetchRenewals, fetchEmployees, fetchRecentFollowUpNotes, upsertSalesGuideSetting, fetchSalesGuideSettings, fetchTickets } from "@/lib/supabase/db";
 import { useAuth } from "@/lib/auth-context";
@@ -177,6 +177,75 @@ function whatsappMessageForStage(stage: string, clientName: string): string {
   }
 }
 
+/* ─── Share helpers ─── */
+const VARIANT_LABEL: Record<"hot" | "warm" | "cold" | "attention", string> = {
+  hot: "🔥 ساخنة",
+  warm: "🌤 دافئة",
+  cold: "❄️ باردة",
+  attention: "⚡ تحتاج تدخل",
+};
+
+function buildDealShareText(d: Deal, intel: DealIntel, variant: "hot" | "warm" | "cold" | "attention"): string {
+  const lines: string[] = [];
+  lines.push(`📌 صفقة ${VARIANT_LABEL[variant]}`);
+  lines.push(`العميل: ${d.client_name}`);
+  if (d.client_phone) lines.push(`الجوال: ${d.client_phone}`);
+  lines.push(`المرحلة: ${d.stage}`);
+  lines.push(`القيمة: ${formatMoneyFull(d.deal_value)}`);
+  if (d.assigned_rep_name) lines.push(`المسؤول: ${d.assigned_rep_name}`);
+  lines.push(`الدرجة: ${intel.score}`);
+  const lastActivityLabel = intel.daysSinceActivity === 0
+    ? "اليوم"
+    : intel.daysSinceActivity === 1
+    ? "أمس"
+    : `قبل ${intel.daysSinceActivity} يوم`;
+  lines.push(`آخر تفاعل: ${lastActivityLabel}`);
+  lines.push(`عمر الصفقة: ${d.cycle_days} يوم`);
+  lines.push(`الخطوة القادمة: ${intel.nextStep}`);
+  if (variant === "attention" && intel.attentionReason) lines.push(`⚠ ${intel.attentionReason}`);
+  return lines.join("\n");
+}
+
+function buildDealsCategoryShareText(
+  items: { deal: Deal; intel: DealIntel }[],
+  variant: "hot" | "warm" | "cold",
+  categoryTitle: string,
+): string {
+  const today = new Date().toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const totalValue = items.reduce((s, { deal }) => s + deal.deal_value, 0);
+  const header = [
+    `📊 ${categoryTitle} — ${VARIANT_LABEL[variant]}`,
+    today,
+    `العدد: ${items.length} صفقة — إجمالي القيمة: ${formatMoneyFull(totalValue)}`,
+    "",
+  ].join("\n");
+  const body = items
+    .map(({ deal: d, intel }, i) => {
+      const last = intel.daysSinceActivity === 0 ? "اليوم" : intel.daysSinceActivity === 1 ? "أمس" : `قبل ${intel.daysSinceActivity}ي`;
+      const rep = d.assigned_rep_name ? ` — ${d.assigned_rep_name}` : "";
+      return `${i + 1}. ${d.client_name}${rep}\n   ${d.stage} • ${formatMoneyFull(d.deal_value)} • درجة ${intel.score} • آخر تفاعل ${last}\n   ↪ ${intel.nextStep}`;
+    })
+    .join("\n\n");
+  return header + body;
+}
+
+async function shareText(title: string, text: string): Promise<void> {
+  if (typeof navigator !== "undefined" && navigator.share) {
+    try {
+      await navigator.share({ title, text });
+      return;
+    } catch {
+      // fall through to clipboard
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    alert("تم نسخ التفاصيل! يمكنك لصقها في واتساب أو أي تطبيق.");
+  } catch {
+    alert("تعذرت المشاركة — يرجى المحاولة يدويًا.");
+  }
+}
+
 /* ─── DealRow: compact deal card with quick actions ─── */
 const VARIANT_STYLES: Record<"hot" | "warm" | "cold" | "attention", { border: string; bg: string; text: string; valueText: string }> = {
   hot: { border: "border-orange-500/25", bg: "bg-orange-500/[0.06]", text: "text-orange-300", valueText: "text-orange-400" },
@@ -267,6 +336,13 @@ function DealRow({
           title="أضف مهمة متابعة غداً"
         >
           <Bell className="w-3 h-3" /> ذكّرني
+        </button>
+        <button
+          onClick={() => shareText(`صفقة ${d.client_name}`, buildDealShareText(d, intel, variant))}
+          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/20 transition-colors"
+          title="مشاركة الصفقة"
+        >
+          <Share2 className="w-3 h-3" /> مشاركة
         </button>
         <Link
           href="/sales"
@@ -1361,7 +1437,18 @@ export default function SecretaryPage() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-bold text-orange-400 flex items-center gap-1.5"><Flame className="w-3.5 h-3.5" /> ساخنة — قريبة من الإغلاق</p>
-                <span className="text-[10px] text-muted-foreground">{hotDeals.length}</span>
+                <div className="flex items-center gap-1.5">
+                  {hotDeals.length > 0 && (
+                    <button
+                      onClick={() => shareText("الصفقات الساخنة", buildDealsCategoryShareText(hotDeals, "hot", "الصفقات الساخنة — قريبة من الإغلاق"))}
+                      className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/20 transition-colors"
+                      title="مشاركة القائمة كاملة"
+                    >
+                      <Share2 className="w-3 h-3" /> مشاركة
+                    </button>
+                  )}
+                  <span className="text-[10px] text-muted-foreground">{hotDeals.length}</span>
+                </div>
               </div>
               {hotDeals.length === 0 ? <p className="text-[11px] text-muted-foreground px-2">لا توجد صفقات ساخنة حالياً</p> : (
                 <div className="space-y-1.5">
@@ -1377,7 +1464,18 @@ export default function SecretaryPage() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-bold text-amber-300 flex items-center gap-1.5"><CloudSun className="w-3.5 h-3.5" /> دافئة — منسية وقابلة للإحياء</p>
-                <span className="text-[10px] text-muted-foreground">{warmDeals.length}</span>
+                <div className="flex items-center gap-1.5">
+                  {warmDeals.length > 0 && (
+                    <button
+                      onClick={() => shareText("الصفقات الدافئة", buildDealsCategoryShareText(warmDeals, "warm", "الصفقات الدافئة — قابلة للإحياء"))}
+                      className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-400/20 transition-colors"
+                      title="مشاركة القائمة كاملة"
+                    >
+                      <Share2 className="w-3 h-3" /> مشاركة
+                    </button>
+                  )}
+                  <span className="text-[10px] text-muted-foreground">{warmDeals.length}</span>
+                </div>
               </div>
               {warmDeals.length === 0 ? <p className="text-[11px] text-muted-foreground px-2">لا توجد صفقات دافئة</p> : (
                 <div className="space-y-1.5">
@@ -1393,7 +1491,18 @@ export default function SecretaryPage() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-bold text-blue-400 flex items-center gap-1.5"><Snowflake className="w-3.5 h-3.5" /> باردة / راكدة</p>
-                <span className="text-[10px] text-muted-foreground">{coldDeals.length}</span>
+                <div className="flex items-center gap-1.5">
+                  {coldDeals.length > 0 && (
+                    <button
+                      onClick={() => shareText("الصفقات الباردة", buildDealsCategoryShareText(coldDeals, "cold", "الصفقات الباردة / الراكدة"))}
+                      className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 transition-colors"
+                      title="مشاركة القائمة كاملة"
+                    >
+                      <Share2 className="w-3 h-3" /> مشاركة
+                    </button>
+                  )}
+                  <span className="text-[10px] text-muted-foreground">{coldDeals.length}</span>
+                </div>
               </div>
               {coldDeals.length === 0 ? <p className="text-[11px] text-muted-foreground px-2">لا توجد صفقات راكدة</p> : (
                 <div className="space-y-1.5">
