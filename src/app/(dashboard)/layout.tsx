@@ -8,6 +8,7 @@ import { TopbarProvider } from "@/components/layout/topbar-context";
 import { NotificationPanel } from "@/components/layout/notification-panel";
 import { AIChatFAB } from "@/components/ai/ai-chat-fab";
 import { AIAlertsBanner } from "@/components/ai/ai-alerts-banner";
+import { LastSaleBanner } from "@/components/layout/last-sale-banner";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { OrgProvider } from "@/lib/org-context";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -287,6 +288,12 @@ export default function DashboardLayout({
           />
           <main className="px-4 sm:px-6 pb-8 pt-5">
             <AuthGate>
+              <LastSaleBanner salesType={
+                pathname === "/sales" ? "office"
+                : pathname === "/support-sales" ? "support"
+                : pathname === "/renewals" ? "renewal"
+                : "all"
+              } />
               <AIAlertsBanner />
               {children}
             </AuthGate>
