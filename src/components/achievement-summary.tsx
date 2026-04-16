@@ -168,6 +168,14 @@ export function AchievementSummary({
       }
     } else if (allPlans && allPlans.length > 0 && completed.length === 0 && periodItems.length > 0) {
       recommendations.push(`⚠️ لا يوجد إنجاز في هذه الفترة — حاول إغلاق صفقة واحدة على الأقل`);
+      const motivations = [
+        "🚀 كل صفقة كبيرة بدأت بمكالمة واحدة — ارفع السماعة الآن!",
+        "💪 الفرصة القادمة على بُعد اتصال واحد، لا تستسلم!",
+        "🎯 البطل هو من يحاول مرة أخرى بعد كل رفض — أنت أقرب مما تظن!",
+        "⭐ النجاح يحب المثابرة — اجعل اليوم نقطة التحول!",
+        "🔥 كل 'لا' تقربك من 'نعم' — استمر!",
+      ];
+      recommendations.push(motivations[Math.floor(Math.random() * motivations.length)]);
     }
 
     return {
