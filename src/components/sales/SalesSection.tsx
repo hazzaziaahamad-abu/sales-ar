@@ -438,7 +438,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
 
   // Apply achievement filter or stage filter
   const baseFilteredDeals = achieveFilter
-    ? repFilteredDeals.filter(d => achieveFilterIds.has(d.id))
+    ? repOnlyDeals.filter(d => achieveFilterIds.has(d.id))
     : stageFilter ? repFilteredDeals.filter((d) => d.stage === stageFilter) : repFilteredDeals;
   const filteredDeals = clientSearch
     ? baseFilteredDeals.filter((d) => d.client_name.toLowerCase().includes(clientSearch.toLowerCase()) || (d.client_code && d.client_code.toLowerCase().includes(clientSearch.toLowerCase())) || (d.client_phone && d.client_phone.includes(clientSearch)))
