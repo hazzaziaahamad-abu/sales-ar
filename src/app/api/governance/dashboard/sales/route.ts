@@ -2,6 +2,15 @@ import { NextResponse } from "next/server";
 import { getAuthUser, hasPermission, isSuperAdmin } from "@/lib/permissions";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
+async function getUserName(userId: string): Promise<string | null> {
+  const { data } = await supabaseAdmin
+    .from("user_profiles")
+    .select("name")
+    .eq("id", userId)
+    .single();
+  return data?.name || null;
+}
+
 export async function GET() {
   const user = await getAuthUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -39,15 +48,16 @@ export async function GET() {
     );
   }
 
+  const userName = await getUserName(user.id);
+  if (!userName) return NextResponse.json([]);
+
   const { data: allDeals } = await supabaseAdmin
     .from("deals")
     .select("*")
+    .eq("assigned_rep_name", userName)
     .order("created_at", { ascending: false });
 
   const filtered = (allDeals || []).filter((d) => {
-    const isOwn = d.assigned_rep_id === user.id;
-    if (!isOwn) return false;
-
     const dealDate = d.deal_date || d.created_at;
     const isCurrentMonth = dealDate >= monthStartStr;
 
