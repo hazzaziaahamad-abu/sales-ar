@@ -75,6 +75,7 @@ import {
   Bell,
   AlertTriangle,
   PhoneCall,
+  Star,
 } from "lucide-react";
 
 /* ─── Stage badge color mapping ─── */
@@ -1491,6 +1492,15 @@ export function SalesSection({ salesType }: SalesPageProps) {
               filteredDeals.map((deal) => {
                 const isTarget = dailyTargetIds.has(deal.id);
                 const isTargetDone = isTarget && deal.stage === "مكتملة";
+                const now = new Date();
+                const isSameDay = (s?: string) => {
+                  if (!s) return false;
+                  const d = new Date(s);
+                  return d.getFullYear() === now.getFullYear()
+                    && d.getMonth() === now.getMonth()
+                    && d.getDate() === now.getDate();
+                };
+                const isTouchedToday = isSameDay(deal.updated_at) || isSameDay(deal.created_at);
                 return (
                 <TableRow key={deal.id} className={isTarget ? (isTargetDone ? "bg-cc-green/[0.04]" : "bg-cyan/[0.04]") : ""}>
                   <TableCell className="text-center">
@@ -1514,6 +1524,12 @@ export function SalesSection({ salesType }: SalesPageProps) {
                   </TableCell>
                   <TableCell className="font-medium text-foreground">
                     {deal.client_name}
+                    {isTouchedToday && (
+                      <Star
+                        className="mr-1 inline-block w-3.5 h-3.5 align-middle fill-amber-400 text-amber-400"
+                        title="أُضيف أو عُدّل اليوم"
+                      />
+                    )}
                     {isTarget && !isTargetDone && (
                       <span className="mr-1.5 inline-block text-[9px] px-1.5 py-0.5 rounded bg-cyan/10 text-cyan font-medium">هدف اليوم</span>
                     )}
