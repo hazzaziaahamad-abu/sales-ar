@@ -34,6 +34,7 @@ import {
   Flame,
   BrainCircuit,
   Radar,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
@@ -65,6 +66,7 @@ export const NAV_ITEMS = [
   { label: "الأكاديمية", href: "/academy", slug: "academy", icon: GraduationCap, color: "amber" },
   { label: "المالية", href: "/finance", slug: "finance", icon: Banknote, color: "lime" },
   { label: "رفع الملفات", href: "/upload", slug: "upload", icon: Upload, color: "slate" },
+  { label: "الحوكمة", href: "/governance", slug: "governance", icon: ShieldCheck, color: "indigo" },
   { label: "إدارة المستخدمين", href: "/users", slug: "users", icon: Shield, color: "red" },
   { label: "مراقبة المنافسين", href: "/competitors", slug: "competitors", icon: Radar, color: "rose" },
   { label: "Maestro", href: "/maestro", slug: "maestro", icon: Flame, color: "amber" },

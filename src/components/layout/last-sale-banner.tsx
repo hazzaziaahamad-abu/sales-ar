@@ -23,7 +23,6 @@ function sectionsFromPath(pathname: string): BannerMode {
   if (pathname.startsWith("/sales")) return ["office"];
   if (pathname.startsWith("/renewals")) return ["renewal"];
   if (pathname.startsWith("/secretary")) return ALL_TYPES;
-  // Pages where the banner should not appear
   if (pathname.startsWith("/support")) return "hidden";
   return null;
 }
@@ -151,13 +150,11 @@ export function LastSaleBanner() {
         }
 
         if (sections && sections.length > 1) {
-          // Stacked: keep requested order, include only those found
           const ordered = requested
             .map((t) => latestByType[t])
             .filter((s): s is LastSaleInfo => Boolean(s));
           setSales(ordered);
         } else {
-          // Single banner: newest across whatever was requested
           const newest = Object.values(latestByType)
             .filter((s): s is LastSaleInfo => Boolean(s))
             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];

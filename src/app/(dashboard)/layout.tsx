@@ -33,6 +33,7 @@ const PAGE_SLUG_MAP: Record<string, string> = {
   "/academy": "academy",
   "/secretary": "secretary",
   "/competitors": "competitors",
+  "/governance": "governance",
 };
 
 function MentionNotifLoader({ onLoad }: { onLoad: (n: AppNotification[]) => void }) {
