@@ -963,7 +963,7 @@ export default function SecretaryPage() {
     return weak;
   }, [deals, tickets, renewals, supportHealth.avgResponse]);
 
-  // Auto-schedule 9 PM review meeting for each weak department (once, after data loads)
+  // Auto-schedule 10 PM review meeting for each weak department (once, after data loads)
   useEffect(() => {
     if (loading || !dbLoaded.current || autoScheduledRef.current) return;
     if (weakDepartments.length === 0) return;
@@ -978,7 +978,7 @@ export default function SecretaryPage() {
         toAdd.push({
           id: `auto-${dept.key}-${todayKey}`,
           title,
-          time: "21:00",
+          time: "22:00",
           attendees: dept.attendees,
           done: false,
         });
