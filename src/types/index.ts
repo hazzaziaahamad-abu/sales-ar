@@ -19,6 +19,7 @@ export interface Deal {
   loss_reason?: string;
   notes?: string;
   last_contact?: string;
+  callback_date?: string;
   collection_status?: "محصّل" | "معلق" | "متأخر";
   month?: number;
   year?: number;

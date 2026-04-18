@@ -120,6 +120,7 @@ const EMPTY_FORM = {
   marketer_name: "",
   notes: "",
   last_contact: new Date().toISOString().slice(0, 10),
+  callback_date: "",
 };
 
 export interface SalesPageProps {
@@ -697,6 +698,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
       marketer_name: deal.marketer_name || "",
       notes: deal.notes || "",
       last_contact: deal.last_contact || deal.deal_date || new Date().toISOString().slice(0, 10),
+      callback_date: deal.callback_date ? deal.callback_date.slice(0, 16) : "",
     });
     setModalOpen(true);
   }
@@ -726,6 +728,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
           marketer_name: marketerName || undefined,
           notes: form.notes || undefined,
           last_contact: form.last_contact || undefined,
+          callback_date: form.stage === "اعادة الاتصال في وقت اخر" && form.callback_date ? new Date(form.callback_date).toISOString() : undefined,
           month,
           year,
         });
@@ -777,6 +780,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
           marketer_name: marketerName,
           notes: form.notes || undefined,
           last_contact: form.last_contact || undefined,
+          callback_date: form.stage === "اعادة الاتصال في وقت اخر" && form.callback_date ? new Date(form.callback_date).toISOString() : undefined,
           cycle_days: 0,
           month,
           year,
@@ -1531,10 +1535,23 @@ export function SalesSection({ salesType }: SalesPageProps) {
                     <span className="text-xs text-muted-foreground">{deal.plan || "—"}</span>
                   </TableCell>
                   <TableCell>
-                    <ColorBadge
-                      text={deal.stage}
-                      color={STAGE_BADGE_COLOR[deal.stage] || "blue"}
-                    />
+                    <div className="flex flex-col gap-1">
+                      <ColorBadge
+                        text={deal.stage}
+                        color={STAGE_BADGE_COLOR[deal.stage] || "blue"}
+                      />
+                      {deal.stage === "اعادة الاتصال في وقت اخر" && deal.callback_date && (
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 w-fit ${
+                          new Date(deal.callback_date).getTime() < Date.now()
+                            ? "bg-red-500/15 text-red-400"
+                            : new Date(deal.callback_date).getTime() - Date.now() < 3600000
+                            ? "bg-amber-500/15 text-amber-400"
+                            : "bg-sky-500/15 text-sky-400"
+                        }`}>
+                          📅 {new Date(deal.callback_date).toLocaleDateString("ar-SA")} — {new Date(deal.callback_date).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="font-bold text-cyan text-xs">
                     {formatMoneyFull(deal.deal_value)}
@@ -2136,6 +2153,22 @@ export function SalesSection({ salesType }: SalesPageProps) {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Callback date — only when stage is "اعادة الاتصال في وقت اخر" */}
+            {form.stage === "اعادة الاتصال في وقت اخر" && (
+              <div className="grid gap-1.5">
+                <Label htmlFor="callback_date">موعد إعادة الاتصال</Label>
+                <Input
+                  id="callback_date"
+                  type="datetime-local"
+                  value={form.callback_date}
+                  onChange={(e) => setForm({ ...form, callback_date: e.target.value })}
+                  dir="ltr"
+                  className="text-right"
+                />
+                <p className="text-[10px] text-muted-foreground">حدد التاريخ والوقت للاتصال بالعميل مرة أخرى</p>
+              </div>
+            )}
 
             {/* Plan (dropdown) */}
             <div className="grid gap-1.5">
