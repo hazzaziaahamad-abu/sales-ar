@@ -376,7 +376,7 @@ export default function AppearancePage() {
                 { label: "معلق", color: "#F59E0B" },
                 { label: "عاجل", color: "#EF4444" },
                 { label: "تفاوض", color: "#8B5CF6" },
-                { label: "تواصل", color: "var(--primary)" },
+                { label: "قيد التواصل", color: "var(--primary)" },
               ].map((b, i) => (
                 <span
                   key={i}

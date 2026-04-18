@@ -149,7 +149,7 @@ const STATUSES: Record<string, { label: string; color: string; bg: string }> = {
 type ViewMode = "today" | "week" | "month" | "all";
 
 const CLIENT_STAGES = [
-  { key: "تواصل", label: "تواصل", color: "emerald" },
+  { key: "قيد التواصل", label: "قيد التواصل", color: "cyan" },
   { key: "تفاوض", label: "جاري التفاوض", color: "purple" },
   { key: "تجريبي", label: "يوزر تجريبي", color: "blue" },
   { key: "انتظار الدفع", label: "بانتظار الدفع", color: "amber" },
@@ -172,7 +172,7 @@ const EMPTY_CLIENT_FORM = {
   deal_value: 0,
   source: "حملة اعلانية",
   plan: "",
-  stage: "تواصل",
+  stage: "قيد التواصل",
   notes: "",
   sales_type: "office" as "office" | "support",
 };
@@ -526,7 +526,7 @@ export default function MyTasksPage() {
         client_phone: task.client_phone || undefined,
         deal_value: valueMatch ? parseFloat(valueMatch[1]) : 0,
         source: sourceMatch ? sourceMatch[1].trim() : "من الموظف",
-        stage: stageMatch ? stageMatch[1].trim() : "تواصل",
+        stage: stageMatch ? stageMatch[1].trim() : "قيد التواصل",
         plan: planMatch ? planMatch[1].trim() : undefined,
         notes: `محوّل من ${user?.name} | ${task.notes || ""}`.trim(),
         submitter_name: user?.name,
