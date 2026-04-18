@@ -184,6 +184,7 @@ export interface Renewal {
   plan_name: string;
   plan_price: number;
   renewal_date: string;
+  payment_date?: string;
   status: string;
   cancel_reason?: string;
   assigned_rep?: string;
