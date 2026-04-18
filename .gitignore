@@ -42,3 +42,8 @@ next-env.d.ts
 
 # supabase
 supabase/.temp/
+
+# mobile app
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
