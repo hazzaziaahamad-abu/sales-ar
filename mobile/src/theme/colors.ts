@@ -1,0 +1,36 @@
+export const colors = {
+  background: "#0C1220",
+  surface: "#162032",
+  card: "#162032",
+  cardHighlight: "#1C2A42",
+  border: "rgba(255,255,255,0.08)",
+  borderHi: "rgba(255,255,255,0.15)",
+
+  primary: "#00D4FF",
+  primaryDim: "rgba(0,212,255,0.15)",
+
+  text: "#F1F5F9",
+  textSecondary: "#94A3B8",
+  textMuted: "#64748B",
+
+  green: "#10B981",
+  greenDim: "rgba(16,185,129,0.15)",
+  red: "#EF4444",
+  redDim: "rgba(239,68,68,0.15)",
+  amber: "#F59E0B",
+  amberDim: "rgba(245,158,11,0.15)",
+  purple: "#8B5CF6",
+  purpleDim: "rgba(139,92,246,0.15)",
+  blue: "#3B82F6",
+  blueDim: "rgba(59,130,246,0.15)",
+  pink: "#EC4899",
+  pinkDim: "rgba(236,72,153,0.15)",
+  cyan: "#00D4FF",
+  cyanDim: "rgba(0,212,255,0.15)",
+  orange: "#F97316",
+  orangeDim: "rgba(249,115,22,0.15)",
+
+  inputBg: "rgba(255,255,255,0.04)",
+  tabBar: "#0F172A",
+  tabBarBorder: "rgba(255,255,255,0.06)",
+};
