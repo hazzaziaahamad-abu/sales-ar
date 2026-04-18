@@ -6,7 +6,7 @@ import { submitPendingDeal } from "@/lib/supabase/db";
 import { SOURCES, PLANS } from "@/lib/utils/constants";
 
 const SUBMIT_STAGES = [
-  { key: "تواصل", label: "تواصل", color: "emerald" },
+  { key: "قيد التواصل", label: "قيد التواصل", color: "emerald" },
   { key: "تفاوض", label: "جاري التفاوض", color: "purple" },
   { key: "تجريبي", label: "يوزر تجريبي", color: "blue" },
   { key: "انتظار الدفع", label: "بانتظار الدفع", color: "amber" },
@@ -24,7 +24,7 @@ export default function SubmitDealPage() {
     deal_value: 0,
     source: "حملة اعلانية",
     plan: "",
-    stage: "تواصل",
+    stage: "قيد التواصل",
     assigned_rep_name: "",
     notes: "",
     submitter_name: "",
@@ -77,7 +77,7 @@ export default function SubmitDealPage() {
           <h1 className="text-2xl font-bold text-white">تم إرسال الطلب بنجاح!</h1>
           <p className="text-gray-400 text-sm">سيتم مراجعة الطلب والموافقة عليه من قبل الإدارة.</p>
           <button
-            onClick={() => { setSubmitted(false); setForm({ client_name: "", client_phone: "", deal_value: 0, source: "حملة اعلانية", stage: "تواصل", plan: "", assigned_rep_name: "", notes: "", submitter_name: "", sales_type: "office" }); }}
+            onClick={() => { setSubmitted(false); setForm({ client_name: "", client_phone: "", deal_value: 0, source: "حملة اعلانية", stage: "قيد التواصل", plan: "", assigned_rep_name: "", notes: "", submitter_name: "", sales_type: "office" }); }}
             className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-cyan-500/15 text-cyan-400 font-medium hover:bg-cyan-500/25 transition-colors"
           >
             إرسال طلب آخر

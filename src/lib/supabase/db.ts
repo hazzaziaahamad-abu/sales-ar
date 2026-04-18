@@ -1417,7 +1417,7 @@ export async function approvePendingDeal(id: string, reviewerName: string): Prom
       client_phone: pd.client_phone,
       deal_value: pd.deal_value,
       source: pd.source,
-      stage: pd.stage || "تواصل",
+      stage: pd.stage || "قيد التواصل",
       plan: pd.plan,
       assigned_rep_name: pd.assigned_rep_name,
       notes: pd.notes,

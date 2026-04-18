@@ -6,7 +6,9 @@ import {
   Target, CheckSquare, Sparkles, TrendingUp, TrendingDown, Clock,
   AlertTriangle, ChevronDown, ChevronUp, RefreshCw, Loader2,
   Users, Banknote, BarChart3, Phone, ArrowLeft, ArrowRight,
+  MessageCircle, Bell, Share2, ExternalLink,
 } from "lucide-react";
+import Link from "next/link";
 import { fetchDeals, fetchRenewals, fetchEmployees, fetchRecentFollowUpNotes } from "@/lib/supabase/db";
 import { useAuth } from "@/lib/auth-context";
 import { formatMoneyFull } from "@/lib/utils/format";
@@ -30,6 +32,361 @@ function getGreeting() {
   if (h < 12) return "صباح الخير";
   if (h < 17) return "مساء الخير";
   return "مساء النور";
+}
+
+/* ─── Deal Temperature Scoring ─── */
+const STAGE_WEIGHTS: Record<string, number> = {
+  "انتظار الدفع": 90,
+  "تجهيز": 78,
+  "تفاوض": 72,
+  "تم إرسال العرض": 62,
+  "تجريبي": 58,
+  "عميل جديد": 52,
+  "قيد التواصل": 42,
+  "اعادة الاتصال في وقت اخر": 25,
+  "تاجيل": 20,
+  "كنسل التجربة": 10,
+  "استهداف خاطئ": 5,
+};
+
+const NEXT_STEP_HINT: Record<string, string> = {
+  "قيد التواصل": "متابعة المحادثة وتحديد الاحتياج",
+  "عميل جديد": "تأهيل الحاجة وتحديد الخطة المناسبة",
+  "تم إرسال العرض": "متابعة رد العميل على العرض",
+  "تفاوض": "إغلاق السعر أو تعديل العرض",
+  "انتظار الدفع": "متابعة التحويل وإرسال التذكير",
+  "تجهيز": "تسليم الخدمة وتأكيد التشغيل",
+  "تجريبي": "متابعة تجربة العميل خلال 48 ساعة",
+  "تاجيل": "إعادة جدولة الاتصال حسب الموعد",
+  "اعادة الاتصال في وقت اخر": "تحديد موعد محدد للاتصال",
+};
+
+type DealTier = "hot" | "warm" | "cold" | "stale";
+
+interface DealIntel {
+  score: number;
+  tier: DealTier;
+  lastActivityDate: string;
+  daysSinceActivity: number;
+  nextStep: string;
+  hasNoNextStep: boolean;
+  needsAttention: boolean;
+  attentionReason?: string;
+}
+
+function computeDealIntel(d: Deal, lastNoteDate?: string): DealIntel {
+  const stageWeight = STAGE_WEIGHTS[d.stage] ?? 20;
+  let score = stageWeight;
+
+  // Value weight (max +20)
+  if (d.deal_value >= 30000) score += 20;
+  else if (d.deal_value >= 10000) score += 15;
+  else if (d.deal_value >= 5000) score += 10;
+  else if (d.deal_value >= 1000) score += 5;
+
+  // Recency
+  const lastActivity = lastNoteDate || d.last_contact || d.updated_at || d.created_at;
+  const daysSinceActivity = daysAgo(lastActivity);
+  if (daysSinceActivity <= 2) score += 15;
+  else if (daysSinceActivity <= 5) score += 8;
+  else if (daysSinceActivity <= 10) score += 0;
+  else if (daysSinceActivity <= 20) score -= 15;
+  else score -= 30;
+
+  // Staleness penalty (cycle days)
+  if (d.cycle_days > 30) score -= 20;
+  else if (d.cycle_days > 14) score -= 10;
+
+  // Determine tier
+  let tier: DealTier;
+  if (d.stage === "انتظار الدفع" || score >= 90) tier = "hot";
+  else if (score >= 60) tier = "warm";
+  else if (daysSinceActivity > 14 || d.cycle_days > 21) tier = "stale";
+  else tier = "cold";
+
+  const nextStep = NEXT_STEP_HINT[d.stage] || "تحديد الخطوة القادمة";
+  const hasNoNextStep = !d.notes || d.notes.trim().length < 5;
+
+  // Needs owner attention?
+  let needsAttention = false;
+  let attentionReason: string | undefined;
+  if (d.stage === "انتظار الدفع" && daysSinceActivity >= 3) {
+    needsAttention = true;
+    attentionReason = `بانتظار الدفع منذ ${daysSinceActivity} أيام`;
+  } else if (d.deal_value >= 10000 && daysSinceActivity >= 5 && tier !== "hot") {
+    needsAttention = true;
+    attentionReason = `قيمة عالية بلا تفاعل ${daysSinceActivity} يوم`;
+  } else if (tier === "warm" && daysSinceActivity >= 7) {
+    needsAttention = true;
+    attentionReason = `صفقة دافئة تُنسى — ${daysSinceActivity} يوم بلا تواصل`;
+  }
+
+  return { score, tier, lastActivityDate: lastActivity, daysSinceActivity, nextStep, hasNoNextStep, needsAttention, attentionReason };
+}
+
+function sanitizePhone(phone?: string): string {
+  if (!phone) return "";
+  let p = phone.replace(/[^\d+]/g, "");
+  if (p.startsWith("00")) p = "+" + p.slice(2);
+  if (p.startsWith("05") || p.startsWith("5")) p = "+966" + p.replace(/^0/, "");
+  return p;
+}
+
+function whatsappLink(phone: string, msg: string): string {
+  const p = sanitizePhone(phone).replace(/^\+/, "");
+  return `https://wa.me/${p}?text=${encodeURIComponent(msg)}`;
+}
+
+function whatsappMessageForStage(stage: string, clientName: string): string {
+  switch (stage) {
+    case "انتظار الدفع":
+      return `مرحبًا ${clientName}، نود التأكد من استلامكم لتفاصيل الدفع. هل هناك ما يمكننا مساعدتكم به لإتمام العملية؟`;
+    case "تفاوض":
+      return `مرحبًا ${clientName}، نتابع معكم بخصوص عرضنا. هل لديكم أي استفسارات حتى نصل لاتفاق يناسبكم؟`;
+    case "تم إرسال العرض":
+      return `مرحبًا ${clientName}، تأكيد وصول العرض — هل اطلعتم عليه ولديكم ملاحظات؟`;
+    default:
+      return `مرحبًا ${clientName}، نتابع معكم بخصوص طلبكم مع RESTAVO. كيف يمكننا خدمتكم؟`;
+  }
+}
+
+/* ─── Share helpers ─── */
+const VARIANT_LABEL: Record<"hot" | "warm" | "cold" | "attention", string> = {
+  hot: "🔥 ساخنة",
+  warm: "🌤 دافئة",
+  cold: "❄️ باردة",
+  attention: "⚡ تحتاج تدخل",
+};
+
+function buildDealShareText(d: Deal, intel: DealIntel, variant: "hot" | "warm" | "cold" | "attention"): string {
+  const lines: string[] = [];
+  lines.push(`📌 صفقة ${VARIANT_LABEL[variant]}`);
+  lines.push(`العميل: ${d.client_name}`);
+  if (d.client_phone) lines.push(`الجوال: ${d.client_phone}`);
+  lines.push(`المرحلة: ${d.stage}`);
+  lines.push(`القيمة: ${formatMoneyFull(d.deal_value)}`);
+  if (d.assigned_rep_name) lines.push(`المسؤول: ${d.assigned_rep_name}`);
+  lines.push(`الدرجة: ${intel.score}`);
+  const lastActivityLabel = intel.daysSinceActivity === 0
+    ? "اليوم"
+    : intel.daysSinceActivity === 1
+    ? "أمس"
+    : `قبل ${intel.daysSinceActivity} يوم`;
+  lines.push(`آخر تفاعل: ${lastActivityLabel}`);
+  lines.push(`عمر الصفقة: ${d.cycle_days} يوم`);
+  lines.push(`الخطوة القادمة: ${intel.nextStep}`);
+  if (variant === "attention" && intel.attentionReason) lines.push(`⚠ ${intel.attentionReason}`);
+  return lines.join("\n");
+}
+
+function buildDealsCategoryShareText(
+  items: { deal: Deal; intel: DealIntel }[],
+  variant: "hot" | "warm" | "cold",
+  categoryTitle: string,
+): string {
+  const today = new Date().toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const totalValue = items.reduce((s, { deal }) => s + deal.deal_value, 0);
+  const header = [
+    `📊 ${categoryTitle} — ${VARIANT_LABEL[variant]}`,
+    today,
+    `العدد: ${items.length} صفقة — إجمالي القيمة: ${formatMoneyFull(totalValue)}`,
+    "",
+  ].join("\n");
+  const body = items
+    .map(({ deal: d, intel }, i) => {
+      const last = intel.daysSinceActivity === 0 ? "اليوم" : intel.daysSinceActivity === 1 ? "أمس" : `قبل ${intel.daysSinceActivity}ي`;
+      const rep = d.assigned_rep_name ? ` — ${d.assigned_rep_name}` : "";
+      return `${i + 1}. ${d.client_name}${rep}\n   ${d.stage} • ${formatMoneyFull(d.deal_value)} • درجة ${intel.score} • آخر تفاعل ${last}\n   ↪ ${intel.nextStep}`;
+    })
+    .join("\n\n");
+  return header + body;
+}
+
+async function shareText(title: string, text: string): Promise<void> {
+  if (typeof navigator !== "undefined" && navigator.share) {
+    try {
+      await navigator.share({ title, text });
+      return;
+    } catch {
+      // fall through to clipboard
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    alert("تم نسخ التفاصيل! يمكنك لصقها في واتساب أو أي تطبيق.");
+  } catch {
+    alert("تعذرت المشاركة — يرجى المحاولة يدويًا.");
+  }
+}
+
+/* ─── DealRow: compact deal card with quick actions ─── */
+const VARIANT_STYLES: Record<"hot" | "warm" | "cold" | "attention", { border: string; bg: string; text: string; valueText: string }> = {
+  hot: { border: "border-orange-500/25", bg: "bg-orange-500/[0.06]", text: "text-orange-300", valueText: "text-orange-400" },
+  warm: { border: "border-amber-400/25", bg: "bg-amber-500/[0.05]", text: "text-amber-200", valueText: "text-amber-300" },
+  cold: { border: "border-blue-500/20", bg: "bg-blue-500/[0.05]", text: "text-blue-300", valueText: "text-blue-400" },
+  attention: { border: "border-red-500/30", bg: "bg-red-500/[0.06]", text: "text-red-300", valueText: "text-red-400" },
+};
+
+function DealRow({
+  deal: d,
+  intel,
+  variant,
+  onRemind,
+}: {
+  deal: Deal;
+  intel: DealIntel;
+  variant: "hot" | "warm" | "cold" | "attention";
+  onRemind: (d: Deal) => void;
+}) {
+  const s = VARIANT_STYLES[variant];
+  const phone = sanitizePhone(d.client_phone);
+  const lastActivityLabel = intel.daysSinceActivity === 0
+    ? "اليوم"
+    : intel.daysSinceActivity === 1
+    ? "أمس"
+    : `قبل ${intel.daysSinceActivity} يوم`;
+
+  const staleColor = intel.daysSinceActivity > 14 ? "text-red-400" : intel.daysSinceActivity > 7 ? "text-amber-400" : "text-muted-foreground";
+
+  return (
+    <div className={`rounded-lg ${s.bg} border ${s.border} px-3 py-2.5`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-xs font-bold text-foreground truncate">{d.client_name}</p>
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-white/[0.05] text-muted-foreground">{d.stage}</span>
+            {variant === "attention" && intel.attentionReason && (
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-300">{intel.attentionReason}</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <span className="text-[10px] text-muted-foreground">{d.assigned_rep_name || "بلا مسؤول"}</span>
+            <span className="text-[10px] text-muted-foreground">•</span>
+            <span className={`text-[10px] ${staleColor} flex items-center gap-0.5`}>
+              <Clock className="w-2.5 h-2.5" /> آخر تفاعل {lastActivityLabel}
+            </span>
+            <span className="text-[10px] text-muted-foreground">•</span>
+            <span className="text-[10px] text-muted-foreground">{d.cycle_days} يوم بالأنبوب</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-1">
+            <span className="text-cyan-400/80">الخطوة القادمة:</span> {intel.nextStep}
+            {intel.hasNoNextStep && <span className="ml-1 text-red-400/90">⚠ بدون ملاحظة</span>}
+          </p>
+        </div>
+        <div className="text-left shrink-0">
+          <p className={`text-sm font-bold ${s.valueText}`}>{formatMoneyFull(d.deal_value)}</p>
+          <p className="text-[9px] text-muted-foreground mt-0.5">درجة {intel.score}</p>
+        </div>
+      </div>
+
+      {/* Quick action buttons */}
+      <div className="flex items-center gap-1 mt-2 pt-2 border-t border-white/[0.04]">
+        {phone ? (
+          <a
+            href={`tel:${phone}`}
+            className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 transition-colors"
+            title="اتصل"
+          >
+            <Phone className="w-3 h-3" /> اتصل
+          </a>
+        ) : (
+          <span className="text-[10px] px-2 py-1 rounded-md bg-white/[0.03] text-muted-foreground/60 border border-white/[0.04]">بلا رقم</span>
+        )}
+        {phone && (
+          <a
+            href={whatsappLink(phone, whatsappMessageForStage(d.stage, d.client_name))}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/20 transition-colors"
+            title="واتساب"
+          >
+            <MessageCircle className="w-3 h-3" /> واتساب
+          </a>
+        )}
+        <button
+          onClick={() => onRemind(d)}
+          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 transition-colors"
+          title="أضف مهمة متابعة غداً"
+        >
+          <Bell className="w-3 h-3" /> ذكّرني
+        </button>
+        <button
+          onClick={() => shareText(`صفقة ${d.client_name}`, buildDealShareText(d, intel, variant))}
+          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/20 transition-colors"
+          title="مشاركة الصفقة"
+        >
+          <Share2 className="w-3 h-3" /> مشاركة
+        </button>
+        <Link
+          href="/sales"
+          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/[0.04] hover:bg-white/[0.08] text-muted-foreground border border-white/[0.06] transition-colors mr-auto"
+          title="افتح في المبيعات"
+        >
+          <ExternalLink className="w-3 h-3" /> فتح
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+/* ─── PerformerCard: top/bottom per department ─── */
+const ACCENT_STYLES: Record<string, { border: string; bg: string; text: string }> = {
+  emerald: { border: "border-emerald-500/20", bg: "bg-emerald-500/[0.05]", text: "text-emerald-400" },
+  orange: { border: "border-orange-500/20", bg: "bg-orange-500/[0.05]", text: "text-orange-400" },
+  rose: { border: "border-rose-500/20", bg: "bg-rose-500/[0.05]", text: "text-rose-400" },
+  sky: { border: "border-sky-500/20", bg: "bg-sky-500/[0.05]", text: "text-sky-400" },
+};
+
+function PerformerCard({
+  title,
+  accent,
+  unit,
+  data,
+}: {
+  title: string;
+  accent: "emerald" | "orange" | "rose" | "sky";
+  unit: string;
+  data: { top?: { name: string; value: number; subValue?: string }; bottom?: { name: string; value: number; subValue?: string }; total: number };
+}) {
+  const s = ACCENT_STYLES[accent];
+  return (
+    <div className={`rounded-xl ${s.bg} border ${s.border} p-3`}>
+      <div className="flex items-center justify-between mb-2">
+        <p className={`text-[11px] font-bold ${s.text}`}>{title}</p>
+        <span className="text-[9px] text-muted-foreground">{data.total} موظف</span>
+      </div>
+      {!data.top && !data.bottom ? (
+        <p className="text-[10px] text-muted-foreground py-2 text-center">لا توجد بيانات</p>
+      ) : (
+        <div className="space-y-1.5">
+          {data.top && (
+            <div className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg bg-emerald-500/[0.08] border border-emerald-500/15">
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] text-emerald-400 flex items-center gap-1">🏆 الأفضل</p>
+                <p className="text-[11px] font-bold text-foreground truncate">{data.top.name}</p>
+              </div>
+              <div className="text-left shrink-0">
+                <p className={`text-sm font-bold ${s.text}`}>{data.top.value}</p>
+                <p className="text-[9px] text-muted-foreground">{data.top.subValue || unit}</p>
+              </div>
+            </div>
+          )}
+          {data.bottom && data.bottom.name !== data.top?.name && (
+            <div className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg bg-red-500/[0.06] border border-red-500/15">
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] text-red-400 flex items-center gap-1">📉 الأقل</p>
+                <p className="text-[11px] font-bold text-foreground truncate">{data.bottom.name}</p>
+              </div>
+              <div className="text-left shrink-0">
+                <p className="text-sm font-bold text-red-400">{data.bottom.value}</p>
+                <p className="text-[9px] text-muted-foreground">{data.bottom.subValue || unit}</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /* ─── Types ─── */

@@ -22,7 +22,7 @@ export const STAGE_MAP: Record<string, string> = {
   "اعادة الاتصال": "اعادة الاتصال في وقت اخر",
   "اعاده الاتصال": "اعادة الاتصال في وقت اخر",
   // Identity mappings for all app stages
-  "تواصل": "تواصل",
+  "تواصل": "قيد التواصل",
   "قيد التواصل": "قيد التواصل",
   "عميل جديد": "عميل جديد",
   "تفاوض": "تفاوض",
@@ -80,7 +80,7 @@ const VALID_SOURCES_SET = new Set(SOURCES);
 export function mapStage(
   raw: string,
   aiStageMap?: Record<string, string>,
-  fallback = "تواصل"
+  fallback = "قيد التواصل"
 ): string {
   const trimmed = raw.trim();
   if (!trimmed) return fallback;

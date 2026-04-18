@@ -229,7 +229,7 @@ export default function RequestsPage() {
               <InfoRow label="اسم العميل" value={detailDeal.client_name} />
               <InfoRow label="رقم الجوال" value={detailDeal.client_phone || "—"} />
               <InfoRow label="القيمة" value={detailDeal.deal_value > 0 ? `${detailDeal.deal_value.toLocaleString()} ر.س` : "—"} />
-              <InfoRow label="المرحلة" value={detailDeal.stage || "تواصل"} />
+              <InfoRow label="المرحلة" value={detailDeal.stage || "قيد التواصل"} />
               <InfoRow label="المصدر" value={detailDeal.source || "—"} />
               <InfoRow label="الباقة" value={detailDeal.plan || "—"} />
               <InfoRow label="القسم" value={detailDeal.sales_type === "support" ? "مبيعات الدعم" : "مبيعات المكتب"} />

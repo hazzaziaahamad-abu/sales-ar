@@ -16,7 +16,7 @@ import { AlertCircle, ArrowUpLeft, Ticket as TicketIcon, TrendingUp, DollarSign,
 import { StarEmployeeCard, Leaderboard } from "@/components/star-employee";
 
 const STAGE_COLORS: Record<string, string> = {
-  "تواصل": "#10B981",
+  "قيد التواصل": "#00D4FF",
   "تفاوض": "#8B5CF6",
   "تجهيز": "#00D4FF",
   "انتظار الدفع": "#F59E0B",
@@ -24,7 +24,7 @@ const STAGE_COLORS: Record<string, string> = {
 };
 
 const STAGE_BADGE: Record<string, "cyan" | "green" | "amber" | "red" | "purple"> = {
-  "تواصل": "green",
+  "قيد التواصل": "cyan",
   "تفاوض": "purple",
   "تجهيز": "cyan",
   "انتظار الدفع": "amber",

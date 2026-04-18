@@ -427,7 +427,7 @@ export default function UploadPage() {
             const clientName = cellStr(row, col("client_name"));
             if (!clientName) continue;
 
-            const rawStage = cellStr(row, col("stage")) || "تواصل";
+            const rawStage = cellStr(row, col("stage")) || "قيد التواصل";
             const stage = mapStage(rawStage, aiStageMap);
 
             const rawSource = cellStr(row, col("source")) || "اخرى";

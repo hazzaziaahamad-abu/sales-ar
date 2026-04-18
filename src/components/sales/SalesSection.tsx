@@ -79,7 +79,6 @@ import {
 
 /* ─── Stage badge color mapping ─── */
 const STAGE_BADGE_COLOR: Record<string, "green" | "amber" | "purple" | "cyan" | "red" | "blue"> = {
-  "تواصل": "green",
   "قيد التواصل": "cyan",
   "عميل جديد": "blue",
   "تفاوض": "purple",
@@ -113,7 +112,7 @@ const EMPTY_FORM = {
   deal_value: 0,
   assigned_rep_name: "",
   source: "حملة اعلانية",
-  stage: "تواصل",
+  stage: "قيد التواصل",
   plan: "",
   deal_date: new Date().toISOString().slice(0, 10),
   probability: 50,
@@ -253,10 +252,10 @@ export function SalesSection({ salesType }: SalesPageProps) {
     if (deal.stage === "تجهيز") {
       return { text: "أسرع في التجهيز وأبلغ العميل بالتقدم", color: "text-cyan", icon: "⚙️" };
     }
-    if (daysSince > 14 && deal.stage === "تواصل") {
+    if (daysSince > 14 && deal.stage === "قيد التواصل") {
       return { text: "مضى أكثر من أسبوعين — اتصل بالعميل مباشرة أو قدّم عرض جديد", color: "text-cc-red", icon: "🔥" };
     }
-    if (daysSince > 7 && deal.stage === "تواصل") {
+    if (daysSince > 7 && deal.stage === "قيد التواصل") {
       return { text: "لم يتم التواصل منذ أسبوع — أرسل رسالة متابعة", color: "text-amber", icon: "📱" };
     }
     if (deal.deal_value >= 500) {
@@ -431,7 +430,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
     value: d.deal_value,
     isCompleted: d.stage === "مكتملة",
     isCancelled: d.stage === "مرفوض مع سبب" || d.stage === "كنسل التجربة",
-    isContacted: d.stage === "تواصل" || d.stage === "تفاوض" || d.stage === "انتظار الدفع",
+    isContacted: d.stage === "قيد التواصل" || d.stage === "تفاوض" || d.stage === "انتظار الدفع",
     repName: d.assigned_rep_name || undefined,
     planName: d.plan || undefined,
   })), [repOnlyDeals]);
@@ -593,7 +592,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
   }).filter((s) => s.count > 0);
 
   /* Funnel data */
-  const funnelStages = ["تواصل", "تفاوض", "تجهيز", "انتظار الدفع", "مكتملة"];
+  const funnelStages = ["قيد التواصل", "تفاوض", "تجهيز", "انتظار الدفع", "مكتملة"];
   const funnelData = funnelStages.map((stage) => ({
     stage,
     count: stageCounts[stage]?.count || 0,

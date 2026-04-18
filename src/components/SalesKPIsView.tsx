@@ -56,9 +56,10 @@ const KPI_TARGETS = {
 };
 
 /* ─── Funnel Stages ─── */
-const FUNNEL_STAGES = ["تواصل", "عرض سعر", "تفاوض", "إغلاق"];
+const FUNNEL_STAGES = ["قيد التواصل", "عرض سعر", "تفاوض", "إغلاق"];
 const FUNNEL_STAGE_MAP: Record<string, string> = {
-  "تواصل": "تواصل",
+  "قيد التواصل": "قيد التواصل",
+  "عميل جديد": "قيد التواصل",
   "تفاوض": "تفاوض",
   "عرض سعر": "عرض سعر",
   "تجهيز": "عرض سعر",
@@ -67,7 +68,7 @@ const FUNNEL_STAGE_MAP: Record<string, string> = {
 };
 
 const FUNNEL_COLORS: Record<string, string> = {
-  "تواصل": T.teal,
+  "قيد التواصل": T.teal,
   "عرض سعر": T.amber,
   "تفاوض": T.purple,
   "إغلاق": T.green,
@@ -125,8 +126,7 @@ export default function SalesKPIsView({ deals, lostDeals }: SalesKPIsViewProps) 
     const avgCycle = activeDeals.length > 0 ? Math.round(activeDeals.reduce((s, d) => s + d.cycle_days, 0) / activeDeals.length) : 0;
     const avgDealVal = activeDeals.length > 0 ? Math.round(activeDeals.reduce((s, d) => s + d.deal_value, 0) / activeDeals.length) : 0;
 
-    // Demo conv: deals past "تواصل" stage / all non-contact deals
-    const nonContact = activeDeals.filter(d => d.stage !== "تواصل");
+    const nonContact = activeDeals.filter(d => d.stage !== "قيد التواصل" && d.stage !== "عميل جديد");
     const demoReached = activeDeals.filter(d => ["عرض سعر", "تجهيز", "تفاوض", "انتظار الدفع", "مكتملة", "إغلاق"].includes(d.stage));
     const demoConv = activeDeals.length > 0 ? Math.round((demoReached.length / activeDeals.length) * 100) : 0;
 
@@ -134,7 +134,7 @@ export default function SalesKPIsView({ deals, lostDeals }: SalesKPIsViewProps) 
     const funnelMap: Record<string, { count: number; value: number }> = {};
     FUNNEL_STAGES.forEach(s => { funnelMap[s] = { count: 0, value: 0 }; });
     activeDeals.forEach(d => {
-      const mapped = FUNNEL_STAGE_MAP[d.stage] || "تواصل";
+      const mapped = FUNNEL_STAGE_MAP[d.stage] || "قيد التواصل";
       if (funnelMap[mapped]) {
         funnelMap[mapped].count++;
         funnelMap[mapped].value += d.deal_value;
