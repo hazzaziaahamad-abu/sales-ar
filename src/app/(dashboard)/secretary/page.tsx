@@ -880,8 +880,8 @@ export default function SecretaryPage() {
     function rankByCount(map: Map<string, { count: number; rev: number }>) {
       const entries = Array.from(map.entries())
         .filter(([name]) => name !== "بلا مسؤول")
-        .map(([name, v]) => ({ name, value: v.count, subValue: v.rev > 0 ? formatMoneyFull(v.rev) : undefined }));
-      const sorted = [...entries].sort((a, b) => b.value - a.value);
+        .map(([name, v]) => ({ name, value: v.count, rev: v.rev, subValue: v.rev > 0 ? formatMoneyFull(v.rev) : undefined }));
+      const sorted = [...entries].sort((a, b) => b.value - a.value || b.rev - a.rev);
       return {
         top: sorted[0],
         bottom: sorted.length > 1 ? sorted[sorted.length - 1] : undefined,
