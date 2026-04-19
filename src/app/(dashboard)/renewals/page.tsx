@@ -487,14 +487,22 @@ export default function RenewalsPage() {
       if (customRange.to) endDate = new Date(customRange.to + "T23:59:59");
     }
 
-    // Filter renewals by renewal_date (due date) within the period
+    // Filter renewals by period:
+    // - Completed: use payment_date (actual payment) or updated_at as fallback
+    // - Contacted (جاري المتابعة / انتظار الدفع): use updated_at (when team contacted)
+    // - Others: use renewal_date (target due date)
     const pad2 = (n: number) => String(n).padStart(2, "0");
     const fmtDate = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
     const startStr = fmtDate(startDate);
     const endStr = fmtDate(endDate);
-    const periodRenewals = renewals.filter(r =>
-      r.renewal_date >= startStr && r.renewal_date <= endStr
-    );
+    const periodRenewals = renewals.filter(r => {
+      const effectiveDate = r.status === "مكتمل"
+        ? (r.payment_date || r.updated_at?.slice(0, 10) || r.renewal_date)
+        : (r.status === "جاري المتابعة" || r.status === "انتظار الدفع")
+          ? (r.updated_at?.slice(0, 10) || r.renewal_date)
+          : r.renewal_date;
+      return effectiveDate >= startStr && effectiveDate <= endStr;
+    });
 
     const completed = periodRenewals.filter(r => r.status === "مكتمل");
     const cancelled = periodRenewals.filter(r => r.status === "ملغي بسبب");
