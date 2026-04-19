@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { Deal, Renewal, MonthlyExpense, MonthlyBudget, StartupCost } from "@/types";
-import { fetchDeals, fetchRenewals, fetchMonthlyExpenses, createExpense, deleteExpense, updateExpense, fetchMonthlyBudget, upsertBudgetItem, deleteBudgetItem, copyBudgetFromPreviousMonth, fetchStartupCosts, createStartupCost, deleteStartupCost, fetchEmployees } from "@/lib/supabase/db";
+import { fetchDeals, fetchRenewals, fetchMonthlyExpenses, createExpense, deleteExpense, updateExpense, updateDeal, fetchMonthlyBudget, upsertBudgetItem, deleteBudgetItem, copyBudgetFromPreviousMonth, fetchStartupCosts, createStartupCost, deleteStartupCost, fetchEmployees } from "@/lib/supabase/db";
 import { useAuth } from "@/lib/auth-context";
 import { useTopbarControls } from "@/components/layout/topbar-context";
 import { MONTHS_AR, SOURCE_COLORS } from "@/lib/utils/constants";
@@ -41,6 +41,7 @@ import {
   Timer,
   TrendingDown,
   CalendarClock,
+  Users,
 } from "lucide-react";
 
 /* CSS variable color → hex for donut chart */
@@ -55,6 +56,8 @@ const COLOR_HEX: Record<string, string> = {
 };
 
 const DEFAULT_CATEGORIES = ["رواتب", "اتصالات", "استضافة", "إيجار", "تسويق", "مواصلات", "صيانة", "اشتراكات", "مستلزمات", "أخرى"];
+
+const MONTHLY_TARGET = 17500;
 
 export default function FinancePage() {
   const { activeOrgId: orgId } = useAuth();
@@ -282,6 +285,16 @@ export default function FinancePage() {
     setStartupCosts(prev => prev.filter(c => c.id !== id));
   }
 
+  /* ─── Collection Status Handler ─── */
+  async function handleCollectionStatus(dealId: string, status: "محصّل" | "معلق" | "متأخر") {
+    try {
+      const updated = await updateDeal(dealId, { collection_status: status });
+      setDeals(prev => prev.map(d => d.id === dealId ? updated : d));
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
   // Merge default categories with existing ones from expenses
   const allCategories = [...new Set([...DEFAULT_CATEGORIES, ...expenses.map((e) => e.category)])];
 
@@ -369,6 +382,80 @@ export default function FinancePage() {
 
   const totalClosedRevenue = sourceRevenue.reduce((s, x) => s + x.value, 0);
 
+  /* ─── 1. Revenue by Product/Plan (donut) ─── */
+  const PRODUCT_COLORS: Record<string, string> = {
+    "MENU": "#00D4FF",
+    "نحجز": "#8B5CF6",
+    "درع": "#F59E0B",
+  };
+  const productRevenue = (() => {
+    const map: Record<string, number> = {};
+    closedDeals.forEach((d) => {
+      const product = d.plan?.trim() || "أخرى";
+      map[product] = (map[product] || 0) + d.deal_value;
+    });
+    if (renewalsRevenue > 0) {
+      // Distribute renewals by plan_name
+      monthRenewals.forEach((r) => {
+        const product = r.plan_name?.trim() || "أخرى";
+        map[product] = (map[product] || 0) + r.plan_price;
+      });
+    }
+    return Object.entries(map)
+      .map(([product, value]) => ({ product, value }))
+      .sort((a, b) => b.value - a.value);
+  })();
+  const productDonutSegments = productRevenue.map((p, i) => ({
+    label: p.product,
+    value: p.value,
+    color: PRODUCT_COLORS[p.product] || ["#EC4899", "#10B981", "#3B82F6", "#EF4444", "#64748B"][i % 5],
+  }));
+  const totalProductRevenue = productRevenue.reduce((s, x) => s + x.value, 0);
+
+  /* ─── 2. ARPU (Average Revenue Per User) ─── */
+  const activeCustomers = new Set(closedDeals.map(d => d.client_name?.trim().toLowerCase())).size;
+  const arpu = activeCustomers > 0 ? Math.round(totalRevenue / activeCustomers) : 0;
+
+  /* ─── 3. MoM Growth % ─── */
+  const momGrowth = (() => {
+    const prevIdx = monthlyRevenue.length - 2; // second to last = previous month
+    const currIdx = monthlyRevenue.length - 1; // last = current month
+    if (prevIdx < 0 || currIdx < 0) return null;
+    const prevRev = monthlyRevenue[prevIdx].revenue;
+    const currRev = monthlyRevenue[currIdx].revenue;
+    if (prevRev === 0) return currRev > 0 ? 100 : 0;
+    return Math.round(((currRev - prevRev) / prevRev) * 100);
+  })();
+
+  /* ─── 4. Threatened Revenue (renewals expiring in 30/60 days) ─── */
+  const threatenedRevenue = (() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const in30 = new Date(today); in30.setDate(in30.getDate() + 30);
+    const in60 = new Date(today); in60.setDate(in60.getDate() + 60);
+
+    const activeRenewals = renewals.filter(r => r.status !== "مكتمل" && r.status !== "ملغي بسبب");
+    const expiring30 = activeRenewals.filter(r => {
+      const rd = new Date(r.renewal_date);
+      return rd >= today && rd <= in30;
+    });
+    const expiring60 = activeRenewals.filter(r => {
+      const rd = new Date(r.renewal_date);
+      return rd > in30 && rd <= in60;
+    });
+    const overdue = activeRenewals.filter(r => {
+      const rd = new Date(r.renewal_date);
+      return rd < today;
+    });
+
+    return {
+      overdue: { count: overdue.length, value: overdue.reduce((s, r) => s + r.plan_price, 0), items: overdue },
+      in30: { count: expiring30.length, value: expiring30.reduce((s, r) => s + r.plan_price, 0), items: expiring30 },
+      in60: { count: expiring60.length, value: expiring60.reduce((s, r) => s + r.plan_price, 0), items: expiring60 },
+      total: overdue.reduce((s, r) => s + r.plan_price, 0) + expiring30.reduce((s, r) => s + r.plan_price, 0) + expiring60.reduce((s, r) => s + r.plan_price, 0),
+    };
+  })();
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -384,10 +471,10 @@ export default function FinancePage() {
         </div>
       </div>
 
-      {/* 4 KPI cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* KPI cards — 6 metrics */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {loading ? (
-          Array.from({ length: 4 }).map((_, i) => (
+          Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="cc-card rounded-[14px] p-4">
               <Skeleton className="h-7 w-20 mb-2" />
               <Skeleton className="h-3 w-24" />
@@ -414,6 +501,29 @@ export default function FinancePage() {
               icon={<BarChart3 className="w-4 h-4 text-cc-purple" />}
             />
             <StatCard
+              value={formatMoney(arpu)}
+              label="ARPU متوسط لكل عميل"
+              color="blue"
+              icon={<Users className="w-4 h-4 text-cc-blue" />}
+            />
+            <div className="cc-card rounded-[14px] p-4">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] text-muted-foreground">النمو الشهري</span>
+                {momGrowth !== null && momGrowth >= 0 ? (
+                  <ArrowUp className="w-4 h-4 text-cc-green" />
+                ) : (
+                  <ArrowDown className="w-4 h-4 text-cc-red" />
+                )}
+              </div>
+              <p className={`text-2xl font-bold ${
+                momGrowth === null ? "text-muted-foreground" :
+                momGrowth >= 0 ? "text-cc-green" : "text-cc-red"
+              }`}>
+                {momGrowth !== null ? `${momGrowth > 0 ? "+" : ""}${momGrowth}%` : "—"}
+              </p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">MoM%</p>
+            </div>
+            <StatCard
               value={formatMoney(pipelineValue)}
               label="قيمة خط الأنابيب"
               color="amber"
@@ -422,6 +532,36 @@ export default function FinancePage() {
           </>
         )}
       </div>
+
+      {/* ─── Monthly Revenue Target ─── */}
+      {!loading && (
+        <div className="cc-card rounded-[14px] p-5 border border-cyan/10">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Target className="w-5 h-5 text-cyan" />
+              <h3 className="text-sm font-bold text-foreground">هدف الإيرادات الشهري</h3>
+            </div>
+            <span className={`text-2xl font-bold ${totalRevenue >= MONTHLY_TARGET ? "text-cc-green" : "text-amber"}`}>
+              {MONTHLY_TARGET > 0 ? Math.round((totalRevenue / MONTHLY_TARGET) * 100) : 0}%
+            </span>
+          </div>
+          <div className="h-4 bg-white/[0.06] rounded-full overflow-hidden mb-2">
+            <div
+              className={`h-full rounded-full transition-all duration-700 ${
+                totalRevenue >= MONTHLY_TARGET ? "bg-gradient-to-l from-emerald-400 to-emerald-600" : "bg-gradient-to-l from-cyan-400 to-cyan-600"
+              }`}
+              style={{ width: `${Math.min(100, MONTHLY_TARGET > 0 ? (totalRevenue / MONTHLY_TARGET) * 100 : 0)}%` }}
+            />
+          </div>
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>محقق: <span className="text-foreground font-bold">{formatMoneyFull(totalRevenue)}</span></span>
+            <span>الهدف: <span className="text-foreground font-bold">{formatMoneyFull(MONTHLY_TARGET)}</span></span>
+            <span>متبقي: <span className={`font-bold ${totalRevenue >= MONTHLY_TARGET ? "text-cc-green" : "text-amber"}`}>
+              {totalRevenue >= MONTHLY_TARGET ? "تم التحقيق!" : formatMoneyFull(MONTHLY_TARGET - totalRevenue)}
+            </span></span>
+          </div>
+        </div>
+      )}
 
       {/* Two charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -512,6 +652,250 @@ export default function FinancePage() {
           )}
         </div>
       </div>
+
+      {/* ─── Product Revenue Donut + Threatened Revenue Row ─── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Revenue by Product donut */}
+        <div className="cc-card rounded-[14px] p-5">
+          <h3 className="text-sm font-bold text-foreground mb-4">
+            الإيرادات حسب المنتج
+          </h3>
+          {loading ? (
+            <Skeleton className="h-[280px] w-full rounded-lg" />
+          ) : productDonutSegments.length === 0 ? (
+            <div className="h-[280px] flex items-center justify-center text-muted-foreground text-sm">
+              لا توجد بيانات
+            </div>
+          ) : (
+            <>
+              <DonutChart
+                segments={productDonutSegments}
+                centerValue={formatMoney(totalProductRevenue)}
+                centerLabel="إجمالي"
+              />
+              <div className="mt-4 space-y-2">
+                {productRevenue.map((p, i) => {
+                  const pct = totalProductRevenue > 0 ? Math.round((p.value / totalProductRevenue) * 100) : 0;
+                  const hex = productDonutSegments[i]?.color || "#00D4FF";
+                  return (
+                    <div key={i} className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                          style={{ backgroundColor: hex }}
+                        />
+                        <span className="text-muted-foreground">{p.product}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-foreground font-medium">
+                          {formatMoney(p.value)}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {pct}%
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Threatened Revenue */}
+        <div className="cc-card rounded-[14px] p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <AlertTriangle className="w-5 h-5 text-amber" />
+            <h3 className="text-sm font-bold text-foreground">إيرادات مهددة</h3>
+            {threatenedRevenue.total > 0 && (
+              <span className="mr-auto text-lg font-bold text-amber">{formatMoney(threatenedRevenue.total)}</span>
+            )}
+          </div>
+          {loading ? (
+            <Skeleton className="h-[280px] w-full rounded-lg" />
+          ) : threatenedRevenue.total === 0 ? (
+            <div className="h-[280px] flex items-center justify-center text-muted-foreground text-sm flex-col gap-2">
+              <CheckCircle2 className="w-10 h-10 text-cc-green opacity-40" />
+              <span>لا توجد إيرادات مهددة حالياً</span>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {/* Overdue */}
+              {threatenedRevenue.overdue.count > 0 && (
+                <div className="p-4 rounded-lg bg-cc-red/10 border border-cc-red/20">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <TrendingDown className="w-4 h-4 text-cc-red" />
+                      <span className="text-sm font-bold text-cc-red">متأخرة</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{threatenedRevenue.overdue.count} عقد</span>
+                  </div>
+                  <p className="text-xl font-bold text-cc-red">{formatMoney(threatenedRevenue.overdue.value)}</p>
+                  <div className="mt-2 space-y-1 max-h-[120px] overflow-y-auto">
+                    {threatenedRevenue.overdue.items.map(r => (
+                      <div key={r.id} className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground truncate flex-1">{r.customer_name}</span>
+                        <span className="text-cc-red font-medium mr-2">{formatMoney(r.plan_price)}</span>
+                        <span className="text-muted-foreground/60">{r.renewal_date}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Expiring in 30 days */}
+              {threatenedRevenue.in30.count > 0 && (
+                <div className="p-4 rounded-lg bg-amber/10 border border-amber/20">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <CalendarClock className="w-4 h-4 text-amber" />
+                      <span className="text-sm font-bold text-amber">تنتهي خلال 30 يوم</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{threatenedRevenue.in30.count} عقد</span>
+                  </div>
+                  <p className="text-xl font-bold text-amber">{formatMoney(threatenedRevenue.in30.value)}</p>
+                  <div className="mt-2 space-y-1 max-h-[120px] overflow-y-auto">
+                    {threatenedRevenue.in30.items.map(r => (
+                      <div key={r.id} className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground truncate flex-1">{r.customer_name}</span>
+                        <span className="text-amber font-medium mr-2">{formatMoney(r.plan_price)}</span>
+                        <span className="text-muted-foreground/60">{r.renewal_date}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Expiring in 60 days */}
+              {threatenedRevenue.in60.count > 0 && (
+                <div className="p-4 rounded-lg bg-cyan/10 border border-cyan/20">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <CalendarClock className="w-4 h-4 text-cyan" />
+                      <span className="text-sm font-bold text-cyan">تنتهي خلال 60 يوم</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{threatenedRevenue.in60.count} عقد</span>
+                  </div>
+                  <p className="text-xl font-bold text-cyan">{formatMoney(threatenedRevenue.in60.value)}</p>
+                  <div className="mt-2 space-y-1 max-h-[120px] overflow-y-auto">
+                    {threatenedRevenue.in60.items.map(r => (
+                      <div key={r.id} className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground truncate flex-1">{r.customer_name}</span>
+                        <span className="text-cyan font-medium mr-2">{formatMoney(r.plan_price)}</span>
+                        <span className="text-muted-foreground/60">{r.renewal_date}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ─── Collection Status Section ─── */}
+      {!loading && closedDeals.length > 0 && (
+        <div className="cc-card rounded-[14px] p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Banknote className="w-5 h-5 text-cc-green" />
+            <h3 className="text-sm font-bold text-foreground">حالة التحصيل — {MONTHS_AR[selectedMonth - 1]} {selectedYear}</h3>
+          </div>
+
+          {/* Status summary pills */}
+          {(() => {
+            const collected = closedDeals.filter(d => d.collection_status === "محصّل");
+            const pending = closedDeals.filter(d => !d.collection_status || d.collection_status === "معلق");
+            const overdue = closedDeals.filter(d => d.collection_status === "متأخر");
+            const collectedVal = collected.reduce((s, d) => s + d.deal_value, 0);
+            const pendingVal = pending.reduce((s, d) => s + d.deal_value, 0);
+            const overdueVal = overdue.reduce((s, d) => s + d.deal_value, 0);
+
+            return (
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="p-3 rounded-lg bg-cc-green/10 border border-cc-green/20 text-center">
+                    <p className="text-xl font-bold text-cc-green">{formatMoney(collectedVal)}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">محصّل ({collected.length})</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-amber/10 border border-amber/20 text-center">
+                    <p className="text-xl font-bold text-amber">{formatMoney(pendingVal)}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">معلق ({pending.length})</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-cc-red/10 border border-cc-red/20 text-center">
+                    <p className="text-xl font-bold text-cc-red">{formatMoney(overdueVal)}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">متأخر ({overdue.length})</p>
+                  </div>
+                </div>
+
+                {/* Collection progress bar */}
+                {(() => {
+                  const total = collectedVal + pendingVal + overdueVal;
+                  const collPct = total > 0 ? Math.round((collectedVal / total) * 100) : 0;
+                  return (
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs text-muted-foreground">نسبة التحصيل</span>
+                        <span className="text-xs font-bold text-cc-green">{collPct}%</span>
+                      </div>
+                      <div className="h-3 bg-white/[0.04] rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-l from-emerald-400 to-emerald-600 transition-all duration-700"
+                          style={{ width: `${collPct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Deals table with status toggle */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">العميل</th>
+                        <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">القيمة</th>
+                        <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">المنتج</th>
+                        <th className="text-center py-2 px-3 text-xs font-semibold text-muted-foreground">حالة التحصيل</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {closedDeals.map(deal => {
+                        const status = deal.collection_status || "معلق";
+                        return (
+                          <tr key={deal.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
+                            <td className="py-2.5 px-3 text-foreground font-medium">{deal.client_name}</td>
+                            <td className="py-2.5 px-3 text-cyan font-semibold">{formatMoney(deal.deal_value)}</td>
+                            <td className="py-2.5 px-3 text-muted-foreground">{deal.plan || "—"}</td>
+                            <td className="py-2.5 px-3">
+                              <div className="flex items-center justify-center gap-1">
+                                {(["محصّل", "معلق", "متأخر"] as const).map(s => (
+                                  <button
+                                    key={s}
+                                    onClick={() => handleCollectionStatus(deal.id, s)}
+                                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all border ${
+                                      status === s
+                                        ? s === "محصّل" ? "bg-cc-green/15 text-cc-green border-cc-green/30"
+                                        : s === "متأخر" ? "bg-cc-red/15 text-cc-red border-cc-red/30"
+                                        : "bg-amber/15 text-amber border-amber/30"
+                                        : "bg-white/[0.03] text-muted-foreground border-white/[0.06] hover:border-white/[0.15]"
+                                    }`}
+                                  >
+                                    {s}
+                                  </button>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       {/* ─── Monthly Budget Plan vs Actual ─── */}
       <div className="cc-card rounded-[14px] p-5">

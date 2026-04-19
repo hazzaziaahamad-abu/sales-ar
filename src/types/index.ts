@@ -19,6 +19,8 @@ export interface Deal {
   loss_reason?: string;
   notes?: string;
   last_contact?: string;
+  callback_date?: string;
+  collection_status?: "محصّل" | "معلق" | "متأخر";
   month?: number;
   year?: number;
   created_at: string;
@@ -182,6 +184,7 @@ export interface Renewal {
   plan_name: string;
   plan_price: number;
   renewal_date: string;
+  payment_date?: string;
   status: string;
   cancel_reason?: string;
   assigned_rep?: string;

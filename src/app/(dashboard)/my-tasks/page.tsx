@@ -807,7 +807,7 @@ export default function MyTasksPage() {
                           </div>
                           <span className={`text-sm flex-1 ${t.status === "completed" ? "text-gray-500 line-through" : "text-white"}`}>{t.title}</span>
                           {t.completed_at && (
-                            <span className="text-[10px] text-gray-500">{new Date(t.completed_at).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}</span>
+                            <span className="text-[10px] text-gray-500">{new Date(t.completed_at).toLocaleTimeString("ar-SA-u-ca-gregory", { hour: "2-digit", minute: "2-digit" })}</span>
                           )}
                         </div>
                       ))}

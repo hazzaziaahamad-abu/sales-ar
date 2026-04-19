@@ -269,7 +269,7 @@ export function TrainingKnowledgeEditor({ onBack }: Props) {
               )}
               {existingEntry?.updated_by && (
                 <span className="text-[10px] text-muted-foreground">
-                  آخر تعديل: {existingEntry.updated_by} — {new Date(existingEntry.updated_at).toLocaleDateString("ar-SA")}
+                  آخر تعديل: {existingEntry.updated_by} — {new Date(existingEntry.updated_at).toLocaleDateString("ar-SA-u-ca-gregory")}
                 </span>
               )}
             </div>

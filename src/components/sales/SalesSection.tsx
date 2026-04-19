@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import type { Deal, Marketer, Package, Employee, EmployeeTask } from "@/types";
 import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createFollowUpNote, fetchRecentFollowUpNotes, fetchPackages, fetchQuoteCommitments, addQuoteCommitment, removeQuoteCommitment, fetchEmployees, fetchEmployeeTasks, createEmployeeTask, createRenewal } from "@/lib/supabase/db";
@@ -119,6 +119,7 @@ const EMPTY_FORM = {
   marketer_name: "",
   notes: "",
   last_contact: new Date().toISOString().slice(0, 10),
+  callback_date: "",
 };
 
 export interface SalesPageProps {
@@ -266,7 +267,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
 
   function buildFollowUpReport() {
     const followUpDeals = deals.filter((d) => followUpIds.has(d.id));
-    const todayStr = new Date().toLocaleDateString("ar-SA", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+    const todayStr = new Date().toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
     let report = `📋 قائمة متابعة العملاء\n`;
     report += `📅 ${todayStr}\n`;
     report += `${"─".repeat(35)}\n`;
@@ -301,7 +302,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
     const total = targetDeals.length;
     const rate = total > 0 ? Math.round((closed.length / total) * 100) : 0;
     const totalValue = closed.reduce((s, d) => s + d.deal_value, 0);
-    const todayStr = new Date().toLocaleDateString("ar-SA", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+    const todayStr = new Date().toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
     // Fetch latest follow-up notes for all target deals
     const latestNotes: Record<string, string> = {};
@@ -422,11 +423,11 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const nonCompletedDeals = repFilteredDeals.filter((d) => d.stage !== "مكتملة" && d.stage !== "مرفوض مع سبب");
 
   /* Achievement summary items — uses all deals (filtered by rep only, not month)
-     because AchievementSummary has its own internal period filter on updated_at */
+     because AchievementSummary has its own internal period filter */
   const repOnlyDeals = repFilter ? deals.filter((d) => d.assigned_rep_name === repFilter) : deals;
   const achievementItems = useMemo(() => repOnlyDeals.map(d => ({
     id: d.id,
-    updated_at: d.updated_at,
+    updated_at: d.deal_date || d.created_at,
     value: d.deal_value,
     isCompleted: d.stage === "مكتملة",
     isCancelled: d.stage === "مرفوض مع سبب" || d.stage === "كنسل التجربة",
@@ -437,7 +438,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
 
   // Apply achievement filter or stage filter
   const baseFilteredDeals = achieveFilter
-    ? repFilteredDeals.filter(d => achieveFilterIds.has(d.id))
+    ? repOnlyDeals.filter(d => achieveFilterIds.has(d.id))
     : stageFilter ? repFilteredDeals.filter((d) => d.stage === stageFilter) : repFilteredDeals;
   const filteredDeals = clientSearch
     ? baseFilteredDeals.filter((d) => d.client_name.toLowerCase().includes(clientSearch.toLowerCase()) || (d.client_code && d.client_code.toLowerCase().includes(clientSearch.toLowerCase())) || (d.client_phone && d.client_phone.includes(clientSearch)))
@@ -528,6 +529,21 @@ export function SalesSection({ salesType }: SalesPageProps) {
     return null;
   };
 
+  // Normalize plan name variants to canonical names
+  const normalizePlanName = (plan: string): string => {
+    const n = plan.toLowerCase().trim().replace(/^ال/, "");
+    if (n === "اساسية" || n === "أساسية" || n === "الاساسية" || n === "الأساسية" || n === "اساسيه" || n === "أساسيه") return "الاساسية";
+    if (n === "vip" || n === "في آي بي" || n === "في اي بي") return "VIP";
+    if (n === "vip plus" || n === "vip بلس") return "VIP Plus";
+    if (n === "ذهبية" || n === "ذهبيه" || n === "الذهبية") return "الذهبية";
+    if (n === "بلس" || n === "البلس" || n === "plus") return "بلس";
+    if (n === "كاشير" || n === "الكاشير") return "الكاشير";
+    if (n === "تصاميم" || n === "تصميم") return "تصاميم";
+    if (n === "ترقية" || n === "ترقيه") return "ترقية";
+    // Return original if no match
+    return plan.trim();
+  };
+
   const repPerformance = (() => {
     const repMap: Record<string, { deals: number; closed: number; value: number; cycleDays: number; plans: Record<string, number>; fullPrice: number; discounted: number; discountTotal: number }> = {};
     repFilteredDeals.forEach((d) => {
@@ -548,7 +564,10 @@ export function SalesSection({ salesType }: SalesPageProps) {
           }
         }
       }
-      if (d.plan) repMap[rep].plans[d.plan] = (repMap[rep].plans[d.plan] || 0) + 1;
+      if (d.plan) {
+        const normalizedPlan = normalizePlanName(d.plan);
+        repMap[rep].plans[normalizedPlan] = (repMap[rep].plans[normalizedPlan] || 0) + 1;
+      }
     });
     return Object.entries(repMap)
       .map(([name, data]) => ({
@@ -566,6 +585,63 @@ export function SalesSection({ salesType }: SalesPageProps) {
       }))
       .sort((a, b) => b.value - a.value);
   })();
+
+  // Averages for relative comparisons in recommendations
+  const avgWinRate = repPerformance.length > 0 ? Math.round(repPerformance.reduce((s, r) => s + r.winRate, 0) / repPerformance.length) : 0;
+  const avgCycle = repPerformance.length > 0 ? Math.round(repPerformance.reduce((s, r) => s + r.avgCycle, 0) / repPerformance.length) : 0;
+
+  function getRepTips(rep: typeof repPerformance[number]): { text: string; color: string }[] {
+    const tips: { text: string; color: string }[] = [];
+
+    // Win rate
+    if (rep.winRate < 20 && rep.deals >= 5) {
+      tips.push({ text: "معدل إغلاق منخفض جداً — تحسين تأهيل العملاء قبل التفاوض", color: "text-red-400 bg-red-500/10 border-red-500/20" });
+    } else if (rep.winRate < avgWinRate && rep.winRate < 35 && rep.deals >= 5) {
+      tips.push({ text: "معدل الإغلاق أقل من متوسط الفريق — التركيز على متابعة الصفقات المفتوحة", color: "text-amber-400 bg-amber-500/10 border-amber-500/20" });
+    } else if (rep.winRate >= 50 && rep.deals >= 10) {
+      tips.push({ text: "إغلاق ممتاز — يمكن رفع المستهدف أو تولّي عملاء أكثر", color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" });
+    }
+
+    // Discounts
+    if (rep.fullPriceRate < 40 && (rep.fullPrice + rep.discounted) >= 3) {
+      tips.push({ text: "أكثر من 60% من الصفقات بخصم — التدريب على البيع بالسعر الكامل", color: "text-amber-400 bg-amber-500/10 border-amber-500/20" });
+    } else if (rep.fullPriceRate >= 80 && (rep.fullPrice + rep.discounted) >= 3) {
+      tips.push({ text: "ممتاز في البيع بالسعر الكامل", color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" });
+    }
+
+    // Cycle time
+    if (rep.avgCycle > avgCycle * 1.5 && rep.avgCycle > 10) {
+      tips.push({ text: `دورة بيع طويلة (${rep.avgCycle} يوم مقابل ${avgCycle} متوسط) — تسريع المتابعة`, color: "text-amber-400 bg-amber-500/10 border-amber-500/20" });
+    } else if (rep.avgCycle > 0 && rep.avgCycle < avgCycle * 0.7 && rep.closed >= 5) {
+      tips.push({ text: "دورة بيع سريعة — نقطة قوة واضحة", color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" });
+    }
+
+    // Plan mix — mostly basic
+    const totalPlans = Object.values(rep.plans).reduce((s, n) => s + n, 0);
+    const basicCount = rep.plans["الاساسية"] || 0;
+    const vipCount = (rep.plans["VIP"] || 0) + (rep.plans["VIP Plus"] || 0) + (rep.plans["الذهبية"] || 0);
+    if (totalPlans >= 5 && basicCount / totalPlans > 0.6) {
+      tips.push({ text: "أغلب الباقات أساسية — التركيز على بيع VIP والذهبية لرفع متوسط الإيراد", color: "text-cyan bg-cyan/10 border-cyan/20" });
+    } else if (totalPlans >= 5 && vipCount / totalPlans > 0.4) {
+      tips.push({ text: "تنوّع ممتاز في الباقات المتقدمة", color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" });
+    }
+
+    // Volume
+    if (rep.deals < 10 && rep.deals > 0) {
+      tips.push({ text: "عدد صفقات منخفض — زيادة التواصل اليومي واستقطاب عملاء جدد", color: "text-amber-400 bg-amber-500/10 border-amber-500/20" });
+    }
+
+    // Star performer
+    if (rep.winRate >= 40 && rep.fullPriceRate >= 60 && rep.deals >= 20) {
+      tips.push({ text: "أداء متميز — يُنصح بتدريب الفريق على أساليبه", color: "text-violet-400 bg-violet-500/10 border-violet-500/20" });
+    }
+
+    if (tips.length === 0) {
+      tips.push({ text: "أداء جيد — استمر بنفس الوتيرة", color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" });
+    }
+
+    return tips;
+  }
 
   /* Lost deals analysis — from real deals with stage "مرفوض مع سبب" */
   const lostDeals = repFilteredDeals.filter((d) => d.stage === "مرفوض مع سبب");
@@ -621,6 +697,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
       marketer_name: deal.marketer_name || "",
       notes: deal.notes || "",
       last_contact: deal.last_contact || deal.deal_date || new Date().toISOString().slice(0, 10),
+      callback_date: deal.callback_date ? deal.callback_date.slice(0, 16) : "",
     });
     setModalOpen(true);
   }
@@ -650,6 +727,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
           marketer_name: marketerName || undefined,
           notes: form.notes || undefined,
           last_contact: form.last_contact || undefined,
+          callback_date: form.stage === "اعادة الاتصال في وقت اخر" && form.callback_date ? new Date(form.callback_date).toISOString() : undefined,
           month,
           year,
         });
@@ -701,6 +779,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
           marketer_name: marketerName,
           notes: form.notes || undefined,
           last_contact: form.last_contact || undefined,
+          callback_date: form.stage === "اعادة الاتصال في وقت اخر" && form.callback_date ? new Date(form.callback_date).toISOString() : undefined,
           cycle_days: 0,
           month,
           year,
@@ -1246,7 +1325,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
                 <div>
                   <h3 className="text-sm font-bold text-foreground">هدف {pageTitle} اليومي</h3>
                   <span className="text-[10px] text-muted-foreground">
-                    {new Date().toLocaleDateString("ar-SA", { weekday: "long", day: "numeric", month: "short" })}
+                    {new Date().toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "long", day: "numeric", month: "short" })}
                   </span>
                 </div>
               </div>
@@ -1455,10 +1534,23 @@ export function SalesSection({ salesType }: SalesPageProps) {
                     <span className="text-xs text-muted-foreground">{deal.plan || "—"}</span>
                   </TableCell>
                   <TableCell>
-                    <ColorBadge
-                      text={deal.stage}
-                      color={STAGE_BADGE_COLOR[deal.stage] || "blue"}
-                    />
+                    <div className="flex flex-col gap-1">
+                      <ColorBadge
+                        text={deal.stage}
+                        color={STAGE_BADGE_COLOR[deal.stage] || "blue"}
+                      />
+                      {deal.stage === "اعادة الاتصال في وقت اخر" && deal.callback_date && (
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 w-fit ${
+                          new Date(deal.callback_date).getTime() < Date.now()
+                            ? "bg-red-500/15 text-red-400"
+                            : new Date(deal.callback_date).getTime() - Date.now() < 3600000
+                            ? "bg-amber-500/15 text-amber-400"
+                            : "bg-sky-500/15 text-sky-400"
+                        }`}>
+                          📅 {new Date(deal.callback_date).toLocaleDateString("ar-SA")} — {new Date(deal.callback_date).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="font-bold text-cyan text-xs">
                     {formatMoneyFull(deal.deal_value)}
@@ -1579,7 +1671,8 @@ export function SalesSection({ salesType }: SalesPageProps) {
                   const rateColor = rep.winRate >= 30 ? "bg-amber" : rep.winRate > 0 ? "bg-cc-red" : "bg-muted-foreground/30";
 
                   return (
-                    <tr key={rep.name} className="border-b border-border/50 hover:bg-white/[0.02] transition-colors">
+                    <React.Fragment key={rep.name}>
+                    <tr className="border-b border-border/50 hover:bg-white/[0.02] transition-colors">
                       <td className="py-3.5 px-5">
                         <div className="flex items-center gap-3">
                           <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ring-1 ring-white/10 ${avatarColor}`}>
@@ -1628,6 +1721,20 @@ export function SalesSection({ salesType }: SalesPageProps) {
                       <td className="py-3.5 px-4 text-right font-bold text-cyan">{formatMoney(rep.value)}</td>
                       <td className="py-3.5 px-4 text-center text-lg">{medal}</td>
                     </tr>
+                    {/* Recommendations row */}
+                    <tr className="border-b border-border/30">
+                      <td colSpan={11} className="px-5 py-2 pb-3">
+                        <div className="flex flex-wrap gap-1.5 items-center">
+                          <span className="text-[10px] text-muted-foreground/70 ml-1">توصيات:</span>
+                          {getRepTips(rep).map((tip, i) => (
+                            <span key={i} className={`text-[10px] px-2 py-0.5 rounded-full border ${tip.color}`}>
+                              {tip.text}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                    </React.Fragment>
                   );
                 })}
               </tbody>
@@ -2045,6 +2152,22 @@ export function SalesSection({ salesType }: SalesPageProps) {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Callback date — only when stage is "اعادة الاتصال في وقت اخر" */}
+            {form.stage === "اعادة الاتصال في وقت اخر" && (
+              <div className="grid gap-1.5">
+                <Label htmlFor="callback_date">موعد إعادة الاتصال</Label>
+                <Input
+                  id="callback_date"
+                  type="datetime-local"
+                  value={form.callback_date}
+                  onChange={(e) => setForm({ ...form, callback_date: e.target.value })}
+                  dir="ltr"
+                  className="text-right"
+                />
+                <p className="text-[10px] text-muted-foreground">حدد التاريخ والوقت للاتصال بالعميل مرة أخرى</p>
+              </div>
+            )}
 
             {/* Plan (dropdown) */}
             <div className="grid gap-1.5">

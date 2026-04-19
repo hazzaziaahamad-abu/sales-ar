@@ -15,7 +15,7 @@ import {
   Loader2,
 } from "lucide-react";
 
-type SummaryPeriod = "today" | "week" | "month" | "quarter" | "custom";
+type SummaryPeriod = "today" | "yesterday" | "week" | "month" | "quarter" | "custom";
 
 interface AchievementItem {
   updated_at: string;
@@ -104,6 +104,12 @@ export function AchievementSummary({
     if (period === "today") {
       startDate = new Date(now);
       startDate.setHours(0, 0, 0, 0);
+    } else if (period === "yesterday") {
+      startDate = new Date(now);
+      startDate.setDate(now.getDate() - 1);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(startDate);
+      endDate.setHours(23, 59, 59, 999);
     } else if (period === "week") {
       startDate = new Date(now);
       startDate.setDate(now.getDate() - now.getDay());
@@ -162,6 +168,14 @@ export function AchievementSummary({
       }
     } else if (allPlans && allPlans.length > 0 && completed.length === 0 && periodItems.length > 0) {
       recommendations.push(`⚠️ لا يوجد إنجاز في هذه الفترة — حاول إغلاق صفقة واحدة على الأقل`);
+      const motivations = [
+        "🚀 كل صفقة كبيرة بدأت بمكالمة واحدة — ارفع السماعة الآن!",
+        "💪 الفرصة القادمة على بُعد اتصال واحد، لا تستسلم!",
+        "🎯 البطل هو من يحاول مرة أخرى بعد كل رفض — أنت أقرب مما تظن!",
+        "⭐ النجاح يحب المثابرة — اجعل اليوم نقطة التحول!",
+        "🔥 كل 'لا' تقربك من 'نعم' — استمر!",
+      ];
+      recommendations.push(motivations[Math.floor(Math.random() * motivations.length)]);
     }
 
     return {
@@ -233,6 +247,7 @@ export function AchievementSummary({
         <div className="flex items-center gap-1.5 bg-white/[0.05] rounded-lg p-1 border border-white/[0.06]">
           {([
             { key: "today" as SummaryPeriod, label: "اليوم" },
+            { key: "yesterday" as SummaryPeriod, label: "أمس" },
             { key: "week" as SummaryPeriod, label: "الأسبوع" },
             { key: "month" as SummaryPeriod, label: "الشهر" },
             { key: "quarter" as SummaryPeriod, label: "الربع" },

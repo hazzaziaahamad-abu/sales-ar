@@ -117,6 +117,7 @@ const EMPTY_FORM = {
   plan_name: "",
   plan_price: 0,
   renewal_date: "",
+  payment_date: "",
   status: "مجدول",
   cancel_reason: "",
   assigned_rep: "",
@@ -224,7 +225,7 @@ export default function RenewalsPage() {
     const remaining = targetRenewals.filter((r) => r.status !== "مكتمل");
     const total = targetRenewals.length;
     const rate = total > 0 ? Math.round((completed.length / total) * 100) : 0;
-    const todayStr = new Date().toLocaleDateString("ar-SA", {
+    const todayStr = new Date().toLocaleDateString("ar-SA-u-ca-gregory", {
       weekday: "long",
       year: "numeric",
       month: "long",
@@ -301,7 +302,7 @@ export default function RenewalsPage() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `تقرير الهدف اليومي — ${new Date().toLocaleDateString("ar-SA")}`,
+          title: `تقرير الهدف اليومي — ${new Date().toLocaleDateString("ar-SA-u-ca-gregory")}`,
           text: report,
         });
       } catch {
@@ -607,6 +608,7 @@ export default function RenewalsPage() {
       plan_name: renewal.plan_name,
       plan_price: renewal.plan_price,
       renewal_date: renewal.renewal_date,
+      payment_date: renewal.payment_date || "",
       status: renewal.status,
       cancel_reason: renewal.cancel_reason || "",
       assigned_rep: renewal.assigned_rep || "",
@@ -625,6 +627,7 @@ export default function RenewalsPage() {
         plan_name: form.plan_name,
         plan_price: form.plan_price,
         renewal_date: form.renewal_date,
+        payment_date: form.payment_date || undefined,
         status: form.status,
         cancel_reason: form.status === "ملغي بسبب" ? form.cancel_reason || undefined : undefined,
         assigned_rep: form.assigned_rep || undefined,
@@ -644,7 +647,8 @@ export default function RenewalsPage() {
           if (oldRenewal.plan_name !== form.plan_name) changes.push(`الباقة: ${oldRenewal.plan_name} ← ${form.plan_name}`);
           if (oldRenewal.plan_price !== form.plan_price) changes.push(`السعر: ${oldRenewal.plan_price} ← ${form.plan_price} ر.س`);
           if ((oldRenewal.assigned_rep || "") !== (form.assigned_rep || "")) changes.push(`المسؤول: ${oldRenewal.assigned_rep || "—"} ← ${form.assigned_rep || "—"}`);
-          if (oldRenewal.renewal_date !== form.renewal_date) changes.push(`تاريخ التجديد: ${oldRenewal.renewal_date} ← ${form.renewal_date}`);
+          if (oldRenewal.renewal_date !== form.renewal_date) changes.push(`موعد التجديد: ${oldRenewal.renewal_date} ← ${form.renewal_date}`);
+          if ((oldRenewal.payment_date || "") !== (form.payment_date || "")) changes.push(`تاريخ الدفع: ${oldRenewal.payment_date || "—"} ← ${form.payment_date || "—"}`);
           if (changes.length > 0) {
             createFollowUpNote("renewal", editingId, `📝 تحديث تلقائي:\n${changes.join("\n")}`, author).catch(console.error);
           }
@@ -1228,7 +1232,7 @@ export default function RenewalsPage() {
                 <div>
                   <h3 className="text-sm font-bold text-foreground">الهدف اليومي</h3>
                   <span className="text-[10px] text-muted-foreground">
-                    {new Date().toLocaleDateString("ar-SA", { weekday: "long", day: "numeric", month: "short" })}
+                    {new Date().toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "long", day: "numeric", month: "short" })}
                   </span>
                 </div>
               </div>
@@ -1345,7 +1349,8 @@ export default function RenewalsPage() {
               <TableHead>العميل</TableHead>
               <TableHead>الخطة</TableHead>
               <TableHead>السعر</TableHead>
-              <TableHead>تاريخ التجديد</TableHead>
+              <TableHead>موعد التجديد</TableHead>
+              <TableHead>تاريخ الدفع</TableHead>
               <TableHead>الأيام المتبقية</TableHead>
               <TableHead>الحالة</TableHead>
               <TableHead>المسؤول</TableHead>
@@ -1423,6 +1428,13 @@ export default function RenewalsPage() {
                     </TableCell>
                     <TableCell className="text-muted-foreground text-xs">
                       {formatDate(renewal.renewal_date)}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {renewal.payment_date ? (
+                        <span className="text-cc-green font-medium">{formatDate(renewal.payment_date)}</span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1.5">
@@ -1633,7 +1645,7 @@ export default function RenewalsPage() {
                     <TableHead>الجوال</TableHead>
                     <TableHead>الخطة</TableHead>
                     <TableHead>السعر</TableHead>
-                    <TableHead>تاريخ التجديد</TableHead>
+                    <TableHead>موعد التجديد</TableHead>
                     <TableHead>سبب الإغلاق</TableHead>
                     <TableHead>المسؤول</TableHead>
                     <TableHead className="text-center">إجراءات</TableHead>
@@ -1763,12 +1775,25 @@ export default function RenewalsPage() {
 
             {/* Renewal date */}
             <div className="grid gap-1.5">
-              <Label htmlFor="renewal_date">تاريخ التجديد</Label>
+              <Label htmlFor="renewal_date">موعد التجديد</Label>
               <Input
                 id="renewal_date"
                 type="date"
                 value={form.renewal_date}
                 onChange={(e) => setForm({ ...form, renewal_date: e.target.value })}
+                dir="ltr"
+                className="text-right"
+              />
+            </div>
+
+            {/* Payment date */}
+            <div className="grid gap-1.5">
+              <Label htmlFor="payment_date">تاريخ الدفع</Label>
+              <Input
+                id="payment_date"
+                type="date"
+                value={form.payment_date}
+                onChange={(e) => setForm({ ...form, payment_date: e.target.value })}
                 dir="ltr"
                 className="text-right"
               />

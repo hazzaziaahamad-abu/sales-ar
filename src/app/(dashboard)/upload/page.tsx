@@ -935,7 +935,7 @@ export default function UploadPage() {
                   </p>
                 </div>
                 <span className="text-[10px] text-muted-foreground shrink-0">
-                  {new Date(entry.created_at).toLocaleDateString("ar-SA", {
+                  {new Date(entry.created_at).toLocaleDateString("ar-SA-u-ca-gregory", {
                     day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
                   })}
                 </span>

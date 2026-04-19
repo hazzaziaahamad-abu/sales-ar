@@ -48,7 +48,7 @@ export async function buildKnowledgeContext(orgId?: string): Promise<string> {
   sections.push(`## معلومات الشركة
 - الاسم: RESTAVO — شركة أتمتة مطاعم في السعودية
 - المنصة: CommandCenter — لوحة إدارة المبيعات والدعم
-- التاريخ الحالي: ${new Date().toLocaleDateString("ar-SA", { year: "numeric", month: "long", day: "numeric" })}`);
+- التاريخ الحالي: ${new Date().toLocaleDateString("ar-SA-u-ca-gregory", { year: "numeric", month: "long", day: "numeric" })}`);
 
   // 2. Monthly KPIs (from kpi_snapshots table)
   if (allKpi.length > 0) {

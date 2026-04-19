@@ -32,6 +32,7 @@ const PAGE_SLUG_MAP: Record<string, string> = {
   "/weekly": "weekly",
   "/academy": "academy",
   "/secretary": "secretary",
+  "/competitors": "competitors",
   "/governance": "governance",
 };
 
@@ -289,12 +290,7 @@ export default function DashboardLayout({
           />
           <main className="px-4 sm:px-6 pb-8 pt-5">
             <AuthGate>
-              <LastSaleBanner salesType={
-                pathname === "/sales" ? "office"
-                : pathname === "/support-sales" ? "support"
-                : pathname === "/renewals" ? "renewal"
-                : "all"
-              } />
+              <LastSaleBanner />
               <AIAlertsBanner />
               {children}
             </AuthGate>

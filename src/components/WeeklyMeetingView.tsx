@@ -36,7 +36,7 @@ interface WeeklyData {
 
 function emptyData(): WeeklyData {
   return {
-    weekLabel: `أسبوع ${new Date().toLocaleDateString("ar-SA", { day: "numeric", month: "long" })}`,
+    weekLabel: `أسبوع ${new Date().toLocaleDateString("ar-SA-u-ca-gregory", { day: "numeric", month: "long" })}`,
     revenue: "", closed: "", closeRate: "", renewRate: "",
     members: [
       { name: "أ", calls: "", demos: "", closed: "", avgVal: "", rate: "", status: "🟡" },
@@ -1170,7 +1170,7 @@ function Tab6MeetingCalendar({ meetings, onRefresh }: { meetings: EmployeeTask[]
 
   const shareMeeting = async (m: { title: string; due_date?: string; due_time?: string; assigned_to_name?: string; client_name?: string; description?: string; completion_notes?: string; notes?: string; priority?: string }) => {
     const priorityLabel = m.priority ? (PRIORITIES as Record<string, { label: string }>)[m.priority]?.label || m.priority : "";
-    const dateStr = m.due_date ? new Date(m.due_date).toLocaleDateString("ar-SA", { weekday: "long", year: "numeric", month: "long", day: "numeric" }) : "";
+    const dateStr = m.due_date ? new Date(m.due_date).toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "long", year: "numeric", month: "long", day: "numeric" }) : "";
 
     let text = `🤝 *${m.title}*\n`;
     text += `${"─".repeat(30)}\n`;
@@ -1221,8 +1221,8 @@ function Tab6MeetingCalendar({ meetings, onRefresh }: { meetings: EmployeeTask[]
             <button onClick={() => navigate(1)} style={{ ...btnStyle, padding: "6px 10px", fontSize: 16 }}>←</button>
             <span style={{ fontSize: 15, fontWeight: 700, color: T.text }}>
               {calView === "day"
-                ? calDate.toLocaleDateString("ar-SA", { weekday: "long", year: "numeric", month: "long", day: "numeric" })
-                : `${weekDays[0].toLocaleDateString("ar-SA", { month: "short", day: "numeric" })} — ${weekDays[6].toLocaleDateString("ar-SA", { month: "short", day: "numeric", year: "numeric" })}`
+                ? calDate.toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "long", year: "numeric", month: "long", day: "numeric" })
+                : `${weekDays[0].toLocaleDateString("ar-SA-u-ca-gregory", { month: "short", day: "numeric" })} — ${weekDays[6].toLocaleDateString("ar-SA-u-ca-gregory", { month: "short", day: "numeric", year: "numeric" })}`
               }
             </span>
           </div>

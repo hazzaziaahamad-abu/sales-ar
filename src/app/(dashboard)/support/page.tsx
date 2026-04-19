@@ -255,7 +255,7 @@ export default function SupportPage() {
   const agentOnlyTickets = agentFilter ? tickets.filter((t) => t.assigned_agent_name === agentFilter) : tickets;
   const achievementItems = useMemo(() => agentOnlyTickets.map(t => ({
     id: t.id,
-    updated_at: t.updated_at,
+    updated_at: t.open_date || t.created_at,
     value: 0,
     isCompleted: t.status === "محلول",
     isCancelled: false,
@@ -269,7 +269,7 @@ export default function SupportPage() {
     ? typeFilteredTickets.filter((t) => t.issue_category === categoryFilter)
     : typeFilteredTickets;
   const baseFilteredTickets = achieveFilter
-    ? categoryFilteredTickets.filter(t => achieveFilterIds.has(t.id))
+    ? agentOnlyTickets.filter(t => achieveFilterIds.has(t.id))
     : cardFilter
       ? cardFilter === "عاجل"
         ? categoryFilteredTickets.filter((t) => t.priority === "عاجل")
@@ -1323,7 +1323,7 @@ export default function SupportPage() {
                           const ActionIcon = config.icon;
                           const logDate = new Date(log.created_at);
                           const dateStr = formatDate(logDate.toISOString().slice(0, 10));
-                          const timeStr = logDate.toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" });
+                          const timeStr = logDate.toLocaleTimeString("ar-SA-u-ca-gregory", { hour: "2-digit", minute: "2-digit" });
 
                           return (
                             <TableRow key={log.id}>
