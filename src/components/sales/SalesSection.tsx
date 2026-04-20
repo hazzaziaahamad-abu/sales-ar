@@ -14,6 +14,7 @@ import { STAGES, SOURCES, SOURCE_COLORS, PLANS } from "@/lib/utils/constants";
 import SalesKPIsView from "@/components/SalesKPIsView";
 import { formatMoney, formatMoneyFull, formatDate, formatPhone, formatPercent } from "@/lib/utils/format";
 import { FollowUpLogButton } from "@/components/follow-up-log";
+import { ClientProfilePanel } from "@/components/client-profile-panel";
 import { AchievementSummary } from "@/components/achievement-summary";
 import { getKpiStatus, KPI_STATUS_STYLES, KPI_TARGETS } from "@/lib/utils/constants";
 import { StatCard } from "@/components/ui/stat-card";
@@ -169,6 +170,8 @@ export function SalesSection({ salesType }: SalesPageProps) {
 
   /* assign task modal */
   const [assignDeal, setAssignDeal] = useState<Deal | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileQuery, setProfileQuery] = useState("");
 
   /* auto follow-up engine */
   const [followUpActions, setFollowUpActions] = useState<FollowUpAction[]>([]);
@@ -1268,7 +1271,10 @@ export function SalesSection({ salesType }: SalesPageProps) {
                       {/* Content */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-bold text-foreground">{deal.client_name}</span>
+                          <button
+                            onClick={() => { setProfileQuery(deal.client_phone || deal.client_name); setProfileOpen(true); }}
+                            className="text-sm font-bold text-foreground hover:text-primary hover:underline transition-colors text-right"
+                          >{deal.client_name}</button>
                           <ColorBadge color={STAGE_BADGE_COLOR[deal.stage] || "cyan"} text={deal.stage} />
                           <span className="text-xs font-bold text-cyan">{formatMoney(deal.deal_value)}</span>
                           {daysSince > 0 && (
@@ -1516,7 +1522,12 @@ export function SalesSection({ salesType }: SalesPageProps) {
                     {deal.client_code || "—"}
                   </TableCell>
                   <TableCell className="font-medium text-foreground">
-                    {deal.client_name}
+                    <button
+                      onClick={() => { setProfileQuery(deal.client_phone || deal.client_name); setProfileOpen(true); }}
+                      className="hover:text-primary hover:underline transition-colors text-right"
+                    >
+                      {deal.client_name}
+                    </button>
                     {isTarget && !isTargetDone && (
                       <span className="mr-1.5 inline-block text-[9px] px-1.5 py-0.5 rounded bg-cyan/10 text-cyan font-medium">هدف اليوم</span>
                     )}
@@ -1525,7 +1536,12 @@ export function SalesSection({ salesType }: SalesPageProps) {
                     )}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs" dir="ltr">
-                    {deal.client_phone ? formatPhone(deal.client_phone) : "—"}
+                    <button
+                      onClick={() => { if (deal.client_phone) { setProfileQuery(deal.client_phone); setProfileOpen(true); } }}
+                      className={deal.client_phone ? "hover:text-primary hover:underline transition-colors" : ""}
+                    >
+                      {deal.client_phone ? formatPhone(deal.client_phone) : "—"}
+                    </button>
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs">
                     {deal.source || "—"}
@@ -2266,6 +2282,11 @@ export function SalesSection({ salesType }: SalesPageProps) {
           defaultTitle={`متابعة ${assignDeal.client_name} — ${assignDeal.stage}`}
         />
       )}
+      <ClientProfilePanel
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        initialQuery={profileQuery}
+      />
     </div>
   );
 }

@@ -86,6 +86,59 @@ async function getNextClientCode(table: "deals" | "renewals", prefix: "S" | "R" 
   return `${prefix}-${String(nextNum).padStart(4, "0")}`;
 }
 
+// ─── CLIENT PROFILE ─────────────────────────────────────────────────────────
+
+export interface ClientProfileData {
+  deals: Deal[];
+  renewals: Renewal[];
+  tickets: Ticket[];
+  notes: FollowUpNote[];
+}
+
+export async function fetchClientProfile(query: string): Promise<ClientProfileData> {
+  const supabase = createClient();
+  const orgId = getOrgId();
+  const q = query.trim();
+
+  const isPhone = /^\d+$/.test(q.replace(/[\s\-+()]/g, ""));
+
+  const [dealsRes, renewalsRes, ticketsRes] = await Promise.all([
+    isPhone
+      ? supabase.from("deals").select("*").eq("org_id", orgId).eq("client_phone", q).order("created_at", { ascending: false })
+      : supabase.from("deals").select("*").eq("org_id", orgId).ilike("client_name", `%${q}%`).order("created_at", { ascending: false }),
+    isPhone
+      ? supabase.from("renewals").select("*").eq("org_id", orgId).eq("customer_phone", q).order("created_at", { ascending: false })
+      : supabase.from("renewals").select("*").eq("org_id", orgId).ilike("customer_name", `%${q}%`).order("created_at", { ascending: false }),
+    isPhone
+      ? supabase.from("tickets").select("*").eq("org_id", orgId).eq("client_phone", q).order("created_at", { ascending: false })
+      : supabase.from("tickets").select("*").eq("org_id", orgId).ilike("client_name", `%${q}%`).order("created_at", { ascending: false }),
+  ]);
+
+  const deals = (dealsRes.data ?? []) as Deal[];
+  const renewals = (renewalsRes.data ?? []) as Renewal[];
+  const tickets = (ticketsRes.data ?? []) as Ticket[];
+
+  const entityIds: { type: "deal" | "renewal" | "ticket"; id: string }[] = [
+    ...deals.map(d => ({ type: "deal" as const, id: d.id })),
+    ...renewals.map(r => ({ type: "renewal" as const, id: r.id })),
+    ...tickets.map(t => ({ type: "ticket" as const, id: t.id })),
+  ];
+
+  let notes: FollowUpNote[] = [];
+  if (entityIds.length > 0) {
+    const ids = entityIds.map(e => e.id);
+    const { data } = await supabase
+      .from("follow_up_notes")
+      .select("*")
+      .eq("org_id", orgId)
+      .in("entity_id", ids)
+      .order("created_at", { ascending: false });
+    notes = (data ?? []) as FollowUpNote[];
+  }
+
+  return { deals, renewals, tickets, notes };
+}
+
 // ─── DEALS ───────────────────────────────────────────────────────────────────
 
 export async function fetchDeals(salesType?: "office" | "support"): Promise<Deal[]> {

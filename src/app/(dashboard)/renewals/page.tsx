@@ -15,6 +15,7 @@ import {
   fetchEmployees,
 } from "@/lib/supabase/db";
 import { AssignTaskModal } from "@/components/tasks/AssignTaskModal";
+import { ClientProfilePanel } from "@/components/client-profile-panel";
 import { useAuth } from "@/lib/auth-context";
 import { useTopbarControls } from "@/components/layout/topbar-context";
 import {
@@ -178,6 +179,8 @@ export default function RenewalsPage() {
 
   /* assign task modal */
   const [assignRenewal, setAssignRenewal] = useState<Renewal | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileQuery, setProfileQuery] = useState("");
 
   /* Achievement summary period */
   type SummaryPeriod = "today" | "week" | "month" | "quarter" | "custom";
@@ -1408,7 +1411,12 @@ export default function RenewalsPage() {
                       {renewal.client_code || "—"}
                     </TableCell>
                     <TableCell className="font-medium text-foreground">
-                      {renewal.customer_name}
+                      <button
+                        onClick={() => { setProfileQuery(renewal.customer_phone || renewal.customer_name); setProfileOpen(true); }}
+                        className="hover:text-primary hover:underline transition-colors text-right"
+                      >
+                        {renewal.customer_name}
+                      </button>
                       {isTarget && !isTargetDone && (
                         <span className="mr-1.5 inline-block text-[9px] px-1.5 py-0.5 rounded bg-cyan/10 text-cyan font-medium">
                           هدف اليوم
@@ -1656,7 +1664,14 @@ export default function RenewalsPage() {
                     const badge = STATUS_BADGE[renewal.status] || STATUS_BADGE["مجدول"];
                     return (
                       <TableRow key={renewal.id} className="opacity-70 hover:opacity-100 transition-opacity">
-                        <TableCell className="font-medium text-foreground">{renewal.customer_name}</TableCell>
+                        <TableCell className="font-medium text-foreground">
+                          <button
+                            onClick={() => { setProfileQuery(renewal.customer_phone || renewal.customer_name); setProfileOpen(true); }}
+                            className="hover:text-primary hover:underline transition-colors text-right"
+                          >
+                            {renewal.customer_name}
+                          </button>
+                        </TableCell>
                         <TableCell className="text-muted-foreground text-xs font-mono" dir="ltr">
                           {renewal.customer_phone ? formatPhone(renewal.customer_phone) : "—"}
                         </TableCell>
@@ -1905,6 +1920,11 @@ export default function RenewalsPage() {
           defaultTitle={`متابعة تجديد ${assignRenewal.customer_name} — ${assignRenewal.plan_name}`}
         />
       )}
+      <ClientProfilePanel
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        initialQuery={profileQuery}
+      />
     </div>
   );
 }
