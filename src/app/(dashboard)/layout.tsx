@@ -9,6 +9,8 @@ import { NotificationPanel } from "@/components/layout/notification-panel";
 import { AIChatFAB } from "@/components/ai/ai-chat-fab";
 import { AIAlertsBanner } from "@/components/ai/ai-alerts-banner";
 import { LastSaleBanner } from "@/components/layout/last-sale-banner";
+import { SaleCelebration } from "@/components/layout/sale-celebration";
+import { WelcomePopup } from "@/components/layout/welcome-popup";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { OrgProvider } from "@/lib/org-context";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -278,6 +280,8 @@ export default function DashboardLayout({
     <AuthProvider>
     <TopbarProvider>
       <MentionNotifLoader onLoad={addNotifications} />
+      <SaleCelebration />
+      <WelcomePopup />
       <div className="min-h-screen bg-background panel-grid">
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
