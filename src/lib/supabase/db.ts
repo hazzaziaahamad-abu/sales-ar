@@ -139,6 +139,29 @@ export async function fetchClientProfile(query: string): Promise<ClientProfileDa
   return { deals, renewals, tickets, notes };
 }
 
+export async function fetchClientBio(clientKey: string): Promise<string> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("client_bios")
+    .select("bio")
+    .eq("org_id", getOrgId())
+    .eq("client_key", clientKey)
+    .single();
+  return data?.bio || "";
+}
+
+export async function upsertClientBio(clientKey: string, bio: string, userName?: string): Promise<void> {
+  const supabase = createClient();
+  const orgId = getOrgId();
+  const { error } = await supabase
+    .from("client_bios")
+    .upsert(
+      { org_id: orgId, client_key: clientKey, bio, updated_by: userName || null, updated_at: new Date().toISOString() },
+      { onConflict: "org_id,client_key" }
+    );
+  if (error) throw error;
+}
+
 // ─── DEALS ───────────────────────────────────────────────────────────────────
 
 export async function fetchDeals(salesType?: "office" | "support"): Promise<Deal[]> {

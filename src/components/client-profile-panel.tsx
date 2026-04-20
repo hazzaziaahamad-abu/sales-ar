@@ -7,8 +7,9 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { fetchClientProfile, type ClientProfileData } from "@/lib/supabase/db";
-import { Search, Phone, User, ShoppingBag, RefreshCw, Headphones, FileText, ChevronDown, ChevronUp, Clock, X } from "lucide-react";
+import { fetchClientProfile, fetchClientBio, upsertClientBio, type ClientProfileData } from "@/lib/supabase/db";
+import { useAuth } from "@/lib/auth-context";
+import { Search, Phone, User, ShoppingBag, RefreshCw, Headphones, FileText, ChevronDown, ChevronUp, Clock, X, Pencil, Check, StickyNote } from "lucide-react";
 import type { Deal, Renewal, Ticket, FollowUpNote } from "@/types";
 
 const STAGE_COLORS: Record<string, string> = {
@@ -195,10 +196,16 @@ interface ClientProfilePanelProps {
 }
 
 export function ClientProfilePanel({ open, onClose, initialQuery }: ClientProfilePanelProps) {
+  const { user } = useAuth();
   const [search, setSearch] = useState(initialQuery || "");
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<ClientProfileData | null>(null);
   const [searched, setSearched] = useState(false);
+  const [bio, setBio] = useState("");
+  const [bioEditing, setBioEditing] = useState(false);
+  const [bioDraft, setBioDraft] = useState("");
+  const [bioSaving, setBioSaving] = useState(false);
+  const [bioKey, setBioKey] = useState("");
 
   useEffect(() => {
     if (initialQuery && open) {
@@ -207,19 +214,53 @@ export function ClientProfilePanel({ open, onClose, initialQuery }: ClientProfil
     }
   }, [initialQuery, open]);
 
+  const loadBio = useCallback(async (key: string) => {
+    if (!key) return;
+    setBioKey(key);
+    try {
+      const b = await fetchClientBio(key);
+      setBio(b);
+      setBioDraft(b);
+    } catch {
+      setBio("");
+      setBioDraft("");
+    }
+  }, []);
+
+  const saveBio = useCallback(async () => {
+    if (!bioKey) return;
+    setBioSaving(true);
+    try {
+      await upsertClientBio(bioKey, bioDraft.trim(), user?.name);
+      setBio(bioDraft.trim());
+      setBioEditing(false);
+    } catch {
+      // silent
+    } finally {
+      setBioSaving(false);
+    }
+  }, [bioKey, bioDraft, user?.name]);
+
   const doSearch = useCallback(async (q: string) => {
     if (!q.trim()) return;
     setLoading(true);
     setSearched(true);
+    setBio("");
+    setBioDraft("");
+    setBioEditing(false);
     try {
       const result = await fetchClientProfile(q.trim());
       setData(result);
+      const phone = result.deals[0]?.client_phone || result.renewals[0]?.customer_phone || result.tickets[0]?.client_phone || "";
+      const name = result.deals[0]?.client_name || result.renewals[0]?.customer_name || result.tickets[0]?.client_name || "";
+      const key = phone || name;
+      if (key) loadBio(key);
     } catch {
       setData(null);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadBio]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -232,6 +273,10 @@ export function ClientProfilePanel({ open, onClose, initialQuery }: ClientProfil
       setSearch("");
       setData(null);
       setSearched(false);
+      setBio("");
+      setBioDraft("");
+      setBioEditing(false);
+      setBioKey("");
     }, 300);
   };
 
@@ -329,6 +374,54 @@ export function ClientProfilePanel({ open, onClose, initialQuery }: ClientProfil
                     <p className="text-[9px] text-muted-foreground">تذاكر دعم</p>
                   </div>
                 </div>
+              </div>
+
+              {/* Bio */}
+              <div className="rounded-xl border border-border/50 bg-muted/20 p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <StickyNote className="w-3.5 h-3.5 text-amber-400" />
+                    <span className="text-xs font-bold text-foreground">نبذة عن العميل</span>
+                  </div>
+                  {!bioEditing ? (
+                    <button
+                      onClick={() => { setBioDraft(bio); setBioEditing(true); }}
+                      className="flex items-center gap-1 text-[10px] text-primary hover:underline"
+                    >
+                      <Pencil className="w-3 h-3" /> {bio ? "تعديل" : "إضافة"}
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={saveBio}
+                        disabled={bioSaving}
+                        className="flex items-center gap-0.5 text-[10px] text-emerald-400 hover:underline disabled:opacity-50"
+                      >
+                        <Check className="w-3 h-3" /> حفظ
+                      </button>
+                      <button
+                        onClick={() => { setBioEditing(false); setBioDraft(bio); }}
+                        className="text-[10px] text-muted-foreground hover:underline"
+                      >
+                        إلغاء
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {bioEditing ? (
+                  <textarea
+                    value={bioDraft}
+                    onChange={(e) => setBioDraft(e.target.value)}
+                    placeholder="اكتب نبذة عن العميل... (مثال: عميل قديم، يفضل التواصل عبر واتساب، مهتم بالترقية)"
+                    className="w-full text-xs bg-background/50 border border-border/50 rounded-lg p-2 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/50 resize-none"
+                    rows={3}
+                    dir="rtl"
+                  />
+                ) : bio ? (
+                  <p className="text-xs text-foreground/70 whitespace-pre-line leading-relaxed">{bio}</p>
+                ) : (
+                  <p className="text-[10px] text-muted-foreground/50">لا توجد نبذة — اضغط "إضافة" لكتابة ملاحظات عن العميل</p>
+                )}
               </div>
 
               {/* Timeline */}
