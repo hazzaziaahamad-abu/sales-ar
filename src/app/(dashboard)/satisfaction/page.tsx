@@ -89,6 +89,7 @@ const MONTH_NAMES = ["يناير", "فبراير", "مارس", "أبريل", "م
 
 export default function SatisfactionPage() {
   const [feedbackFilter, setFeedbackFilter] = useState<"all" | ReviewType>("all");
+  const [overviewType, setOverviewType] = useState<ReviewType | null>(null);
 
   const { activeOrgId: orgId } = useAuth();
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -323,21 +324,72 @@ export default function SatisfactionPage() {
           {/* Breakdown by type */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
             {([
-              { type: "very_satisfied", label: "راضي جداً", color: "text-cc-green", bg: "bg-green-dim", border: "border-cc-green/20" },
-              { type: "satisfied", label: "راضي", color: "text-cyan", bg: "bg-cyan-dim", border: "border-cyan/20" },
-              { type: "neutral", label: "متوسط", color: "text-amber", bg: "bg-amber-dim", border: "border-amber/20" },
-              { type: "needs_improvement", label: "يحتاج تطوير", color: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/20" },
-              { type: "unsatisfied", label: "غير راضي", color: "text-cc-red", bg: "bg-red-dim", border: "border-cc-red/20" },
+              { type: "very_satisfied", label: "راضي جداً", color: "text-cc-green", bg: "bg-green-dim", border: "border-cc-green/20", activeBorder: "border-cc-green/60" },
+              { type: "satisfied", label: "راضي", color: "text-cyan", bg: "bg-cyan-dim", border: "border-cyan/20", activeBorder: "border-cyan/60" },
+              { type: "neutral", label: "متوسط", color: "text-amber", bg: "bg-amber-dim", border: "border-amber/20", activeBorder: "border-amber/60" },
+              { type: "needs_improvement", label: "يحتاج تطوير", color: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/20", activeBorder: "border-orange-500/60" },
+              { type: "unsatisfied", label: "غير راضي", color: "text-cc-red", bg: "bg-red-dim", border: "border-cc-red/20", activeBorder: "border-cc-red/60" },
             ] as const).map((item) => {
               const count = monthReviews.filter(r => r.type === item.type).length;
+              const isActive = overviewType === item.type;
               return (
-                <div key={item.type} className={`cc-card rounded-xl p-3 text-center border ${item.border}`}>
+                <button
+                  key={item.type}
+                  onClick={() => setOverviewType(isActive ? null : item.type)}
+                  className={`cc-card rounded-xl p-3 text-center border transition-all ${isActive ? `${item.activeBorder} ring-1 ring-white/10 scale-[1.03]` : `${item.border} hover:scale-[1.02]`}`}
+                >
                   <p className={`text-2xl font-black ${item.color}`}>{count}</p>
                   <p className="text-[10px] text-muted-foreground mt-0.5">{item.label}</p>
-                </div>
+                </button>
               );
             })}
           </div>
+
+          {/* Filtered reviews by selected type */}
+          {overviewType && (() => {
+            const typeReviews = monthReviews.filter(r => r.type === overviewType);
+            const style = feedbackTypeStyle[overviewType] || DEFAULT_STYLE;
+            if (typeReviews.length === 0) return null;
+            return (
+              <div className="cc-card rounded-[14px] p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${style.bg} ${style.color}`}>
+                      {style.label}
+                    </span>
+                    {typeReviews.length} عميل
+                  </h3>
+                  <button onClick={() => setOverviewType(null)} className="text-[10px] text-muted-foreground hover:text-foreground transition-colors">إغلاق ✕</button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-80 overflow-y-auto">
+                  {typeReviews.map((review) => (
+                    <div key={review.id} className="flex items-start gap-3 p-2.5 rounded-lg bg-muted/20 border border-border/30">
+                      <div className="w-8 h-8 rounded-full bg-cyan-dim border border-cyan/20 flex items-center justify-center text-cyan font-bold text-xs shrink-0">
+                        {review.avatar || review.customer_name.charAt(0)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs font-bold text-foreground truncate">{review.customer_name}</p>
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            {Array.from({ length: 5 }).map((_, s) => (
+                              <Star key={s} className={`w-2.5 h-2.5 ${s < review.stars ? "text-amber fill-amber" : "text-muted-foreground/20"}`} />
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {review.category && <span className="text-[9px] text-muted-foreground">{review.category}</span>}
+                          {review.review_date && <span className="text-[9px] text-muted-foreground">{review.review_date}</span>}
+                        </div>
+                        {review.comment && (
+                          <p className="text-[10px] text-muted-foreground/70 mt-1 line-clamp-2">{review.comment}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* 3 KPI cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
