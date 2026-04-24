@@ -84,23 +84,21 @@ const SECTION_COLORS: Record<string, string> = {
 type FilterMode = "all" | "today" | "week";
 type TabMode = "updates" | "log" | "academy";
 
-function isToday(dateStr: string): boolean {
+function toLocalDateStr(dateStr: string): string {
   const d = new Date(dateStr);
-  const now = new Date();
-  return (
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate()
-  );
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function isToday(dateStr: string): boolean {
+  return toLocalDateStr(dateStr) === toLocalDateStr(new Date().toISOString());
 }
 
 function isThisWeek(dateStr: string): boolean {
-  const d = new Date(dateStr);
   const now = new Date();
   const startOfWeek = new Date(now);
   startOfWeek.setDate(now.getDate() - now.getDay());
   startOfWeek.setHours(0, 0, 0, 0);
-  return d >= startOfWeek;
+  return new Date(dateStr) >= startOfWeek;
 }
 
 function formatTime(dateStr: string): string {
