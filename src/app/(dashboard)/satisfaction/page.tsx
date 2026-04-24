@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { DEMO_SATISFACTION } from "@/lib/demo-data";
+import { useState, useEffect, useMemo } from "react";
 import { fetchReviews, createReview, updateReview, deleteReview } from "@/lib/supabase/db";
 import { useAuth } from "@/lib/auth-context";
 import { useTopbarControls } from "@/components/layout/topbar-context";
@@ -80,12 +79,17 @@ const DEFAULT_STYLE = { label: "متوسط", color: "text-amber", bg: "bg-amber-
 
 /* ---------- page ---------- */
 
+const CSAT_TARGET = 4.0;
+const NPS_TARGET = 40;
+const PROMOTERS_TARGET = 60;
+const SAAS_INDUSTRY_NPS = 38;
+
+const MONTH_NAMES = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+
 export default function SatisfactionPage() {
-  const d = DEMO_SATISFACTION;
   const [feedbackFilter, setFeedbackFilter] = useState<"all" | ReviewType>("all");
 
   const { activeOrgId: orgId } = useAuth();
-  /* reviews CRUD state */
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -103,21 +107,73 @@ export default function SatisfactionPage() {
       .finally(() => setLoading(false));
   }, [orgId]);
 
-  /* KPI status */
-  const csatStatus = getKpiStatus(d.csat, d.csatTarget);
-  const npsStatus = getKpiStatus(d.nps, d.npsTarget);
-  const promotersStatus = getKpiStatus(d.promotersPercent, d.promotersTarget);
-
   /* month filter */
   const { activeMonthIndex, filterCutoff } = useTopbarControls();
   const monthReviews = filterCutoff
     ? reviews.filter((r) => new Date(r.review_date || r.created_at) >= filterCutoff)
     : activeMonthIndex
       ? reviews.filter((r) => {
-          const d = new Date(r.review_date || r.created_at);
-          return d.getMonth() + 1 === activeMonthIndex.month && d.getFullYear() === activeMonthIndex.year;
+          const dt = new Date(r.review_date || r.created_at);
+          return dt.getMonth() + 1 === activeMonthIndex.month && dt.getFullYear() === activeMonthIndex.year;
         })
       : reviews;
+
+  /* ── Computed metrics from real reviews ── */
+  const metrics = useMemo(() => {
+    const total = monthReviews.length;
+    if (total === 0) {
+      return {
+        csat: 0, nps: 0,
+        promotersPercent: 0, passivesPercent: 0, detractorsPercent: 0,
+        starDistribution: [5, 4, 3, 2, 1].map(s => ({ stars: s, percent: 0, count: 0 })),
+      };
+    }
+
+    const csat = Math.round((monthReviews.reduce((s, r) => s + r.stars, 0) / total) * 10) / 10;
+
+    const promoters = monthReviews.filter(r => r.stars >= 4).length;
+    const detractors = monthReviews.filter(r => r.stars <= 2).length;
+    const passives = total - promoters - detractors;
+
+    const promotersPercent = Math.round((promoters / total) * 100);
+    const detractorsPercent = Math.round((detractors / total) * 100);
+    const passivesPercent = 100 - promotersPercent - detractorsPercent;
+    const nps = promotersPercent - detractorsPercent;
+
+    const starDistribution = [5, 4, 3, 2, 1].map(s => {
+      const count = monthReviews.filter(r => r.stars === s).length;
+      return { stars: s, percent: Math.round((count / total) * 100), count };
+    });
+
+    return { csat, nps, promotersPercent, passivesPercent, detractorsPercent, starDistribution };
+  }, [monthReviews]);
+
+  /* Monthly trend — last 6 months */
+  const trendMonths = useMemo(() => {
+    const now = new Date();
+    const months: { label: string; csat: number; nps: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const m = d.getMonth();
+      const y = d.getFullYear();
+      const mReviews = reviews.filter(r => {
+        const rd = new Date(r.review_date || r.created_at);
+        return rd.getMonth() === m && rd.getFullYear() === y;
+      });
+      const total = mReviews.length;
+      const csat = total > 0 ? Math.round((mReviews.reduce((s, r) => s + r.stars, 0) / total) * 10) / 10 : 0;
+      const promo = total > 0 ? mReviews.filter(r => r.stars >= 4).length : 0;
+      const detract = total > 0 ? mReviews.filter(r => r.stars <= 2).length : 0;
+      const nps = total > 0 ? Math.round(((promo - detract) / total) * 100) : 0;
+      months.push({ label: MONTH_NAMES[m].slice(0, 3), csat, nps });
+    }
+    return months;
+  }, [reviews]);
+
+  /* KPI status */
+  const csatStatus = getKpiStatus(metrics.csat, CSAT_TARGET);
+  const npsStatus = getKpiStatus(metrics.nps, NPS_TARGET);
+  const promotersStatus = getKpiStatus(metrics.promotersPercent, PROMOTERS_TARGET);
 
   /* client search */
   const [clientSearch, setClientSearch] = useState("");
@@ -131,18 +187,18 @@ export default function SatisfactionPage() {
     : typeFilteredReviews;
 
   /* chart data */
-  const trendData = d.monthlyTrend.map((m) => ({
-    label: m.month.slice(0, 3),
+  const trendData = trendMonths.map((m) => ({
+    label: m.label,
     value: m.csat * 20,
     target: m.nps,
   }));
 
-  const npsBarData = d.monthlyTrend.map((m) => ({
-    label: m.month.slice(0, 3),
+  const npsBarData = trendMonths.map((m) => ({
+    label: m.label,
     values: [{ value: m.nps, color: "#00D4FF", label: "NPS" }],
   }));
 
-  const starBarData = d.starDistribution.map((s) => ({
+  const starBarData = metrics.starDistribution.map((s) => ({
     label: `${s.stars}★`,
     values: [
       {
@@ -255,23 +311,23 @@ export default function SatisfactionPage() {
           {/* 3 KPI cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <KPICard
-              value={`${d.csat}/5`}
+              value={`${metrics.csat}/5`}
               label="CSAT"
-              target={`${d.csatTarget}/5`}
+              target={`${CSAT_TARGET}/5`}
               status={csatStatus}
               icon={<Star className="w-4 h-4" />}
             />
             <KPICard
-              value={`+${d.nps}`}
+              value={`${metrics.nps >= 0 ? "+" : ""}${metrics.nps}`}
               label="NPS"
-              target={`+${d.npsTarget}`}
+              target={`+${NPS_TARGET}`}
               status={npsStatus}
               icon={<TrendingUp className="w-4 h-4" />}
             />
             <KPICard
-              value={`${d.promotersPercent}%`}
+              value={`${metrics.promotersPercent}%`}
               label="نسبة الرضى"
-              target={`${d.promotersTarget}%`}
+              target={`${PROMOTERS_TARGET}%`}
               status={promotersStatus}
               icon={<Users className="w-4 h-4" />}
             />
@@ -283,7 +339,7 @@ export default function SatisfactionPage() {
               <h3 className="text-sm font-bold text-foreground mb-4">توزيع النجوم</h3>
               <BarChart data={starBarData} height={200} />
               <div className="mt-4 space-y-2">
-                {d.starDistribution.map((s) => (
+                {metrics.starDistribution.map((s) => (
                   <div key={s.stars} className="flex items-center gap-3 text-xs">
                     <div className="flex items-center gap-0.5 w-16 shrink-0">
                       {Array.from({ length: s.stars }).map((_, i) => (
@@ -315,32 +371,32 @@ export default function SatisfactionPage() {
             <h3 className="text-sm font-bold text-foreground mb-4">توزيع شرائح NPS</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
               <NPSSegment
-                label="مروّجون (9-10)"
-                percent={d.promotersPercent}
+                label="مروّجون (4-5 نجوم)"
+                percent={metrics.promotersPercent}
                 description="يوصون بالمنتج"
                 color="cc-green"
               />
               <NPSSegment
-                label="محايدون (7-8)"
-                percent={d.passivesPercent}
+                label="محايدون (3 نجوم)"
+                percent={metrics.passivesPercent}
                 description="راضون لكن قابلون للتحوّل"
                 color="amber"
               />
               <NPSSegment
-                label="منتقدون (0-6)"
-                percent={d.detractorsPercent}
+                label="منتقدون (1-2 نجوم)"
+                percent={metrics.detractorsPercent}
                 description="غير راضين"
                 color="cc-red"
               />
             </div>
             {/* Visual bar */}
             <div className="flex h-3 rounded-full overflow-hidden">
-              <div className="bg-cc-green" style={{ width: `${d.promotersPercent}%` }} />
-              <div className="bg-amber" style={{ width: `${d.passivesPercent}%` }} />
-              <div className="bg-cc-red" style={{ width: `${d.detractorsPercent}%` }} />
+              <div className="bg-cc-green" style={{ width: `${metrics.promotersPercent}%` }} />
+              <div className="bg-amber" style={{ width: `${metrics.passivesPercent}%` }} />
+              <div className="bg-cc-red" style={{ width: `${metrics.detractorsPercent}%` }} />
             </div>
             <p className="text-xs text-muted-foreground mt-3 text-center">
-              NPS = {d.promotersPercent}% − {d.detractorsPercent}% = <span className="text-cyan font-bold">+{d.nps}</span>
+              NPS = {metrics.promotersPercent}% − {metrics.detractorsPercent}% = <span className="text-cyan font-bold">{metrics.nps >= 0 ? "+" : ""}{metrics.nps}</span>
             </p>
           </div>
         </TabsContent>
@@ -349,11 +405,11 @@ export default function SatisfactionPage() {
         <TabsContent value="nps" className="space-y-6">
           <div className="cc-card rounded-[14px] p-8 text-center">
             <p className="text-sm text-muted-foreground mb-2">مؤشر صافي الرضى</p>
-            <p className="text-7xl font-extrabold text-cyan">+{d.nps}</p>
+            <p className="text-7xl font-extrabold text-cyan">{metrics.nps >= 0 ? "+" : ""}{metrics.nps}</p>
             <div className="flex items-center justify-center gap-2 mt-3">
               <span className={`w-2 h-2 rounded-full ${KPI_STATUS_STYLES[npsStatus].dot}`} />
               <span className={`text-sm ${KPI_STATUS_STYLES[npsStatus].text}`}>
-                {KPI_STATUS_STYLES[npsStatus].label} — أعلى من الهدف (+{d.npsTarget})
+                {KPI_STATUS_STYLES[npsStatus].label} — الهدف (+{NPS_TARGET})
               </span>
             </div>
           </div>
@@ -363,16 +419,16 @@ export default function SatisfactionPage() {
               <h3 className="text-sm font-bold text-foreground mb-4">مقارنة مع صناعة SaaS</h3>
               <div className="flex items-end gap-6 justify-center">
                 <div className="text-center">
-                  <p className="text-3xl font-extrabold text-cyan">+{d.nps}</p>
+                  <p className="text-3xl font-extrabold text-cyan">{metrics.nps >= 0 ? "+" : ""}{metrics.nps}</p>
                   <p className="text-xs text-muted-foreground mt-1">نتيجتك</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-3xl font-extrabold text-muted-foreground">+{d.saasIndustryNPS}</p>
+                  <p className="text-3xl font-extrabold text-muted-foreground">+{SAAS_INDUSTRY_NPS}</p>
                   <p className="text-xs text-muted-foreground mt-1">متوسط SaaS</p>
                 </div>
               </div>
-              <p className="text-xs text-cc-green text-center mt-4">
-                أعلى بـ {d.nps - d.saasIndustryNPS} نقطة من المتوسط
+              <p className={`text-xs text-center mt-4 ${metrics.nps >= SAAS_INDUSTRY_NPS ? "text-cc-green" : "text-cc-red"}`}>
+                {metrics.nps >= SAAS_INDUSTRY_NPS ? "أعلى" : "أقل"} بـ {Math.abs(metrics.nps - SAAS_INDUSTRY_NPS)} نقطة من المتوسط
               </p>
             </div>
 
@@ -385,7 +441,12 @@ export default function SatisfactionPage() {
           <div className="cc-card rounded-[14px] p-5">
             <h3 className="text-sm font-bold text-foreground mb-2">توصية للتحسين</h3>
             <p className="text-sm text-muted-foreground leading-7">
-              نسبة المنتقدين ({d.detractorsPercent}%) مرتفعة نسبياً. نوصي بالتركيز على تحسين تجربة العملاء في مجالات الأداء والتسعير — وهي الشكاوى الأكثر تكراراً. تقليل نسبة المنتقدين بمقدار 5% يرفع NPS إلى +{d.nps + 5}.
+              {metrics.detractorsPercent > 20
+                ? `نسبة المنتقدين (${metrics.detractorsPercent}%) مرتفعة نسبياً. نوصي بالتركيز على تحسين تجربة العملاء. تقليل نسبة المنتقدين بمقدار 5% يرفع NPS إلى +${metrics.nps + 5}.`
+                : metrics.detractorsPercent > 10
+                  ? `نسبة المنتقدين (${metrics.detractorsPercent}%) مقبولة. استمر في تحسين الخدمة لزيادة نسبة المروّجين وتعزيز NPS.`
+                  : `أداء ممتاز! نسبة المنتقدين (${metrics.detractorsPercent}%) منخفضة. حافظ على هذا المستوى وركّز على تحويل المحايدين إلى مروّجين.`
+              }
             </p>
           </div>
         </TabsContent>
