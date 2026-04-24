@@ -40,6 +40,7 @@ import {
   Plus,
   Pencil,
   Trash2,
+  MessageSquare,
 } from "lucide-react";
 
 /* ---------- helpers ---------- */
@@ -308,6 +309,17 @@ export default function SatisfactionPage() {
 
         {/* ─── Tab 1: Overview ─── */}
         <TabsContent value="overview" className="space-y-6">
+          {/* Total reviewers hero */}
+          <div className="cc-card rounded-[14px] p-6 flex items-center justify-center gap-4 border-t-2 border-t-primary/30">
+            <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+              <MessageSquare className="w-7 h-7 text-primary" />
+            </div>
+            <div className="text-center">
+              <p className="text-4xl font-black text-foreground">{monthReviews.length}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">إجمالي التقييمات</p>
+            </div>
+          </div>
+
           {/* 3 KPI cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <KPICard
