@@ -320,6 +320,25 @@ export default function SatisfactionPage() {
             </div>
           </div>
 
+          {/* Breakdown by type */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+            {([
+              { type: "very_satisfied", label: "راضي جداً", color: "text-cc-green", bg: "bg-green-dim", border: "border-cc-green/20" },
+              { type: "satisfied", label: "راضي", color: "text-cyan", bg: "bg-cyan-dim", border: "border-cyan/20" },
+              { type: "neutral", label: "متوسط", color: "text-amber", bg: "bg-amber-dim", border: "border-amber/20" },
+              { type: "needs_improvement", label: "يحتاج تطوير", color: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/20" },
+              { type: "unsatisfied", label: "غير راضي", color: "text-cc-red", bg: "bg-red-dim", border: "border-cc-red/20" },
+            ] as const).map((item) => {
+              const count = monthReviews.filter(r => r.type === item.type).length;
+              return (
+                <div key={item.type} className={`cc-card rounded-xl p-3 text-center border ${item.border}`}>
+                  <p className={`text-2xl font-black ${item.color}`}>{count}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{item.label}</p>
+                </div>
+              );
+            })}
+          </div>
+
           {/* 3 KPI cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <KPICard
