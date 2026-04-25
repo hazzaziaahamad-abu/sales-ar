@@ -1890,7 +1890,15 @@ export default function SecretaryPage() {
         id="attendance"
         title="سجل الموظفين"
         icon={<LogIn className="w-5 h-5 text-violet-400" />}
-        badge={loginLogs.length > 0 ? <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-400">{loginLogs.filter(l => isToday(l.login_at)).length} اليوم</span> : undefined}
+        badge={(() => {
+          const activeCount = employees.filter(e => e.status === "نشط").filter(emp => {
+            const lastAction = activityLogs.find(l => l.user_name === emp.name);
+            const lastLogin = loginLogs.find(l => l.user_name === emp.name);
+            const lastSeen = [lastAction?.created_at, lastLogin?.login_at].filter(Boolean).sort().pop();
+            return lastSeen && (Date.now() - new Date(lastSeen).getTime()) < 24 * 60 * 60 * 1000;
+          }).length;
+          return activeCount > 0 ? <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-400">{activeCount} نشط</span> : undefined;
+        })()}
         isOpen={expandedSections.attendance !== false} onToggle={toggleSection}
       >
         {(() => {
@@ -1898,14 +1906,17 @@ export default function SecretaryPage() {
           const empSummary = activeEmps.map(emp => {
             const lastLogin = loginLogs.find(l => l.user_name === emp.name);
             const lastAction = activityLogs.find(l => l.user_name === emp.name);
-            return { emp, lastLogin, lastAction };
+            const lastSeenDate = [lastAction?.created_at, lastLogin?.login_at].filter(Boolean).sort().pop();
+            return { emp, lastLogin, lastAction, lastSeenDate };
           }).sort((a, b) => {
-            const aTime = a.lastLogin?.login_at || "0";
-            const bTime = b.lastLogin?.login_at || "0";
+            const aTime = a.lastSeenDate || "0";
+            const bTime = b.lastSeenDate || "0";
             return bTime.localeCompare(aTime);
           });
 
-          const todayLogins = loginLogs.filter(l => isToday(l.login_at));
+          const todayActive = empSummary.filter(e => e.lastSeenDate && isToday(e.lastSeenDate)).length;
+          const last24h = empSummary.filter(e => e.lastSeenDate && (Date.now() - new Date(e.lastSeenDate).getTime()) < 24 * 60 * 60 * 1000).length;
+          const inactive = empSummary.length - last24h;
 
           const loginGroups: { date: string; logins: UserLoginLog[] }[] = [];
           const loginMap = new Map<string, UserLoginLog[]>();
@@ -1925,25 +1936,24 @@ export default function SecretaryPage() {
               {/* Summary Stats */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="rounded-lg bg-violet-500/[0.06] border border-violet-500/15 p-3 text-center">
-                  <p className="text-xl font-bold text-foreground">{todayLogins.length}</p>
-                  <p className="text-[10px] text-muted-foreground">دخول اليوم</p>
+                  <p className="text-xl font-bold text-foreground">{todayActive}</p>
+                  <p className="text-[10px] text-muted-foreground">نشط اليوم</p>
                 </div>
                 <div className="rounded-lg bg-emerald-500/[0.06] border border-emerald-500/15 p-3 text-center">
-                  <p className="text-xl font-bold text-emerald-400">{empSummary.filter(e => e.lastLogin && (Date.now() - new Date(e.lastLogin.login_at).getTime()) < 24 * 60 * 60 * 1000).length}</p>
+                  <p className="text-xl font-bold text-emerald-400">{last24h}</p>
                   <p className="text-[10px] text-muted-foreground">نشط آخر 24 ساعة</p>
                 </div>
                 <div className="rounded-lg bg-red-500/[0.06] border border-red-500/15 p-3 text-center">
-                  <p className="text-xl font-bold text-red-400">{empSummary.filter(e => !e.lastLogin || (Date.now() - new Date(e.lastLogin.login_at).getTime()) >= 24 * 60 * 60 * 1000).length}</p>
+                  <p className="text-xl font-bold text-red-400">{inactive}</p>
                   <p className="text-[10px] text-muted-foreground">غير نشط</p>
                 </div>
               </div>
 
               {/* Employee Summary Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                {empSummary.map(({ emp, lastLogin, lastAction }) => {
-                  const hasLogin = !!lastLogin;
-                  const loginDiff = hasLogin ? (Date.now() - new Date(lastLogin.login_at).getTime()) / (1000 * 60 * 60) : Infinity;
-                  const statusColor = loginDiff < 1 ? "bg-emerald-400" : loginDiff < 24 ? "bg-amber-400" : "bg-red-400";
+                {empSummary.map(({ emp, lastLogin, lastAction, lastSeenDate }) => {
+                  const lastSeenDiffHrs = lastSeenDate ? (Date.now() - new Date(lastSeenDate).getTime()) / (1000 * 60 * 60) : Infinity;
+                  const statusColor = lastSeenDiffHrs < 1 ? "bg-emerald-400" : lastSeenDiffHrs < 24 ? "bg-amber-400" : "bg-red-400";
 
                   return (
                     <div key={emp.id} className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-3.5 space-y-2">
@@ -1967,12 +1977,21 @@ export default function SecretaryPage() {
 
                       <div className="space-y-1 text-[10px]">
                         <div className="flex items-center gap-1.5">
-                          <LogIn className="w-3 h-3 text-violet-400" />
-                          <span className="text-muted-foreground">آخر دخول:</span>
-                          <span className={`font-medium ${hasLogin ? "text-foreground" : "text-red-400"}`}>
-                            {hasLogin ? formatTimeAgo(lastLogin.login_at) : "لم يسجل دخول"}
+                          <Clock className="w-3 h-3 text-emerald-400" />
+                          <span className="text-muted-foreground">آخر نشاط:</span>
+                          <span className={`font-medium ${lastSeenDate ? "text-foreground" : "text-red-400"}`}>
+                            {lastSeenDate ? formatTimeAgo(lastSeenDate) : "لا يوجد نشاط"}
                           </span>
                         </div>
+                        {lastLogin && (
+                          <div className="flex items-center gap-1.5">
+                            <LogIn className="w-3 h-3 text-violet-400" />
+                            <span className="text-muted-foreground">آخر دخول:</span>
+                            <span className="font-medium text-foreground">
+                              {formatTimeAgo(lastLogin.login_at)}
+                            </span>
+                          </div>
+                        )}
                         <div className="flex items-center gap-1.5">
                           <Activity className="w-3 h-3 text-amber-400" />
                           <span className="text-muted-foreground">آخر إجراء:</span>
@@ -2032,10 +2051,10 @@ export default function SecretaryPage() {
                 </div>
               )}
 
-              {loginLogs.length === 0 && (
+              {loginLogs.length === 0 && activityLogs.length === 0 && (
                 <div className="text-center py-6">
                   <LogIn className="w-8 h-8 text-muted-foreground/20 mx-auto mb-2" />
-                  <p className="text-xs text-muted-foreground">لا توجد سجلات دخول</p>
+                  <p className="text-xs text-muted-foreground">لا توجد سجلات</p>
                 </div>
               )}
             </div>
