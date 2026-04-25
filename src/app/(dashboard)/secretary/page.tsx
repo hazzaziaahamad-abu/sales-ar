@@ -8,9 +8,10 @@ import {
   AlertTriangle, ChevronDown, ChevronUp, RefreshCw, Loader2,
   Users, Banknote, BarChart3, Phone, ArrowLeft, ArrowRight,
   MessageCircle, Bell, ExternalLink, Zap, CloudSun, Thermometer,
-  Headphones, UserX, Timer, Share2,
+  Headphones, UserX, Timer, Share2, LogIn, Smartphone, Monitor, Activity,
 } from "lucide-react";
-import { fetchDeals, fetchRenewals, fetchEmployees, fetchRecentFollowUpNotes, upsertSalesGuideSetting, fetchSalesGuideSettings, fetchTickets } from "@/lib/supabase/db";
+import { fetchDeals, fetchRenewals, fetchEmployees, fetchRecentFollowUpNotes, upsertSalesGuideSetting, fetchSalesGuideSettings, fetchTickets, fetchUserLoginLogs, fetchActivityLogs, type UserLoginLog } from "@/lib/supabase/db";
+import type { ActivityLog } from "@/types";
 import { useAuth } from "@/lib/auth-context";
 import { formatMoneyFull } from "@/lib/utils/format";
 import { Button } from "@/components/ui/button";
@@ -57,6 +58,40 @@ function getGreeting() {
   if (h < 12) return "صباح الخير";
   if (h < 17) return "مساء الخير";
   return "مساء النور";
+}
+
+function toLocalDateStr(dateStr: string): string {
+  const d = new Date(dateStr);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function isToday(dateStr: string): boolean {
+  return toLocalDateStr(dateStr) === toLocalDateStr(new Date().toISOString());
+}
+
+function formatTimeAgo(dateStr: string): string {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  if (diffMins < 1) return "الآن";
+  if (diffMins < 60) return `منذ ${diffMins} دقيقة`;
+  if (diffHours < 24) return `منذ ${diffHours} ساعة`;
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffDays === 1) return "أمس";
+  if (diffDays < 7) return `منذ ${diffDays} أيام`;
+  return d.toLocaleDateString("ar-SA-u-ca-gregory", { month: "short", day: "numeric" });
+}
+
+function formatDateGroupSec(dateStr: string): string {
+  if (isToday(dateStr)) return "اليوم";
+  const d = new Date(dateStr);
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (d.getFullYear() === yesterday.getFullYear() && d.getMonth() === yesterday.getMonth() && d.getDate() === yesterday.getDate()) return "أمس";
+  return d.toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "long", month: "short", day: "numeric" });
 }
 
 /* ─── Deal Temperature Scoring ─── */
@@ -450,6 +485,8 @@ export default function SecretaryPage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [recentNotes, setRecentNotes] = useState<{ entity_id: string; note: string; author_name: string; created_at: string; entity_name?: string; entity_type: string }[]>([]);
+  const [loginLogs, setLoginLogs] = useState<UserLoginLog[]>([]);
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [aiAnalysis, setAiAnalysis] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
@@ -458,7 +495,7 @@ export default function SecretaryPage() {
   const [selectedPeriod, setSelectedPeriod] = useState<"today" | "yesterday" | "week" | "month">("today");
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     briefing: true, meetings: true, hotCold: true, supportHealth: true, renewalHealth: true, priorities: true,
-    goal90: true, quickTasks: true, tasks: true,
+    goal90: true, quickTasks: true, tasks: true, attendance: true,
   });
 
   const todayKey = new Date().toISOString().slice(0, 10);
@@ -504,9 +541,9 @@ export default function SecretaryPage() {
   // Load data
   useEffect(() => {
     setLoading(true);
-    Promise.all([fetchDeals(), fetchRenewals(), fetchEmployees(), fetchRecentFollowUpNotes(50), fetchSalesGuideSettings(), fetchTickets()])
-      .then(([d, r, e, n, settings, t]) => {
-        setDeals(d); setRenewals(r); setEmployees(e); setRecentNotes(n); setTickets(t);
+    Promise.all([fetchDeals(), fetchRenewals(), fetchEmployees(), fetchRecentFollowUpNotes(50), fetchSalesGuideSettings(), fetchTickets(), fetchUserLoginLogs(500), fetchActivityLogs({ limit: 200 })])
+      .then(([d, r, e, n, settings, t, ll, al]) => {
+        setDeals(d); setRenewals(r); setEmployees(e); setRecentNotes(n); setTickets(t); setLoginLogs(ll); setActivityLogs(al);
         // Restore secretary tasks/meetings/quickTasks from database
         const loadSetting = (key: string) => {
           const row = settings.find((s: { setting_key: string }) => s.setting_key === key);
@@ -1846,6 +1883,164 @@ export default function SecretaryPage() {
             </div>
           )}
         </div>
+      </Section>
+
+      {/* ─── 9. Employee Attendance ─── */}
+      <Section
+        id="attendance"
+        title="سجل الموظفين"
+        icon={<LogIn className="w-5 h-5 text-violet-400" />}
+        badge={loginLogs.length > 0 ? <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-400">{loginLogs.filter(l => isToday(l.login_at)).length} اليوم</span> : undefined}
+        isOpen={expandedSections.attendance !== false} onToggle={toggleSection}
+      >
+        {(() => {
+          const activeEmps = employees.filter(e => e.status === "نشط");
+          const empSummary = activeEmps.map(emp => {
+            const lastLogin = loginLogs.find(l => l.user_name === emp.name);
+            const lastAction = activityLogs.find(l => l.user_name === emp.name);
+            return { emp, lastLogin, lastAction };
+          }).sort((a, b) => {
+            const aTime = a.lastLogin?.login_at || "0";
+            const bTime = b.lastLogin?.login_at || "0";
+            return bTime.localeCompare(aTime);
+          });
+
+          const todayLogins = loginLogs.filter(l => isToday(l.login_at));
+
+          const loginGroups: { date: string; logins: UserLoginLog[] }[] = [];
+          const loginMap = new Map<string, UserLoginLog[]>();
+          for (const l of loginLogs.slice(0, 200)) {
+            const key = toLocalDateStr(l.login_at);
+            if (!loginMap.has(key)) loginMap.set(key, []);
+            loginMap.get(key)!.push(l);
+          }
+          for (const [date, logins] of loginMap) {
+            loginGroups.push({ date, logins });
+          }
+
+          const isMobile = (ua?: string) => ua && /mobile|android|iphone/i.test(ua);
+
+          return (
+            <div className="space-y-4">
+              {/* Summary Stats */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="rounded-lg bg-violet-500/[0.06] border border-violet-500/15 p-3 text-center">
+                  <p className="text-xl font-bold text-foreground">{todayLogins.length}</p>
+                  <p className="text-[10px] text-muted-foreground">دخول اليوم</p>
+                </div>
+                <div className="rounded-lg bg-emerald-500/[0.06] border border-emerald-500/15 p-3 text-center">
+                  <p className="text-xl font-bold text-emerald-400">{empSummary.filter(e => e.lastLogin && (Date.now() - new Date(e.lastLogin.login_at).getTime()) < 24 * 60 * 60 * 1000).length}</p>
+                  <p className="text-[10px] text-muted-foreground">نشط آخر 24 ساعة</p>
+                </div>
+                <div className="rounded-lg bg-red-500/[0.06] border border-red-500/15 p-3 text-center">
+                  <p className="text-xl font-bold text-red-400">{empSummary.filter(e => !e.lastLogin || (Date.now() - new Date(e.lastLogin.login_at).getTime()) >= 24 * 60 * 60 * 1000).length}</p>
+                  <p className="text-[10px] text-muted-foreground">غير نشط</p>
+                </div>
+              </div>
+
+              {/* Employee Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                {empSummary.map(({ emp, lastLogin, lastAction }) => {
+                  const hasLogin = !!lastLogin;
+                  const loginDiff = hasLogin ? (Date.now() - new Date(lastLogin.login_at).getTime()) / (1000 * 60 * 60) : Infinity;
+                  const statusColor = loginDiff < 1 ? "bg-emerald-400" : loginDiff < 24 ? "bg-amber-400" : "bg-red-400";
+
+                  return (
+                    <div key={emp.id} className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-3.5 space-y-2">
+                      <div className="flex items-center gap-3">
+                        <div className="relative">
+                          <div className="w-10 h-10 rounded-full bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400 font-bold text-sm">
+                            {emp.name.charAt(0)}
+                          </div>
+                          <span className={`absolute -bottom-0.5 -left-0.5 w-3 h-3 rounded-full border-2 border-background ${statusColor}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-foreground truncate">{emp.name}</p>
+                          {emp.role && <p className="text-[10px] text-muted-foreground">{emp.role}</p>}
+                        </div>
+                        {lastLogin && isMobile(lastLogin.user_agent) ? (
+                          <Smartphone className="w-3.5 h-3.5 text-muted-foreground/50" />
+                        ) : lastLogin ? (
+                          <Monitor className="w-3.5 h-3.5 text-muted-foreground/50" />
+                        ) : null}
+                      </div>
+
+                      <div className="space-y-1 text-[10px]">
+                        <div className="flex items-center gap-1.5">
+                          <LogIn className="w-3 h-3 text-violet-400" />
+                          <span className="text-muted-foreground">آخر دخول:</span>
+                          <span className={`font-medium ${hasLogin ? "text-foreground" : "text-red-400"}`}>
+                            {hasLogin ? formatTimeAgo(lastLogin.login_at) : "لم يسجل دخول"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Activity className="w-3 h-3 text-amber-400" />
+                          <span className="text-muted-foreground">آخر إجراء:</span>
+                          {lastAction ? (
+                            <span className="text-foreground font-medium truncate">
+                              {lastAction.section_label} — {lastAction.entity_title || lastAction.details?.slice(0, 30)}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground/50">لا يوجد</span>
+                          )}
+                        </div>
+                        {lastAction && (
+                          <div className="flex items-center gap-1.5">
+                            <Clock className="w-3 h-3 text-muted-foreground/50" />
+                            <span className="text-muted-foreground">{formatTimeAgo(lastAction.created_at)}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Login Timeline */}
+              {loginGroups.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold text-foreground flex items-center gap-2">
+                    <LogIn className="w-3.5 h-3.5 text-violet-400" />
+                    سجل الدخول
+                  </h4>
+                  {loginGroups.map(({ date, logins }) => (
+                    <div key={date} className="space-y-1.5">
+                      <p className="text-[11px] font-bold text-muted-foreground">{formatDateGroupSec(date)}</p>
+                      {logins.map(l => (
+                        <div key={l.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/20 transition-colors">
+                          <div className="w-2 h-2 rounded-full bg-violet-400 shrink-0" />
+                          <div className="w-7 h-7 rounded-full bg-violet-500/10 border border-violet-500/15 flex items-center justify-center text-violet-400 text-[10px] font-bold shrink-0">
+                            {l.user_name.charAt(0)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-foreground">{l.user_name}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              {isMobile(l.user_agent) ? (
+                                <span className="text-[9px] text-muted-foreground flex items-center gap-0.5"><Smartphone className="w-2.5 h-2.5" /> جوال</span>
+                              ) : (
+                                <span className="text-[9px] text-muted-foreground flex items-center gap-0.5"><Monitor className="w-2.5 h-2.5" /> كمبيوتر</span>
+                              )}
+                            </div>
+                          </div>
+                          <span className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0">
+                            {formatTimeAgo(l.login_at)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {loginLogs.length === 0 && (
+                <div className="text-center py-6">
+                  <LogIn className="w-8 h-8 text-muted-foreground/20 mx-auto mb-2" />
+                  <p className="text-xs text-muted-foreground">لا توجد سجلات دخول</p>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </Section>
 
       {/* ─── 7. AI Analysis Result ─── */}
