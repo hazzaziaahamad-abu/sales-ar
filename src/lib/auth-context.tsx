@@ -71,6 +71,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setUser(authUserData);
 
+    // Log login (once per session)
+    const loginKey = `login_logged_${authUser.id}_${new Date().toISOString().slice(0, 10)}`;
+    if (!sessionStorage.getItem(loginKey)) {
+      sessionStorage.setItem(loginKey, "1");
+      supabase.from("user_login_logs").insert({
+        org_id: profile.org_id,
+        user_id: authUser.id,
+        user_name: profile.name,
+        user_agent: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 200) : null,
+      }).then(() => {});
+    }
+
     // Set org_id in localStorage for db.ts compatibility
     const orgId = localStorage.getItem("cc_org_id") || profile.org_id;
     // Non-super-admin always uses their own org

@@ -43,6 +43,29 @@ export async function logActivity(entry: {
   }
 }
 
+// ─── USER LOGIN LOGS ────────────────────────────────────────────────────────
+
+export interface UserLoginLog {
+  id: string;
+  org_id: string;
+  user_id: string;
+  user_name: string;
+  login_at: string;
+  user_agent?: string;
+}
+
+export async function fetchUserLoginLogs(limit = 200): Promise<UserLoginLog[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("user_login_logs")
+    .select("*")
+    .eq("org_id", getOrgId())
+    .order("login_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []) as UserLoginLog[];
+}
+
 export async function fetchActivityLogs(options?: {
   section?: string;
   limit?: number;

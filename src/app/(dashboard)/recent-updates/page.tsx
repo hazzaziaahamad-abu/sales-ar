@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useMemo } from "react";
-import { fetchRecentUpdates, fetchActivityLogs, fetchTrainingSessionLogs, fetchEmployees, type RecentUpdateItem } from "@/lib/supabase/db";
+import { fetchRecentUpdates, fetchActivityLogs, fetchTrainingSessionLogs, fetchEmployees, fetchUserLoginLogs, type RecentUpdateItem, type UserLoginLog } from "@/lib/supabase/db";
 import type { ActivityLog, TrainingSessionLog, Employee } from "@/types";
 import { useAuth } from "@/lib/auth-context";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -34,6 +34,9 @@ import {
   CheckCircle,
   PlayCircle,
   UserX,
+  LogIn,
+  Smartphone,
+  Monitor,
 } from "lucide-react";
 
 const SECTION_ICONS: Record<string, typeof TrendingUp> = {
@@ -82,7 +85,7 @@ const SECTION_COLORS: Record<string, string> = {
 };
 
 type FilterMode = "all" | "today" | "week";
-type TabMode = "updates" | "log" | "academy";
+type TabMode = "updates" | "log" | "academy" | "attendance";
 
 function toLocalDateStr(dateStr: string): string {
   const d = new Date(dateStr);
@@ -163,6 +166,7 @@ export default function RecentUpdatesPage() {
   const [items, setItems] = useState<RecentUpdateItem[]>([]);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [trainingSessions, setTrainingSessions] = useState<TrainingSessionLog[]>([]);
+  const [loginLogs, setLoginLogs] = useState<UserLoginLog[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -182,17 +186,19 @@ export default function RecentUpdatesPage() {
       setError(null);
 
       try {
-        const [updatesData, logsData, trainingData, empsData] = await Promise.allSettled([
+        const [updatesData, logsData, trainingData, empsData, loginData] = await Promise.allSettled([
           fetchRecentUpdates(),
           fetchActivityLogs({ limit: 200 }),
           fetchTrainingSessionLogs(200),
           fetchEmployees(),
+          fetchUserLoginLogs(500),
         ]);
 
         if (updatesData.status === "fulfilled") setItems(updatesData.value);
         if (logsData.status === "fulfilled") setLogs(logsData.value);
         if (trainingData.status === "fulfilled") setTrainingSessions(trainingData.value);
         if (empsData.status === "fulfilled") setEmployees(empsData.value.filter(e => e.status === "نشط"));
+        if (loginData.status === "fulfilled") setLoginLogs(loginData.value);
 
         setLastUpdatedAt(new Date().toISOString());
       } catch {
@@ -394,6 +400,20 @@ export default function RecentUpdatesPage() {
           سجل الأكاديمية
           {trainingSessions.length > 0 && (
             <span className="text-[10px] bg-white/[0.06] rounded-full px-2 py-0.5">{trainingSessions.length}</span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab("attendance")}
+          className={`flex items-center gap-2 rounded-[14px] px-5 py-3 text-sm font-bold transition-all ${
+            activeTab === "attendance"
+              ? "bg-violet-500/10 text-violet-400 border border-violet-500/20"
+              : "glass-surface text-muted-foreground hover:text-foreground border border-transparent"
+          }`}
+        >
+          <LogIn className="w-4 h-4" />
+          سجل الموظفين
+          {loginLogs.length > 0 && (
+            <span className="text-[10px] bg-white/[0.06] rounded-full px-2 py-0.5">{loginLogs.length}</span>
           )}
         </button>
       </div>
@@ -905,6 +925,151 @@ export default function RecentUpdatesPage() {
                   </div>
                 </div>
               ))
+            )}
+          </>
+        );
+      })()}
+
+      {/* ─── Tab 4: Employee Attendance ─── */}
+      {activeTab === "attendance" && (() => {
+        const filteredLogins = filter === "today"
+          ? loginLogs.filter(l => isToday(l.login_at))
+          : filter === "week"
+            ? loginLogs.filter(l => isThisWeek(l.login_at))
+            : loginLogs;
+
+        // Build employee summary: last login + last action
+        const empSummary = employees.map(emp => {
+          const lastLogin = loginLogs.find(l => l.user_name === emp.name);
+          const lastAction = logs.find(l =>
+            l.user_name === emp.name ||
+            l.entity_title?.includes(emp.name) ||
+            l.details?.includes(emp.name)
+          );
+          return { emp, lastLogin, lastAction };
+        }).sort((a, b) => {
+          const aTime = a.lastLogin?.login_at || "0";
+          const bTime = b.lastLogin?.login_at || "0";
+          return bTime.localeCompare(aTime);
+        });
+
+        // Group logins by date
+        const loginGroups: { date: string; logins: UserLoginLog[] }[] = [];
+        const loginMap = new Map<string, UserLoginLog[]>();
+        for (const l of filteredLogins) {
+          const key = toLocalDateStr(l.login_at);
+          if (!loginMap.has(key)) loginMap.set(key, []);
+          loginMap.get(key)!.push(l);
+        }
+        for (const [date, logins] of loginMap) {
+          loginGroups.push({ date, logins });
+        }
+
+        const isMobile = (ua?: string) => ua && /mobile|android|iphone/i.test(ua);
+
+        return (
+          <>
+            {/* Employee Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+              {empSummary.map(({ emp, lastLogin, lastAction }) => {
+                const hasLogin = !!lastLogin;
+                const loginDiff = hasLogin ? (Date.now() - new Date(lastLogin.login_at).getTime()) / (1000 * 60 * 60) : Infinity;
+                const statusColor = loginDiff < 1 ? "bg-emerald-400" : loginDiff < 24 ? "bg-amber-400" : "bg-red-400";
+
+                return (
+                  <div key={emp.id} className="cc-card rounded-xl p-3.5 space-y-2">
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <div className="w-10 h-10 rounded-full bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400 font-bold text-sm">
+                          {emp.name.charAt(0)}
+                        </div>
+                        <span className={`absolute -bottom-0.5 -left-0.5 w-3 h-3 rounded-full border-2 border-background ${statusColor}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-foreground truncate">{emp.name}</p>
+                        {emp.role && <p className="text-[10px] text-muted-foreground">{emp.role}</p>}
+                      </div>
+                      {lastLogin && isMobile(lastLogin.user_agent) ? (
+                        <Smartphone className="w-3.5 h-3.5 text-muted-foreground/50" />
+                      ) : lastLogin ? (
+                        <Monitor className="w-3.5 h-3.5 text-muted-foreground/50" />
+                      ) : null}
+                    </div>
+
+                    <div className="space-y-1 text-[10px]">
+                      <div className="flex items-center gap-1.5">
+                        <LogIn className="w-3 h-3 text-violet-400" />
+                        <span className="text-muted-foreground">آخر دخول:</span>
+                        <span className={`font-medium ${hasLogin ? "text-foreground" : "text-red-400"}`}>
+                          {hasLogin ? formatTime(lastLogin.login_at) : "لم يسجل دخول"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Activity className="w-3 h-3 text-amber-400" />
+                        <span className="text-muted-foreground">آخر إجراء:</span>
+                        {lastAction ? (
+                          <span className="text-foreground font-medium truncate">
+                            {lastAction.section_label} — {lastAction.entity_title || lastAction.details?.slice(0, 30) || ACTION_CONFIG[lastAction.action]?.label}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground/50">لا يوجد</span>
+                        )}
+                      </div>
+                      {lastAction && (
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="w-3 h-3 text-muted-foreground/50" />
+                          <span className="text-muted-foreground">{formatTime(lastAction.created_at)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Login Timeline */}
+            {loginGroups.length > 0 && (
+              <div className="space-y-4 mt-4">
+                <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                  <LogIn className="w-4 h-4 text-violet-400" />
+                  سجل الدخول
+                </h3>
+                {loginGroups.map(({ date, logins }) => (
+                  <div key={date} className="space-y-1.5">
+                    <p className="text-xs font-bold text-muted-foreground sticky top-0 bg-background/80 backdrop-blur-sm py-1 z-10">
+                      {formatDateGroup(date)}
+                    </p>
+                    {logins.map(l => (
+                      <div key={l.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/20 transition-colors">
+                        <div className="w-2 h-2 rounded-full bg-violet-400 shrink-0" />
+                        <div className="w-8 h-8 rounded-full bg-violet-500/10 border border-violet-500/15 flex items-center justify-center text-violet-400 text-xs font-bold shrink-0">
+                          {l.user_name.charAt(0)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-foreground">{l.user_name}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {isMobile(l.user_agent) ? (
+                              <span className="text-[9px] text-muted-foreground flex items-center gap-0.5"><Smartphone className="w-2.5 h-2.5" /> جوال</span>
+                            ) : (
+                              <span className="text-[9px] text-muted-foreground flex items-center gap-0.5"><Monitor className="w-2.5 h-2.5" /> كمبيوتر</span>
+                            )}
+                          </div>
+                        </div>
+                        <span className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0">
+                          {formatTime(l.login_at)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {filteredLogins.length === 0 && !isLoading && (
+              <div className="text-center py-12">
+                <LogIn className="w-10 h-10 text-muted-foreground/20 mx-auto mb-3" />
+                <p className="text-sm text-muted-foreground">لا توجد سجلات دخول في هذه الفترة</p>
+              </div>
             )}
           </>
         );
