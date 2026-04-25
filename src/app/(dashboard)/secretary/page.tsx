@@ -1931,6 +1931,17 @@ export default function SecretaryPage() {
 
           const isMobile = (ua?: string) => ua && /mobile|android|iphone/i.test(ua);
 
+          // Most active employee by action count
+          const actionCounts = new Map<string, number>();
+          for (const l of activityLogs) {
+            if (l.user_name) actionCounts.set(l.user_name, (actionCounts.get(l.user_name) || 0) + 1);
+          }
+          const empActionRanking = activeEmps
+            .map(emp => ({ name: emp.name, role: emp.role, count: actionCounts.get(emp.name) || 0 }))
+            .filter(e => e.count > 0)
+            .sort((a, b) => b.count - a.count);
+          const mostActive = empActionRanking[0];
+
           return (
             <div className="space-y-4">
               {/* Summary Stats */}
@@ -1948,6 +1959,37 @@ export default function SecretaryPage() {
                   <p className="text-[10px] text-muted-foreground">غير نشط</p>
                 </div>
               </div>
+
+              {/* Most Active Employee */}
+              {mostActive && (
+                <div className="rounded-xl bg-gradient-to-l from-amber-500/[0.08] to-emerald-500/[0.06] border border-amber-500/20 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-full bg-amber-500/15 border border-amber-500/25 flex items-center justify-center text-lg">
+                      🏆
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] text-amber-400 font-bold">الأكثر نشاطاً</p>
+                      <p className="text-sm font-bold text-foreground">{mostActive.name}</p>
+                      {mostActive.role && <p className="text-[10px] text-muted-foreground">{mostActive.role}</p>}
+                    </div>
+                    <div className="text-left shrink-0">
+                      <p className="text-xl font-bold text-amber-400">{mostActive.count}</p>
+                      <p className="text-[9px] text-muted-foreground">إجراء</p>
+                    </div>
+                  </div>
+                  {empActionRanking.length > 1 && (
+                    <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-white/[0.06]">
+                      {empActionRanking.slice(1, 4).map((e, i) => (
+                        <div key={e.name} className="flex items-center gap-1.5 bg-white/[0.04] rounded-lg px-2.5 py-1.5 border border-white/[0.06]">
+                          <span className="text-[10px] text-muted-foreground">{i + 2}.</span>
+                          <span className="text-[11px] font-bold text-foreground">{e.name}</span>
+                          <span className="text-[10px] text-muted-foreground">{e.count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Employee Summary Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
