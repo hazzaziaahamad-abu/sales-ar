@@ -1891,9 +1891,10 @@ export default function SecretaryPage() {
         title="سجل الموظفين"
         icon={<LogIn className="w-5 h-5 text-violet-400" />}
         badge={(() => {
+          const mn = (a: string | undefined, b: string) => { if (!a) return false; const x = a.trim(), y = b.trim(); return x === y || x.includes(y) || y.includes(x); };
           const activeCount = employees.filter(e => e.status === "نشط").filter(emp => {
-            const lastAction = activityLogs.find(l => l.user_name === emp.name);
-            const lastLogin = loginLogs.find(l => l.user_name === emp.name);
+            const lastAction = activityLogs.find(l => mn(l.user_name, emp.name));
+            const lastLogin = loginLogs.find(l => mn(l.user_name, emp.name));
             const lastSeen = [lastAction?.created_at, lastLogin?.login_at].filter(Boolean).sort().pop();
             return lastSeen && (Date.now() - new Date(lastSeen).getTime()) < 24 * 60 * 60 * 1000;
           }).length;
@@ -1903,11 +1904,20 @@ export default function SecretaryPage() {
       >
         {(() => {
           const activeEmps = employees.filter(e => e.status === "نشط");
+
+          const matchName = (logName: string | undefined, empName: string) => {
+            if (!logName) return false;
+            const a = logName.trim();
+            const b = empName.trim();
+            return a === b || a.includes(b) || b.includes(a);
+          };
+
           const empSummary = activeEmps.map(emp => {
-            const lastLogin = loginLogs.find(l => l.user_name === emp.name);
-            const lastAction = activityLogs.find(l => l.user_name === emp.name);
+            const lastLogin = loginLogs.find(l => matchName(l.user_name, emp.name));
+            const lastAction = activityLogs.find(l => matchName(l.user_name, emp.name));
+            const actionCount = activityLogs.filter(l => matchName(l.user_name, emp.name)).length;
             const lastSeenDate = [lastAction?.created_at, lastLogin?.login_at].filter(Boolean).sort().pop();
-            return { emp, lastLogin, lastAction, lastSeenDate };
+            return { emp, lastLogin, lastAction, lastSeenDate, actionCount };
           }).sort((a, b) => {
             const aTime = a.lastSeenDate || "0";
             const bTime = b.lastSeenDate || "0";
@@ -1932,12 +1942,8 @@ export default function SecretaryPage() {
           const isMobile = (ua?: string) => ua && /mobile|android|iphone/i.test(ua);
 
           // Most active employee by action count
-          const actionCounts = new Map<string, number>();
-          for (const l of activityLogs) {
-            if (l.user_name) actionCounts.set(l.user_name, (actionCounts.get(l.user_name) || 0) + 1);
-          }
-          const empActionRanking = activeEmps
-            .map(emp => ({ name: emp.name, role: emp.role, count: actionCounts.get(emp.name) || 0 }))
+          const empActionRanking = empSummary
+            .map(e => ({ name: e.emp.name, role: e.emp.role, count: e.actionCount }))
             .filter(e => e.count > 0)
             .sort((a, b) => b.count - a.count);
           const mostActive = empActionRanking[0];
