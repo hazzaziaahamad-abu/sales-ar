@@ -84,13 +84,38 @@ function formatTimeAgo(dateStr: string): string {
   return d.toLocaleDateString("ar-SA-u-ca-gregory", { month: "short", day: "numeric" });
 }
 
-function formatDateGroupSec(dateStr: string): string {
-  if (isToday(dateStr)) return "اليوم";
-  const d = new Date(dateStr);
+function isYesterday(dateStr: string): boolean {
   const now = new Date();
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
-  if (d.getFullYear() === yesterday.getFullYear() && d.getMonth() === yesterday.getMonth() && d.getDate() === yesterday.getDate()) return "أمس";
+  return toLocalDateStr(dateStr) === toLocalDateStr(yesterday.toISOString());
+}
+
+function isThisWeek(dateStr: string): boolean {
+  const now = new Date();
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - now.getDay());
+  startOfWeek.setHours(0, 0, 0, 0);
+  return new Date(dateStr) >= startOfWeek;
+}
+
+function isThisMonth(dateStr: string): boolean {
+  const now = new Date();
+  const d = new Date(dateStr);
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+}
+
+function matchPeriod(dateStr: string, period: "today" | "yesterday" | "week" | "month"): boolean {
+  if (period === "today") return isToday(dateStr);
+  if (period === "yesterday") return isYesterday(dateStr);
+  if (period === "week") return isThisWeek(dateStr);
+  return isThisMonth(dateStr);
+}
+
+function formatDateGroupSec(dateStr: string): string {
+  if (isToday(dateStr)) return "اليوم";
+  if (isYesterday(dateStr)) return "أمس";
+  const d = new Date(dateStr);
   return d.toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "long", month: "short", day: "numeric" });
 }
 
@@ -493,6 +518,7 @@ export default function SecretaryPage() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedPeriod, setSelectedPeriod] = useState<"today" | "yesterday" | "week" | "month">("today");
+  const [attendancePeriod, setAttendancePeriod] = useState<"today" | "yesterday" | "week" | "month">("today");
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     briefing: true, meetings: true, hotCold: true, supportHealth: true, renewalHealth: true, priorities: true,
     goal90: true, quickTasks: true, tasks: true, attendance: true,
@@ -1892,11 +1918,12 @@ export default function SecretaryPage() {
         icon={<LogIn className="w-5 h-5 text-violet-400" />}
         badge={(() => {
           const mn = (a: string | undefined, b: string) => { if (!a) return false; const x = a.trim(), y = b.trim(); return x === y || x.includes(y) || y.includes(x); };
+          const pLogs = activityLogs.filter(l => matchPeriod(l.created_at, attendancePeriod));
+          const pLogins = loginLogs.filter(l => matchPeriod(l.login_at, attendancePeriod));
           const activeCount = employees.filter(e => e.status === "نشط").filter(emp => {
-            const lastAction = activityLogs.find(l => mn(l.user_name, emp.name));
-            const lastLogin = loginLogs.find(l => mn(l.user_name, emp.name));
-            const lastSeen = [lastAction?.created_at, lastLogin?.login_at].filter(Boolean).sort().pop();
-            return lastSeen && (Date.now() - new Date(lastSeen).getTime()) < 24 * 60 * 60 * 1000;
+            const hasAction = pLogs.some(l => mn(l.user_name, emp.name));
+            const hasLogin = pLogins.some(l => mn(l.user_name, emp.name));
+            return hasAction || hasLogin;
           }).length;
           return activeCount > 0 ? <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-400">{activeCount} نشط</span> : undefined;
         })()}
@@ -1912,10 +1939,13 @@ export default function SecretaryPage() {
             return a === b || a.includes(b) || b.includes(a);
           };
 
+          const periodLogs = activityLogs.filter(l => matchPeriod(l.created_at, attendancePeriod));
+          const periodLogins = loginLogs.filter(l => matchPeriod(l.login_at, attendancePeriod));
+
           const empSummary = activeEmps.map(emp => {
-            const lastLogin = loginLogs.find(l => matchName(l.user_name, emp.name));
-            const lastAction = activityLogs.find(l => matchName(l.user_name, emp.name));
-            const actionCount = activityLogs.filter(l => matchName(l.user_name, emp.name)).length;
+            const lastLogin = periodLogins.find(l => matchName(l.user_name, emp.name));
+            const lastAction = periodLogs.find(l => matchName(l.user_name, emp.name));
+            const actionCount = periodLogs.filter(l => matchName(l.user_name, emp.name)).length;
             const lastSeenDate = [lastAction?.created_at, lastLogin?.login_at].filter(Boolean).sort().pop();
             return { emp, lastLogin, lastAction, lastSeenDate, actionCount };
           }).sort((a, b) => {
@@ -1924,13 +1954,13 @@ export default function SecretaryPage() {
             return bTime.localeCompare(aTime);
           });
 
-          const todayActive = empSummary.filter(e => e.lastSeenDate && isToday(e.lastSeenDate)).length;
-          const last24h = empSummary.filter(e => e.lastSeenDate && (Date.now() - new Date(e.lastSeenDate).getTime()) < 24 * 60 * 60 * 1000).length;
-          const inactive = empSummary.length - last24h;
+          const activeInPeriod = empSummary.filter(e => e.lastSeenDate).length;
+          const withActions = empSummary.filter(e => e.actionCount > 0).length;
+          const inactive = empSummary.length - activeInPeriod;
 
           const loginGroups: { date: string; logins: UserLoginLog[] }[] = [];
           const loginMap = new Map<string, UserLoginLog[]>();
-          for (const l of loginLogs.slice(0, 200)) {
+          for (const l of periodLogins.slice(0, 200)) {
             const key = toLocalDateStr(l.login_at);
             if (!loginMap.has(key)) loginMap.set(key, []);
             loginMap.get(key)!.push(l);
@@ -1941,24 +1971,43 @@ export default function SecretaryPage() {
 
           const isMobile = (ua?: string) => ua && /mobile|android|iphone/i.test(ua);
 
-          // Most active employee by action count
+          // Most active employee by period action count
           const empActionRanking = empSummary
             .map(e => ({ name: e.emp.name, role: e.emp.role, count: e.actionCount }))
             .filter(e => e.count > 0)
             .sort((a, b) => b.count - a.count);
           const mostActive = empActionRanking[0];
 
+          const periodLabels = { today: "اليوم", yesterday: "أمس", week: "الأسبوع", month: "الشهر" } as const;
+
           return (
             <div className="space-y-4">
+              {/* Period Filter */}
+              <div className="flex flex-wrap gap-2">
+                {(["today", "yesterday", "week", "month"] as const).map(p => (
+                  <button
+                    key={p}
+                    onClick={() => setAttendancePeriod(p)}
+                    className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition-all ${
+                      attendancePeriod === p
+                        ? "bg-violet-500/15 text-violet-400 border border-violet-500/25"
+                        : "bg-white/[0.04] text-muted-foreground hover:text-foreground border border-white/[0.06]"
+                    }`}
+                  >
+                    {periodLabels[p]}
+                  </button>
+                ))}
+              </div>
+
               {/* Summary Stats */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="rounded-lg bg-violet-500/[0.06] border border-violet-500/15 p-3 text-center">
-                  <p className="text-xl font-bold text-foreground">{todayActive}</p>
-                  <p className="text-[10px] text-muted-foreground">نشط اليوم</p>
+                  <p className="text-xl font-bold text-foreground">{activeInPeriod}</p>
+                  <p className="text-[10px] text-muted-foreground">نشط</p>
                 </div>
                 <div className="rounded-lg bg-emerald-500/[0.06] border border-emerald-500/15 p-3 text-center">
-                  <p className="text-xl font-bold text-emerald-400">{last24h}</p>
-                  <p className="text-[10px] text-muted-foreground">نشط آخر 24 ساعة</p>
+                  <p className="text-xl font-bold text-emerald-400">{withActions}</p>
+                  <p className="text-[10px] text-muted-foreground">سوّى إجراءات</p>
                 </div>
                 <div className="rounded-lg bg-red-500/[0.06] border border-red-500/15 p-3 text-center">
                   <p className="text-xl font-bold text-red-400">{inactive}</p>
@@ -1974,7 +2023,7 @@ export default function SecretaryPage() {
                       🏆
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[10px] text-amber-400 font-bold">الأكثر نشاطاً</p>
+                      <p className="text-[10px] text-amber-400 font-bold">الأكثر نشاطاً — {periodLabels[attendancePeriod]}</p>
                       <p className="text-sm font-bold text-foreground">{mostActive.name}</p>
                       {mostActive.role && <p className="text-[10px] text-muted-foreground">{mostActive.role}</p>}
                     </div>
@@ -1999,9 +2048,8 @@ export default function SecretaryPage() {
 
               {/* Employee Summary Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                {empSummary.map(({ emp, lastLogin, lastAction, lastSeenDate }) => {
-                  const lastSeenDiffHrs = lastSeenDate ? (Date.now() - new Date(lastSeenDate).getTime()) / (1000 * 60 * 60) : Infinity;
-                  const statusColor = lastSeenDiffHrs < 1 ? "bg-emerald-400" : lastSeenDiffHrs < 24 ? "bg-amber-400" : "bg-red-400";
+                {empSummary.map(({ emp, lastLogin, lastAction, lastSeenDate, actionCount }) => {
+                  const statusColor = lastSeenDate ? (actionCount > 0 ? "bg-emerald-400" : "bg-amber-400") : "bg-red-400";
 
                   return (
                     <div key={emp.id} className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-3.5 space-y-2">
