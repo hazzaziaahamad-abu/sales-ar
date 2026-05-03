@@ -310,7 +310,7 @@ function recommendedExperiment(reason?: string): ExperimentKey {
 }
 
 /* ─── TestTube visual ─── */
-function TestTube({
+function TubeViz({
   fill,
   hex,
   size = 64,
@@ -758,7 +758,7 @@ export default function RecoveryLabPage() {
                     {meta.icon}
                     <span>{meta.label}</span>
                   </div>
-                  <TestTube fill={fill} hex={meta.hex} size={56} />
+                  <TubeViz fill={fill} hex={meta.hex} size={56} />
                   <div className="text-center">
                     <div className="text-lg font-extrabold font-mono" style={{ color: meta.hex }}>
                       {count}
