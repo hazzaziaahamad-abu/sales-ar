@@ -1349,7 +1349,7 @@ export default function RecoveryLabPage() {
       e.totalRecovered += 1;
       e.daily.recovered += 1;
       e.totalSaved += opts.renewal.plan_price || 0;
-      e.recentOutcomes = ["recovered", ...e.recentOutcomes].slice(0, 5);
+      e.recentOutcomes = ["recovered" as const, ...e.recentOutcomes].slice(0, 5);
       e.activity.unshift({
         ts: Date.now(),
         type: "recovered",
@@ -1359,9 +1359,9 @@ export default function RecoveryLabPage() {
       });
       renewalRewards.recoverAwarded = true;
     } else if (opts.outcome === "lost") {
-      e.recentOutcomes = ["lost", ...e.recentOutcomes].slice(0, 5);
+      e.recentOutcomes = ["lost" as const, ...e.recentOutcomes].slice(0, 5);
     } else if (opts.outcome === "pending") {
-      e.recentOutcomes = ["pending", ...e.recentOutcomes].slice(0, 5);
+      e.recentOutcomes = ["pending" as const, ...e.recentOutcomes].slice(0, 5);
     }
 
     /* Daily mission completion */
