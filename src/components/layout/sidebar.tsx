@@ -35,6 +35,7 @@ import {
   BrainCircuit,
   Radar,
   ShieldCheck,
+  FlaskConical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
@@ -52,6 +53,7 @@ export const NAV_ITEMS = [
   { label: "الاجتماع الأسبوعي", href: "/weekly", slug: "weekly", icon: ClipboardList, color: "violet" },
   { label: "التجديدات", href: "/renewals", slug: "renewals", icon: RefreshCw, color: "sky" },
   { label: "تحسين التجديدات", href: "/renewal-boost", slug: "renewal-boost", icon: Zap, color: "amber" },
+  { label: "معمل الاستعادة", href: "/recovery-lab", slug: "recovery-lab", icon: FlaskConical, color: "violet" },
   { label: "رضا العملاء", href: "/satisfaction", slug: "satisfaction", icon: Heart, color: "rose" },
   { label: "قائمة الاستهداف", href: "/targeting", slug: "targeting", icon: Target, color: "fuchsia" },
   { label: "بوكس الهدايا", href: "/gifts", slug: "gifts", icon: Gift, color: "amber" },
