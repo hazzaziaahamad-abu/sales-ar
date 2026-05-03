@@ -53,6 +53,13 @@ import {
   Star,
   Wand2,
   ChevronDown,
+  Trophy,
+  Crown,
+  Award,
+  Medal,
+  Zap,
+  Rocket,
+  Shield,
 } from "lucide-react";
 
 const CLOSED_FOREVER_REASONS = new Set([
@@ -388,9 +395,678 @@ function scoreHex(score: number): string {
   return "#EF4444";
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+ * GAMIFICATION ENGINE — XP, Levels, Ranks, Streak, Achievements, Activity
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+const XP_REWARDS = {
+  APPLY: 25,
+  FOLLOWUP: 15,
+  RECOVER_BASE: 250,
+  RECOVER_HOT: 500,
+  RECOVER_LEGENDARY: 750,
+  DAILY_MISSION: 100,
+  STRETCH_GOAL: 50,
+} as const;
+
+const RANKS: { minLevel: number; name: string; hex: string; icon: React.ReactNode }[] = [
+  { minLevel: 1, name: "مبتدئ", hex: "#7da6ff", icon: <Shield className="w-4 h-4" /> },
+  { minLevel: 3, name: "محقق", hex: "#00D4FF", icon: <Microscope className="w-4 h-4" /> },
+  { minLevel: 5, name: "خبير الاستعادة", hex: "#8B5CF6", icon: <FlaskConical className="w-4 h-4" /> },
+  { minLevel: 8, name: "قائد المعمل", hex: "#F59E0B", icon: <Crown className="w-4 h-4" /> },
+  { minLevel: 12, name: "أسطورة الاستعادة", hex: "#EF4444", icon: <Trophy className="w-4 h-4" /> },
+];
+
+function totalXpForLevel(level: number): number {
+  if (level <= 1) return 0;
+  return (250 * (level - 1) * level) / 2;
+}
+
+function levelFromXp(xp: number): number {
+  let lvl = 1;
+  while (totalXpForLevel(lvl + 1) <= xp) lvl++;
+  return lvl;
+}
+
+function rankForLevel(level: number) {
+  let r = RANKS[0];
+  for (const candidate of RANKS) {
+    if (level >= candidate.minLevel) r = candidate;
+  }
+  return r;
+}
+
+function todayStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}-${d.getDate().toString().padStart(2, "0")}`;
+}
+
+function diffDays(a: string, b: string): number {
+  const da = new Date(a + "T00:00:00").getTime();
+  const db = new Date(b + "T00:00:00").getTime();
+  return Math.round((db - da) / (1000 * 60 * 60 * 24));
+}
+
+type Activity = {
+  ts: number;
+  type: "apply" | "followup" | "recovered" | "lost" | "mission" | "achievement" | "streak";
+  text: string;
+  xp: number;
+  hex: string;
+};
+
+type DailyStats = {
+  date: string;
+  applied: number;
+  recovered: number;
+  missionAwarded: boolean;
+  stretchAwarded: boolean;
+};
+
+type EmployeeProgress = {
+  xp: number;
+  totalApplied: number;
+  totalRecovered: number;
+  totalSaved: number;
+  streakDays: number;
+  longestStreak: number;
+  lastActivityDate: string;
+  recentOutcomes: ("recovered" | "lost" | "pending")[];
+  experimentCounts: Record<ExperimentKey, number>;
+  unlockedAchievements: string[];
+  activity: Activity[];
+  daily: DailyStats;
+};
+
+const EMPLOYEE_STORE_KEY = "recovery-lab:employee:v1";
+const LAB_REWARDS_KEY = "recovery-lab:rewards:v1";
+
+function emptyEmployee(): EmployeeProgress {
+  return {
+    xp: 0,
+    totalApplied: 0,
+    totalRecovered: 0,
+    totalSaved: 0,
+    streakDays: 0,
+    longestStreak: 0,
+    lastActivityDate: "",
+    recentOutcomes: [],
+    experimentCounts: {
+      discount: 0,
+      free_month: 0,
+      manager_call: 0,
+      training: 0,
+      gift: 0,
+      feature_demo: 0,
+      payment_plan: 0,
+      exit_interview: 0,
+    },
+    unlockedAchievements: [],
+    activity: [],
+    daily: { date: todayStr(), applied: 0, recovered: 0, missionAwarded: false, stretchAwarded: false },
+  };
+}
+
+function loadEmployee(): EmployeeProgress {
+  if (typeof window === "undefined") return emptyEmployee();
+  try {
+    const raw = localStorage.getItem(EMPLOYEE_STORE_KEY);
+    if (!raw) return emptyEmployee();
+    const parsed = JSON.parse(raw) as EmployeeProgress;
+    return { ...emptyEmployee(), ...parsed, experimentCounts: { ...emptyEmployee().experimentCounts, ...(parsed.experimentCounts || {}) }, daily: parsed.daily || emptyEmployee().daily };
+  } catch {
+    return emptyEmployee();
+  }
+}
+
+function saveEmployee(e: EmployeeProgress) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(EMPLOYEE_STORE_KEY, JSON.stringify(e));
+}
+
+function loadRewardsLog(): Record<string, { applyAwarded?: boolean; recoverAwarded?: boolean }> {
+  if (typeof window === "undefined") return {};
+  try {
+    return JSON.parse(localStorage.getItem(LAB_REWARDS_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function saveRewardsLog(state: Record<string, { applyAwarded?: boolean; recoverAwarded?: boolean }>) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(LAB_REWARDS_KEY, JSON.stringify(state));
+}
+
+/* ─── Daily mission target (scales with level) ─── */
+function dailyMissionTarget(level: number): { mission: number; stretch: number } {
+  if (level <= 2) return { mission: 1, stretch: 3 };
+  if (level <= 5) return { mission: 2, stretch: 5 };
+  if (level <= 9) return { mission: 3, stretch: 7 };
+  return { mission: 4, stretch: 10 };
+}
+
+/* ─── Achievements ─── */
+type Achievement = {
+  id: string;
+  name: string;
+  desc: string;
+  hex: string;
+  icon: React.ReactNode;
+  check: (e: EmployeeProgress) => boolean;
+};
+
+const ACHIEVEMENTS: Achievement[] = [
+  { id: "first_experiment", name: "أول تجربة", desc: "طبّقت أول تجربة في المعمل", hex: "#7da6ff", icon: <FlaskConical className="w-4 h-4" />, check: (e) => e.totalApplied >= 1 },
+  { id: "first_recovery", name: "أول استعادة", desc: "أعدت أول عميل", hex: "#10B981", icon: <Sparkles className="w-4 h-4" />, check: (e) => e.totalRecovered >= 1 },
+  { id: "golden_hunter", name: "صياد ذهبي", desc: "5 استعادات", hex: "#F59E0B", icon: <Star className="w-4 h-4" />, check: (e) => e.totalRecovered >= 5 },
+  { id: "legendary_hunter", name: "صياد أسطوري", desc: "20 استعادة", hex: "#EF4444", icon: <Crown className="w-4 h-4" />, check: (e) => e.totalRecovered >= 20 },
+  { id: "discount_master", name: "بطل الخصومات", desc: "10 تجارب خصم", hex: "#F59E0B", icon: <Percent className="w-4 h-4" />, check: (e) => e.experimentCounts.discount >= 10 },
+  { id: "diplomat", name: "دبلوماسي", desc: "5 مكالمات مدير", hex: "#8B5CF6", icon: <Phone className="w-4 h-4" />, check: (e) => e.experimentCounts.manager_call >= 5 },
+  { id: "diverse", name: "متعدد المواهب", desc: "استخدمت 5 تجارب مختلفة", hex: "#00D4FF", icon: <Atom className="w-4 h-4" />, check: (e) => Object.values(e.experimentCounts).filter((c) => c > 0).length >= 5 },
+  { id: "streak_3", name: "ستريك 3 أيام", desc: "نشاط 3 أيام متتالية", hex: "#F59E0B", icon: <Flame className="w-4 h-4" />, check: (e) => e.longestStreak >= 3 },
+  { id: "streak_7", name: "ستريك أسبوعي", desc: "نشاط 7 أيام متتالية", hex: "#EF4444", icon: <Flame className="w-4 h-4" />, check: (e) => e.longestStreak >= 7 },
+  { id: "streak_30", name: "ستريك أسطوري", desc: "نشاط 30 يوم متتالي", hex: "#EC4899", icon: <Flame className="w-4 h-4" />, check: (e) => e.longestStreak >= 30 },
+  { id: "saved_10k", name: "أنقذت 10,000", desc: "استعدت إيرادات 10K+", hex: "#10B981", icon: <DollarSign className="w-4 h-4" />, check: (e) => e.totalSaved >= 10000 },
+  { id: "saved_100k", name: "أنقذت 100,000", desc: "استعدت إيرادات 100K+", hex: "#10B981", icon: <Trophy className="w-4 h-4" />, check: (e) => e.totalSaved >= 100000 },
+  { id: "machine", name: "آلة الإنتاج", desc: "10 تجارب في يوم واحد", hex: "#F59E0B", icon: <Zap className="w-4 h-4" />, check: (e) => e.daily.applied >= 10 },
+  { id: "level_5", name: "خبير", desc: "وصلت للمستوى 5", hex: "#8B5CF6", icon: <Award className="w-4 h-4" />, check: (e) => levelFromXp(e.xp) >= 5 },
+  { id: "level_10", name: "نخبة", desc: "وصلت للمستوى 10", hex: "#EF4444", icon: <Medal className="w-4 h-4" />, check: (e) => levelFromXp(e.xp) >= 10 },
+];
+
+/* ─── On-fire detection (3+ recovered in a row) ─── */
+function isOnFire(recent: ("recovered" | "lost" | "pending")[]): boolean {
+  if (recent.length < 3) return false;
+  return recent.slice(0, 3).every((o) => o === "recovered");
+}
+
+/* ─── Animated Counter ─── */
+function AnimatedNumber({
+  value,
+  duration = 700,
+  format,
+}: {
+  value: number;
+  duration?: number;
+  format?: (n: number) => string;
+}) {
+  const [display, setDisplay] = useState(value);
+  const prevRef = (typeof window !== "undefined" ? (window as unknown as { __anRef?: Map<string, number> }) : null);
+  void prevRef;
+
+  useEffect(() => {
+    const start = display;
+    const end = value;
+    if (start === end) return;
+    const startTime = performance.now();
+    let raf = 0;
+    const step = (now: number) => {
+      const t = Math.min(1, (now - startTime) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const current = Math.round(start + (end - start) * eased);
+      setDisplay(current);
+      if (t < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [value, duration]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return <>{format ? format(display) : display.toLocaleString()}</>;
+}
+
+/* ─── Confetti burst ─── */
+function ConfettiBurst({ trigger }: { trigger: number }) {
+  if (trigger === 0) return null;
+  const colors = ["#10B981", "#F59E0B", "#7da6ff", "#EC4899", "#8B5CF6", "#00D4FF"];
+  const pieces = Array.from({ length: 60 }).map((_, i) => {
+    const c = colors[i % colors.length];
+    const left = Math.random() * 100;
+    const delay = Math.random() * 0.4;
+    const duration = 1.6 + Math.random() * 1.2;
+    const size = 6 + Math.random() * 8;
+    const rotate = Math.random() * 360;
+    return (
+      <span
+        key={`${trigger}-${i}`}
+        className="rl-confetti"
+        style={{
+          left: `${left}%`,
+          background: c,
+          width: size,
+          height: size * 0.4,
+          animationDelay: `${delay}s`,
+          animationDuration: `${duration}s`,
+          transform: `rotate(${rotate}deg)`,
+        }}
+      />
+    );
+  });
+  return (
+    <div key={trigger} className="rl-confetti-overlay" aria-hidden>
+      {pieces}
+    </div>
+  );
+}
+
+/* ─── On-fire badge ─── */
+function OnFireBadge() {
+  return (
+    <span className="rl-on-fire inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold">
+      <Flame className="w-3.5 h-3.5 rl-flame" />
+      على النار — 3 استعادات متتالية
+    </span>
+  );
+}
+
+/* ─── Hero Card ─── */
+function HeroCard({
+  employee,
+  name,
+  onFire,
+}: {
+  employee: EmployeeProgress;
+  name: string;
+  onFire: boolean;
+}) {
+  const level = levelFromXp(employee.xp);
+  const rank = rankForLevel(level);
+  const xpForCurrent = totalXpForLevel(level);
+  const xpForNext = totalXpForLevel(level + 1);
+  const xpInLevel = employee.xp - xpForCurrent;
+  const xpNeeded = xpForNext - xpForCurrent;
+  const pct = Math.min(100, (xpInLevel / xpNeeded) * 100);
+  const target = dailyMissionTarget(level);
+  const dailyApplied = employee.daily.date === todayStr() ? employee.daily.applied : 0;
+  const dailyRecovered = employee.daily.date === todayStr() ? employee.daily.recovered : 0;
+
+  return (
+    <div className="cc-card rounded-[14px] p-5 relative overflow-hidden" style={{ border: `1px solid ${rank.hex}33` }}>
+      <div
+        className="absolute inset-0 opacity-30"
+        style={{
+          background: `radial-gradient(circle at 20% 0%, ${rank.hex}22 0%, transparent 50%), radial-gradient(circle at 80% 100%, #8B5CF622 0%, transparent 50%)`,
+        }}
+      />
+      <div className="relative">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div
+              className="rl-avatar w-16 h-16 rounded-2xl flex items-center justify-center font-extrabold font-mono text-2xl shrink-0"
+              style={{
+                background: `linear-gradient(135deg, ${rank.hex}33, ${rank.hex}11)`,
+                border: `2px solid ${rank.hex}`,
+                boxShadow: `0 0 24px ${rank.hex}44`,
+                color: rank.hex,
+              }}
+            >
+              {level}
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-base font-extrabold text-foreground">
+                  {name || "بطل المعمل"}
+                </h2>
+                {onFire && <OnFireBadge />}
+              </div>
+              <div className="flex items-center gap-1.5 mt-1 text-[11px] font-bold" style={{ color: rank.hex }}>
+                {rank.icon}
+                <span>{rank.name}</span>
+                <span className="text-muted-foreground font-normal">· المستوى {level}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <HeroStat icon={<Flame className="w-3.5 h-3.5" />} label="ستريك" value={`${employee.streakDays} يوم`} hex="#F59E0B" />
+            <HeroStat icon={<Sparkles className="w-3.5 h-3.5" />} label="استعادات" value={employee.totalRecovered.toString()} hex="#10B981" />
+            <HeroStat
+              icon={<DollarSign className="w-3.5 h-3.5" />}
+              label="أُنقذ"
+              valueNode={
+                <AnimatedNumber value={employee.totalSaved} format={(n) => formatMoney(n)} />
+              }
+              hex="#7da6ff"
+            />
+          </div>
+        </div>
+
+        {/* XP bar */}
+        <div className="mt-4">
+          <div className="flex items-center justify-between text-[10px] font-bold mb-1.5">
+            <span className="text-muted-foreground">
+              تجربة (XP) — <AnimatedNumber value={employee.xp} /> /
+              {" "}
+              {xpForNext.toLocaleString()}
+            </span>
+            <span style={{ color: rank.hex }}>
+              {Math.round(xpInLevel)}/{xpNeeded} للمستوى {level + 1}
+            </span>
+          </div>
+          <div className="rl-xp-track relative h-2.5 rounded-full overflow-hidden" style={{ background: "var(--border)" }}>
+            <div
+              className="rl-xp-fill absolute inset-y-0 right-0 rounded-full transition-all duration-700"
+              style={{
+                width: `${pct}%`,
+                background: `linear-gradient(90deg, ${rank.hex}, ${rank.hex}cc)`,
+                boxShadow: `0 0 12px ${rank.hex}88`,
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Daily mission */}
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <MissionTile
+            label="مهمة اليوم"
+            current={dailyRecovered}
+            target={target.mission}
+            unit="استعادة"
+            xp={XP_REWARDS.DAILY_MISSION}
+            hex="#10B981"
+            icon={<Target className="w-4 h-4" />}
+          />
+          <MissionTile
+            label="هدف إضافي"
+            current={dailyApplied}
+            target={target.stretch}
+            unit="تجربة"
+            xp={XP_REWARDS.STRETCH_GOAL}
+            hex="#F59E0B"
+            icon={<Rocket className="w-4 h-4" />}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HeroStat({
+  icon,
+  label,
+  value,
+  valueNode,
+  hex,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value?: string;
+  valueNode?: React.ReactNode;
+  hex: string;
+}) {
+  return (
+    <div className="flex flex-col items-center min-w-[70px]">
+      <div className="flex items-center gap-1 text-[9px] text-muted-foreground font-semibold">
+        <span style={{ color: hex }}>{icon}</span>
+        {label}
+      </div>
+      <div className="text-sm font-extrabold font-mono mt-0.5" style={{ color: hex }}>
+        {valueNode ?? value}
+      </div>
+    </div>
+  );
+}
+
+function MissionTile({
+  label,
+  current,
+  target,
+  unit,
+  xp,
+  hex,
+  icon,
+}: {
+  label: string;
+  current: number;
+  target: number;
+  unit: string;
+  xp: number;
+  hex: string;
+  icon: React.ReactNode;
+}) {
+  const pct = Math.min(100, (current / target) * 100);
+  const done = current >= target;
+  return (
+    <div
+      className="rounded-xl p-3 relative overflow-hidden"
+      style={{
+        background: done ? `${hex}22` : "var(--card)",
+        border: `1px solid ${done ? hex : "var(--border)"}`,
+      }}
+    >
+      {done && (
+        <div className="absolute -top-1 -left-1 text-[9px] font-extrabold px-1.5 py-0.5 rounded" style={{ background: hex, color: "#0a0e1a" }}>
+          ✓ +{xp} XP
+        </div>
+      )}
+      <div className="flex items-center justify-between mb-1.5">
+        <div className="flex items-center gap-1.5 text-[10px] font-bold" style={{ color: hex }}>
+          {icon}
+          {label}
+        </div>
+        <div className="text-[11px] font-mono font-extrabold" style={{ color: hex }}>
+          {current}/{target} {unit}
+        </div>
+      </div>
+      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--border)" }}>
+        <div
+          className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${pct}%`, background: hex, boxShadow: done ? `0 0 8px ${hex}` : undefined }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/* ─── Activity Feed ─── */
+function ActivityFeed({ items }: { items: Activity[] }) {
+  return (
+    <div className="cc-card rounded-[14px] border border-white/[0.06] p-5 h-full flex flex-col">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-8 h-8 rounded-xl bg-cyan-dim flex items-center justify-center">
+          <Activity className="w-4 h-4 text-cyan" />
+        </div>
+        <div>
+          <h2 className="text-sm font-bold text-foreground">سجل البطولة</h2>
+          <p className="text-[10px] text-muted-foreground">آخر أنشطتك في المعمل</p>
+        </div>
+      </div>
+      {items.length === 0 ? (
+        <div className="flex-1 flex items-center justify-center text-center">
+          <div className="text-[11px] text-muted-foreground">
+            لم تبدأ بعد!
+            <br />
+            افتح أول عميل وابدأ مغامرتك
+          </div>
+        </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto space-y-1.5 max-h-[320px] pr-1">
+          {items.slice(0, 20).map((a, i) => (
+            <ActivityItem key={`${a.ts}-${i}`} a={a} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ActivityItem({ a }: { a: Activity }) {
+  const icons: Record<Activity["type"], React.ReactNode> = {
+    apply: <FlaskConical className="w-3.5 h-3.5" />,
+    followup: <RefreshCw className="w-3.5 h-3.5" />,
+    recovered: <Sparkles className="w-3.5 h-3.5" />,
+    lost: <XCircle className="w-3.5 h-3.5" />,
+    mission: <Target className="w-3.5 h-3.5" />,
+    achievement: <Trophy className="w-3.5 h-3.5" />,
+    streak: <Flame className="w-3.5 h-3.5" />,
+  };
+  const ago = relativeTime(a.ts);
+  return (
+    <div
+      className="flex items-center gap-2 p-2 rounded-lg"
+      style={{ background: "var(--card)", border: "1px solid var(--border)" }}
+    >
+      <div
+        className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+        style={{ background: `${a.hex}22`, color: a.hex }}
+      >
+        {icons[a.type]}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-[11px] font-bold text-foreground truncate">{a.text}</div>
+        <div className="text-[9px] text-muted-foreground">{ago}</div>
+      </div>
+      {a.xp > 0 && (
+        <div className="text-[10px] font-extrabold font-mono shrink-0" style={{ color: a.hex }}>
+          +{a.xp}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function relativeTime(ts: number): string {
+  const diff = Date.now() - ts;
+  const sec = Math.floor(diff / 1000);
+  if (sec < 60) return "الآن";
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `قبل ${min} د`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `قبل ${hr} س`;
+  const day = Math.floor(hr / 24);
+  if (day < 7) return `قبل ${day} يوم`;
+  return new Date(ts).toLocaleDateString();
+}
+
+/* ─── Achievement toast ─── */
+function AchievementToast({ ach, onDone }: { ach: Achievement; onDone: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 4000);
+    return () => clearTimeout(t);
+  }, [onDone]);
+  return (
+    <div className="rl-toast" style={{ borderColor: ach.hex, boxShadow: `0 0 24px ${ach.hex}66` }}>
+      <div
+        className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+        style={{ background: `${ach.hex}33`, color: ach.hex }}
+      >
+        <Trophy className="w-5 h-5" />
+      </div>
+      <div>
+        <div className="text-[10px] text-muted-foreground font-bold">إنجاز جديد فُتح!</div>
+        <div className="text-sm font-extrabold" style={{ color: ach.hex }}>
+          {ach.name}
+        </div>
+        <div className="text-[10px] text-muted-foreground">{ach.desc}</div>
+      </div>
+      <div className="flex items-center gap-1 text-[10px] font-extrabold shrink-0" style={{ color: ach.hex }}>
+        <Sparkles className="w-3 h-3" />
+        +50 XP
+      </div>
+    </div>
+  );
+}
+
+/* ─── Inline keyframes / styles ─── */
+function RecoveryLabStyles() {
+  return (
+    <style>{`
+      @keyframes rl-confetti-fall {
+        0% { transform: translateY(-20vh) rotate(0deg); opacity: 1; }
+        100% { transform: translateY(120vh) rotate(720deg); opacity: 0; }
+      }
+      .rl-confetti-overlay {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 60;
+        overflow: hidden;
+      }
+      .rl-confetti {
+        position: absolute;
+        top: -5vh;
+        border-radius: 2px;
+        animation-name: rl-confetti-fall;
+        animation-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        animation-fill-mode: forwards;
+      }
+      @keyframes rl-flame-pulse {
+        0%, 100% { transform: scale(1); filter: drop-shadow(0 0 4px #F59E0B); }
+        50% { transform: scale(1.2); filter: drop-shadow(0 0 10px #EF4444); }
+      }
+      .rl-flame {
+        animation: rl-flame-pulse 0.9s ease-in-out infinite;
+        color: #F59E0B;
+      }
+      @keyframes rl-on-fire-bg {
+        0%, 100% { background: linear-gradient(90deg, #F59E0B33, #EF444433); }
+        50% { background: linear-gradient(90deg, #EF444444, #F59E0B44); }
+      }
+      .rl-on-fire {
+        animation: rl-on-fire-bg 1.2s ease-in-out infinite;
+        color: #EF4444;
+        border: 1px solid #EF444466;
+      }
+      @keyframes rl-float-xp {
+        0% { transform: translate(-50%, 0) scale(0.6); opacity: 0; }
+        15% { transform: translate(-50%, -10px) scale(1.1); opacity: 1; }
+        70% { transform: translate(-50%, -60px) scale(1); opacity: 1; }
+        100% { transform: translate(-50%, -110px) scale(0.9); opacity: 0; }
+      }
+      .rl-floating-xp {
+        position: fixed;
+        top: 25%;
+        left: 50%;
+        font-size: 32px;
+        font-weight: 900;
+        font-family: ui-monospace, monospace;
+        text-shadow: 0 0 24px currentColor;
+        z-index: 70;
+        pointer-events: none;
+        animation: rl-float-xp 1.8s ease-out forwards;
+      }
+      @keyframes rl-avatar-glow {
+        0%, 100% { filter: brightness(1); }
+        50% { filter: brightness(1.15); }
+      }
+      .rl-avatar { animation: rl-avatar-glow 2.5s ease-in-out infinite; }
+      @keyframes rl-xp-shine {
+        0% { background-position: -200% 0; }
+        100% { background-position: 200% 0; }
+      }
+      .rl-xp-fill::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%);
+        background-size: 200% 100%;
+        animation: rl-xp-shine 2.5s linear infinite;
+      }
+      @keyframes rl-toast-in {
+        0% { transform: translateX(-120%); opacity: 0; }
+        15% { transform: translateX(8%); opacity: 1; }
+        25% { transform: translateX(0); opacity: 1; }
+        85% { transform: translateX(0); opacity: 1; }
+        100% { transform: translateX(-120%); opacity: 0; }
+      }
+      .rl-toast {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        background: var(--card);
+        border-radius: 12px;
+        border: 2px solid;
+        max-width: 360px;
+        animation: rl-toast-in 4s ease-in-out forwards;
+        pointer-events: auto;
+      }
+    `}</style>
+  );
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════ */
 export default function RecoveryLabPage() {
-  const { activeOrgId: orgId } = useAuth();
+  const { activeOrgId: orgId, user } = useAuth();
   const { activeMonthIndex, filterCutoff } = useTopbarControls();
 
   const [renewals, setRenewals] = useState<Renewal[]>([]);
@@ -410,8 +1086,15 @@ export default function RecoveryLabPage() {
   const [draftOutcome, setDraftOutcome] =
     useState<"pending" | "recovered" | "lost">("pending");
 
+  /* Gamification state */
+  const [employee, setEmployee] = useState<EmployeeProgress>(emptyEmployee());
+  const [confettiKey, setConfettiKey] = useState(0);
+  const [achievementQueue, setAchievementQueue] = useState<Achievement[]>([]);
+  const [floatingXp, setFloatingXp] = useState<{ amount: number; id: number; hex: string } | null>(null);
+
   useEffect(() => {
     setLab(loadLab());
+    setEmployee(loadEmployee());
   }, []);
 
   useEffect(() => {
@@ -592,6 +1275,156 @@ export default function RecoveryLabPage() {
     setDraftOutcome("pending");
   };
 
+  /* ─── Reward / progress engine ─── */
+  function awardProgress(opts: {
+    renewal: Renewal;
+    experiment: ExperimentKey;
+    outcome: "pending" | "recovered" | "lost";
+    isFollowup?: boolean;
+    score: number;
+  }): { gained: number; hex: string } {
+    const rewards = loadRewardsLog();
+    const renewalRewards = rewards[opts.renewal.id] ?? {};
+    let gained = 0;
+    const today = todayStr();
+
+    const e: EmployeeProgress = {
+      ...employee,
+      experimentCounts: { ...employee.experimentCounts },
+      activity: [...employee.activity],
+      recentOutcomes: [...employee.recentOutcomes],
+      daily:
+        employee.daily.date === today
+          ? { ...employee.daily }
+          : { date: today, applied: 0, recovered: 0, missionAwarded: false, stretchAwarded: false },
+    };
+
+    /* Streak logic */
+    if (e.lastActivityDate !== today) {
+      const gap = e.lastActivityDate ? diffDays(e.lastActivityDate, today) : 999;
+      if (gap === 1) {
+        e.streakDays = e.streakDays + 1;
+      } else {
+        e.streakDays = 1;
+      }
+      e.longestStreak = Math.max(e.longestStreak, e.streakDays);
+      e.lastActivityDate = today;
+      if (e.streakDays >= 2) {
+        e.activity.unshift({
+          ts: Date.now(),
+          type: "streak",
+          text: `أكملت ستريك ${e.streakDays} أيام`,
+          xp: 0,
+          hex: "#F59E0B",
+        });
+      }
+    }
+
+    /* Apply XP (one-time per renewal) */
+    if (!renewalRewards.applyAwarded) {
+      const xpAmt = opts.isFollowup ? XP_REWARDS.FOLLOWUP : XP_REWARDS.APPLY;
+      gained += xpAmt;
+      e.totalApplied += 1;
+      e.daily.applied += 1;
+      e.experimentCounts[opts.experiment] = (e.experimentCounts[opts.experiment] ?? 0) + 1;
+      e.activity.unshift({
+        ts: Date.now(),
+        type: opts.isFollowup ? "followup" : "apply",
+        text: `${opts.isFollowup ? "نقلت إلى المتابعة" : "طبّقت تجربة"} · ${opts.renewal.customer_name}`,
+        xp: xpAmt,
+        hex: "#7da6ff",
+      });
+      renewalRewards.applyAwarded = true;
+    }
+
+    /* Recovery XP (one-time per renewal) */
+    if (opts.outcome === "recovered" && !renewalRewards.recoverAwarded) {
+      const xpAmt =
+        opts.score >= 85
+          ? XP_REWARDS.RECOVER_LEGENDARY
+          : opts.score >= 70
+            ? XP_REWARDS.RECOVER_HOT
+            : XP_REWARDS.RECOVER_BASE;
+      gained += xpAmt;
+      e.totalRecovered += 1;
+      e.daily.recovered += 1;
+      e.totalSaved += opts.renewal.plan_price || 0;
+      e.recentOutcomes = ["recovered", ...e.recentOutcomes].slice(0, 5);
+      e.activity.unshift({
+        ts: Date.now(),
+        type: "recovered",
+        text: `استعدت ${opts.renewal.customer_name}!`,
+        xp: xpAmt,
+        hex: "#10B981",
+      });
+      renewalRewards.recoverAwarded = true;
+    } else if (opts.outcome === "lost") {
+      e.recentOutcomes = ["lost", ...e.recentOutcomes].slice(0, 5);
+    } else if (opts.outcome === "pending") {
+      e.recentOutcomes = ["pending", ...e.recentOutcomes].slice(0, 5);
+    }
+
+    /* Daily mission completion */
+    const target = dailyMissionTarget(levelFromXp(e.xp + gained));
+    if (!e.daily.missionAwarded && e.daily.recovered >= target.mission) {
+      gained += XP_REWARDS.DAILY_MISSION;
+      e.daily.missionAwarded = true;
+      e.activity.unshift({
+        ts: Date.now(),
+        type: "mission",
+        text: `أنجزت مهمة اليوم (${target.mission} استعادات)`,
+        xp: XP_REWARDS.DAILY_MISSION,
+        hex: "#10B981",
+      });
+    }
+    if (!e.daily.stretchAwarded && e.daily.applied >= target.stretch) {
+      gained += XP_REWARDS.STRETCH_GOAL;
+      e.daily.stretchAwarded = true;
+      e.activity.unshift({
+        ts: Date.now(),
+        type: "mission",
+        text: `أنجزت الهدف الإضافي (${target.stretch} تجارب)`,
+        xp: XP_REWARDS.STRETCH_GOAL,
+        hex: "#F59E0B",
+      });
+    }
+
+    e.xp += gained;
+    e.activity = e.activity.slice(0, 50);
+
+    /* Achievement detection */
+    const newAch: Achievement[] = [];
+    for (const a of ACHIEVEMENTS) {
+      if (!e.unlockedAchievements.includes(a.id) && a.check(e)) {
+        e.unlockedAchievements.push(a.id);
+        e.xp += 50;
+        e.activity.unshift({
+          ts: Date.now(),
+          type: "achievement",
+          text: `إنجاز جديد: ${a.name}`,
+          xp: 50,
+          hex: a.hex,
+        });
+        newAch.push(a);
+      }
+    }
+    e.activity = e.activity.slice(0, 50);
+
+    rewards[opts.renewal.id] = renewalRewards;
+    saveRewardsLog(rewards);
+    setEmployee(e);
+    saveEmployee(e);
+
+    if (newAch.length > 0) {
+      setAchievementQueue((q) => [...q, ...newAch]);
+    }
+
+    return {
+      gained,
+      hex: opts.outcome === "recovered" ? "#10B981" : "#7da6ff",
+    };
+  }
+
   const applyExperiment = () => {
     if (!activeRenewal || !draftExperiment) return;
     const stage: LabStage =
@@ -612,6 +1445,22 @@ export default function RecoveryLabPage() {
     };
     setLab(next);
     saveLab(next);
+
+    const score = recoveryScore(activeRenewal, maxPrice);
+    const reward = awardProgress({
+      renewal: activeRenewal,
+      experiment: draftExperiment as ExperimentKey,
+      outcome: draftOutcome,
+      score,
+    });
+
+    if (draftOutcome === "recovered") {
+      setConfettiKey((k) => k + 1);
+    }
+    if (reward.gained > 0) {
+      setFloatingXp({ amount: reward.gained, id: Date.now(), hex: reward.hex });
+      setTimeout(() => setFloatingXp(null), 1800);
+    }
     closeLab();
   };
 
@@ -630,6 +1479,21 @@ export default function RecoveryLabPage() {
     };
     setLab(next);
     saveLab(next);
+
+    if (draftExperiment) {
+      const score = recoveryScore(activeRenewal, maxPrice);
+      const reward = awardProgress({
+        renewal: activeRenewal,
+        experiment: draftExperiment as ExperimentKey,
+        outcome: "pending",
+        score,
+        isFollowup: true,
+      });
+      if (reward.gained > 0) {
+        setFloatingXp({ amount: reward.gained, id: Date.now(), hex: reward.hex });
+        setTimeout(() => setFloatingXp(null), 1800);
+      }
+    }
     closeLab();
   };
 
@@ -664,8 +1528,32 @@ export default function RecoveryLabPage() {
     );
   }
 
+  const onFire = isOnFire(employee.recentOutcomes);
+  const unlockedSet = new Set(employee.unlockedAchievements);
+
   return (
-    <div className="space-y-6 p-1">
+    <div className="space-y-6 p-1 relative">
+      <RecoveryLabStyles />
+      <ConfettiBurst trigger={confettiKey} />
+
+      {/* Achievement toasts */}
+      <div className="fixed top-20 left-4 z-50 space-y-2 pointer-events-none">
+        {achievementQueue.slice(0, 3).map((ach) => (
+          <AchievementToast
+            key={ach.id}
+            ach={ach}
+            onDone={() => setAchievementQueue((q) => q.filter((x) => x.id !== ach.id))}
+          />
+        ))}
+      </div>
+
+      {/* Floating XP gain */}
+      {floatingXp && (
+        <div className="rl-floating-xp" style={{ color: floatingXp.hex }}>
+          +{floatingXp.amount} XP
+        </div>
+      )}
+
       {/* ═══ HEADER ═══ */}
       <div className="flex items-start gap-3">
         <div className="w-10 h-10 rounded-2xl bg-purple-dim flex items-center justify-center ring-1 ring-white/8 relative overflow-hidden">
@@ -682,6 +1570,62 @@ export default function RecoveryLabPage() {
           <p className="text-[11px] text-muted-foreground">
             معمل تفاعلي لتحويل العملاء اللي ما جدّدوا إلى عملاء عائدين عبر تجارب مدروسة
           </p>
+        </div>
+      </div>
+
+      {/* ═══ HERO ROW (Card + Activity Feed) ═══ */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <div className="lg:col-span-8">
+          <HeroCard employee={employee} name={user?.name ?? ""} onFire={onFire} />
+        </div>
+        <div className="lg:col-span-4">
+          <ActivityFeed items={employee.activity} />
+        </div>
+      </div>
+
+      {/* Achievements ribbon */}
+      <div className="cc-card rounded-[14px] border border-white/[0.06] p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-8 h-8 rounded-xl bg-amber-dim flex items-center justify-center">
+            <Trophy className="w-4 h-4 text-amber" />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-sm font-bold text-foreground">الإنجازات</h2>
+            <p className="text-[10px] text-muted-foreground">
+              فُتح {employee.unlockedAchievements.length} من {ACHIEVEMENTS.length}
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-8 gap-2">
+          {ACHIEVEMENTS.map((a) => {
+            const unlocked = unlockedSet.has(a.id);
+            return (
+              <div
+                key={a.id}
+                className="rounded-xl p-2.5 flex flex-col items-center gap-1.5 text-center transition-all"
+                style={{
+                  background: "var(--card)",
+                  border: `1px solid ${unlocked ? a.hex : "var(--border)"}`,
+                  opacity: unlocked ? 1 : 0.45,
+                  boxShadow: unlocked ? `0 0 12px ${a.hex}33` : "none",
+                }}
+                title={a.desc}
+              >
+                <div
+                  className="w-9 h-9 rounded-lg flex items-center justify-center"
+                  style={{
+                    background: unlocked ? `${a.hex}22` : "var(--border)",
+                    color: unlocked ? a.hex : "var(--muted-foreground)",
+                  }}
+                >
+                  {unlocked ? a.icon : <Shield className="w-4 h-4" />}
+                </div>
+                <div className="text-[9px] font-bold text-foreground leading-tight line-clamp-2">
+                  {a.name}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
