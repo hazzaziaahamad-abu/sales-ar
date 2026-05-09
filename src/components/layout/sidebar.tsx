@@ -36,7 +36,6 @@ import {
   Radar,
   ShieldCheck,
   FlaskConical,
-  HeartPulse,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
@@ -74,7 +73,6 @@ export const NAV_ITEMS = [
   { label: "مراقبة المنافسين", href: "/competitors", slug: "competitors", icon: Radar, color: "rose" },
   { label: "Maestro", href: "/maestro", slug: "maestro", icon: Flame, color: "amber" },
   { label: "المظهر", href: "/appearance", slug: "appearance", icon: Palette, color: "violet" },
-  { label: "صحة القائد", href: "/leader-health", slug: "leader-health", icon: HeartPulse, color: "amber" },
 ];
 
 const COLOR_MAP: Record<string, { bg: string; text: string; ring: string; gradFrom: string; border: string; shadow: string; bar: string }> = {
