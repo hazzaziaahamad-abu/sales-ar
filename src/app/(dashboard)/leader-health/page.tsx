@@ -21,6 +21,7 @@ type DailyLog = {
   water?: number;
   steps?: number;
   sleep?: number;
+  exercises?: Record<string, boolean>;
 };
 
 type ChallengeState = {
@@ -70,6 +71,93 @@ const MILESTONES = [
   { tag: "الشهر الأول", period: "يوم ١ — ٣٠", target: "−٤ كجم", focus: "مرحلة التكيف. التركيز على بناء العادة وتجاوز الجوع المفاجئ. الجسم يتخلص من الماء الزائد أولاً." },
   { tag: "الشهر الثاني", period: "يوم ٣١ — ٦٠", target: "−٥ كجم", focus: "مرحلة الذروة. الانضباط الآن طبيعي. ستلاحظ تغير ملابسك أكثر من الميزان. لا تستسلم لاستقرار الوزن." },
   { tag: "الشهر الثالث", period: "يوم ٦١ — ٩٠", target: "−٤ كجم", focus: "مرحلة الاستقرار والتثبيت. تبني نمط حياة دائم — ليس مجرد حمية مؤقتة. النتيجة الحقيقية تظهر هنا." },
+];
+
+type ExerciseId =
+  | "pushup"
+  | "incline_pushup"
+  | "dips"
+  | "plank"
+  | "squat"
+  | "lunge"
+  | "bent_row"
+  | "one_arm_row"
+  | "superman"
+  | "reverse_fly"
+  | "mountain_climber"
+  | "bicycle_crunch"
+  | "walk"
+  | "hiit";
+
+type Exercise = { id: ExerciseId; name: string; reps: string; tip?: string };
+
+type ExerciseDay = {
+  id: string;
+  label: string;
+  emoji: string;
+  hex: string;
+  exercises: Exercise[];
+};
+
+const EXERCISE_PROGRAM: ExerciseDay[] = [
+  {
+    id: "beginner",
+    label: "مبتدئ",
+    emoji: "🌱",
+    hex: "#4ec77a",
+    exercises: [
+      { id: "pushup", name: "ضغط (على الركب لو بداية)", reps: "٣ × ١٠", tip: "الجسم مستقيم من الكتف للركبة/القدم" },
+      { id: "squat", name: "سكوات", reps: "٣ × ١٥", tip: "الكعب ملامس للأرض، الظهر مستقيم" },
+      { id: "plank", name: "بلانك", reps: "٣ × ٣٠ ثانية", tip: "البطن مشدود، لا تترك خصرك يهبط" },
+    ],
+  },
+  {
+    id: "day1",
+    label: "صدر وذراعين",
+    emoji: "💪",
+    hex: "#c9a961",
+    exercises: [
+      { id: "pushup", name: "ضغط (push-ups)", reps: "٣ × ١٠", tip: "النزول حتى يلامس صدرك الأرض تقريباً" },
+      { id: "incline_pushup", name: "ضغط مرتفع (يدّيك على كرسي)", reps: "٣ × ١٢", tip: "يستهدف الصدر العلوي" },
+      { id: "dips", name: "Dips على كرسي", reps: "٣ × ١٠", tip: "اخفض جسمك حتى زاوية ٩٠° في المرفقين" },
+      { id: "plank", name: "بلانك", reps: "٣ × ٣٠-٦٠ ثانية" },
+    ],
+  },
+  {
+    id: "day2",
+    label: "كارديو",
+    emoji: "🏃",
+    hex: "#4a90e2",
+    exercises: [
+      { id: "walk", name: "مشي سريع", reps: "٣٠-٤٥ دقيقة", tip: "السرعة تكفي بأن تستطيع التحدث لكن لا الغناء" },
+      { id: "hiit", name: "HIIT (٣٠ث جري + ٣٠ث مشي × ١٠)", reps: "١٥ دقيقة", tip: "الحرق يستمر بعد التمرين بساعات" },
+    ],
+  },
+  {
+    id: "day3",
+    label: "ظهر",
+    emoji: "🔝",
+    hex: "#8B5CF6",
+    exercises: [
+      { id: "bent_row", name: "Bent-over rows (دمبل/قوارير ماء)", reps: "٣ × ١٢", tip: "اضغط لوحَي الكتف معاً عند السحب" },
+      { id: "one_arm_row", name: "One-arm row", reps: "٣ × ١٠ لكل ذراع", tip: "اسند يدك الأخرى على كرسي" },
+      { id: "superman", name: "Superman (للظهر السفلي)", reps: "٣ × ١٥", tip: "ارفع اليدين والرجلين معاً، ثبّت ٢ ثانية" },
+      { id: "reverse_fly", name: "Reverse fly", reps: "٣ × ١٢", tip: "افتح ذراعيك للجانبين كأنك تحلّق" },
+    ],
+  },
+  {
+    id: "day4",
+    label: "أرجل وكور",
+    emoji: "🦵",
+    hex: "#e15d5d",
+    exercises: [
+      { id: "squat", name: "سكوات", reps: "٣ × ١٥" },
+      { id: "lunge", name: "Lunges", reps: "٣ × ١٠ لكل رجل", tip: "الركبة الأمامية لا تتعدى مشط القدم" },
+      { id: "mountain_climber", name: "Mountain climbers", reps: "٣ × ٣٠ ثانية", tip: "اجعل الإيقاع سريعاً — تمرين كارديو وكور معاً" },
+      { id: "bicycle_crunch", name: "Bicycle crunches", reps: "٣ × ٢٠", tip: "كوع مع الركبة المعاكسة" },
+      { id: "plank", name: "بلانك طويل", reps: "٣ × ٦٠ ثانية" },
+    ],
+  },
 ];
 
 const todayISO = () => new Date().toISOString().split("T")[0];
@@ -186,6 +274,11 @@ export default function LeaderHealthPage() {
 
   const setWater = (glasses: number) => updateTodayLog({ water: glasses });
 
+  const toggleExercise = (key: string) => {
+    const cur = todayLog.exercises || {};
+    updateTodayLog({ exercises: { ...cur, [key]: !cur[key] } });
+  };
+
   if (!loaded) {
     return (
       <div className="min-h-screen bg-[#0a0d14] text-white flex items-center justify-center">
@@ -263,16 +356,20 @@ export default function LeaderHealthPage() {
           })}
         </section>
 
+        {/* EXERCISES */}
+        <SectionTitle num="٣" title="تمارين اليوم" meta="اضغط على البطاقة لتحديدها كمنجزة" />
+        <ExercisesSection todayLog={todayLog} onToggle={toggleExercise} />
+
         {/* CALENDAR */}
-        <SectionTitle num="٣" title="تقويم الـ ٩٠ يوم" />
+        <SectionTitle num="٤" title="تقويم الـ ٩٠ يوم" />
         <Calendar state={state} />
 
         {/* CHART */}
-        <SectionTitle num="٤" title="منحنى الوزن" />
+        <SectionTitle num="٥" title="منحنى الوزن" />
         <WeightChart state={state} />
 
         {/* MEALS LIBRARY */}
-        <SectionTitle num="٥" title="دليل الوجبات السعودية" />
+        <SectionTitle num="٦" title="دليل الوجبات السعودية" />
         <div className="flex gap-2 mb-4">
           {([
             { id: "breakfast", label: "إفطار" },
@@ -880,6 +977,342 @@ function WeightChart({ state }: { state: ChallengeState }) {
       </svg>
     </div>
   );
+}
+
+function ExercisesSection({
+  todayLog,
+  onToggle,
+}: {
+  todayLog: DailyLog;
+  onToggle: (key: string) => void;
+}) {
+  const [activeDay, setActiveDay] = useState<string>(EXERCISE_PROGRAM[1].id);
+  const day = EXERCISE_PROGRAM.find((d) => d.id === activeDay) ?? EXERCISE_PROGRAM[1];
+  const done = todayLog.exercises || {};
+  const doneInDay = day.exercises.filter((e) => done[`${day.id}:${e.id}`]).length;
+  const pct = day.exercises.length > 0 ? (doneInDay / day.exercises.length) * 100 : 0;
+
+  return (
+    <div>
+      {/* Day tabs */}
+      <div className="flex gap-2 mb-4 overflow-x-auto">
+        {EXERCISE_PROGRAM.map((d) => {
+          const active = d.id === activeDay;
+          return (
+            <button
+              key={d.id}
+              onClick={() => setActiveDay(d.id)}
+              className="px-4 py-2.5 rounded-lg border text-sm transition flex items-center gap-2 whitespace-nowrap"
+              style={{
+                background: active ? d.hex : "#141926",
+                borderColor: active ? d.hex : "#2a3242",
+                color: active ? "#1a1410" : "#8a92a3",
+                fontWeight: active ? 500 : 400,
+              }}
+            >
+              <span className="text-base">{d.emoji}</span>
+              <span>{d.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Day progress bar */}
+      <div className="bg-[#141926] border border-[#2a3242] rounded-2xl p-5 mb-4">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">{day.emoji}</span>
+            <div>
+              <div className="font-semibold text-base">{day.label}</div>
+              <div className="text-xs text-[#8a92a3]">
+                {arabicNum(doneInDay)} من {arabicNum(day.exercises.length)} تمارين منجزة
+              </div>
+            </div>
+          </div>
+          <div className="text-2xl font-extrabold font-mono" style={{ color: day.hex }}>
+            {arabicNum(Math.round(pct))}٪
+          </div>
+        </div>
+        <div className="h-2 rounded-full overflow-hidden" style={{ background: "#1b2230" }}>
+          <div
+            className="h-full rounded-full transition-all duration-500"
+            style={{ width: `${pct}%`, background: day.hex, boxShadow: `0 0 12px ${day.hex}66` }}
+          />
+        </div>
+      </div>
+
+      {/* Exercise cards */}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {day.exercises.map((ex, i) => {
+          const key = `${day.id}:${ex.id}`;
+          const checked = !!done[key];
+          return (
+            <button
+              key={`${day.id}-${ex.id}-${i}`}
+              onClick={() => onToggle(key)}
+              className="text-right rounded-2xl p-4 transition group relative overflow-hidden"
+              style={{
+                background: checked ? `${day.hex}1a` : "#141926",
+                border: `1px solid ${checked ? day.hex : "#2a3242"}`,
+              }}
+            >
+              {checked && (
+                <div className="absolute top-2 left-2">
+                  <div
+                    className="w-6 h-6 rounded-full grid place-items-center"
+                    style={{ background: day.hex }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1a1410" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  </div>
+                </div>
+              )}
+              <div
+                className="w-full h-28 rounded-xl mb-3 grid place-items-center transition"
+                style={{
+                  background: checked ? `${day.hex}10` : "#0f131c",
+                  border: `1px solid ${checked ? day.hex + "66" : "#2a3242"}`,
+                }}
+              >
+                <ExerciseIllustration type={ex.id} hex={day.hex} muted={!checked} />
+              </div>
+              <div className="font-semibold text-[14px] leading-tight mb-1">{ex.name}</div>
+              <div className="text-[13px] font-mono mb-1.5" style={{ color: day.hex }}>
+                {ex.reps}
+              </div>
+              {ex.tip && <div className="text-[11px] text-[#8a92a3] leading-relaxed">{ex.tip}</div>}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-3 text-[11px] text-[#8a92a3] text-center">
+        التمارين تُحفظ ضمن سجل اليوم. ابدأ بالمستوى المبتدئ أول أسبوعين ثم انتقل لجدول الأيام.
+      </div>
+    </div>
+  );
+}
+
+function ExerciseIllustration({
+  type,
+  hex,
+  muted,
+}: {
+  type: ExerciseId;
+  hex: string;
+  muted?: boolean;
+}) {
+  const c = muted ? "#8a92a3" : hex;
+  const floor = "#5a6273";
+  const sw = 2.5;
+  const cap = "round";
+  const stroke = { stroke: c, strokeWidth: sw, strokeLinecap: cap as "round", strokeLinejoin: "round" as const, fill: "none" };
+  const headR = 5;
+  const view = "0 0 100 80";
+
+  switch (type) {
+    case "pushup":
+      return (
+        <svg viewBox={view} className="w-24 h-20">
+          <line x1="2" y1="74" x2="98" y2="74" stroke={floor} strokeWidth="1.5" />
+          <circle cx="22" cy="42" r={headR} fill={c} />
+          <line x1="27" y1="44" x2="80" y2="50" {...stroke} />
+          <line x1="35" y1="46" x2="35" y2="73" {...stroke} />
+          <line x1="58" y1="48" x2="58" y2="73" {...stroke} />
+          <line x1="80" y1="50" x2="93" y2="73" {...stroke} />
+        </svg>
+      );
+    case "incline_pushup":
+      return (
+        <svg viewBox={view} className="w-24 h-20">
+          <line x1="2" y1="74" x2="98" y2="74" stroke={floor} strokeWidth="1.5" />
+          <rect x="20" y="48" width="20" height="4" fill={floor} opacity="0.6" />
+          <line x1="20" y1="52" x2="20" y2="74" stroke={floor} strokeWidth="1.5" />
+          <line x1="40" y1="52" x2="40" y2="74" stroke={floor} strokeWidth="1.5" />
+          <circle cx="32" cy="40" r={headR} fill={c} />
+          <line x1="35" y1="44" x2="85" y2="60" {...stroke} />
+          <line x1="42" y1="46" x2="38" y2="50" {...stroke} />
+          <line x1="58" y1="50" x2="58" y2="74" {...stroke} />
+          <line x1="85" y1="60" x2="95" y2="74" {...stroke} />
+        </svg>
+      );
+    case "dips":
+      return (
+        <svg viewBox={view} className="w-24 h-20">
+          <line x1="2" y1="74" x2="98" y2="74" stroke={floor} strokeWidth="1.5" />
+          <rect x="65" y="40" width="22" height="3" fill={floor} opacity="0.6" />
+          <line x1="65" y1="43" x2="65" y2="74" stroke={floor} strokeWidth="1.5" />
+          <line x1="87" y1="43" x2="87" y2="74" stroke={floor} strokeWidth="1.5" />
+          <circle cx="50" cy="30" r={headR} fill={c} />
+          <line x1="50" y1="35" x2="50" y2="58" {...stroke} />
+          <line x1="50" y1="40" x2="68" y2="40" {...stroke} />
+          <line x1="68" y1="40" x2="68" y2="58" {...stroke} />
+          <line x1="50" y1="58" x2="40" y2="74" {...stroke} />
+          <line x1="50" y1="58" x2="60" y2="74" {...stroke} />
+        </svg>
+      );
+    case "plank":
+      return (
+        <svg viewBox={view} className="w-24 h-20">
+          <line x1="2" y1="74" x2="98" y2="74" stroke={floor} strokeWidth="1.5" />
+          <circle cx="20" cy="50" r={headR} fill={c} />
+          <line x1="25" y1="52" x2="80" y2="55" {...stroke} />
+          <line x1="20" y1="55" x2="20" y2="73" {...stroke} />
+          <line x1="20" y1="73" x2="40" y2="73" {...stroke} />
+          <line x1="80" y1="55" x2="93" y2="73" {...stroke} />
+        </svg>
+      );
+    case "squat":
+      return (
+        <svg viewBox={view} className="w-24 h-20">
+          <line x1="2" y1="74" x2="98" y2="74" stroke={floor} strokeWidth="1.5" />
+          <circle cx="50" cy="20" r={headR} fill={c} />
+          <line x1="50" y1="25" x2="50" y2="48" {...stroke} />
+          <line x1="50" y1="30" x2="65" y2="40" {...stroke} />
+          <line x1="50" y1="30" x2="35" y2="40" {...stroke} />
+          <line x1="50" y1="48" x2="38" y2="55" {...stroke} />
+          <line x1="38" y1="55" x2="38" y2="74" {...stroke} />
+          <line x1="50" y1="48" x2="62" y2="55" {...stroke} />
+          <line x1="62" y1="55" x2="62" y2="74" {...stroke} />
+        </svg>
+      );
+    case "lunge":
+      return (
+        <svg viewBox={view} className="w-24 h-20">
+          <line x1="2" y1="74" x2="98" y2="74" stroke={floor} strokeWidth="1.5" />
+          <circle cx="50" cy="18" r={headR} fill={c} />
+          <line x1="50" y1="23" x2="50" y2="46" {...stroke} />
+          <line x1="50" y1="30" x2="38" y2="42" {...stroke} />
+          <line x1="50" y1="30" x2="60" y2="42" {...stroke} />
+          <line x1="50" y1="46" x2="70" y2="60" {...stroke} />
+          <line x1="70" y1="60" x2="72" y2="74" {...stroke} />
+          <line x1="50" y1="46" x2="38" y2="60" {...stroke} />
+          <line x1="38" y1="60" x2="22" y2="74" {...stroke} />
+        </svg>
+      );
+    case "bent_row":
+      return (
+        <svg viewBox={view} className="w-24 h-20">
+          <line x1="2" y1="74" x2="98" y2="74" stroke={floor} strokeWidth="1.5" />
+          <circle cx="35" cy="22" r={headR} fill={c} />
+          <line x1="38" y1="26" x2="70" y2="38" {...stroke} />
+          <line x1="55" y1="33" x2="55" y2="20" {...stroke} />
+          <line x1="55" y1="20" x2="50" y2="14" {...stroke} />
+          <line x1="55" y1="20" x2="60" y2="14" {...stroke} />
+          <rect x="48" y="10" width="14" height="3" fill={c} />
+          <line x1="70" y1="38" x2="60" y2="60" {...stroke} />
+          <line x1="60" y1="60" x2="55" y2="74" {...stroke} />
+          <line x1="70" y1="38" x2="80" y2="60" {...stroke} />
+          <line x1="80" y1="60" x2="80" y2="74" {...stroke} />
+        </svg>
+      );
+    case "one_arm_row":
+      return (
+        <svg viewBox={view} className="w-24 h-20">
+          <line x1="2" y1="74" x2="98" y2="74" stroke={floor} strokeWidth="1.5" />
+          <rect x="20" y="42" width="22" height="4" fill={floor} opacity="0.6" />
+          <line x1="20" y1="46" x2="20" y2="74" stroke={floor} strokeWidth="1.5" />
+          <line x1="42" y1="46" x2="42" y2="74" stroke={floor} strokeWidth="1.5" />
+          <circle cx="40" cy="32" r={headR} fill={c} />
+          <line x1="44" y1="35" x2="78" y2="44" {...stroke} />
+          <line x1="32" y1="38" x2="32" y2="42" {...stroke} />
+          <line x1="65" y1="42" x2="65" y2="30" {...stroke} />
+          <rect x="60" y="26" width="10" height="3" fill={c} />
+          <line x1="78" y1="44" x2="76" y2="60" {...stroke} />
+          <line x1="76" y1="60" x2="74" y2="74" {...stroke} />
+          <line x1="78" y1="44" x2="88" y2="60" {...stroke} />
+          <line x1="88" y1="60" x2="88" y2="74" {...stroke} />
+        </svg>
+      );
+    case "superman":
+      return (
+        <svg viewBox={view} className="w-24 h-20">
+          <line x1="2" y1="74" x2="98" y2="74" stroke={floor} strokeWidth="1.5" />
+          <circle cx="20" cy="55" r={headR} fill={c} />
+          <line x1="25" y1="57" x2="75" y2="57" {...stroke} />
+          <line x1="25" y1="55" x2="6" y2="40" {...stroke} />
+          <line x1="35" y1="55" x2="22" y2="42" {...stroke} />
+          <line x1="75" y1="55" x2="92" y2="42" {...stroke} />
+          <line x1="70" y1="57" x2="86" y2="44" {...stroke} />
+        </svg>
+      );
+    case "reverse_fly":
+      return (
+        <svg viewBox={view} className="w-24 h-20">
+          <line x1="2" y1="74" x2="98" y2="74" stroke={floor} strokeWidth="1.5" />
+          <circle cx="50" cy="22" r={headR} fill={c} />
+          <line x1="50" y1="27" x2="65" y2="44" {...stroke} />
+          <line x1="55" y1="35" x2="20" y2="28" {...stroke} />
+          <line x1="55" y1="35" x2="80" y2="28" {...stroke} />
+          <rect x="14" y="24" width="12" height="3" fill={c} />
+          <rect x="74" y="24" width="12" height="3" fill={c} />
+          <line x1="65" y1="44" x2="55" y2="64" {...stroke} />
+          <line x1="55" y1="64" x2="50" y2="74" {...stroke} />
+          <line x1="65" y1="44" x2="78" y2="64" {...stroke} />
+          <line x1="78" y1="64" x2="78" y2="74" {...stroke} />
+        </svg>
+      );
+    case "mountain_climber":
+      return (
+        <svg viewBox={view} className="w-24 h-20">
+          <line x1="2" y1="74" x2="98" y2="74" stroke={floor} strokeWidth="1.5" />
+          <circle cx="22" cy="42" r={headR} fill={c} />
+          <line x1="27" y1="46" x2="80" y2="55" {...stroke} />
+          <line x1="35" y1="48" x2="35" y2="73" {...stroke} />
+          <line x1="58" y1="51" x2="50" y2="58" {...stroke} />
+          <line x1="50" y1="58" x2="55" y2="42" {...stroke} />
+          <line x1="80" y1="55" x2="93" y2="73" {...stroke} />
+        </svg>
+      );
+    case "bicycle_crunch":
+      return (
+        <svg viewBox={view} className="w-24 h-20">
+          <line x1="2" y1="74" x2="98" y2="74" stroke={floor} strokeWidth="1.5" />
+          <circle cx="20" cy="55" r={headR} fill={c} />
+          <line x1="25" y1="57" x2="55" y2="55" {...stroke} />
+          <line x1="40" y1="55" x2="50" y2="35" {...stroke} />
+          <line x1="50" y1="35" x2="60" y2="35" {...stroke} />
+          <line x1="55" y1="55" x2="65" y2="40" {...stroke} />
+          <line x1="65" y1="40" x2="55" y2="30" {...stroke} />
+          <line x1="55" y1="55" x2="80" y2="60" {...stroke} />
+          <line x1="80" y1="60" x2="92" y2="50" {...stroke} />
+        </svg>
+      );
+    case "walk":
+      return (
+        <svg viewBox={view} className="w-24 h-20">
+          <line x1="2" y1="74" x2="98" y2="74" stroke={floor} strokeWidth="1.5" />
+          <circle cx="50" cy="18" r={headR} fill={c} />
+          <line x1="50" y1="23" x2="50" y2="46" {...stroke} />
+          <line x1="50" y1="30" x2="38" y2="40" {...stroke} />
+          <line x1="50" y1="30" x2="62" y2="38" {...stroke} />
+          <line x1="50" y1="46" x2="42" y2="62" {...stroke} />
+          <line x1="42" y1="62" x2="35" y2="74" {...stroke} />
+          <line x1="50" y1="46" x2="60" y2="62" {...stroke} />
+          <line x1="60" y1="62" x2="68" y2="74" {...stroke} />
+        </svg>
+      );
+    case "hiit":
+      return (
+        <svg viewBox={view} className="w-24 h-20">
+          <line x1="2" y1="74" x2="98" y2="74" stroke={floor} strokeWidth="1.5" />
+          <circle cx="48" cy="14" r={headR} fill={c} />
+          <line x1="48" y1="19" x2="55" y2="42" {...stroke} />
+          <line x1="50" y1="26" x2="34" y2="22" {...stroke} />
+          <line x1="52" y1="32" x2="68" y2="20" {...stroke} />
+          <line x1="55" y1="42" x2="40" y2="58" {...stroke} />
+          <line x1="40" y1="58" x2="32" y2="74" {...stroke} />
+          <line x1="55" y1="42" x2="72" y2="58" {...stroke} />
+          <line x1="72" y1="58" x2="78" y2="74" {...stroke} />
+          <line x1="20" y1="22" x2="14" y2="22" stroke={c} strokeWidth="1.5" />
+          <line x1="22" y1="14" x2="18" y2="10" stroke={c} strokeWidth="1.5" />
+          <line x1="22" y1="30" x2="18" y2="34" stroke={c} strokeWidth="1.5" />
+        </svg>
+      );
+    default:
+      return null;
+  }
 }
 
 function MealCard({ meal }: { meal: Meal }) {
