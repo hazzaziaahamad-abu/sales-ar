@@ -22,6 +22,7 @@ type DailyLog = {
   steps?: number;
   sleep?: number;
   exercises?: Record<string, boolean>;
+  slumpBreakerCount?: number;
 };
 
 type ChallengeState = {
@@ -160,6 +161,39 @@ const EXERCISE_PROGRAM: ExerciseDay[] = [
   },
 ];
 
+const SLUMP_QUOTES = [
+  "المزاج يأتي بعد الفعل، لا قبله.",
+  "أنت لا تحتاج طاقة لتبدأ. تحتاج تبدأ لتحصل الطاقة.",
+  "الجسم يتحرّك بعد دقيقتين من التحرّك. مجرد ابدأ.",
+  "الانضباط حرية، لا قيد.",
+  "الستريك يحميك أكثر من نفسك.",
+  "أصعب ١٠ دقائق هي اللي تسبق التمرين، لا اللي خلاله.",
+  "اللي يكره الحمية يحب نتيجتها.",
+  "السمنة لم تأتِ في يوم. لن تذهب في يوم.",
+  "ما لا تقيسه، لا تقدر تحسّنه.",
+  "أبسط حركة الآن أفضل من أكمل خطة بكرة.",
+  "كل مرة تختار الصعب، تكون نسخة أفضل.",
+  "الجسم ينفّذ ما يقرّره العقل. أمر العقل بوضوح.",
+  "النوم رقم واحد من حيث التأثير. لا تستهين به.",
+  "الانضباط ٢٠ دقيقة ألم. الندم سنوات ألم.",
+  "كل ٢٪ تقدّم يومياً = جسم مختلف بعد ٩٠ يوم.",
+];
+
+type SlumpExercise = { name: string; duration: number; emoji: string };
+
+const SLUMP_EXERCISES: SlumpExercise[] = [
+  { name: "٢٠ Jumping Jacks", duration: 60, emoji: "🤸" },
+  { name: "١٠ ضغطات سريعة", duration: 60, emoji: "💪" },
+  { name: "٣٠ ثانية بلانك", duration: 30, emoji: "🪖" },
+  { name: "٢٠ سكوات", duration: 60, emoji: "🦵" },
+  { name: "١٠ Burpees", duration: 90, emoji: "🔥" },
+  { name: "مشي سريع في المكان", duration: 120, emoji: "🚶" },
+  { name: "١٥ Mountain Climbers", duration: 45, emoji: "⛰️" },
+  { name: "تمدّد + تنفّس عميق ٥ مرات", duration: 60, emoji: "🧘" },
+];
+
+type StoodOption = "now" | "lt30" | "30to60" | "gt60" | "forgot";
+
 const todayISO = () => new Date().toISOString().split("T")[0];
 const dateISO = (d: Date) => d.toISOString().split("T")[0];
 
@@ -279,6 +313,10 @@ export default function LeaderHealthPage() {
     updateTodayLog({ exercises: { ...cur, [key]: !cur[key] } });
   };
 
+  const incrementSlumpBreaker = () => {
+    updateTodayLog({ slumpBreakerCount: (todayLog.slumpBreakerCount || 0) + 1 });
+  };
+
   if (!loaded) {
     return (
       <div className="min-h-screen bg-[#0a0d14] text-white flex items-center justify-center">
@@ -360,16 +398,20 @@ export default function LeaderHealthPage() {
         <SectionTitle num="٣" title="تمارين اليوم" meta="اضغط على البطاقة لتحديدها كمنجزة" />
         <ExercisesSection todayLog={todayLog} onToggle={toggleExercise} />
 
+        {/* SLUMP BREAKER */}
+        <SectionTitle num="٤" title="كاسر الخمول" meta="فحص سريع + تمرين دقيقتين" />
+        <SlumpBreakerSection todayLog={todayLog} onCompleteBurst={incrementSlumpBreaker} />
+
         {/* CALENDAR */}
-        <SectionTitle num="٤" title="تقويم الـ ٩٠ يوم" />
+        <SectionTitle num="٥" title="تقويم الـ ٩٠ يوم" />
         <Calendar state={state} />
 
         {/* CHART */}
-        <SectionTitle num="٥" title="منحنى الوزن" />
+        <SectionTitle num="٦" title="منحنى الوزن" />
         <WeightChart state={state} />
 
         {/* MEALS LIBRARY */}
-        <SectionTitle num="٦" title="دليل الوجبات السعودية" />
+        <SectionTitle num="٧" title="دليل الوجبات السعودية" />
         <div className="flex gap-2 mb-4">
           {([
             { id: "breakfast", label: "إفطار" },
@@ -975,6 +1017,331 @@ function WeightChart({ state }: { state: ChallengeState }) {
           {arabicNum(minW.toFixed(0))}
         </text>
       </svg>
+    </div>
+  );
+}
+
+function SlumpBreakerSection({
+  todayLog,
+  onCompleteBurst,
+}: {
+  todayLog: DailyLog;
+  onCompleteBurst: () => void;
+}) {
+  const [sleep, setSleep] = useState<number>(7);
+  const [water, setWater] = useState<number>(0);
+  const [stood, setStood] = useState<StoodOption>("forgot");
+  const [quoteIdx, setQuoteIdx] = useState<number>(0);
+  const [burstOpen, setBurstOpen] = useState(false);
+
+  useEffect(() => {
+    setQuoteIdx(Math.floor(Math.random() * SLUMP_QUOTES.length));
+  }, []);
+
+  const diagnosis = useMemo(() => {
+    const issues: { hex: string; cause: string; fix: string }[] = [];
+    if (sleep < 6)
+      issues.push({
+        hex: "#8B5CF6",
+        cause: "النوم القاصر هو المرجّح للخمول الآن",
+        fix: "قيلولة ٢٠ دقيقة (لا تتجاوز)، ثم كاسة ماء بارد. الليلة نم قبل ١١ مساءً.",
+      });
+    else if (sleep < 7)
+      issues.push({
+        hex: "#7da6ff",
+        cause: "النوم تحت المثالي",
+        fix: "زِد ساعة الليلة. مثبت أن ٧+ ساعات تختلف جذرياً.",
+      });
+
+    if (water < 3)
+      issues.push({
+        hex: "#4a90e2",
+        cause: "أنت في حالة جفاف خفيف",
+        fix: "اشرب ٥٠٠ مل ماء بارد الآن. ١٠ دقائق وستحس الفرق.",
+      });
+    else if (water < 6)
+      issues.push({
+        hex: "#7da6ff",
+        cause: "ماؤك أقل من الكافي",
+        fix: "كاسة ماء كل ساعة حتى تكمّل ٨.",
+      });
+
+    if (stood === "gt60" || stood === "forgot")
+      issues.push({
+        hex: "#e15d5d",
+        cause: "قعدت أكثر من ساعة بدون حركة",
+        fix: "قم الآن. ٢ دقيقة مشي تنشّط الدورة الدموية وترفع الانتباه.",
+      });
+
+    if (issues.length === 0) {
+      return [
+        {
+          hex: "#4ec77a",
+          cause: "جسدياً أنت بخير",
+          fix: 'الخمول الآن "ذهني". اضغط "ابدأ الآن" تحت — دقيقتان حركة تكسر الجمود.',
+        },
+      ];
+    }
+    return issues;
+  }, [sleep, water, stood]);
+
+  const slumpsToday = todayLog.slumpBreakerCount || 0;
+
+  return (
+    <div className="grid lg:grid-cols-[1fr_1fr] gap-4">
+      {/* Quick check-in */}
+      <div className="bg-[#141926] border border-[#2a3242] rounded-2xl p-6">
+        <h3 className="font-semibold text-base mb-4 flex items-center gap-2">
+          <span>🔍</span>
+          فحص سريع
+        </h3>
+
+        {/* Sleep */}
+        <div className="mb-5">
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-[12px] text-[#8a92a3]">كم ساعة نمت أمس؟</label>
+            <span className="text-base font-semibold" style={{ color: sleep >= 7 ? "#4ec77a" : sleep >= 6 ? "#c9a961" : "#e15d5d" }}>
+              {arabicNum(sleep)} ساعة
+            </span>
+          </div>
+          <input
+            type="range"
+            min={4}
+            max={10}
+            step={1}
+            value={sleep}
+            onChange={(e) => setSleep(parseInt(e.target.value, 10))}
+            className="w-full accent-[#c9a961]"
+          />
+          <div className="flex justify-between text-[10px] text-[#5a6273] mt-1">
+            <span>{arabicNum(4)}</span>
+            <span>{arabicNum(10)}</span>
+          </div>
+        </div>
+
+        {/* Water */}
+        <div className="mb-5">
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-[12px] text-[#8a92a3]">كاسات الماء اليوم</label>
+            <span className="text-base font-semibold" style={{ color: water >= 6 ? "#4ec77a" : water >= 3 ? "#c9a961" : "#e15d5d" }}>
+              {arabicNum(water)}/٨
+            </span>
+          </div>
+          <div className="grid grid-cols-9 gap-1">
+            {Array.from({ length: 9 }).map((_, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setWater(i)}
+                className="h-7 rounded-md text-[10px] font-mono transition"
+                style={{
+                  background: water === i ? "#c9a961" : "#0f131c",
+                  color: water === i ? "#1a1410" : "#8a92a3",
+                  border: `1px solid ${water === i ? "#c9a961" : "#2a3242"}`,
+                }}
+              >
+                {arabicNum(i)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Last stood */}
+        <div>
+          <label className="text-[12px] text-[#8a92a3] mb-2 block">آخر مرة قمت من الكرسي</label>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+            {(
+              [
+                { id: "now", label: "الآن", hex: "#4ec77a" },
+                { id: "lt30", label: "أقل من ٣٠ د", hex: "#c9a961" },
+                { id: "30to60", label: "٣٠-٦٠ د", hex: "#c9a961" },
+                { id: "gt60", label: "أكثر من ساعة", hex: "#e15d5d" },
+                { id: "forgot", label: "ما أتذكر", hex: "#e15d5d" },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.id}
+                onClick={() => setStood(opt.id)}
+                className="px-2 py-2 rounded-lg text-[11px] transition"
+                style={{
+                  background: stood === opt.id ? `${opt.hex}22` : "#0f131c",
+                  color: stood === opt.id ? opt.hex : "#8a92a3",
+                  border: `1px solid ${stood === opt.id ? opt.hex : "#2a3242"}`,
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Diagnosis + action */}
+      <div className="bg-[#141926] border border-[#2a3242] rounded-2xl p-6 flex flex-col">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-base flex items-center gap-2">
+            <span>🩺</span>
+            التشخيص
+          </h3>
+          <span className="text-[10px] text-[#8a92a3]">
+            كسرت الخمول اليوم {arabicNum(slumpsToday)} مرة
+          </span>
+        </div>
+
+        <div className="flex-1 space-y-2.5 mb-4">
+          {diagnosis.map((d, i) => (
+            <div
+              key={i}
+              className="rounded-xl p-3 border-r-[3px]"
+              style={{
+                background: `${d.hex}10`,
+                borderRightColor: d.hex,
+                borderTop: "1px solid #2a3242",
+                borderBottom: "1px solid #2a3242",
+                borderLeft: "1px solid #2a3242",
+              }}
+            >
+              <div className="text-[12px] font-semibold mb-1" style={{ color: d.hex }}>
+                {d.cause}
+              </div>
+              <div className="text-[12px] text-[#ecedf0] leading-relaxed">{d.fix}</div>
+            </div>
+          ))}
+        </div>
+
+        <button
+          onClick={() => setBurstOpen(true)}
+          className="w-full py-4 rounded-xl text-base font-semibold transition hover:-translate-y-0.5"
+          style={{
+            background: "linear-gradient(135deg, #c9a961, #8a7340)",
+            color: "#1a1410",
+            boxShadow: "0 0 20px rgba(201,169,97,0.3)",
+          }}
+        >
+          ⚡ ابدأ الآن — دقيقتان فقط
+        </button>
+
+        {/* Quote */}
+        <div className="mt-4 px-4 py-3 bg-[#0f131c] border border-[#2a3242] border-r-[3px] border-r-[#c9a961] rounded-lg flex items-start gap-2">
+          <p className="flex-1 text-[12px] leading-relaxed text-[#ecedf0]">
+            «{SLUMP_QUOTES[quoteIdx]}»
+          </p>
+          <button
+            onClick={() => setQuoteIdx((p) => (p + 1) % SLUMP_QUOTES.length)}
+            aria-label="اقتباس آخر"
+            className="text-[#8a92a3] hover:text-[#c9a961] transition shrink-0"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="23 4 23 10 17 10" />
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {burstOpen && (
+        <SlumpBurstModal
+          onClose={() => setBurstOpen(false)}
+          onComplete={() => {
+            onCompleteBurst();
+            setBurstOpen(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function SlumpBurstModal({ onClose, onComplete }: { onClose: () => void; onComplete: () => void }) {
+  const [exercise] = useState<SlumpExercise>(
+    () => SLUMP_EXERCISES[Math.floor(Math.random() * SLUMP_EXERCISES.length)]
+  );
+  const [secondsLeft, setSecondsLeft] = useState<number>(exercise.duration);
+  const [running, setRunning] = useState<boolean>(true);
+  const [done, setDone] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!running || done) return;
+    if (secondsLeft <= 0) {
+      setDone(true);
+      return;
+    }
+    const t = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [secondsLeft, running, done]);
+
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${sec.toString().padStart(2, "0")}`;
+  };
+
+  const pct = ((exercise.duration - secondsLeft) / exercise.duration) * 100;
+
+  return (
+    <div onClick={onClose} className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-50 p-5">
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-[#141926] border-2 border-[#c9a961] rounded-2xl p-8 max-w-md w-full text-center"
+      >
+        {!done ? (
+          <>
+            <div className="text-[11px] tracking-[3px] text-[#c9a961] mb-3 font-medium">SLUMP BREAKER</div>
+            <div className="text-7xl mb-4">{exercise.emoji}</div>
+            <h2 className="font-semibold text-2xl mb-6">{exercise.name}</h2>
+
+            <div
+              className="text-7xl font-mono font-extrabold mb-4 tabular-nums"
+              style={{
+                background: "linear-gradient(180deg, #e6c577, #8a7340)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}
+            >
+              {formatTime(secondsLeft)}
+            </div>
+
+            <div className="h-2 rounded-full overflow-hidden mb-6" style={{ background: "#1b2230" }}>
+              <div
+                className="h-full transition-all duration-700"
+                style={{ width: `${pct}%`, background: "linear-gradient(90deg, #8a7340, #e6c577)" }}
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setRunning((r) => !r)}
+                className="flex-1 py-3 rounded-xl border border-[#2a3242] text-[#8a92a3] hover:text-white hover:border-[#c9a961] transition text-sm"
+              >
+                {running ? "⏸ إيقاف مؤقت" : "▶ متابعة"}
+              </button>
+              <button
+                onClick={() => {
+                  setDone(true);
+                }}
+                className="flex-1 py-3 rounded-xl bg-gradient-to-br from-[#c9a961] to-[#8a7340] text-[#1a1410] font-semibold text-sm hover:-translate-y-0.5 transition"
+              >
+                ✓ خلصت
+              </button>
+            </div>
+            <button onClick={onClose} className="mt-3 text-[11px] text-[#5a6273] hover:text-[#8a92a3]">
+              إلغاء
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="text-7xl mb-4">🎉</div>
+            <h2 className="text-2xl font-semibold mb-2">أحسنت!</h2>
+            <p className="text-[#8a92a3] mb-6">كسرت الخمول. الآن أنت في حالة أفضل من قبل دقيقتين.</p>
+            <button
+              onClick={onComplete}
+              className="w-full py-3.5 bg-gradient-to-br from-[#c9a961] to-[#8a7340] text-[#1a1410] rounded-xl font-semibold text-base hover:-translate-y-0.5 transition"
+            >
+              تم
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
