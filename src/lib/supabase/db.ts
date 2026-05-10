@@ -196,7 +196,14 @@ export async function fetchDeals(salesType?: "office" | "support"): Promise<Deal
   if (salesType) query = query.eq("sales_type", salesType);
   const { data, error } = await query.order("created_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []) as Deal[];
+  return (data ?? []).map((d) => ({ ...d, cycle_days: computeCycleDays(d) })) as Deal[];
+}
+
+function computeCycleDays(d: { created_at?: string; close_date?: string }): number {
+  if (!d.created_at) return 0;
+  const start = new Date(d.created_at).getTime();
+  const end = d.close_date ? new Date(d.close_date).getTime() : Date.now();
+  return Math.max(0, Math.floor((end - start) / 86_400_000));
 }
 
 export async function createDeal(
