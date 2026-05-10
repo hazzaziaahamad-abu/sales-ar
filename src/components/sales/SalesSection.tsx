@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import type { Deal, Marketer, Package, Employee, EmployeeTask } from "@/types";
-import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createFollowUpNote, fetchRecentFollowUpNotes, fetchPackages, fetchQuoteCommitments, addQuoteCommitment, removeQuoteCommitment, fetchEmployees, fetchEmployeeTasks, createEmployeeTask, createRenewal } from "@/lib/supabase/db";
+import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createFollowUpNote, fetchRecentFollowUpNotes, fetchPackages, fetchQuoteCommitments, addQuoteCommitment, removeQuoteCommitment, fetchEmployees, fetchEmployeeTasks, createEmployeeTask, createRenewal, fetchRenewals } from "@/lib/supabase/db";
 import { checkDealsForFollowUp, buildFollowUpTask, type FollowUpAction } from "@/lib/auto-followup";
 import { StarEmployeeCard, Leaderboard } from "@/components/star-employee";
 import { AssignTaskModal } from "@/components/tasks/AssignTaskModal";
@@ -125,6 +125,57 @@ const EMPTY_FORM = {
 
 export interface SalesPageProps {
   salesType: "office" | "support";
+}
+
+/** Auto-create a renewal one year out from a completed deal, with dedup. */
+async function autoCreateRenewalFromDeal(
+  dealId: string,
+  clientName: string,
+  clientPhone: string | undefined,
+  plan: string,
+  dealValue: number,
+  assignedRep: string | undefined,
+  salesType: "office" | "support",
+  author: string,
+) {
+  try {
+    const renewalDate = new Date();
+    renewalDate.setFullYear(renewalDate.getFullYear() + 1);
+    const target = renewalDate.toISOString().slice(0, 10);
+
+    /* Dedup: skip if a renewal already exists for this customer + plan within ±30d of target */
+    const existing = await fetchRenewals();
+    const normPhone = (clientPhone || "").replace(/\D/g, "");
+    const normName = clientName.trim();
+    const targetMs = new Date(target).getTime();
+    const dup = existing.find((r) => {
+      const samePhone = normPhone && (r.customer_phone || "").replace(/\D/g, "") === normPhone;
+      const sameName = !normPhone && (r.customer_name || "").trim() === normName;
+      if (!samePhone && !sameName) return false;
+      if (r.plan_name !== plan) return false;
+      const dMs = new Date(r.renewal_date).getTime();
+      return Math.abs(dMs - targetMs) <= 30 * 86_400_000;
+    });
+    if (dup) {
+      createFollowUpNote("deal", dealId, `ℹ️ تجديد تلقائي تم تخطّيه — موجود تجديد مشابه بتاريخ ${dup.renewal_date}.`, author).catch(console.error);
+      return;
+    }
+
+    await createRenewal({
+      customer_name: clientName,
+      customer_phone: clientPhone || undefined,
+      plan_name: plan,
+      plan_price: dealValue,
+      renewal_date: target,
+      status: "مجدول",
+      assigned_rep: assignedRep || undefined,
+      sales_type: salesType,
+      notes: `تجديد تلقائي من صفقة ${salesType === "office" ? "مكتب" : "دعم"} مكتملة — ${author}`,
+    });
+    createFollowUpNote("deal", dealId, `🔄 تم إنشاء تجديد تلقائي للعميل بتاريخ ${target}`, author).catch(console.error);
+  } catch (err) {
+    console.error("Auto-renewal creation failed:", err);
+  }
 }
 
 export function SalesSection({ salesType }: SalesPageProps) {
@@ -750,22 +801,9 @@ export function SalesSection({ salesType }: SalesPageProps) {
             createFollowUpNote("deal", editingId, `📝 تحديث تلقائي:\n${changes.join("\n")}`, author).catch(console.error);
           }
 
-          /* Auto-create renewal when deal is completed */
+          /* Auto-create renewal when deal transitions to "مكتملة" */
           if (oldDeal.stage !== "مكتملة" && form.stage === "مكتملة" && form.plan) {
-            const renewalDate = new Date();
-            renewalDate.setFullYear(renewalDate.getFullYear() + 1);
-            createRenewal({
-              customer_name: form.client_name,
-              customer_phone: form.client_phone || undefined,
-              plan_name: form.plan,
-              plan_price: form.deal_value,
-              renewal_date: renewalDate.toISOString().slice(0, 10),
-              status: "مجدول",
-              assigned_rep: form.assigned_rep_name || undefined,
-              notes: `تجديد تلقائي من صفقة مكتملة — ${author}`,
-            }).then(() => {
-              createFollowUpNote("deal", editingId, `🔄 تم إنشاء تجديد تلقائي للعميل بتاريخ ${renewalDate.toISOString().slice(0, 10)}`, author).catch(console.error);
-            }).catch(console.error);
+            autoCreateRenewalFromDeal(editingId, form.client_name, form.client_phone, form.plan, form.deal_value, form.assigned_rep_name, salesType, author);
           }
         }
       } else {
@@ -789,6 +827,11 @@ export function SalesSection({ salesType }: SalesPageProps) {
           sales_type: salesType,
         });
         setDeals((prev) => [created, ...prev]);
+
+        /* Auto-create renewal if the new deal is created directly as completed */
+        if (form.stage === "مكتملة" && form.plan) {
+          autoCreateRenewalFromDeal(created.id, form.client_name, form.client_phone, form.plan, form.deal_value, form.assigned_rep_name, salesType, authUser?.name || "النظام");
+        }
       }
       setModalOpen(false);
     } catch (err) {

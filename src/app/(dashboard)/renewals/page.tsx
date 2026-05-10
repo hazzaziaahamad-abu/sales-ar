@@ -319,16 +319,22 @@ export default function RenewalsPage() {
     }
   }
 
+  /* sales type tabs: all / office / support */
+  const [salesTypeTab, setSalesTypeTab] = useState<"all" | "office" | "support">("all");
+  const typedRenewals = salesTypeTab === "all"
+    ? renewals
+    : renewals.filter((r) => (r.sales_type || "support") === salesTypeTab);
+
   /* month filter — by month only (ignoring year) based on renewal_date */
   const { activeMonthIndex, filterCutoff } = useTopbarControls();
   const allMonthRenewals = filterCutoff
-    ? renewals.filter((r) => new Date(r.renewal_date) >= filterCutoff)
+    ? typedRenewals.filter((r) => new Date(r.renewal_date) >= filterCutoff)
     : activeMonthIndex
-      ? renewals.filter((r) => {
+      ? typedRenewals.filter((r) => {
           const rd = new Date(r.renewal_date);
           return rd.getMonth() + 1 === activeMonthIndex.month;
         })
-      : renewals;
+      : typedRenewals;
 
   // Separate closed-forever from active renewals
   const closedForeverRenewals = allMonthRenewals.filter(isClosedForever);
@@ -779,6 +785,33 @@ export default function RenewalsPage() {
           <Plus className="w-4 h-4" />
           إضافة تجديد
         </Button>
+      </div>
+
+      {/* ─── Sales Type Tabs ─── */}
+      <div className="flex items-center gap-1.5 bg-white/[0.04] rounded-xl p-1 border border-white/[0.06] w-fit">
+        {([
+          { key: "all" as const, label: "الكل", count: renewals.length },
+          { key: "office" as const, label: "تجديدات المكتب", count: renewals.filter((r) => r.sales_type === "office").length },
+          { key: "support" as const, label: "تجديدات الدعم", count: renewals.filter((r) => (r.sales_type || "support") === "support").length },
+        ]).map((tab) => {
+          const active = salesTypeTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setSalesTypeTab(tab.key)}
+              className={`px-3.5 py-1.5 rounded-lg text-[12px] font-semibold transition-all flex items-center gap-1.5 ${
+                active
+                  ? "bg-cyan/15 text-cyan border border-cyan/30"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {tab.label}
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${active ? "bg-cyan/20" : "bg-white/[0.05]"}`}>
+                {tab.count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* ─── Achievement Summary ─── */}
