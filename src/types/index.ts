@@ -189,6 +189,7 @@ export interface Renewal {
   cancel_reason?: string;
   assigned_rep?: string;
   notes?: string;
+  sales_type?: "office" | "support";
   created_at: string;
   updated_at: string;
 }
