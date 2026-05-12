@@ -27,7 +27,7 @@ import {
   getKpiStatus,
   KPI_STATUS_STYLES,
 } from "@/lib/utils/constants";
-import { formatMoneyFull, formatDate, formatPhone, formatPercent } from "@/lib/utils/format";
+import { formatMoneyFull, formatDate, formatPhone, formatPercent, todayLocal } from "@/lib/utils/format";
 import { FollowUpLogButton } from "@/components/follow-up-log";
 import { StatCard } from "@/components/ui/stat-card";
 import { DonutChart } from "@/components/ui/donut-chart";
@@ -190,7 +190,7 @@ export default function RenewalsPage() {
   const [summaryFilter, setSummaryFilter] = useState<SummaryFilterType>(null);
 
   /* daily target selection — persisted per day in localStorage */
-  const todayKey = `daily_target_${new Date().toISOString().slice(0, 10)}`;
+  const todayKey = `daily_target_${todayLocal()}`;
   const [dailyTargetIds, setDailyTargetIds] = useState<Set<string>>(() => {
     if (typeof window === "undefined") return new Set();
     try {
@@ -295,7 +295,7 @@ export default function RenewalsPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `تقرير-الهدف-اليومي-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.download = `تقرير-الهدف-اليومي-${todayLocal()}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -370,7 +370,7 @@ export default function RenewalsPage() {
   }, [orgId]);
 
   /* ─── Quote Commitment ─── */
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = todayLocal();
   const [commitments, setCommitments] = useState<{ user_name: string; created_at: string }[]>([]);
   const myName = authUser?.name || authUser?.email || "";
   const hasCommitted = commitments.some((c) => c.user_name === myName);

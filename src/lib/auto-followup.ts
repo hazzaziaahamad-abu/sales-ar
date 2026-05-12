@@ -1,4 +1,5 @@
 import type { Deal, EmployeeTask } from "@/types";
+import { todayLocal } from "@/lib/utils/format";
 
 /* ─── Follow-up Rules ─── */
 
@@ -185,7 +186,7 @@ export function buildFollowUpTask(
     assigned_to_name: action.deal.assigned_rep_name || "",
     assigned_by: createdBy,
     assigned_by_name: createdByName || "النظام",
-    due_date: new Date().toISOString().slice(0, 10),
+    due_date: todayLocal(),
     entity_type: "deal",
     entity_id: action.deal.id,
     client_name: action.deal.client_name,

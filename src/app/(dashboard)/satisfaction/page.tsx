@@ -5,6 +5,7 @@ import { fetchReviews, createReview, updateReview, deleteReview } from "@/lib/su
 import { useAuth } from "@/lib/auth-context";
 import { useTopbarControls } from "@/components/layout/topbar-context";
 import { REVIEW_CATEGORIES, REVIEW_TYPES, PLANS, getKpiStatus, KPI_STATUS_STYLES } from "@/lib/utils/constants";
+import { todayLocal } from "@/lib/utils/format";
 import { KPICard } from "@/components/ui/kpi-card";
 import { LineChart } from "@/components/ui/line-chart";
 import { BarChart } from "@/components/ui/bar-chart";
@@ -61,7 +62,7 @@ const EMPTY_FORM = {
   type: "very_satisfied" as ReviewType,
   category: "المنتج",
   plan: "" as string,
-  review_date: new Date().toISOString().slice(0, 10),
+  review_date: todayLocal(),
   comment: "",
 };
 
@@ -226,7 +227,7 @@ export default function SatisfactionPage() {
       type: review.type,
       category: review.category || "المنتج",
       plan: (review as Review & { plan?: string }).plan || "",
-      review_date: review.review_date || new Date().toISOString().slice(0, 10),
+      review_date: review.review_date || todayLocal(),
       comment: review.comment || "",
     });
     setModalOpen(true);

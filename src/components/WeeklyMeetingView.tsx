@@ -5,6 +5,7 @@ import { fetchWeeklyRetentionStats, fetchWeeklyReferralStats, fetchEmployees, fe
 import { createClient } from "@/lib/supabase/client";
 import type { Employee, Deal, EmployeeTask } from "@/types";
 import { useAuth } from "@/lib/auth-context";
+import { todayLocal, dateToLocal } from "@/lib/utils/format";
 
 /* ─── Design Tokens ─── */
 const T = {
@@ -113,7 +114,7 @@ export default function WeeklyMeetingView() {
     const diff = (day + 1) % 7;
     const sat = new Date(now);
     sat.setDate(now.getDate() - diff);
-    return sat.toISOString().slice(0, 10);
+    return dateToLocal(sat);
   }, []);
 
   // Auto-save with debounce to Supabase
@@ -1096,9 +1097,9 @@ function Tab6MeetingCalendar({ meetings, onRefresh }: { meetings: EmployeeTask[]
   useEffect(() => { fetchEmployees().then(e => setEmployees(e.filter(x => x.status === "نشط"))).catch(console.error); }, []);
   useEffect(() => { const iv = setInterval(() => setTick(t => t + 1), 30_000); return () => clearInterval(iv); }, []);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
   const weekDays = useMemo(() => getWeekDays(calDate), [calDate]);
-  const calDateStr = calDate.toISOString().slice(0, 10);
+  const calDateStr = dateToLocal(calDate);
 
   const getMeetingsForDate = useCallback((dateStr: string) =>
     meetings.filter(m => m.due_date === dateStr).sort((a, b) => (a.due_time || "00:00").localeCompare(b.due_time || "00:00")),
@@ -1237,7 +1238,7 @@ function Tab6MeetingCalendar({ meetings, onRefresh }: { meetings: EmployeeTask[]
         {calView === "week" && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 8 }}>
             {weekDays.map(day => {
-              const dateStr = day.toISOString().slice(0, 10);
+              const dateStr = dateToLocal(day);
               const dayMeetings = getMeetingsForDate(dateStr);
               const isToday = dateStr === today;
               return (

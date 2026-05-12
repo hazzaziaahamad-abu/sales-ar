@@ -1,4 +1,5 @@
 import type { Deal } from "@/types";
+import { todayLocal } from "@/lib/utils/format";
 
 /* ─── Badge Definitions ─── */
 
@@ -241,7 +242,7 @@ export function buildLeaderboard(
     fullPriceCount: number;
   }> = {};
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
   const pkgPriceMap = new Map<string, number>();
   packages?.forEach((p) => pkgPriceMap.set(p.name.toLowerCase().trim(), p.original_price));
 

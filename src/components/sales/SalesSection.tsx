@@ -12,7 +12,7 @@ import { useTopbarControls } from "@/components/layout/topbar-context";
 import { STAGES, SOURCES, SOURCE_COLORS, PLANS } from "@/lib/utils/constants";
 
 import SalesKPIsView from "@/components/SalesKPIsView";
-import { formatMoney, formatMoneyFull, formatDate, formatPhone, formatPercent } from "@/lib/utils/format";
+import { formatMoney, formatMoneyFull, formatDate, formatPhone, formatPercent, todayLocal, dateToLocal } from "@/lib/utils/format";
 import { FollowUpLogButton } from "@/components/follow-up-log";
 import { ClientProfilePanel } from "@/components/client-profile-panel";
 import { AchievementSummary } from "@/components/achievement-summary";
@@ -115,11 +115,11 @@ const EMPTY_FORM = {
   source: "حملة اعلانية",
   stage: "قيد التواصل",
   plan: "",
-  deal_date: new Date().toISOString().slice(0, 10),
+  deal_date: todayLocal(),
   probability: 50,
   marketer_name: "",
   notes: "",
-  last_contact: new Date().toISOString().slice(0, 10),
+  last_contact: todayLocal(),
   callback_date: "",
 };
 
@@ -141,7 +141,7 @@ async function autoCreateRenewalFromDeal(
   try {
     const renewalDate = new Date();
     renewalDate.setFullYear(renewalDate.getFullYear() + 1);
-    const target = renewalDate.toISOString().slice(0, 10);
+    const target = dateToLocal(renewalDate);
 
     /* Dedup: skip if a renewal already exists for this customer + plan within ±30d of target */
     const existing = await fetchRenewals();
@@ -231,13 +231,13 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const [dismissedFollowUps, setDismissedFollowUps] = useState<Set<string>>(() => {
     if (typeof window === "undefined") return new Set();
     try {
-      const saved = localStorage.getItem(`followup_dismissed_${new Date().toISOString().slice(0, 10)}`);
+      const saved = localStorage.getItem(`followup_dismissed_${todayLocal()}`);
       return saved ? new Set(JSON.parse(saved)) : new Set();
     } catch { return new Set(); }
   });
 
   /* daily target selection — persisted per day in localStorage */
-  const salesTodayKey = `sales_daily_target_${salesType}_${new Date().toISOString().slice(0, 10)}`;
+  const salesTodayKey = `sales_daily_target_${salesType}_${todayLocal()}`;
   const [dailyTargetIds, setDailyTargetIds] = useState<Set<string>>(() => {
     if (typeof window === "undefined") return new Set();
     try {
@@ -436,7 +436,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `تقرير-${isOffice ? "مبيعات-مكتب" : "مبيعات-دعم"}-يومي-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.download = `تقرير-${isOffice ? "مبيعات-مكتب" : "مبيعات-دعم"}-يومي-${todayLocal()}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -522,7 +522,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
   }, [orgId, salesType]);
 
   /* ─── Quote Commitment ─── */
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = todayLocal();
   const [commitments, setCommitments] = useState<{ user_name: string; created_at: string }[]>([]);
   const myName = authUser?.name || authUser?.email || "";
   const hasCommitted = commitments.some((c) => c.user_name === myName);
@@ -746,11 +746,11 @@ export function SalesSection({ salesType }: SalesPageProps) {
       source: deal.source || "حملة اعلانية",
       stage: deal.stage,
       plan: deal.plan || "",
-      deal_date: deal.deal_date || new Date().toISOString().slice(0, 10),
+      deal_date: deal.deal_date || todayLocal(),
       probability: deal.probability,
       marketer_name: deal.marketer_name || "",
       notes: deal.notes || "",
-      last_contact: deal.last_contact || deal.deal_date || new Date().toISOString().slice(0, 10),
+      last_contact: deal.last_contact || deal.deal_date || todayLocal(),
       callback_date: deal.callback_date ? deal.callback_date.slice(0, 16) : "",
     });
     setModalOpen(true);
@@ -866,7 +866,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
     setDismissedFollowUps((prev) => {
       const next = new Set(prev);
       next.add(dealId);
-      localStorage.setItem(`followup_dismissed_${new Date().toISOString().slice(0, 10)}`, JSON.stringify([...next]));
+      localStorage.setItem(`followup_dismissed_${todayLocal()}`, JSON.stringify([...next]));
       return next;
     });
   }

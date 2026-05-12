@@ -13,7 +13,7 @@ import {
 import { fetchDeals, fetchRenewals, fetchEmployees, fetchRecentFollowUpNotes, upsertSalesGuideSetting, fetchSalesGuideSettings, fetchTickets, fetchUserLoginLogs, fetchActivityLogs, type UserLoginLog } from "@/lib/supabase/db";
 import type { ActivityLog } from "@/types";
 import { useAuth } from "@/lib/auth-context";
-import { formatMoneyFull } from "@/lib/utils/format";
+import { formatMoneyFull, todayLocal, dateToLocal } from "@/lib/utils/format";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Deal, Renewal, Employee, Ticket } from "@/types";
@@ -524,7 +524,7 @@ export default function SecretaryPage() {
     goal90: true, quickTasks: true, tasks: true, attendance: true,
   });
 
-  const todayKey = new Date().toISOString().slice(0, 10);
+  const todayKey = todayLocal();
 
   // Tasks persisted in database (syncs across devices)
   const [tasks, setTasks] = useState<TaskItem[]>([]);
@@ -646,7 +646,7 @@ export default function SecretaryPage() {
   // Support health (tickets)
   const supportHealth = useMemo(() => {
     const now = Date.now();
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = todayLocal();
     const isOpen = (t: Ticket) => t.status !== "محلول";
     const openTickets = tickets.filter(isOpen);
     const urgentOpen = openTickets.filter(t => t.priority === "عاجل");
@@ -787,11 +787,11 @@ export default function SecretaryPage() {
 
   // Briefing stats — summaries for today / yesterday / week / month
   const briefingStats = useMemo(() => {
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const yesterdayStr = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const todayStr = todayLocal();
+    const yesterdayStr = dateToLocal(new Date(Date.now() - 24 * 60 * 60 * 1000));
 
     // Week range: last 7 days inclusive (today ... today - 6)
-    const weekStart = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const weekStart = dateToLocal(new Date(Date.now() - 6 * 24 * 60 * 60 * 1000));
 
     // Split deals by sales_type
     const officeDeals = deals.filter(d => d.sales_type === "office" || !d.sales_type);
@@ -878,9 +878,9 @@ export default function SecretaryPage() {
 
   // Performers — top/bottom per department for the selected period
   const performers = useMemo(() => {
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const yesterdayStr = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    const weekStart = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const todayStr = todayLocal();
+    const yesterdayStr = dateToLocal(new Date(Date.now() - 24 * 60 * 60 * 1000));
+    const weekStart = dateToLocal(new Date(Date.now() - 6 * 24 * 60 * 60 * 1000));
 
     const inRange = (dateStr: string | undefined, start: string, end: string) =>
       !!dateStr && dateStr.slice(0, 10) >= start && dateStr.slice(0, 10) <= end;
@@ -989,7 +989,7 @@ export default function SecretaryPage() {
     // Only flag departments as weak after 3 PM (end-of-day review window)
     if (now.getHours() < 15) return [];
 
-    const todayStr = now.toISOString().slice(0, 10);
+    const todayStr = dateToLocal(now);
     const inToday = (s?: string) => !!s && s.slice(0, 10) === todayStr;
     const weak: { key: string; label: string; attendees: string; reason: string }[] = [];
 
