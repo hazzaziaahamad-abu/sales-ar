@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { todayLocal } from "@/lib/utils/format";
 
 export interface AuthUser {
   id: string;
@@ -72,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(authUserData);
 
     // Log login (once per session)
-    const loginKey = `login_logged_${authUser.id}_${new Date().toISOString().slice(0, 10)}`;
+    const loginKey = `login_logged_${authUser.id}_${todayLocal()}`;
     if (!sessionStorage.getItem(loginKey)) {
       sessionStorage.setItem(loginKey, "1");
       supabase.from("user_login_logs").insert({

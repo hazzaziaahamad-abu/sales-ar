@@ -21,7 +21,7 @@ import {
   type DailyTaskTemplate,
 } from "@/lib/supabase/db";
 import { SOURCES, PLANS } from "@/lib/utils/constants";
-import { formatMoney } from "@/lib/utils/format";
+import { formatMoney, todayLocal } from "@/lib/utils/format";
 import {
   CheckCircle2,
   Clock,
@@ -467,7 +467,7 @@ export default function MyTasksPage() {
         assigned_to_name: user.name,
         assigned_by: user.id,
         assigned_by_name: user.name,
-        due_date: new Date().toISOString().slice(0, 10),
+        due_date: todayLocal(),
         client_name: clientForm.client_name.trim(),
         client_phone: clientForm.client_phone.trim() || undefined,
         notes: clientForm.notes.trim() || undefined,

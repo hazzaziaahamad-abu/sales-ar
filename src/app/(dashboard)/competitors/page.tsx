@@ -8,6 +8,7 @@ import {
   Sparkles, Loader2, BrainCircuit,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { todayLocal } from "@/lib/utils/format";
 
 /* ─── Types ─── */
 interface CompetitorPlan {
@@ -102,7 +103,7 @@ export default function CompetitorsPage() {
   const [compForm, setCompForm] = useState(emptyComp);
   const [planForm, setPlanForm] = useState<{ name: string; price: number; billing: "monthly" | "yearly" | "once"; features: string }>({ name: "", price: 0, billing: "monthly", features: "" });
   const [offerForm, setOfferForm] = useState({ title: "", description: "", start_date: "", end_date: "" });
-  const [updateForm, setUpdateForm] = useState<{ title: string; description: string; date: string; source: string; type: "feature" | "pricing" | "partnership" | "other" }>({ title: "", description: "", date: new Date().toISOString().slice(0, 10), source: "", type: "feature" });
+  const [updateForm, setUpdateForm] = useState<{ title: string; description: string; date: string; source: string; type: "feature" | "pricing" | "partnership" | "other" }>({ title: "", description: "", date: todayLocal(), source: "", type: "feature" });
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(competitors));
@@ -171,7 +172,7 @@ export default function CompetitorsPage() {
     if (!selected || !updateForm.title.trim()) return;
     const upd: CompetitorUpdate = { id: genId(), ...updateForm };
     setCompetitors(prev => prev.map(c => c.id === selected.id ? { ...c, updates: [upd, ...c.updates] } : c));
-    setUpdateForm({ title: "", description: "", date: new Date().toISOString().slice(0, 10), source: "", type: "feature" });
+    setUpdateForm({ title: "", description: "", date: todayLocal(), source: "", type: "feature" });
     setShowAddUpdate(false);
   }
 
@@ -198,7 +199,7 @@ export default function CompetitorsPage() {
         weaknesses: c.weaknesses,
         plans: c.plans.map(p => ({ name: p.name, price: p.price, billing: BILLING_LABELS[p.billing], features: p.features })),
         active_offers: c.offers.filter(o => {
-          const now = new Date().toISOString().slice(0, 10);
+          const now = todayLocal();
           return (!o.end_date || o.end_date >= now) && (!o.start_date || o.start_date <= now);
         }).map(o => ({ title: o.title, description: o.description })),
         recent_updates: c.updates.slice(0, 5).map(u => ({ title: u.title, type: UPDATE_TYPES[u.type]?.label, date: u.date, description: u.description })),
@@ -479,7 +480,7 @@ ${JSON.stringify(context, null, 2)}`,
               ) : (
                 <div className="space-y-2">
                   {selected.offers.map(o => {
-                    const now = new Date().toISOString().slice(0, 10);
+                    const now = todayLocal();
                     const isActive = (!o.end_date || o.end_date >= now) && (!o.start_date || o.start_date <= now);
                     return (
                       <div key={o.id} className={`flex items-start gap-3 px-3 py-2.5 rounded-xl border ${isActive ? "bg-amber-500/[0.06] border-amber-500/15" : "bg-white/[0.01] border-white/[0.04] opacity-60"}`}>

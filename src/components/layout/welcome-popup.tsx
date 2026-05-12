@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Rocket } from "lucide-react";
+import { todayLocal } from "@/lib/utils/format";
 
 const MOTIVATIONAL_QUOTES = [
   "كل يوم هو فرصة جديدة لتحقيق إنجاز عظيم 🌟",
@@ -25,7 +26,7 @@ function getGreeting(): string {
 }
 
 function getTodayKey(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayLocal();
 }
 
 export function WelcomePopup() {

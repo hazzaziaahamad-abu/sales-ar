@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { dateToLocal } from "@/lib/utils/format";
 import {
   fetchTargetClients,
   createTargetClient,
@@ -134,7 +135,7 @@ const EMPTY_FORM = {
 export default function TargetingPage() {
   const { activeOrgId } = useAuth();
   const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10);
+  const todayStr = dateToLocal(today);
 
   const [month, setMonth] = useState(today.getMonth() + 1);
   const [year, setYear] = useState(today.getFullYear());

@@ -1,4 +1,5 @@
 import { createClient } from "./client";
+import { todayLocal } from "@/lib/utils/format";
 import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, MonthlyBudget, StartupCost, Marketer, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating, FollowUpNote, MentionNotification, PendingDeal, TargetClient, GiftOffer, EmployeeTask, Package, AcademyContent, LearningStage, LearningLesson, LearningQuiz, ActivityLog, TrainingKnowledge, ProductFeature, TrainingSessionLog } from "@/types";
 
 const DEFAULT_ORG = "00000000-0000-0000-0000-000000000001";
@@ -1510,7 +1511,7 @@ export async function approvePendingDeal(id: string, reviewerName: string): Prom
   // 2. Create real deal
   const prefix = pd.sales_type === "support" ? "D" : "S";
   const client_code = await getNextClientCode("deals", prefix);
-  const dealDate = new Date().toISOString().slice(0, 10);
+  const dealDate = todayLocal();
   const d = new Date(dealDate);
 
   const { data: deal, error: createErr } = await supabase

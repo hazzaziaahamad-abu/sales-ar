@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, X, Loader2, Download } from "lucide-react";
+import { todayLocal, dateToLocal } from "@/lib/utils/format";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -179,12 +180,12 @@ function toDateStr(val: unknown): string | undefined {
   if (!val && val !== 0) return undefined;
   if (typeof val === "number") {
     const d = new Date(Math.round((val - 25569) * 86400 * 1000));
-    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+    if (!isNaN(d.getTime())) return dateToLocal(d);
   }
   const s = String(val).trim();
   if (!s) return undefined;
   const d = new Date(s);
-  return isNaN(d.getTime()) ? undefined : d.toISOString().slice(0, 10);
+  return isNaN(d.getTime()) ? undefined : dateToLocal(d);
 }
 
 function normProb(val: unknown): number {
@@ -437,7 +438,7 @@ export default function UploadPage() {
 
             const dealDate =
               toDateStr(col("deal_date") >= 0 ? row[col("deal_date")] : undefined) ??
-              new Date().toISOString().slice(0, 10);
+              todayLocal();
             const d = new Date(dealDate);
 
             const rawRepName = cellStr(row, col("assigned_rep"));
@@ -563,7 +564,7 @@ export default function UploadPage() {
 
             const phone = cellStr(row, col("customer_phone")) || undefined;
             const renewalDate = toDateStr(col("renewal_date") >= 0 ? row[col("renewal_date")] : undefined)
-              ?? new Date().toISOString().slice(0, 10);
+              ?? todayLocal();
 
             const key = renewalKey(customerName, phone, renewalDate);
             const existingRenewal = renewalMap.get(key);
@@ -654,7 +655,7 @@ export default function UploadPage() {
     // Sales sheet
     const salesHeaders = ["اسم العميل", "رقم الجوال", "المصدر", "الباقة", "المرحلة", "القيمة", "احتمالية", "المسؤول", "التاريخ", "آخر تواصل", "ملاحظات"];
     const salesSample = [
-      ["مثال: محمد", "05xxxxxxxx", SOURCES[0], PLANS[0], STAGES[0], "5000", "50", empNames[0] || "", new Date().toISOString().slice(0, 10), new Date().toISOString().slice(0, 10), ""],
+      ["مثال: محمد", "05xxxxxxxx", SOURCES[0], PLANS[0], STAGES[0], "5000", "50", empNames[0] || "", todayLocal(), todayLocal(), ""],
     ];
     const salesWs = XLSX.utils.aoa_to_sheet([salesHeaders, ...salesSample]);
     salesWs["!cols"] = salesHeaders.map(() => ({ wch: 18 }));
@@ -663,7 +664,7 @@ export default function UploadPage() {
     // Renewals sheet
     const renewHeaders = ["اسم العميل", "رقم الجوال", "الباقة", "سعر الخطة", "تاريخ التجديد", "الحالة", "المسؤول", "ملاحظات"];
     const renewSample = [
-      ["مثال: أحمد", "05xxxxxxxx", PLANS[0], "3000", new Date().toISOString().slice(0, 10), "مجدول", empNames[0] || "", ""],
+      ["مثال: أحمد", "05xxxxxxxx", PLANS[0], "3000", todayLocal(), "مجدول", empNames[0] || "", ""],
     ];
     const renewWs = XLSX.utils.aoa_to_sheet([renewHeaders, ...renewSample]);
     renewWs["!cols"] = renewHeaders.map(() => ({ wch: 18 }));
@@ -672,7 +673,7 @@ export default function UploadPage() {
     // Support sheet
     const supportHeaders = ["اسم العميل", "رقم الجوال", "المشكلة", "الأولوية", "الحالة", "المسؤول", "تاريخ الفتح", "ملاحظات"];
     const supportSample = [
-      ["مثال: سارة", "05xxxxxxxx", "وصف المشكلة", "عادي", "مفتوح", empNames[0] || "", new Date().toISOString().slice(0, 10), ""],
+      ["مثال: سارة", "05xxxxxxxx", "وصف المشكلة", "عادي", "مفتوح", empNames[0] || "", todayLocal(), ""],
     ];
     const supportWs = XLSX.utils.aoa_to_sheet([supportHeaders, ...supportSample]);
     supportWs["!cols"] = supportHeaders.map(() => ({ wch: 18 }));
@@ -690,7 +691,7 @@ export default function UploadPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `قالب-الاستيراد-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    a.download = `قالب-الاستيراد-${todayLocal()}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
   }, [employees]);

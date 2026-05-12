@@ -10,7 +10,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useTopbarControls } from "@/components/layout/topbar-context";
 import { PRIORITIES, TICKET_STATUSES, TICKET_CATEGORIES, PROBLEM_CATEGORIES, SERVICE_CATEGORIES, REQUEST_TYPES } from "@/lib/utils/constants";
 import { PRIORITY_COLORS, TICKET_STATUS_COLORS } from "@/lib/utils/constants";
-import { formatDate, formatPhone } from "@/lib/utils/format";
+import { formatDate, formatPhone, todayLocal } from "@/lib/utils/format";
 import type { Ticket, Employee, ActivityLog } from "@/types";
 
 import { AchievementSummary } from "@/components/achievement-summary";
@@ -144,7 +144,7 @@ const EMPTY_FORM: TicketForm = {
   priority: "عادي",
   status: "مفتوح",
   assigned_agent_name: "",
-  open_date: new Date().toISOString().slice(0, 10),
+  open_date: todayLocal(),
   due_date: "",
 };
 
@@ -561,7 +561,7 @@ export default function SupportPage() {
   const dailyQuote = getDailySupportQuote();
 
   /* ─── Quote Commitment ─── */
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = todayLocal();
   const [commitments, setCommitments] = useState<{ user_name: string; created_at: string }[]>([]);
   const myName = authUser?.name || authUser?.email || "";
   const hasCommitted = commitments.some((c) => c.user_name === myName);
@@ -1322,7 +1322,7 @@ export default function SupportPage() {
                           const config = ACTION_CONFIG[log.action];
                           const ActionIcon = config.icon;
                           const logDate = new Date(log.created_at);
-                          const dateStr = formatDate(logDate.toISOString().slice(0, 10));
+                          const dateStr = formatDate(logDate);
                           const timeStr = logDate.toLocaleTimeString("ar-SA-u-ca-gregory", { hour: "2-digit", minute: "2-digit" });
 
                           return (

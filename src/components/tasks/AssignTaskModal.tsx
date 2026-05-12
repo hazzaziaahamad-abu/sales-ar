@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { fetchUserProfiles, createEmployeeTask } from "@/lib/supabase/db";
 import { X, UserPlus, CheckCircle2 } from "lucide-react";
+import { todayLocal } from "@/lib/utils/format";
 
 const TASK_TYPES = [
   { value: "call", label: "📞 اتصال" },
@@ -55,7 +56,7 @@ export function AssignTaskModal({
     description: "",
     task_type: defaultTaskType || (entityType === "renewal" ? "renewal" : "followup"),
     priority: "medium",
-    due_date: new Date().toISOString().slice(0, 10),
+    due_date: todayLocal(),
     due_time: "",
     notes: "",
   });
