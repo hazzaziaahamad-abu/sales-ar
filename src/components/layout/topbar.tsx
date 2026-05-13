@@ -98,17 +98,17 @@ export function Topbar({ unreadCount = 0, onBellClick, onMenuClick }: TopbarProp
 
           <div className="min-w-0">
             <div className="mb-1 flex items-center gap-2 flex-wrap">
-              <span className="rounded-full border border-cyan/15 bg-cyan-dim px-2 sm:px-2.5 py-0.5 sm:py-1 text-[9px] sm:text-[10px] font-semibold tracking-[0.18em] text-cyan uppercase">
+              <span className="rounded-full border border-cyan/15 bg-cyan-dim px-2 sm:px-2.5 py-0.5 sm:py-1 text-[11px] sm:text-[12px] font-semibold tracking-[0.18em] text-cyan uppercase">
                 لوحة التحكم
               </span>
               {showPeriodBadge && (
-                <span className="rounded-full bg-cyan/15 border border-cyan/25 px-2 sm:px-2.5 py-0.5 sm:py-1 text-[9px] sm:text-[10px] font-medium text-cyan">
+                <span className="rounded-full bg-cyan/15 border border-cyan/25 px-2 sm:px-2.5 py-0.5 sm:py-1 text-[11px] sm:text-[12px] font-medium text-cyan">
                   {activeMonth || activeFilter}
                 </span>
               )}
             </div>
             <h2 className="text-base sm:text-xl font-extrabold tracking-tight text-foreground truncate">{title}</h2>
-            <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-muted-foreground hidden sm:block">{subtitle}</p>
+            <p className="mt-0.5 sm:mt-1 text-[12px] sm:text-xs text-muted-foreground hidden sm:block">{subtitle}</p>
           </div>
         </div>
 
@@ -117,7 +117,7 @@ export function Topbar({ unreadCount = 0, onBellClick, onMenuClick }: TopbarProp
           {showRefresh && (
             <div className="hidden md:flex items-center gap-2 rounded-2xl border border-border bg-white/[0.05] px-3 py-2">
               {formattedLastUpdated && (
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-[13px] text-muted-foreground">
                   آخر تحديث: {formattedLastUpdated}
                 </p>
               )}
@@ -143,7 +143,7 @@ export function Topbar({ unreadCount = 0, onBellClick, onMenuClick }: TopbarProp
                   onFilterChange(filter);
                   if (filter !== "الكل") onMonthChange(null);
                 }}
-                className={`px-3 sm:px-4 py-1.5 rounded-[14px] text-[10px] sm:text-xs transition-all ${
+                className={`px-3 sm:px-4 py-1.5 rounded-[14px] text-[12px] sm:text-xs transition-all ${
                   activeFilter === filter && !activeMonth
                     ? "bg-cyan/15 text-cyan font-medium border border-cyan/30 shadow-[0_0_10px_rgba(0,212,255,0.15)]"
                     : "text-muted-foreground hover:text-foreground border border-transparent"
@@ -168,7 +168,7 @@ export function Topbar({ unreadCount = 0, onBellClick, onMenuClick }: TopbarProp
           <Button variant="ghost" size="icon" className="relative rounded-[14px] sm:rounded-2xl bg-white/[0.05] hover:bg-white/[0.10]" onClick={onBellClick}>
             <Bell className="w-4 h-4 text-amber" />
             {unreadCount > 0 && (
-              <span className="absolute -top-0.5 -left-0.5 w-5 h-5 bg-cc-red rounded-full text-[9px] text-white flex items-center justify-center font-bold">
+              <span className="absolute -top-0.5 -left-0.5 w-5 h-5 bg-cc-red rounded-full text-[11px] text-white flex items-center justify-center font-bold">
                 {unreadCount}
               </span>
             )}
@@ -215,7 +215,7 @@ export function Topbar({ unreadCount = 0, onBellClick, onMenuClick }: TopbarProp
                   onFilterChange("الكل");
                 }
               }}
-              className={`relative px-3 sm:px-4 py-1.5 sm:py-2 rounded-[14px] text-[10px] sm:text-xs whitespace-nowrap transition-all shrink-0 font-medium ${
+              className={`relative px-3 sm:px-4 py-1.5 sm:py-2 rounded-[14px] text-[12px] sm:text-xs whitespace-nowrap transition-all shrink-0 font-medium ${
                 isSelected
                   ? "bg-cyan/15 text-cyan border border-cyan/30 shadow-[0_0_12px_rgba(0,212,255,0.15)]"
                   : isCurrentMonth

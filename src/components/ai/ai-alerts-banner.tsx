@@ -54,7 +54,7 @@ export function AIAlertsBanner() {
           {visibleAlerts.length > 1 && (
             <button
               onClick={() => setIsExpanded(!isExpanded)}
-              className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+              className="flex items-center gap-1 text-[12px] text-muted-foreground hover:text-foreground"
             >
               {visibleAlerts.length - 1} تنبيهات أخرى
               {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}

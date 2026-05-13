@@ -508,7 +508,7 @@ export default function FinancePage() {
             />
             <div className="cc-card rounded-[14px] p-4">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] text-muted-foreground">النمو الشهري</span>
+                <span className="text-[12px] text-muted-foreground">النمو الشهري</span>
                 {momGrowth !== null && momGrowth >= 0 ? (
                   <ArrowUp className="w-4 h-4 text-cc-green" />
                 ) : (
@@ -521,7 +521,7 @@ export default function FinancePage() {
               }`}>
                 {momGrowth !== null ? `${momGrowth > 0 ? "+" : ""}${momGrowth}%` : "—"}
               </p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">MoM%</p>
+              <p className="text-[12px] text-muted-foreground mt-0.5">MoM%</p>
             </div>
             <StatCard
               value={formatMoney(pipelineValue)}
@@ -580,7 +580,7 @@ export default function FinancePage() {
                   <p className="text-lg font-bold text-cyan">
                     {formatMoney(totalRevenue)}
                   </p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                  <p className="text-[12px] text-muted-foreground mt-0.5">
                     إجمالي الإيرادات
                   </p>
                 </div>
@@ -588,7 +588,7 @@ export default function FinancePage() {
                   <p className="text-lg font-bold text-cc-green">
                     {closedDeals.length}
                   </p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                  <p className="text-[12px] text-muted-foreground mt-0.5">
                     مبيعات مكتملة
                   </p>
                 </div>
@@ -596,7 +596,7 @@ export default function FinancePage() {
                   <p className="text-lg font-bold text-cc-purple">
                     {formatMoney(avgDealValue)}
                   </p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                  <p className="text-[12px] text-muted-foreground mt-0.5">
                     متوسط قيمة المبيع
                   </p>
                 </div>
@@ -815,15 +815,15 @@ export default function FinancePage() {
                 <div className="grid grid-cols-3 gap-3">
                   <div className="p-3 rounded-lg bg-cc-green/10 border border-cc-green/20 text-center">
                     <p className="text-xl font-bold text-cc-green">{formatMoney(collectedVal)}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">محصّل ({collected.length})</p>
+                    <p className="text-[12px] text-muted-foreground mt-0.5">محصّل ({collected.length})</p>
                   </div>
                   <div className="p-3 rounded-lg bg-amber/10 border border-amber/20 text-center">
                     <p className="text-xl font-bold text-amber">{formatMoney(pendingVal)}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">معلق ({pending.length})</p>
+                    <p className="text-[12px] text-muted-foreground mt-0.5">معلق ({pending.length})</p>
                   </div>
                   <div className="p-3 rounded-lg bg-cc-red/10 border border-cc-red/20 text-center">
                     <p className="text-xl font-bold text-cc-red">{formatMoney(overdueVal)}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">متأخر ({overdue.length})</p>
+                    <p className="text-[12px] text-muted-foreground mt-0.5">متأخر ({overdue.length})</p>
                   </div>
                 </div>
 
@@ -872,7 +872,7 @@ export default function FinancePage() {
                                   <button
                                     key={s}
                                     onClick={() => handleCollectionStatus(deal.id, s)}
-                                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all border ${
+                                    className={`px-2.5 py-1 rounded-md text-[13px] font-medium transition-all border ${
                                       status === s
                                         ? s === "محصّل" ? "bg-cc-green/15 text-cc-green border-cc-green/30"
                                         : s === "متأخر" ? "bg-cc-red/15 text-cc-red border-cc-red/30"
@@ -945,11 +945,11 @@ export default function FinancePage() {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div className="p-3 rounded-lg bg-cyan/10 border border-cyan/20 text-center">
                       <p className="text-xl font-bold text-cyan">{formatMoney(totalPlanned)}</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">إجمالي الميزانية</p>
+                      <p className="text-[12px] text-muted-foreground mt-0.5">إجمالي الميزانية</p>
                     </div>
                     <div className="p-3 rounded-lg bg-cc-purple/10 border border-cc-purple/20 text-center">
                       <p className="text-xl font-bold text-cc-purple">{formatMoney(totalActual)}</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">المصروف الفعلي</p>
+                      <p className="text-[12px] text-muted-foreground mt-0.5">المصروف الفعلي</p>
                     </div>
                     <div className={`p-3 rounded-lg text-center border ${
                       variance >= 0 ? "bg-cc-green/10 border-cc-green/20" : "bg-cc-red/10 border-cc-red/20"
@@ -957,7 +957,7 @@ export default function FinancePage() {
                       <p className={`text-xl font-bold ${variance >= 0 ? "text-cc-green" : "text-cc-red"}`}>
                         {variance >= 0 ? "+" : ""}{formatMoney(variance)}
                       </p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">{variance >= 0 ? "متبقي من الميزانية" : "تجاوز الميزانية"}</p>
+                      <p className="text-[12px] text-muted-foreground mt-0.5">{variance >= 0 ? "متبقي من الميزانية" : "تجاوز الميزانية"}</p>
                     </div>
                     <div className={`p-3 rounded-lg text-center border ${
                       usagePct <= 80 ? "bg-cc-green/10 border-cc-green/20" : usagePct <= 100 ? "bg-amber/10 border-amber/20" : "bg-cc-red/10 border-cc-red/20"
@@ -965,7 +965,7 @@ export default function FinancePage() {
                       <p className={`text-xl font-bold ${
                         usagePct <= 80 ? "text-cc-green" : usagePct <= 100 ? "text-amber" : "text-cc-red"
                       }`}>{usagePct}%</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">نسبة الاستخدام</p>
+                      <p className="text-[12px] text-muted-foreground mt-0.5">نسبة الاستخدام</p>
                     </div>
                   </div>
 
@@ -1025,7 +1025,7 @@ export default function FinancePage() {
                                     <div className="w-3.5 h-3.5 rounded-full border border-white/20 shrink-0" />
                                   )}
                                   <span className="font-medium text-foreground">{b.category}</span>
-                                  {b.notes && <span className="text-[10px] text-muted-foreground hidden sm:inline">({b.notes})</span>}
+                                  {b.notes && <span className="text-[12px] text-muted-foreground hidden sm:inline">({b.notes})</span>}
                                 </div>
                               </td>
                               <td className="py-3 px-3 text-cyan font-semibold">{formatMoney(b.planned_amount)}</td>
@@ -1101,7 +1101,7 @@ export default function FinancePage() {
                           {unbudgetedCats.map(cat => {
                             const catTotal = unbudgeted.filter(e => e.category === cat).reduce((s, e) => s + e.amount, 0);
                             return (
-                              <span key={cat} className="px-2 py-1 rounded-md bg-amber/15 text-amber text-[11px] font-medium">
+                              <span key={cat} className="px-2 py-1 rounded-md bg-amber/15 text-amber text-[13px] font-medium">
                                 {cat}: {formatMoney(catTotal)}
                               </span>
                             );
@@ -1145,17 +1145,17 @@ export default function FinancePage() {
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-5">
               <div className="p-3 rounded-lg bg-cc-red/10 border border-cc-red/20 text-center">
                 <p className="text-xl font-bold text-cc-red">{formatMoney(expenses.reduce((s, e) => s + e.amount, 0))}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">إجمالي المصاريف</p>
+                <p className="text-[12px] text-muted-foreground mt-0.5">إجمالي المصاريف</p>
               </div>
               <div className="p-3 rounded-lg bg-amber/10 border border-amber/20 text-center">
                 <p className="text-xl font-bold text-amber">{expenses.length}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">عدد الأصناف</p>
+                <p className="text-[12px] text-muted-foreground mt-0.5">عدد الأصناف</p>
               </div>
               <div className="p-3 rounded-lg bg-cyan/10 border border-cyan/20 text-center">
                 <p className="text-xl font-bold text-cyan">
                   {formatMoney(totalRevenue > 0 ? totalRevenue - expenses.reduce((s, e) => s + e.amount, 0) : 0)}
                 </p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">صافي الربح</p>
+                <p className="text-[12px] text-muted-foreground mt-0.5">صافي الربح</p>
               </div>
             </div>
 
@@ -1226,13 +1226,13 @@ export default function FinancePage() {
                           <span className={`text-xs font-bold ${textColor} w-8 shrink-0`}>#{idx + 1}</span>
                           <span className="text-sm font-semibold text-foreground truncate">{exp.category}</span>
                           {exp.description && (
-                            <span className="text-[10px] text-muted-foreground truncate hidden sm:inline">— {exp.description}</span>
+                            <span className="text-[12px] text-muted-foreground truncate hidden sm:inline">— {exp.description}</span>
                           )}
-                          <span className="text-[10px] text-muted-foreground/60 hidden md:inline">{exp.expense_date}</span>
+                          <span className="text-[12px] text-muted-foreground/60 hidden md:inline">{exp.expense_date}</span>
                         </div>
                         <div className="flex items-center gap-3 shrink-0">
                           <span className={`text-sm font-bold ${textColor}`}>{formatMoney(exp.amount)}</span>
-                          <span className="text-[10px] text-muted-foreground">{expPct}%</span>
+                          <span className="text-[12px] text-muted-foreground">{expPct}%</span>
                           <button
                             onClick={() => openEditDialog(exp)}
                             className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-cyan/10 text-muted-foreground hover:text-cyan transition-all"
@@ -1273,9 +1273,9 @@ export default function FinancePage() {
                       return (
                         <div key={cat} className="p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.06] text-center">
                           <div className="w-3 h-3 rounded-full mx-auto mb-1.5" style={{ backgroundColor: color }} />
-                          <p className="text-[11px] font-semibold text-foreground truncate">{cat}</p>
+                          <p className="text-[13px] font-semibold text-foreground truncate">{cat}</p>
                           <p className="text-xs font-bold mt-0.5" style={{ color }}>{formatMoney(val)}</p>
-                          <p className="text-[10px] text-muted-foreground">{pct}%</p>
+                          <p className="text-[12px] text-muted-foreground">{pct}%</p>
                         </div>
                       );
                     });
@@ -1435,23 +1435,23 @@ export default function FinancePage() {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <div className="text-center">
                         <p className="text-lg font-bold text-cc-purple">{formatMoney(totalStartup)}</p>
-                        <p className="text-[10px] text-muted-foreground">إجمالي التأسيس</p>
+                        <p className="text-[12px] text-muted-foreground">إجمالي التأسيس</p>
                       </div>
                       <div className="text-center">
                         <p className="text-lg font-bold text-cyan">{formatMoney(recoveredAmount)}</p>
-                        <p className="text-[10px] text-muted-foreground">تم استرداده</p>
+                        <p className="text-[12px] text-muted-foreground">تم استرداده</p>
                       </div>
                       <div className="text-center">
                         <p className={`text-lg font-bold ${isRecovered ? "text-cc-green" : "text-amber"}`}>
                           {isRecovered ? "0" : formatMoney(remaining)}
                         </p>
-                        <p className="text-[10px] text-muted-foreground">المتبقي</p>
+                        <p className="text-[12px] text-muted-foreground">المتبقي</p>
                       </div>
                       <div className="text-center">
                         {isRecovered ? (
                           <>
                             <p className="text-lg font-bold text-cc-green">✅</p>
-                            <p className="text-[10px] text-muted-foreground">مكتمل</p>
+                            <p className="text-[12px] text-muted-foreground">مكتمل</p>
                           </>
                         ) : monthsToRecover > 0 ? (
                           <>
@@ -1459,12 +1459,12 @@ export default function FinancePage() {
                               <CalendarClock className="w-4 h-4 text-muted-foreground" />
                               {monthsToRecover}
                             </p>
-                            <p className="text-[10px] text-muted-foreground">شهر للاسترداد (تقديري)</p>
+                            <p className="text-[12px] text-muted-foreground">شهر للاسترداد (تقديري)</p>
                           </>
                         ) : (
                           <>
                             <p className="text-lg font-bold text-muted-foreground">—</p>
-                            <p className="text-[10px] text-muted-foreground">يعتمد على الأرباح</p>
+                            <p className="text-[12px] text-muted-foreground">يعتمد على الأرباح</p>
                           </>
                         )}
                       </div>
@@ -1488,9 +1488,9 @@ export default function FinancePage() {
                         return (
                           <div key={cat} className="p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.06] text-center">
                             <div className="w-3 h-3 rounded-full mx-auto mb-1.5" style={{ backgroundColor: color }} />
-                            <p className="text-[11px] font-semibold text-foreground truncate">{cat}</p>
+                            <p className="text-[13px] font-semibold text-foreground truncate">{cat}</p>
                             <p className="text-xs font-bold mt-0.5" style={{ color }}>{formatMoney(val)}</p>
-                            <p className="text-[10px] text-muted-foreground">{pct}%</p>
+                            <p className="text-[12px] text-muted-foreground">{pct}%</p>
                           </div>
                         );
                       })}
@@ -1508,9 +1508,9 @@ export default function FinancePage() {
                             <div className="flex items-center gap-2 flex-1 min-w-0">
                               <span className="text-xs font-bold text-cc-purple w-8 shrink-0">#{idx + 1}</span>
                               <span className="text-sm font-semibold text-foreground truncate">{cost.item_name}</span>
-                              <span className="text-[10px] text-muted-foreground bg-white/[0.04] rounded px-1.5 py-0.5">{cost.category}</span>
-                              {cost.notes && <span className="text-[10px] text-muted-foreground truncate hidden sm:inline">— {cost.notes}</span>}
-                              {cost.paid_date && <span className="text-[10px] text-muted-foreground/60 hidden md:inline">{cost.paid_date}</span>}
+                              <span className="text-[12px] text-muted-foreground bg-white/[0.04] rounded px-1.5 py-0.5">{cost.category}</span>
+                              {cost.notes && <span className="text-[12px] text-muted-foreground truncate hidden sm:inline">— {cost.notes}</span>}
+                              {cost.paid_date && <span className="text-[12px] text-muted-foreground/60 hidden md:inline">{cost.paid_date}</span>}
                             </div>
                             <div className="flex items-center gap-3 shrink-0">
                               <span className="text-sm font-bold text-cc-purple">{formatMoney(cost.amount)}</span>

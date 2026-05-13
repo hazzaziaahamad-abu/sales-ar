@@ -225,7 +225,7 @@ export function TrainingKnowledgeEditor({ onBack }: Props) {
                 className="font-mono text-xs leading-relaxed"
                 dir="rtl"
               />
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-[12px] text-muted-foreground">
                 {selectedTopic === "_product_knowledge"
                   ? "هذا النص يُضاف لكل جلسة تدريبية. يمكنك استخدام Markdown."
                   : "هذه القواعد تُلحق بنهاية كل سيناريو تدريبي."}
@@ -246,7 +246,7 @@ export function TrainingKnowledgeEditor({ onBack }: Props) {
                 className="font-mono text-xs leading-relaxed"
                 dir="rtl"
               />
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-[12px] text-muted-foreground">
                 هذا النص يحدد شخصية وسلوك العميل الافتراضي في هذا الموضوع. إذا تركته فارغاً سيُستخدم المحتوى الافتراضي المبرمج مسبقاً.
               </p>
             </div>
@@ -268,7 +268,7 @@ export function TrainingKnowledgeEditor({ onBack }: Props) {
                 </span>
               )}
               {existingEntry?.updated_by && (
-                <span className="text-[10px] text-muted-foreground">
+                <span className="text-[12px] text-muted-foreground">
                   آخر تعديل: {existingEntry.updated_by} — {new Date(existingEntry.updated_at).toLocaleDateString("ar-SA-u-ca-gregory")}
                 </span>
               )}

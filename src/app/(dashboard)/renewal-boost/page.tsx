@@ -202,7 +202,7 @@ function HealthScoreRing({ score, size = 180 }: { score: number; size?: number }
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="text-4xl font-extrabold font-mono" style={{ color }}>{Math.round(score)}</span>
-        <span className="text-[10px] text-muted-foreground mt-0.5">من 100</span>
+        <span className="text-[12px] text-muted-foreground mt-0.5">من 100</span>
       </div>
     </div>
   );
@@ -405,7 +405,7 @@ export default function RenewalBoostPage() {
         </div>
         <div>
           <h1 className="text-lg font-bold text-foreground">خطة تحسين التجديدات</h1>
-          <p className="text-[11px] text-muted-foreground">تحليل ذكي للأرقام وخطط عملية لرفع معدل التجديد وتقليل الإلغاء</p>
+          <p className="text-[13px] text-muted-foreground">تحليل ذكي للأرقام وخطط عملية لرفع معدل التجديد وتقليل الإلغاء</p>
         </div>
       </div>
 
@@ -425,7 +425,7 @@ export default function RenewalBoostPage() {
               { label: "تغطية المتابعة", value: metrics.coverageRate, target: 100, weight: "20%" },
               { label: "استرداد الإيرادات", value: metrics.revenueRetention, target: 100, weight: "10%" },
             ].map((item) => (
-              <div key={item.label} className="flex items-center gap-2 text-[10px]">
+              <div key={item.label} className="flex items-center gap-2 text-[12px]">
                 <span className="text-muted-foreground w-24 shrink-0">{item.label}</span>
                 <div className="flex-1">
                   <SimpleBar
@@ -491,7 +491,7 @@ export default function RenewalBoostPage() {
             </div>
             <div>
               <h2 className="text-sm font-bold text-foreground">أسباب الإلغاء الرئيسية</h2>
-              <p className="text-[10px] text-muted-foreground">{cancelReasons.totalCancelled} إلغاء في هذه الفترة</p>
+              <p className="text-[12px] text-muted-foreground">{cancelReasons.totalCancelled} إلغاء في هذه الفترة</p>
             </div>
           </div>
           <div className="space-y-3">
@@ -513,7 +513,7 @@ export default function RenewalBoostPage() {
                       style={{ width: `${pct}%`, opacity: 0.6 + (pct / 100) * 0.4 }}
                     />
                   </div>
-                  <p className="text-[10px] text-muted-foreground">
+                  <p className="text-[12px] text-muted-foreground">
                     {strategy && `الاستراتيجية: ${strategy.steps[0]}`}
                   </p>
                 </div>
@@ -532,7 +532,7 @@ export default function RenewalBoostPage() {
             </div>
             <div>
               <h2 className="text-sm font-bold text-foreground">استراتيجيات الاستعادة</h2>
-              <p className="text-[10px] text-muted-foreground">خطط عملية لكل سبب إلغاء مع سكربتات جاهزة للتواصل</p>
+              <p className="text-[12px] text-muted-foreground">خطط عملية لكل سبب إلغاء مع سكربتات جاهزة للتواصل</p>
             </div>
           </div>
           <div className="space-y-2">
@@ -552,7 +552,7 @@ export default function RenewalBoostPage() {
                     </div>
                     <div className="flex-1 text-right">
                       <span className="text-xs font-bold text-foreground">{reason}</span>
-                      <span className={`mr-2 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${impact.bg} ${impact.color}`}>
+                      <span className={`mr-2 text-[12px] font-medium px-1.5 py-0.5 rounded-full ${impact.bg} ${impact.color}`}>
                         {impact.label}
                       </span>
                     </div>
@@ -562,11 +562,11 @@ export default function RenewalBoostPage() {
                     <div className="px-4 pb-4 space-y-3 border-t border-white/[0.06] pt-3">
                       {/* Steps */}
                       <div>
-                        <p className="text-[11px] font-bold text-foreground mb-2">الخطوات المقترحة:</p>
+                        <p className="text-[13px] font-bold text-foreground mb-2">الخطوات المقترحة:</p>
                         <div className="space-y-1.5">
                           {strategy.steps.map((step, i) => (
                             <div key={i} className="flex items-start gap-2">
-                              <div className="w-5 h-5 rounded-full bg-amber/10 text-amber flex items-center justify-center shrink-0 text-[10px] font-bold mt-0.5">
+                              <div className="w-5 h-5 rounded-full bg-amber/10 text-amber flex items-center justify-center shrink-0 text-[12px] font-bold mt-0.5">
                                 {i + 1}
                               </div>
                               <span className="text-xs text-foreground/80">{step}</span>
@@ -576,7 +576,7 @@ export default function RenewalBoostPage() {
                       </div>
                       {/* Script */}
                       <div>
-                        <p className="text-[11px] font-bold text-foreground mb-1.5">سكربت التواصل:</p>
+                        <p className="text-[13px] font-bold text-foreground mb-1.5">سكربت التواصل:</p>
                         <div className="p-3 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-foreground/70 leading-relaxed">
                           {strategy.script}
                         </div>
@@ -598,7 +598,7 @@ export default function RenewalBoostPage() {
           </div>
           <div>
             <h2 className="text-sm font-bold text-foreground">خطة العمل الأسبوعية</h2>
-            <p className="text-[10px] text-muted-foreground">مرتبة حسب الأولوية - ابدأ من الأعلى</p>
+            <p className="text-[12px] text-muted-foreground">مرتبة حسب الأولوية - ابدأ من الأعلى</p>
           </div>
         </div>
         <div className="space-y-2">
@@ -617,15 +617,15 @@ export default function RenewalBoostPage() {
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-foreground">{action.label}</span>
                   <span
-                    className="text-[10px] font-bold font-mono px-1.5 py-0.5 rounded-full"
+                    className="text-[12px] font-bold font-mono px-1.5 py-0.5 rounded-full"
                     style={{ background: `${action.color}15`, color: action.color }}
                   >
                     {action.count}
                   </span>
                 </div>
-                <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">{action.guidance}</p>
+                <p className="text-[13px] text-muted-foreground mt-1 leading-relaxed">{action.guidance}</p>
               </div>
-              <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-white/[0.04] text-[10px] font-bold text-muted-foreground">
+              <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-white/[0.04] text-[12px] font-bold text-muted-foreground">
                 {action.priority}
               </div>
             </div>
@@ -648,7 +648,7 @@ export default function RenewalBoostPage() {
             </div>
             <div>
               <h2 className="text-sm font-bold text-foreground">أداء الفريق</h2>
-              <p className="text-[10px] text-muted-foreground">توزيع التجديدات ومعدل النجاح لكل موظف</p>
+              <p className="text-[12px] text-muted-foreground">توزيع التجديدات ومعدل النجاح لكل موظف</p>
             </div>
           </div>
           <div className="space-y-3">
@@ -659,12 +659,12 @@ export default function RenewalBoostPage() {
                 <div key={rep} className="space-y-1.5">
                   <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-cc-blue/10 text-cc-blue flex items-center justify-center text-[10px] font-bold">
+                      <div className="w-6 h-6 rounded-full bg-cc-blue/10 text-cc-blue flex items-center justify-center text-[12px] font-bold">
                         {rep.charAt(0)}
                       </div>
                       <span className="font-medium text-foreground">{rep}</span>
                     </div>
-                    <div className="flex items-center gap-3 text-[10px]">
+                    <div className="flex items-center gap-3 text-[12px]">
                       <span className="text-cc-green">{data.completed} مكتمل</span>
                       <span className="text-cc-red">{data.cancelled} ملغي</span>
                       <span className="text-amber">{data.pending} معلق</span>
@@ -688,7 +688,7 @@ export default function RenewalBoostPage() {
             </div>
             <div>
               <h2 className="text-sm font-bold text-foreground">تجديدات في خطر</h2>
-              <p className="text-[10px] text-muted-foreground">{atRiskRenewals.length} تجديد يحتاج تدخل فوري</p>
+              <p className="text-[12px] text-muted-foreground">{atRiskRenewals.length} تجديد يحتاج تدخل فوري</p>
             </div>
           </div>
           <div className="space-y-2 max-h-[400px] overflow-y-auto">
@@ -703,11 +703,11 @@ export default function RenewalBoostPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold text-foreground truncate">{r.customer_name}</span>
-                      {r.client_code && <span className="text-[10px] text-muted-foreground font-mono">{r.client_code}</span>}
+                      {r.client_code && <span className="text-[12px] text-muted-foreground font-mono">{r.client_code}</span>}
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${badge.bg} ${badge.color}`}>{r.status}</span>
-                      <span className="text-[10px] text-muted-foreground">{r.plan_name} - {formatMoneyFull(r.plan_price)}</span>
+                      <span className={`text-[12px] font-medium px-1.5 py-0.5 rounded-full ${badge.bg} ${badge.color}`}>{r.status}</span>
+                      <span className="text-[12px] text-muted-foreground">{r.plan_name} - {formatMoneyFull(r.plan_price)}</span>
                     </div>
                   </div>
                   <div className="text-left shrink-0">
@@ -715,9 +715,9 @@ export default function RenewalBoostPage() {
                       {days < 0 ? `متأخر ${Math.abs(days)} يوم` : days === 0 ? "اليوم!" : `${days} يوم`}
                     </span>
                     {r.assigned_rep ? (
-                      <p className="text-[10px] text-muted-foreground">{r.assigned_rep}</p>
+                      <p className="text-[12px] text-muted-foreground">{r.assigned_rep}</p>
                     ) : (
-                      <p className="text-[10px] text-cc-red">غير معيّن!</p>
+                      <p className="text-[12px] text-cc-red">غير معيّن!</p>
                     )}
                   </div>
                 </div>
@@ -746,12 +746,12 @@ export default function RenewalBoostPage() {
           ].map((tip) => (
             <div key={tip.icon} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
               <div className="flex items-center gap-2 mb-1.5">
-                <div className="w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center justify-center text-[10px] font-bold">
+                <div className="w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center justify-center text-[12px] font-bold">
                   {tip.icon}
                 </div>
                 <span className="text-xs font-bold text-foreground">{tip.title}</span>
               </div>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">{tip.desc}</p>
+              <p className="text-[13px] text-muted-foreground leading-relaxed">{tip.desc}</p>
             </div>
           ))}
         </div>

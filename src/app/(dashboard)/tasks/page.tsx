@@ -445,16 +445,16 @@ export default function TasksPage() {
                       <h3 className={`font-medium ${task.status === "completed" ? "text-gray-500 line-through" : "text-white"}`}>
                         {task.title}
                       </h3>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${pr.color} ${pr.bg}`}>{pr.label}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${st.color} ${st.bg}`}>{st.label}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[12px] font-medium ${pr.color} ${pr.bg}`}>{pr.label}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[12px] font-medium ${st.color} ${st.bg}`}>{st.label}</span>
                       {isOverdue && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-medium text-red-400 bg-red-500/10 animate-pulse">متأخرة</span>
+                        <span className="px-2 py-0.5 rounded-full text-[12px] font-medium text-red-400 bg-red-500/10 animate-pulse">متأخرة</span>
                       )}
                     </div>
 
                     {/* Countdown Timer */}
                     {countdown.urgency !== "none" && (
-                      <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border mb-2 ${countdownColors[countdown.urgency]} ${countdown.urgency === "passed" || countdown.urgency === "critical" ? "animate-pulse" : ""}`}>
+                      <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[13px] font-bold border mb-2 ${countdownColors[countdown.urgency]} ${countdown.urgency === "passed" || countdown.urgency === "critical" ? "animate-pulse" : ""}`}>
                         <CountdownIcon className="w-3.5 h-3.5" />
                         {countdown.label}
                       </div>

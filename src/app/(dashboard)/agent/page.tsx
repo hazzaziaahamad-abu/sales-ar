@@ -210,7 +210,7 @@ export default function AgentPage() {
           {conversations.length === 0 ? (
             <div className="text-center py-8 px-3">
               <Bot className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
-              <p className="text-[11px] text-muted-foreground">لا توجد محادثات سابقة</p>
+              <p className="text-[13px] text-muted-foreground">لا توجد محادثات سابقة</p>
             </div>
           ) : (
             <div className="space-y-1">
@@ -251,7 +251,7 @@ export default function AgentPage() {
             </div>
             <div>
               <h3 className="text-sm font-bold text-foreground">المساعد الذكي</h3>
-              <p className="text-[10px] text-muted-foreground">مستشار أعمال — مدعوم بـ Gemini AI</p>
+              <p className="text-[12px] text-muted-foreground">مستشار أعمال — مدعوم بـ Gemini AI</p>
             </div>
           </div>
           {messages.length > 0 && (
@@ -295,7 +295,7 @@ export default function AgentPage() {
                       <Icon className={cn("w-5 h-5 mt-0.5 flex-shrink-0", item.color)} />
                       <div>
                         <p className={cn("text-xs font-bold", item.color)}>{item.label}</p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5 leading-relaxed">
+                        <p className="text-[12px] text-muted-foreground mt-0.5 leading-relaxed">
                           {item.prompt}
                         </p>
                       </div>
@@ -333,7 +333,7 @@ export default function AgentPage() {
                         <span className="text-xs font-bold text-foreground">
                           {msg.role === "user" ? "أنت" : "المساعد الذكي"}
                         </span>
-                        <span className="text-[10px] text-muted-foreground">
+                        <span className="text-[12px] text-muted-foreground">
                           {new Date().toLocaleTimeString("ar-SA-u-ca-gregory", {
                             hour: "2-digit",
                             minute: "2-digit",
@@ -368,7 +368,7 @@ export default function AgentPage() {
 
                               if (name === "webSearch" && isDone) {
                                 return (
-                                  <div key={i} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cyan/5 border border-cyan/10 text-[11px] text-cyan/70">
+                                  <div key={i} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cyan/5 border border-cyan/10 text-[13px] text-cyan/70">
                                     <Globe className="w-3 h-3" />
                                     تم البحث في الويب
                                   </div>
@@ -393,7 +393,7 @@ export default function AgentPage() {
 
                               if (name === "queryDatabase" && isDone) {
                                 return (
-                                  <div key={i} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cc-purple/5 border border-cc-purple/10 text-[11px] text-cc-purple/70">
+                                  <div key={i} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cc-purple/5 border border-cc-purple/10 text-[13px] text-cc-purple/70">
                                     <Database className="w-3 h-3" />
                                     تم الاستعلام من قاعدة البيانات
                                   </div>
@@ -426,7 +426,7 @@ export default function AgentPage() {
                       {msg.role === "assistant" && text && (
                         <button
                           onClick={() => copyMessage(msg.id, text)}
-                          className="mt-2 flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                          className="mt-2 flex items-center gap-1 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
                         >
                           {copiedId === msg.id ? (
                             <>
@@ -493,7 +493,7 @@ export default function AgentPage() {
               <Send className="w-4 h-4" />
             </Button>
           </div>
-          <p className="text-[10px] text-muted-foreground text-center mt-2">
+          <p className="text-[12px] text-muted-foreground text-center mt-2">
             المساعد الذكي مدعوم بـ Gemini AI — الإجابات مبنية على بيانات الشركة الفعلية
           </p>
         </div>
@@ -648,7 +648,7 @@ function formatInline(text: string): React.ReactNode {
       );
     } else if (first.type === "code") {
       parts.push(
-        <code key={key++} className="px-1 py-0.5 bg-muted rounded text-cyan text-[11px]">
+        <code key={key++} className="px-1 py-0.5 bg-muted rounded text-cyan text-[13px]">
           {first.match[1]}
         </code>
       );

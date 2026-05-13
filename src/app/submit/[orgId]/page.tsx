@@ -288,7 +288,7 @@ export default function SubmitDealPage() {
           </button>
         </form>
 
-        <p className="text-center text-[11px] text-gray-500 mt-4">
+        <p className="text-center text-[13px] text-gray-500 mt-4">
           هذا الطلب سيتم مراجعته من الإدارة قبل إضافته
         </p>
       </div>

@@ -405,17 +405,17 @@ export default function GiftsPage() {
                         ) : offer.client_name}
                       </p>
                       {offer.client_phone && (
-                        <p className="text-[10px] text-muted-foreground mt-0.5" dir="ltr">{offer.client_phone}</p>
+                        <p className="text-[12px] text-muted-foreground mt-0.5" dir="ltr">{offer.client_phone}</p>
                       )}
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5">
                     {isBundle && (
-                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-fuchsia-500/10 text-fuchsia-400 text-[10px] font-medium">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-fuchsia-500/10 text-fuchsia-400 text-[12px] font-medium">
                         🎰 {bundleSiblings.length} هدايا
                       </span>
                     )}
-                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium ${status.bg} ${status.color}`}>
+                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[12px] font-medium ${status.bg} ${status.color}`}>
                       <StatusIcon className="w-3 h-3" />
                       {status.label}
                     </span>
@@ -425,7 +425,7 @@ export default function GiftsPage() {
                 <div>
                   <p className="text-sm font-medium text-foreground">{offer.gift_title}</p>
                   {offer.gift_value && (
-                    <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 text-[11px] font-medium">
+                    <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 text-[13px] font-medium">
                       {offer.gift_value}
                     </span>
                   )}
@@ -435,7 +435,7 @@ export default function GiftsPage() {
                   <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{offer.gift_description}</p>
                 )}
 
-                <div className="text-[10px] text-muted-foreground">
+                <div className="text-[12px] text-muted-foreground">
                   {offer.entity_type === "renewal" ? "تجديد" : "صفقة"} — {new Date(offer.created_at).toLocaleDateString("ar-SA-u-ca-gregory")}
                   {offer.accepted_at && (
                     <span className="text-emerald-400 mr-2">قبل في {new Date(offer.accepted_at).toLocaleDateString("ar-SA-u-ca-gregory")}</span>
@@ -540,9 +540,9 @@ export default function GiftsPage() {
                 >
                   <div>
                     <p className="text-sm font-medium text-foreground">{r.customer_name}</p>
-                    <p className="text-[10px] text-muted-foreground">{r.plan_name} — {r.status}</p>
+                    <p className="text-[12px] text-muted-foreground">{r.plan_name} — {r.status}</p>
                   </div>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                  <span className={`text-[12px] px-2 py-0.5 rounded-full ${
                     r.status === "ملغي" ? "bg-red-500/10 text-red-400" :
                     r.status === "متأخر" ? "bg-amber-500/10 text-amber-400" :
                     "bg-white/5 text-muted-foreground"
@@ -560,9 +560,9 @@ export default function GiftsPage() {
                 >
                   <div>
                     <p className="text-sm font-medium text-foreground">{d.client_name}</p>
-                    <p className="text-[10px] text-muted-foreground">{d.stage} — {d.plan || "بدون خطة"}</p>
+                    <p className="text-[12px] text-muted-foreground">{d.stage} — {d.plan || "بدون خطة"}</p>
                   </div>
-                  <span className="text-[10px] text-muted-foreground">{d.deal_value} ر.س</span>
+                  <span className="text-[12px] text-muted-foreground">{d.deal_value} ر.س</span>
                 </button>
               ))
             )}
@@ -688,7 +688,7 @@ export default function GiftsPage() {
                           <button
                             key={t.key}
                             onClick={() => updateGiftItem(idx, { gift_type: t.key })}
-                            className={`px-2 py-1 rounded text-[10px] border transition-colors ${
+                            className={`px-2 py-1 rounded text-[12px] border transition-colors ${
                               item.gift_type === t.key
                                 ? "bg-amber-500/10 text-amber-400 border-amber-500/30 font-medium"
                                 : "border-border text-muted-foreground"

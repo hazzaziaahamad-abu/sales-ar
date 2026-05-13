@@ -57,7 +57,7 @@ export function NotificationPanel({
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-bold text-foreground">الإشعارات</h3>
             {unreadCount > 0 && (
-              <span className="bg-cc-red text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+              <span className="bg-cc-red text-white text-[12px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
                 {unreadCount}
               </span>
             )}
@@ -98,7 +98,7 @@ export function NotificationPanel({
                     <p className={`text-xs leading-relaxed ${n.isRead ? "text-muted-foreground" : "text-foreground"}`}>
                       {n.message}
                     </p>
-                    <p className="text-[10px] text-muted-foreground/70 mt-1">
+                    <p className="text-[12px] text-muted-foreground/70 mt-1">
                       {timeAgo(n.timestamp)}
                     </p>
                   </div>

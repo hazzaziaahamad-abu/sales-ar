@@ -426,32 +426,32 @@ export default function TeamPage() {
                   <div className="rounded-lg bg-white/[0.02] border border-white/[0.06] p-2.5">
                     <div className="flex items-center gap-1.5 mb-2">
                       <TrendingUp className="w-3.5 h-3.5 text-cc-green" />
-                      <span className="text-[10px] text-muted-foreground">المبيعات</span>
+                      <span className="text-[12px] text-muted-foreground">المبيعات</span>
                     </div>
                     <div className="flex items-end justify-between">
                       <div>
                         <span className="text-lg font-bold text-cc-green">{stats.closedDeals}</span>
-                        <span className="text-[10px] text-muted-foreground mr-1">/ {stats.totalDeals}</span>
+                        <span className="text-[12px] text-muted-foreground mr-1">/ {stats.totalDeals}</span>
                       </div>
                     </div>
                     {stats.dealsValue > 0 && (
-                      <p className="text-[10px] text-cyan font-semibold mt-1">{formatMoney(stats.dealsValue)}</p>
+                      <p className="text-[12px] text-cyan font-semibold mt-1">{formatMoney(stats.dealsValue)}</p>
                     )}
                   </div>
                   {/* Support stats */}
                   <div className="rounded-lg bg-white/[0.02] border border-white/[0.06] p-2.5">
                     <div className="flex items-center gap-1.5 mb-2">
                       <Headphones className="w-3.5 h-3.5 text-cc-purple" />
-                      <span className="text-[10px] text-muted-foreground">الدعم</span>
+                      <span className="text-[12px] text-muted-foreground">الدعم</span>
                     </div>
                     <div className="flex items-end justify-between">
                       <div>
                         <span className="text-lg font-bold text-cc-purple">{stats.resolvedTickets}</span>
-                        <span className="text-[10px] text-muted-foreground mr-1">/ {stats.totalTickets}</span>
+                        <span className="text-[12px] text-muted-foreground mr-1">/ {stats.totalTickets}</span>
                       </div>
                     </div>
                     {stats.totalTickets > 0 && (
-                      <p className="text-[10px] text-amber font-semibold mt-1">
+                      <p className="text-[12px] text-amber font-semibold mt-1">
                         {stats.totalTickets > 0 ? Math.round((stats.resolvedTickets / stats.totalTickets) * 100) : 0}% حل
                       </p>
                     )}
@@ -462,8 +462,8 @@ export default function TeamPage() {
                 {hasActivity && (
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[10px] text-muted-foreground">الإنجاز</span>
-                      <span className="text-[10px] font-bold text-cyan">
+                      <span className="text-[12px] text-muted-foreground">الإنجاز</span>
+                      <span className="text-[12px] font-bold text-cyan">
                         {stats.closedDeals + stats.resolvedTickets} منجز
                       </span>
                     </div>
@@ -482,10 +482,10 @@ export default function TeamPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-3 mt-1.5">
-                      <span className="flex items-center gap-1 text-[9px] text-muted-foreground">
+                      <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
                         <span className="w-2 h-2 rounded-full bg-cc-green" /> مبيعات
                       </span>
-                      <span className="flex items-center gap-1 text-[9px] text-muted-foreground">
+                      <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
                         <span className="w-2 h-2 rounded-full bg-cc-purple" /> دعم
                       </span>
                     </div>
@@ -500,14 +500,14 @@ export default function TeamPage() {
                     <div className="rounded-lg bg-white/[0.02] border border-white/[0.06] p-2.5">
                       <div className="flex items-center gap-1.5 mb-2">
                         <GraduationCap className="w-3.5 h-3.5 text-emerald-400" />
-                        <span className="text-[10px] text-muted-foreground">تقدم الأكاديمية</span>
-                        <span className="mr-auto text-[10px] font-bold text-emerald-400">{stats.completed}/{stats.total}</span>
+                        <span className="text-[12px] text-muted-foreground">تقدم الأكاديمية</span>
+                        <span className="mr-auto text-[12px] font-bold text-emerald-400">{stats.completed}/{stats.total}</span>
                       </div>
                       <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
                         <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${stats.pct}%` }} />
                       </div>
                       {stats.lastLessonName && (
-                        <p className="text-[9px] text-muted-foreground mt-1.5">آخر درس: {stats.lastLessonName}</p>
+                        <p className="text-[11px] text-muted-foreground mt-1.5">آخر درس: {stats.lastLessonName}</p>
                       )}
                     </div>
                   );

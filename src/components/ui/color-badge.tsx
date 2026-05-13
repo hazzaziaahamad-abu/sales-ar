@@ -22,7 +22,7 @@ export function ColorBadge({ text, color, size = "sm" }: ColorBadgeProps) {
       className={cn(
         "inline-flex items-center rounded-full font-bold whitespace-nowrap",
         COLOR_CLASSES[color],
-        size === "sm" ? "px-[9px] py-[3px] text-[11px]" : "px-[10px] py-[3px] text-xs"
+        size === "sm" ? "px-[9px] py-[3px] text-[13px]" : "px-[10px] py-[3px] text-xs"
       )}
     >
       {text}

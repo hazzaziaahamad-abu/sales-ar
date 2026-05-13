@@ -330,12 +330,12 @@ ${JSON.stringify(context, null, 2)}`,
                   </div>
                   <div>
                     <p className="text-sm font-bold text-foreground">{c.name}</p>
-                    <p className="text-[10px] text-muted-foreground">{c.category}</p>
+                    <p className="text-[12px] text-muted-foreground">{c.category}</p>
                   </div>
                 </div>
                 {selectedId === c.id && <Eye className="w-4 h-4 text-rose-400" />}
               </div>
-              <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+              <div className="flex items-center gap-3 text-[12px] text-muted-foreground">
                 <span>{c.plans.length} باقة</span>
                 <span>{c.offers.length} عرض</span>
                 <span>{c.updates.length} تحديث</span>
@@ -382,13 +382,13 @@ ${JSON.stringify(context, null, 2)}`,
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
                 {selected.strengths && (
                   <div className="p-3 rounded-lg bg-emerald-500/[0.06] border border-emerald-500/15">
-                    <p className="text-[10px] font-bold text-emerald-400 mb-1">نقاط القوة</p>
+                    <p className="text-[12px] font-bold text-emerald-400 mb-1">نقاط القوة</p>
                     <p className="text-xs text-foreground/80 whitespace-pre-wrap">{selected.strengths}</p>
                   </div>
                 )}
                 {selected.weaknesses && (
                   <div className="p-3 rounded-lg bg-red-500/[0.06] border border-red-500/15">
-                    <p className="text-[10px] font-bold text-red-400 mb-1">نقاط الضعف</p>
+                    <p className="text-[12px] font-bold text-red-400 mb-1">نقاط الضعف</p>
                     <p className="text-xs text-foreground/80 whitespace-pre-wrap">{selected.weaknesses}</p>
                   </div>
                 )}
@@ -396,14 +396,14 @@ ${JSON.stringify(context, null, 2)}`,
             )}
             {selected.notes && (
               <div className="mt-3 p-3 rounded-lg bg-white/[0.03] border border-white/[0.06]">
-                <p className="text-[10px] font-bold text-muted-foreground mb-1">ملاحظات</p>
+                <p className="text-[12px] font-bold text-muted-foreground mb-1">ملاحظات</p>
                 <p className="text-xs text-foreground/80 whitespace-pre-wrap">{selected.notes}</p>
               </div>
             )}
           </div>
 
           {/* ── Pricing Plans ── */}
-          <Section title="الأسعار والباقات" icon={<DollarSign className="w-5 h-5 text-emerald-400" />} badge={<span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">{selected.plans.length}</span>}>
+          <Section title="الأسعار والباقات" icon={<DollarSign className="w-5 h-5 text-emerald-400" />} badge={<span className="text-[12px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">{selected.plans.length}</span>}>
             <div className="space-y-3">
               {showAddPlan ? (
                 <div className="p-3 rounded-lg bg-white/[0.03] border border-emerald-500/20 space-y-2">
@@ -435,11 +435,11 @@ ${JSON.stringify(context, null, 2)}`,
                         <p className="text-xs font-bold text-foreground">{p.name}</p>
                         <button onClick={() => deletePlan(p.id)} className="text-muted-foreground hover:text-red-400 transition-colors"><Trash2 className="w-3 h-3" /></button>
                       </div>
-                      <p className="text-lg font-bold text-emerald-400">{p.price.toLocaleString()} <span className="text-[10px] text-muted-foreground">ر.س / {BILLING_LABELS[p.billing]}</span></p>
+                      <p className="text-lg font-bold text-emerald-400">{p.price.toLocaleString()} <span className="text-[12px] text-muted-foreground">ر.س / {BILLING_LABELS[p.billing]}</span></p>
                       {p.features && (
                         <div className="mt-2 space-y-1">
                           {p.features.split("\n").filter(Boolean).map((f, i) => (
-                            <p key={i} className="text-[10px] text-muted-foreground flex items-start gap-1"><span className="text-emerald-400 mt-0.5">•</span> {f}</p>
+                            <p key={i} className="text-[12px] text-muted-foreground flex items-start gap-1"><span className="text-emerald-400 mt-0.5">•</span> {f}</p>
                           ))}
                         </div>
                       )}
@@ -451,7 +451,7 @@ ${JSON.stringify(context, null, 2)}`,
           </Section>
 
           {/* ── Offers & Promotions ── */}
-          <Section title="العروض والحملات" icon={<Megaphone className="w-5 h-5 text-amber-400" />} badge={selected.offers.filter(o => o.active).length > 0 ? <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">{selected.offers.filter(o => o.active).length} نشط</span> : undefined}>
+          <Section title="العروض والحملات" icon={<Megaphone className="w-5 h-5 text-amber-400" />} badge={selected.offers.filter(o => o.active).length > 0 ? <span className="text-[12px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">{selected.offers.filter(o => o.active).length} نشط</span> : undefined}>
             <div className="space-y-3">
               {showAddOffer ? (
                 <div className="p-3 rounded-lg bg-white/[0.03] border border-amber-500/20 space-y-2">
@@ -459,11 +459,11 @@ ${JSON.stringify(context, null, 2)}`,
                   <textarea value={offerForm.description} onChange={e => setOfferForm(p => ({ ...p, description: e.target.value }))} placeholder="تفاصيل العرض..." rows={2} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-foreground text-xs placeholder:text-muted-foreground focus:outline-none resize-none" />
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="text-[10px] text-muted-foreground">تاريخ البداية</label>
+                      <label className="text-[12px] text-muted-foreground">تاريخ البداية</label>
                       <input type="date" value={offerForm.start_date} onChange={e => setOfferForm(p => ({ ...p, start_date: e.target.value }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-foreground text-xs focus:outline-none" />
                     </div>
                     <div>
-                      <label className="text-[10px] text-muted-foreground">تاريخ النهاية</label>
+                      <label className="text-[12px] text-muted-foreground">تاريخ النهاية</label>
                       <input type="date" value={offerForm.end_date} onChange={e => setOfferForm(p => ({ ...p, end_date: e.target.value }))} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-foreground text-xs focus:outline-none" />
                     </div>
                   </div>
@@ -488,11 +488,11 @@ ${JSON.stringify(context, null, 2)}`,
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="text-xs font-medium text-foreground">{o.title}</p>
-                            {isActive && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400">نشط</span>}
+                            {isActive && <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400">نشط</span>}
                           </div>
-                          {o.description && <p className="text-[10px] text-muted-foreground mt-0.5">{o.description}</p>}
+                          {o.description && <p className="text-[12px] text-muted-foreground mt-0.5">{o.description}</p>}
                           {(o.start_date || o.end_date) && (
-                            <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
+                            <p className="text-[12px] text-muted-foreground mt-1 flex items-center gap-1">
                               <Calendar className="w-3 h-3" />
                               {o.start_date && o.start_date} {o.start_date && o.end_date && "—"} {o.end_date && o.end_date}
                             </p>
@@ -508,7 +508,7 @@ ${JSON.stringify(context, null, 2)}`,
           </Section>
 
           {/* ── Latest Developments ── */}
-          <Section title="آخر التطويرات والأخبار" icon={<Zap className="w-5 h-5 text-violet-400" />} badge={<span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-400">{selected.updates.length}</span>}>
+          <Section title="آخر التطويرات والأخبار" icon={<Zap className="w-5 h-5 text-violet-400" />} badge={<span className="text-[12px] px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-400">{selected.updates.length}</span>}>
             <div className="space-y-3">
               {showAddUpdate ? (
                 <div className="p-3 rounded-lg bg-white/[0.03] border border-violet-500/20 space-y-2">
@@ -539,11 +539,11 @@ ${JSON.stringify(context, null, 2)}`,
                     const t = UPDATE_TYPES[u.type] || UPDATE_TYPES.other;
                     return (
                       <div key={u.id} className="flex items-start gap-3 px-3 py-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0 mt-0.5 ${t.color}`}>{t.label}</span>
+                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0 mt-0.5 ${t.color}`}>{t.label}</span>
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-medium text-foreground">{u.title}</p>
-                          {u.description && <p className="text-[10px] text-muted-foreground mt-0.5">{u.description}</p>}
-                          <div className="flex items-center gap-3 mt-1 text-[10px] text-muted-foreground">
+                          {u.description && <p className="text-[12px] text-muted-foreground mt-0.5">{u.description}</p>}
+                          <div className="flex items-center gap-3 mt-1 text-[12px] text-muted-foreground">
                             <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {u.date}</span>
                             {u.source && <span className="flex items-center gap-1"><ExternalLink className="w-3 h-3" /> {u.source}</span>}
                           </div>

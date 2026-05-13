@@ -364,7 +364,7 @@ export default function TargetingPage() {
             </p>
             <div className="flex items-center gap-2 mt-2">
               <span className="text-xs text-fuchsia-400 font-medium">{quote.author}</span>
-              <span className="text-[10px] text-muted-foreground">— {quote.book}</span>
+              <span className="text-[12px] text-muted-foreground">— {quote.book}</span>
             </div>
           </div>
         </div>
@@ -375,22 +375,22 @@ export default function TargetingPage() {
         <div className="cc-card rounded-[14px] p-4 text-center">
           <Users className="w-5 h-5 text-fuchsia-400 mx-auto mb-1" />
           <p className="text-2xl font-extrabold text-foreground">{totalCount}</p>
-          <p className="text-[11px] text-muted-foreground">إجمالي العملاء</p>
+          <p className="text-[13px] text-muted-foreground">إجمالي العملاء</p>
         </div>
         <div className="cc-card rounded-[14px] p-4 text-center">
           <CalendarCheck className="w-5 h-5 text-amber-400 mx-auto mb-1" />
           <p className="text-2xl font-extrabold text-foreground">{dailyCount}</p>
-          <p className="text-[11px] text-muted-foreground">هدف اليوم</p>
+          <p className="text-[13px] text-muted-foreground">هدف اليوم</p>
         </div>
         <div className="cc-card rounded-[14px] p-4 text-center">
           <CheckCircle2 className="w-5 h-5 text-emerald-400 mx-auto mb-1" />
           <p className="text-2xl font-extrabold text-foreground">{contactedCount}</p>
-          <p className="text-[11px] text-muted-foreground">تم التواصل</p>
+          <p className="text-[13px] text-muted-foreground">تم التواصل</p>
         </div>
         <div className="cc-card rounded-[14px] p-4 text-center">
           <Clock className="w-5 h-5 text-sky-400 mx-auto mb-1" />
           <p className="text-2xl font-extrabold text-foreground">{pendingCount}</p>
-          <p className="text-[11px] text-muted-foreground">في الانتظار</p>
+          <p className="text-[13px] text-muted-foreground">في الانتظار</p>
         </div>
       </div>
 
@@ -479,7 +479,7 @@ export default function TargetingPage() {
           >
             {f.label}
             {f.key === "daily" && dailyCount > 0 && (
-              <span className="mr-1.5 px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[10px]">
+              <span className="mr-1.5 px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[12px]">
                 {dailyCount}
               </span>
             )}
@@ -550,7 +550,7 @@ export default function TargetingPage() {
                     <p className="text-sm font-bold text-foreground truncate">{client.client_name}</p>
                     <div className="flex items-center gap-2 mt-0.5">
                       {client.client_phone && (
-                        <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                        <span className="text-[13px] text-muted-foreground flex items-center gap-1">
                           <Phone className="w-3 h-3" />
                           {client.client_phone}
                         </span>
@@ -558,7 +558,7 @@ export default function TargetingPage() {
                     </div>
                   </div>
                   {isDaily && (
-                    <span className="px-2 py-1 rounded-full bg-amber-500/15 text-amber-400 text-[10px] font-medium flex items-center gap-1">
+                    <span className="px-2 py-1 rounded-full bg-amber-500/15 text-amber-400 text-[12px] font-medium flex items-center gap-1">
                       <CalendarCheck className="w-3 h-3" />
                       هدف اليوم
                     </span>
@@ -567,30 +567,30 @@ export default function TargetingPage() {
 
                 {/* Info row */}
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${status.bg} ${status.color}`}>
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] font-medium ${status.bg} ${status.color}`}>
                     <StatusIcon className="w-3 h-3" />
                     {status.label}
                   </span>
                   {sat && (
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${sat.bg} ${sat.color}`}>
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] font-medium ${sat.bg} ${sat.color}`}>
                       <sat.icon className="w-3 h-3" />
                       {sat.label}
                     </span>
                   )}
                   {client.plan && (
-                    <span className="px-2 py-0.5 rounded-full bg-white/5 text-[10px] text-muted-foreground">
+                    <span className="px-2 py-0.5 rounded-full bg-white/5 text-[12px] text-muted-foreground">
                       {client.plan}
                     </span>
                   )}
                   {client.assigned_rep && (
-                    <span className="px-2 py-0.5 rounded-full bg-white/5 text-[10px] text-muted-foreground">
+                    <span className="px-2 py-0.5 rounded-full bg-white/5 text-[12px] text-muted-foreground">
                       {client.assigned_rep}
                     </span>
                   )}
                 </div>
 
                 {client.notes && (
-                  <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2">
+                  <p className="text-[13px] text-muted-foreground leading-relaxed line-clamp-2">
                     {client.notes}
                   </p>
                 )}

@@ -155,7 +155,7 @@ function PaletteSection({ theme }: { theme: ThemeTokens }) {
           />
           <div>
             <div className="text-xs font-semibold text-foreground">{x.label}</div>
-            <div className="mt-0.5 font-mono text-[10px] text-muted-foreground">{x.color}</div>
+            <div className="mt-0.5 font-mono text-[12px] text-muted-foreground">{x.color}</div>
           </div>
         </div>
       ))}
@@ -239,7 +239,7 @@ export default function AppearancePage() {
                     </div>
                     {isActive ? (
                       <span
-                        className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold"
+                        className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[13px] font-bold"
                         style={{
                           background: `${theme.primary}20`,
                           color: theme.primary,
@@ -251,7 +251,7 @@ export default function AppearancePage() {
                       </span>
                     ) : (
                       <span
-                        className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
+                        className="rounded-full px-2.5 py-0.5 text-[13px] font-semibold"
                         style={{
                           background: `${theme.border}50`,
                           color: theme.dim,
@@ -262,7 +262,7 @@ export default function AppearancePage() {
                       </span>
                     )}
                   </div>
-                  <p className="mb-2.5 text-[11px] leading-relaxed" style={{ color: theme.dim }}>
+                  <p className="mb-2.5 text-[13px] leading-relaxed" style={{ color: theme.dim }}>
                     {theme.desc}
                   </p>
                   {/* Color dots */}
@@ -320,7 +320,7 @@ export default function AppearancePage() {
               key={i}
               className="flex items-center gap-3 rounded-[10px] border border-border bg-card/50 px-3.5 py-2.5"
             >
-              <div className="w-20 shrink-0 text-[10px] text-muted-foreground">{x.label}</div>
+              <div className="w-20 shrink-0 text-[12px] text-muted-foreground">{x.label}</div>
               <div className="h-5 w-px shrink-0 bg-border" />
               <div
                 className={`${x.color} ${"mono" in x ? "font-mono" : ""}`}
@@ -342,7 +342,7 @@ export default function AppearancePage() {
         <div className="space-y-5">
           {/* Buttons */}
           <div>
-            <div className="mb-2 text-[11px] text-muted-foreground">الأزرار</div>
+            <div className="mb-2 text-[13px] text-muted-foreground">الأزرار</div>
             <div className="flex flex-wrap items-center gap-2">
               {[
                 { label: "الإجراء الرئيسي", color: "var(--primary)" },
@@ -369,7 +369,7 @@ export default function AppearancePage() {
 
           {/* Badges */}
           <div>
-            <div className="mb-2 text-[11px] text-muted-foreground">الحالات (Badges)</div>
+            <div className="mb-2 text-[13px] text-muted-foreground">الحالات (Badges)</div>
             <div className="flex flex-wrap gap-1.5">
               {[
                 { label: "نشط", color: "#10B981" },
@@ -391,7 +391,7 @@ export default function AppearancePage() {
 
           {/* Progress Bars */}
           <div>
-            <div className="mb-2 text-[11px] text-muted-foreground">أشرطة التقدم</div>
+            <div className="mb-2 text-[13px] text-muted-foreground">أشرطة التقدم</div>
             <div className="space-y-2">
               {[
                 { label: "ممتاز (100%)", w: 100, color: "#10B981" },
@@ -400,14 +400,14 @@ export default function AppearancePage() {
                 { label: "متأخر (18%)", w: 18, color: "#EF4444" },
               ].map((p, i) => (
                 <div key={i} className="flex items-center gap-3">
-                  <div className="w-24 shrink-0 text-[11px] text-muted-foreground">{p.label}</div>
+                  <div className="w-24 shrink-0 text-[13px] text-muted-foreground">{p.label}</div>
                   <div className="h-[6px] flex-1 overflow-hidden rounded-full bg-border">
                     <div
                       className="h-full rounded-full transition-all duration-500"
                       style={{ width: `${p.w}%`, background: p.color }}
                     />
                   </div>
-                  <span className="w-8 text-left text-[11px] font-bold" style={{ color: p.color }}>
+                  <span className="w-8 text-left text-[13px] font-bold" style={{ color: p.color }}>
                     {p.w}%
                   </span>
                 </div>
@@ -417,7 +417,7 @@ export default function AppearancePage() {
 
           {/* Mini KPI cards */}
           <div>
-            <div className="mb-2 text-[11px] text-muted-foreground">بطاقة KPI نموذجية</div>
+            <div className="mb-2 text-[13px] text-muted-foreground">بطاقة KPI نموذجية</div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {[
                 { label: "الإيراد الشهري", value: "3.4M", color: "#10B981", icon: "💰" },
@@ -437,7 +437,7 @@ export default function AppearancePage() {
                   <div className="mb-1.5 flex items-center justify-between">
                     <span className="text-base">{k.icon}</span>
                     <span
-                      className="rounded-full px-1.5 py-px text-[10px] font-bold"
+                      className="rounded-full px-1.5 py-px text-[12px] font-bold"
                       style={{ background: "#10B98120", color: "#10B981" }}
                     >
                       +12%
@@ -446,7 +446,7 @@ export default function AppearancePage() {
                   <div className="font-mono text-lg font-extrabold" style={{ color: k.color }}>
                     {k.value}
                   </div>
-                  <div className="mt-1 text-[11px] text-muted-foreground">{k.label}</div>
+                  <div className="mt-1 text-[13px] text-muted-foreground">{k.label}</div>
                 </div>
               ))}
             </div>

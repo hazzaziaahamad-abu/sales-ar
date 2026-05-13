@@ -233,7 +233,7 @@ export function AchievementSummary({
           <button
             onClick={handleShare}
             disabled={isExporting}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium text-muted-foreground hover:text-cyan hover:bg-cyan/10 transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[13px] font-medium text-muted-foreground hover:text-cyan hover:bg-cyan/10 transition-colors disabled:opacity-50"
             title="مشاركة كصورة"
           >
             {isExporting ? (
@@ -321,7 +321,7 @@ export function AchievementSummary({
         >
           <CheckCircle2 className="w-5 h-5 text-cc-green mx-auto mb-1" />
           <p className="text-2xl font-bold text-cc-green">{summary.completed}</p>
-          <p className="text-[10px] text-muted-foreground mt-0.5">{l.completed}</p>
+          <p className="text-[12px] text-muted-foreground mt-0.5">{l.completed}</p>
         </button>
         <button
           onClick={() => handleFilter("revenue")}
@@ -331,7 +331,7 @@ export function AchievementSummary({
         >
           <TrendingUp className="w-5 h-5 text-cyan mx-auto mb-1" />
           <p className="text-2xl font-bold text-cyan">{formatMoneyFull(summary.completedRevenue)}</p>
-          <p className="text-[10px] text-muted-foreground mt-0.5">{l.revenue}</p>
+          <p className="text-[12px] text-muted-foreground mt-0.5">{l.revenue}</p>
         </button>
         <button
           onClick={() => handleFilter("contacted")}
@@ -341,7 +341,7 @@ export function AchievementSummary({
         >
           <Users className="w-5 h-5 text-cc-purple mx-auto mb-1" />
           <p className="text-2xl font-bold text-cc-purple">{summary.contacted}</p>
-          <p className="text-[10px] text-muted-foreground mt-0.5">{l.contacted}</p>
+          <p className="text-[12px] text-muted-foreground mt-0.5">{l.contacted}</p>
         </button>
         <button
           onClick={() => handleFilter("success")}
@@ -351,7 +351,7 @@ export function AchievementSummary({
         >
           <Zap className="w-5 h-5 text-amber mx-auto mb-1" />
           <p className="text-2xl font-bold text-amber">{summary.successRate}%</p>
-          <p className="text-[10px] text-muted-foreground mt-0.5">{l.successRate}</p>
+          <p className="text-[12px] text-muted-foreground mt-0.5">{l.successRate}</p>
         </button>
         <button
           onClick={() => handleFilter("lost")}
@@ -361,7 +361,7 @@ export function AchievementSummary({
         >
           <TrendingDown className="w-5 h-5 text-cc-red mx-auto mb-1" />
           <p className="text-2xl font-bold text-cc-red">{formatMoneyFull(summary.lostRevenue)}</p>
-          <p className="text-[10px] text-muted-foreground mt-0.5">{l.lostRevenue}</p>
+          <p className="text-[12px] text-muted-foreground mt-0.5">{l.lostRevenue}</p>
         </button>
       </div>
 
@@ -369,7 +369,7 @@ export function AchievementSummary({
       <div className="flex items-center gap-4 flex-wrap">
         <div className="flex-1 min-w-[200px]">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[11px] text-muted-foreground">معدل الإنجاز</span>
+            <span className="text-[13px] text-muted-foreground">معدل الإنجاز</span>
             <span className={`text-xs font-bold ${
               summary.successRate >= 70 ? "text-cc-green" :
               summary.successRate >= 40 ? "text-amber" : "text-cc-red"
@@ -390,14 +390,14 @@ export function AchievementSummary({
         {summary.avgValue > 0 && (
           <div className="text-center px-3 py-1.5 rounded-lg bg-white/[0.05] border border-white/[0.06]">
             <p className="text-xs font-bold text-foreground">{formatMoneyFull(summary.avgValue)}</p>
-            <p className="text-[10px] text-muted-foreground">متوسط القيمة</p>
+            <p className="text-[12px] text-muted-foreground">متوسط القيمة</p>
           </div>
         )}
 
         {summary.topRep && (
           <div className="text-center px-3 py-1.5 rounded-lg bg-amber/10 border border-amber/20">
             <p className="text-xs font-bold text-amber">🏆 {summary.topRep.name}</p>
-            <p className="text-[10px] text-muted-foreground">{summary.topRep.count} {l.topRep}</p>
+            <p className="text-[12px] text-muted-foreground">{summary.topRep.count} {l.topRep}</p>
           </div>
         )}
       </div>
@@ -405,13 +405,13 @@ export function AchievementSummary({
       {/* Plan/Package breakdown */}
       {summary.planBreakdown.length > 0 && (
         <div className="mt-4 pt-4 border-t border-white/[0.06]">
-          <p className="text-[11px] text-muted-foreground mb-2.5 font-medium">📦 توزيع الباقات المنجزة</p>
+          <p className="text-[13px] text-muted-foreground mb-2.5 font-medium">📦 توزيع الباقات المنجزة</p>
           <div className="flex flex-wrap gap-2">
             {summary.planBreakdown.map(p => (
               <div key={p.plan} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.06]">
                 <span className="text-xs font-bold text-cc-green">{p.count}</span>
                 <span className="text-xs text-foreground">{p.plan}</span>
-                <span className="text-[10px] text-muted-foreground">({formatMoneyFull(p.revenue)})</span>
+                <span className="text-[12px] text-muted-foreground">({formatMoneyFull(p.revenue)})</span>
               </div>
             ))}
           </div>

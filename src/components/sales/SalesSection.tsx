@@ -992,12 +992,12 @@ export function SalesSection({ salesType }: SalesPageProps) {
                   <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-l from-amber/[0.08] via-cc-purple/[0.05] to-transparent border border-amber/15">
                     <span className="text-lg">🔥</span>
                     <div className="flex-1">
-                      <p className="text-[11px] font-medium text-amber italic leading-tight">"{q.text}"</p>
-                      <p className="text-[10px] text-cc-purple mt-0.5 font-semibold">📖 {q.author}</p>
+                      <p className="text-[13px] font-medium text-amber italic leading-tight">"{q.text}"</p>
+                      <p className="text-[12px] text-cc-purple mt-0.5 font-semibold">📖 {q.author}</p>
                     </div>
                     <button
                       onClick={toggleCommitment}
-                      className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all ${
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[12px] font-semibold transition-all ${
                         hasCommitted
                           ? "bg-green-500/15 text-green-600 border border-green-500/30"
                           : "bg-muted/50 text-muted-foreground border border-border hover:bg-amber/10 hover:text-amber hover:border-amber/30"
@@ -1006,7 +1006,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
                       <ThumbsUp className={`w-3 h-3 ${hasCommitted ? "fill-green-500" : ""}`} />
                       {hasCommitted ? "ملتزم" : "ألتزم"}
                       {commitments.length > 0 && (
-                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber/20 text-amber text-[9px] font-bold">
+                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber/20 text-amber text-[11px] font-bold">
                           {commitments.length}
                         </span>
                       )}
@@ -1015,7 +1015,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
                   {commitments.length > 0 && (
                     <div className="mt-1 flex flex-wrap gap-1 px-3">
                       {commitments.map((c) => (
-                        <span key={c.user_name} className="text-[9px] px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-600 border border-green-500/20">
+                        <span key={c.user_name} className="text-[11px] px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-600 border border-green-500/20">
                           {c.user_name}
                         </span>
                       ))}
@@ -1047,13 +1047,13 @@ export function SalesSection({ salesType }: SalesPageProps) {
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-cc-red/10 flex items-center justify-center relative">
                 <Bell className="w-4 h-4 text-cc-red" />
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-cc-red text-white text-[9px] font-bold flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-cc-red text-white text-[11px] font-bold flex items-center justify-center">
                   {visibleFollowUps.length}
                 </span>
               </div>
               <div className="text-right">
                 <h3 className="text-sm font-bold text-foreground">تنبيهات المتابعة التلقائية</h3>
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-[12px] text-muted-foreground">
                   {visibleFollowUps.filter((a) => a.rule.priority === "urgent").length > 0
                     ? `${visibleFollowUps.filter((a) => a.rule.priority === "urgent").length} تصعيد عاجل — `
                     : ""}
@@ -1085,12 +1085,12 @@ export function SalesSection({ salesType }: SalesPageProps) {
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium text-foreground truncate">{action.taskTitle}</p>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${ps.bg} ${ps.text} font-semibold`}>
+                      <span className={`text-[12px] px-1.5 py-0.5 rounded-full border ${ps.bg} ${ps.text} font-semibold`}>
                         {ps.label}
                       </span>
-                      <span className="text-[10px] text-muted-foreground">{action.rule.label}</span>
+                      <span className="text-[12px] text-muted-foreground">{action.rule.label}</span>
                       {action.deal.assigned_rep_name && (
-                        <span className="text-[10px] text-muted-foreground">• {action.deal.assigned_rep_name}</span>
+                        <span className="text-[12px] text-muted-foreground">• {action.deal.assigned_rep_name}</span>
                       )}
                     </div>
                   </div>
@@ -1098,13 +1098,13 @@ export function SalesSection({ salesType }: SalesPageProps) {
                     <button
                       onClick={() => handleCreateFollowUpTask(action)}
                       disabled={creatingFollowUpTask === action.deal.id}
-                      className="text-[10px] px-2.5 py-1.5 rounded-lg bg-cc-green/10 text-cc-green border border-cc-green/30 hover:bg-cc-green/20 transition-colors disabled:opacity-50 font-medium"
+                      className="text-[12px] px-2.5 py-1.5 rounded-lg bg-cc-green/10 text-cc-green border border-cc-green/30 hover:bg-cc-green/20 transition-colors disabled:opacity-50 font-medium"
                     >
                       {creatingFollowUpTask === action.deal.id ? "جاري..." : "إنشاء مهمة"}
                     </button>
                     <button
                       onClick={() => dismissFollowUp(action.deal.id)}
-                      className="text-[10px] px-2 py-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                      className="text-[12px] px-2 py-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
                     >
                       تخطي
                     </button>
@@ -1115,7 +1115,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
           </div>
           {visibleFollowUps.length > 10 && (
             <div className="px-4 py-2 text-center border-t border-border/30">
-              <span className="text-[10px] text-muted-foreground">و {visibleFollowUps.length - 10} تنبيه آخر...</span>
+              <span className="text-[12px] text-muted-foreground">و {visibleFollowUps.length - 10} تنبيه آخر...</span>
             </div>
           )}
         </div>
@@ -1234,11 +1234,11 @@ export function SalesSection({ salesType }: SalesPageProps) {
                   }`}
                 >
                   <p className={`text-2xl font-extrabold ${count > 0 ? `text-${rawColor}` : "text-muted-foreground/50"}`}>{count}</p>
-                  <p className="text-[11px] text-muted-foreground mt-1 leading-tight">{src}</p>
+                  <p className="text-[13px] text-muted-foreground mt-1 leading-tight">{src}</p>
                   <div className="flex justify-center mt-2.5 mb-1">
                     <div className={`w-2.5 h-2.5 rounded-full ${count > 0 ? `bg-${rawColor}` : "bg-muted-foreground/20"}`} />
                   </div>
-                  <p className={`text-[11px] font-semibold ${count > 0 ? `text-${rawColor}` : "text-muted-foreground/40"}`}>{pct}%</p>
+                  <p className={`text-[13px] font-semibold ${count > 0 ? `text-${rawColor}` : "text-muted-foreground/40"}`}>{pct}%</p>
                 </div>
               );
             })}
@@ -1257,7 +1257,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
               </div>
               <div className="text-right">
                 <h3 className="text-sm font-bold text-foreground">متابعة العملاء</h3>
-                <span className="text-[10px] text-muted-foreground">{nonCompletedDeals.length} عميل غير مكتمل — {followUpIds.size > 0 ? `${followUpIds.size} محدد` : "اختر للمتابعة"}</span>
+                <span className="text-[12px] text-muted-foreground">{nonCompletedDeals.length} عميل غير مكتمل — {followUpIds.size > 0 ? `${followUpIds.size} محدد` : "اختر للمتابعة"}</span>
               </div>
             </div>
             <svg className={`w-4 h-4 text-muted-foreground transition-transform ${showFollowUp ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -1269,16 +1269,16 @@ export function SalesSection({ salesType }: SalesPageProps) {
             <div className="px-4 pb-4 space-y-3">
               {/* Actions bar */}
               <div className="flex items-center gap-2 flex-wrap">
-                <button onClick={selectAllFollowUp} className="text-[10px] px-2.5 py-1.5 rounded-lg border border-amber/30 text-amber hover:bg-amber/10 transition-colors">
+                <button onClick={selectAllFollowUp} className="text-[12px] px-2.5 py-1.5 rounded-lg border border-amber/30 text-amber hover:bg-amber/10 transition-colors">
                   <SquareCheck className="w-3 h-3 inline-block ml-1" />تحديد الكل
                 </button>
                 {followUpIds.size > 0 && (
                   <>
-                    <button onClick={shareFollowUpReport} className="text-[10px] px-2.5 py-1.5 rounded-lg border border-cc-purple/30 text-cc-purple hover:bg-cc-purple/10 transition-colors">
+                    <button onClick={shareFollowUpReport} className="text-[12px] px-2.5 py-1.5 rounded-lg border border-cc-purple/30 text-cc-purple hover:bg-cc-purple/10 transition-colors">
                       <Share2 className="w-3 h-3 inline-block ml-1" />مشاركة مع الفريق
                     </button>
-                    <button onClick={clearFollowUp} className="text-[10px] text-muted-foreground hover:text-cc-red transition-colors">مسح التحديد</button>
-                    <span className="text-[10px] text-muted-foreground mr-auto">
+                    <button onClick={clearFollowUp} className="text-[12px] text-muted-foreground hover:text-cc-red transition-colors">مسح التحديد</button>
+                    <span className="text-[12px] text-muted-foreground mr-auto">
                       {followUpIds.size} عميل | {formatMoney(deals.filter((d) => followUpIds.has(d.id)).reduce((s, d) => s + d.deal_value, 0))}
                     </span>
                   </>
@@ -1321,16 +1321,16 @@ export function SalesSection({ salesType }: SalesPageProps) {
                           <ColorBadge color={STAGE_BADGE_COLOR[deal.stage] || "cyan"} text={deal.stage} />
                           <span className="text-xs font-bold text-cyan">{formatMoney(deal.deal_value)}</span>
                           {daysSince > 0 && (
-                            <span className={`text-[10px] ${daysSince > 14 ? "text-cc-red" : daysSince > 7 ? "text-amber" : "text-muted-foreground"}`}>
+                            <span className={`text-[12px] ${daysSince > 14 ? "text-cc-red" : daysSince > 7 ? "text-amber" : "text-muted-foreground"}`}>
                               منذ {daysSince} يوم
                             </span>
                           )}
-                          {deal.assigned_rep_name && <span className="text-[10px] text-muted-foreground">{deal.assigned_rep_name}</span>}
+                          {deal.assigned_rep_name && <span className="text-[12px] text-muted-foreground">{deal.assigned_rep_name}</span>}
                         </div>
                         {/* Recommendation */}
                         <div className={`flex items-start gap-1.5 mt-1.5 ${rec.color}`}>
                           <span className="text-xs leading-none">{rec.icon}</span>
-                          <span className="text-[11px] leading-relaxed">{rec.text}</span>
+                          <span className="text-[13px] leading-relaxed">{rec.text}</span>
                         </div>
                       </div>
                     </div>
@@ -1373,7 +1373,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-foreground">هدف {pageTitle} اليومي</h3>
-                  <span className="text-[10px] text-muted-foreground">
+                  <span className="text-[12px] text-muted-foreground">
                     {new Date().toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "long", day: "numeric", month: "short" })}
                   </span>
                 </div>
@@ -1384,13 +1384,13 @@ export function SalesSection({ salesType }: SalesPageProps) {
                 }`}>
                   {motivationMsg}
                 </span>
-                <button onClick={shareSalesReport} className="flex items-center gap-1 text-[10px] px-2 py-1.5 rounded-lg border border-cc-purple/30 text-cc-purple hover:bg-cc-purple/10 transition-colors" title="مشاركة">
+                <button onClick={shareSalesReport} className="flex items-center gap-1 text-[12px] px-2 py-1.5 rounded-lg border border-cc-purple/30 text-cc-purple hover:bg-cc-purple/10 transition-colors" title="مشاركة">
                   <Share2 className="w-3 h-3" />مشاركة
                 </button>
-                <button onClick={exportSalesReport} className="flex items-center gap-1 text-[10px] px-2 py-1.5 rounded-lg border border-cyan/30 text-cyan hover:bg-cyan/10 transition-colors" title="تصدير">
+                <button onClick={exportSalesReport} className="flex items-center gap-1 text-[12px] px-2 py-1.5 rounded-lg border border-cyan/30 text-cyan hover:bg-cyan/10 transition-colors" title="تصدير">
                   <Download className="w-3 h-3" />تصدير
                 </button>
-                <button onClick={deselectAll} className="text-[10px] text-muted-foreground hover:text-cc-red transition-colors">مسح</button>
+                <button onClick={deselectAll} className="text-[12px] text-muted-foreground hover:text-cc-red transition-colors">مسح</button>
               </div>
             </div>
 
@@ -1401,7 +1401,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
                 ))}
               </div>
               <div className="flex items-center justify-between mt-1">
-                <span className="text-[10px] text-muted-foreground">{closed} / {total}</span>
+                <span className="text-[12px] text-muted-foreground">{closed} / {total}</span>
                 <span className={`text-xs font-extrabold ${allDone ? "text-cc-green" : rate >= 50 ? "text-amber" : "text-cyan"}`}>{rate}%</span>
               </div>
             </div>
@@ -1410,22 +1410,22 @@ export function SalesSection({ salesType }: SalesPageProps) {
               <div className="text-center p-2.5 rounded-lg bg-card/50 border border-border/30">
                 <p className="text-lg mb-0.5">{allDone ? "🏆" : timeUp ? "⏰" : hoursLeft < 2 ? "😰" : "🎯"}</p>
                 <p className="text-xl font-extrabold text-cyan">{total}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">الهدف</p>
+                <p className="text-[12px] text-muted-foreground mt-0.5">الهدف</p>
               </div>
               <div className="text-center p-2.5 rounded-lg bg-card/50 border border-border/30">
                 <p className="text-lg mb-0.5">{closed > 0 ? "✅" : "⭕"}</p>
                 <p className="text-xl font-extrabold text-cc-green">{closed}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">مكتمل</p>
+                <p className="text-[12px] text-muted-foreground mt-0.5">مكتمل</p>
               </div>
               <div className="text-center p-2.5 rounded-lg bg-card/50 border border-border/30">
                 <p className="text-lg mb-0.5">{remaining === 0 ? "🎉" : remaining <= 2 ? "💪" : "⏳"}</p>
                 <p className={`text-xl font-extrabold ${remaining > 0 ? "text-amber" : "text-cc-green"}`}>{remaining}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">متبقي</p>
+                <p className="text-[12px] text-muted-foreground mt-0.5">متبقي</p>
               </div>
               <div className="text-center p-2.5 rounded-lg bg-card/50 border border-border/30">
                 <p className="text-lg mb-0.5">💰</p>
                 <p className="text-xl font-extrabold text-cc-purple">{formatMoney(closedValue)}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">قيمة المغلقة</p>
+                <p className="text-[12px] text-muted-foreground mt-0.5">قيمة المغلقة</p>
               </div>
               <div className={`text-center p-2.5 rounded-lg border ${
                 allDone ? "bg-cc-green/10 border-cc-green/30" : timeUp ? "bg-red-500/10 border-red-500/30" : hoursLeft < 2 ? "bg-amber/10 border-amber/30" : "bg-card/50 border-border/30"
@@ -1436,7 +1436,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
                 }`}>
                   {allDone ? "تم!" : timeUp ? "انتهى" : `${hoursLeft}:${String(minutesLeft).padStart(2, "0")}:${String(secondsLeft).padStart(2, "0")}`}
                 </p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">{allDone ? "أنجزت الهدف" : "الوقت المتبقي"}</p>
+                <p className="text-[12px] text-muted-foreground mt-0.5">{allDone ? "أنجزت الهدف" : "الوقت المتبقي"}</p>
               </div>
             </div>
 
@@ -1464,12 +1464,12 @@ export function SalesSection({ salesType }: SalesPageProps) {
                     <div key={name} className={`flex items-center gap-3 p-3 rounded-lg bg-gradient-to-l ${bgGrads[i]} to-transparent border ${borderColors[i]}`}>
                       <div className="w-9 h-9 rounded-full bg-card/80 flex items-center justify-center text-lg">{medals[i]}</div>
                       <div className="flex-1">
-                        {i === 0 && <p className="text-[10px] text-muted-foreground">الموظف الأكثر إنجازاً اليوم 🔥</p>}
+                        {i === 0 && <p className="text-[12px] text-muted-foreground">الموظف الأكثر إنجازاً اليوم 🔥</p>}
                         <p className={`text-sm font-bold text-foreground`}>{name}</p>
                       </div>
                       <div className="text-left">
                         <p className={`text-xs font-bold ${textColors[i]}`}>{stats.count} صفقة</p>
-                        <p className="text-[10px] text-muted-foreground">{stats.value.toLocaleString()} ر.س</p>
+                        <p className="text-[12px] text-muted-foreground">{stats.value.toLocaleString()} ر.س</p>
                       </div>
                     </div>
                   ))}
@@ -1489,7 +1489,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
             placeholder="ابحث باسم العميل أو رقم الجوال..."
             className="max-w-xs"
           />
-          <button onClick={selectAllVisible} className="text-[10px] px-2.5 py-1.5 rounded-lg border border-cyan/30 text-cyan hover:bg-cyan/10 transition-colors whitespace-nowrap" title="تحديد الكل كهدف يومي">
+          <button onClick={selectAllVisible} className="text-[12px] px-2.5 py-1.5 rounded-lg border border-cyan/30 text-cyan hover:bg-cyan/10 transition-colors whitespace-nowrap" title="تحديد الكل كهدف يومي">
             <SquareCheck className="w-3 h-3 inline-block ml-1" />تحديد الكل
           </button>
         </div>
@@ -1572,10 +1572,10 @@ export function SalesSection({ salesType }: SalesPageProps) {
                       {deal.client_name}
                     </button>
                     {isTarget && !isTargetDone && (
-                      <span className="mr-1.5 inline-block text-[9px] px-1.5 py-0.5 rounded bg-cyan/10 text-cyan font-medium">هدف اليوم</span>
+                      <span className="mr-1.5 inline-block text-[11px] px-1.5 py-0.5 rounded bg-cyan/10 text-cyan font-medium">هدف اليوم</span>
                     )}
                     {isTargetDone && (
-                      <span className="mr-1.5 inline-block text-[9px] px-1.5 py-0.5 rounded bg-cc-green/15 text-cc-green font-medium">تم الإنجاز</span>
+                      <span className="mr-1.5 inline-block text-[11px] px-1.5 py-0.5 rounded bg-cc-green/15 text-cc-green font-medium">تم الإنجاز</span>
                     )}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs" dir="ltr">
@@ -1599,7 +1599,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
                         color={STAGE_BADGE_COLOR[deal.stage] || "blue"}
                       />
                       {deal.stage === "اعادة الاتصال في وقت اخر" && deal.callback_date && (
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 w-fit ${
+                        <span className={`text-[12px] px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 w-fit ${
                           new Date(deal.callback_date).getTime() < Date.now()
                             ? "bg-red-500/15 text-red-400"
                             : new Date(deal.callback_date).getTime() - Date.now() < 3600000
@@ -1649,7 +1649,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
                           const daysSince = Math.floor((Date.now() - new Date(deal.updated_at).getTime()) / 86400000);
                           if (daysSince < 3) return null;
                           return (
-                            <span className={`absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[9px] font-bold px-1 ${
+                            <span className={`absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[11px] font-bold px-1 ${
                               daysSince >= 7 ? "bg-red-500 text-white" : "bg-amber-500 text-white"
                             }`} title={`${daysSince} يوم بدون تحديث`}>
                               {daysSince}
@@ -1745,7 +1745,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex flex-wrap gap-1 justify-end">
                           {Object.entries(rep.plans).map(([plan, count]) => (
-                            <span key={plan} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-white/5 text-[10px] text-muted-foreground">
+                            <span key={plan} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-white/5 text-[12px] text-muted-foreground">
                               {plan} <span className="text-cyan font-bold">{count}</span>
                             </span>
                           ))}
@@ -1784,9 +1784,9 @@ export function SalesSection({ salesType }: SalesPageProps) {
                     <tr className="border-b border-border/30">
                       <td colSpan={11} className="px-5 py-2 pb-3">
                         <div className="flex flex-wrap gap-1.5 items-center">
-                          <span className="text-[10px] text-muted-foreground/70 ml-1">توصيات:</span>
+                          <span className="text-[12px] text-muted-foreground/70 ml-1">توصيات:</span>
                           {getRepTips(rep).map((tip, i) => (
-                            <span key={i} className={`text-[10px] px-2 py-0.5 rounded-full border ${tip.color}`}>
+                            <span key={i} className={`text-[12px] px-2 py-0.5 rounded-full border ${tip.color}`}>
                               {tip.text}
                             </span>
                           ))}
@@ -1871,7 +1871,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
                       <span className="text-xs text-muted-foreground w-20 text-right shrink-0">{f.stage}</span>
                       {/* Change percentage */}
                       {changePct !== null ? (
-                        <span className="text-[10px] text-muted-foreground w-10 text-left shrink-0" dir="ltr">
+                        <span className="text-[12px] text-muted-foreground w-10 text-left shrink-0" dir="ltr">
                           {changePct > 0 ? `${changePct}%↑` : `${Math.abs(changePct)}%↓`}
                         </span>
                       ) : (
@@ -1886,7 +1886,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
                           style={{ width: `${widthPct}%` }}
                         />
                         {f.count > 0 && (
-                          <span className={`mr-2 ${badgeColors[i]} text-white text-[11px] font-bold px-3 py-1 rounded-full shrink-0 whitespace-nowrap`}>
+                          <span className={`mr-2 ${badgeColors[i]} text-white text-[13px] font-bold px-3 py-1 rounded-full shrink-0 whitespace-nowrap`}>
                             {f.count} عميل
                           </span>
                         )}
@@ -1947,9 +1947,9 @@ export function SalesSection({ salesType }: SalesPageProps) {
                     <div key={d.id} className="flex items-center justify-between bg-white/[0.02] rounded-[14px] p-3 border border-cc-red/10">
                       <div>
                         <p className="text-xs font-bold text-foreground">{d.client_name}</p>
-                        <p className="text-[10px] text-muted-foreground truncate max-w-[180px]">{d.notes || d.loss_reason || ""}</p>
+                        <p className="text-[12px] text-muted-foreground truncate max-w-[180px]">{d.notes || d.loss_reason || ""}</p>
                         {d.loss_reason && (
-                          <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-cc-red/10 text-cc-red">{d.loss_reason}</span>
+                          <span className="inline-block mt-1 text-[12px] px-2 py-0.5 rounded-full bg-cc-red/10 text-cc-red">{d.loss_reason}</span>
                         )}
                       </div>
                       <span className="text-xs font-bold text-cc-red whitespace-nowrap">{formatMoney(d.deal_value)}-</span>
@@ -2188,7 +2188,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
                   </SelectContent>
                 </Select>
                 {marketers.filter((m) => m.is_active).length === 0 && (
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-[13px] text-muted-foreground">
                     لا يوجد مسوقين. أضف مسوقين من صفحة المسوقين أولاً.
                   </p>
                 )}
@@ -2224,7 +2224,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
                   dir="ltr"
                   className="text-right"
                 />
-                <p className="text-[10px] text-muted-foreground">حدد التاريخ والوقت للاتصال بالعميل مرة أخرى</p>
+                <p className="text-[12px] text-muted-foreground">حدد التاريخ والوقت للاتصال بالعميل مرة أخرى</p>
               </div>
             )}
 
@@ -2274,7 +2274,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
                 onChange={(e) => setForm({ ...form, probability: Number(e.target.value) })}
                 className="w-full h-1.5 bg-muted rounded-full appearance-none cursor-pointer accent-cyan [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-cyan [&::-webkit-slider-thumb]:cursor-pointer"
               />
-              <div className="flex justify-between text-[10px] text-muted-foreground">
+              <div className="flex justify-between text-[12px] text-muted-foreground">
                 <span>0%</span>
                 <span>50%</span>
                 <span>100%</span>

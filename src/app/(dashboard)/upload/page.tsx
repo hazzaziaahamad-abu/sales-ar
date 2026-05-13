@@ -742,7 +742,7 @@ export default function UploadPage() {
             <Download className="w-4 h-4" />
             تحميل قالب Excel جاهز للتعبئة
           </Button>
-          <p className="text-[11px] text-muted-foreground mt-2">
+          <p className="text-[13px] text-muted-foreground mt-2">
             القالب يحتوي على أوراق المبيعات والتجديدات والدعم مع أسماء الموظفين الصحيحة
           </p>
         </div>
@@ -806,7 +806,7 @@ export default function UploadPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-medium text-foreground">{sheet.name}</p>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${badgeStyle}`}>
+                      <span className={`px-2 py-0.5 rounded-full text-[12px] font-medium ${badgeStyle}`}>
                         {badgeLabel}
                       </span>
                     </div>
@@ -816,12 +816,12 @@ export default function UploadPage() {
                     {sheet.type !== "skip" && (
                       <div className="flex flex-wrap gap-1 mt-2">
                         {sheet.headers.filter(Boolean).slice(0, 8).map((h, hi) => (
-                          <span key={hi} className="px-1.5 py-0.5 bg-muted rounded text-[10px] text-muted-foreground">
+                          <span key={hi} className="px-1.5 py-0.5 bg-muted rounded text-[12px] text-muted-foreground">
                             {h}
                           </span>
                         ))}
                         {sheet.headers.filter(Boolean).length > 8 && (
-                          <span className="text-[10px] text-muted-foreground">
+                          <span className="text-[12px] text-muted-foreground">
                             +{sheet.headers.filter(Boolean).length - 8} أعمدة أخرى
                           </span>
                         )}
@@ -928,14 +928,14 @@ export default function UploadPage() {
                 <FileSpreadsheet className="w-5 h-5 text-cc-green shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium text-foreground truncate">{entry.filename}</p>
-                  <p className="text-[10px] text-muted-foreground">
+                  <p className="text-[12px] text-muted-foreground">
                     {[
                       entry.deals_imported > 0   && `${entry.deals_imported} صفقة`,
                       entry.tickets_imported > 0 && `${entry.tickets_imported} تذكرة`,
                     ].filter(Boolean).join(" • ") || "لا بيانات"}
                   </p>
                 </div>
-                <span className="text-[10px] text-muted-foreground shrink-0">
+                <span className="text-[12px] text-muted-foreground shrink-0">
                   {new Date(entry.created_at).toLocaleDateString("ar-SA-u-ca-gregory", {
                     day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
                   })}

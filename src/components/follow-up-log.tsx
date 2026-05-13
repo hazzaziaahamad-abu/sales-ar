@@ -244,7 +244,7 @@ export function FollowUpLogButton({ entityType, entityId, entityName }: FollowUp
                           {emp.name.charAt(0)}
                         </div>
                         <span className="font-medium whitespace-nowrap">{emp.name}</span>
-                        {emp.role && <span className="text-[10px] text-muted-foreground mr-auto whitespace-nowrap">{emp.role}</span>}
+                        {emp.role && <span className="text-[12px] text-muted-foreground mr-auto whitespace-nowrap">{emp.role}</span>}
                       </button>
                     ))}
                   </div>
@@ -302,7 +302,7 @@ export function FollowUpLogButton({ entityType, entityId, entityName }: FollowUp
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold text-cyan">{n.author_name}</span>
                       {n.edited_at && (
-                        <span className="text-[10px] text-amber/70">(معدّل بواسطة {n.edited_by})</span>
+                        <span className="text-[12px] text-amber/70">(معدّل بواسطة {n.edited_by})</span>
                       )}
                     </div>
                     <div className="flex items-center gap-1">
@@ -325,7 +325,7 @@ export function FollowUpLogButton({ entityType, entityId, entityName }: FollowUp
                           </button>
                         </div>
                       )}
-                      <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                      <span className="flex items-center gap-1 text-[12px] text-muted-foreground">
                         <Clock className="w-3 h-3" />
                         {formatDateTime(n.created_at)}
                       </span>

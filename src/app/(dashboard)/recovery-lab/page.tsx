@@ -382,7 +382,7 @@ function ScoreBar({ score, hex }: { score: number; hex: string }) {
           }}
         />
       </div>
-      <span className="font-mono text-[11px] font-bold w-8 text-left" style={{ color: hex }}>
+      <span className="font-mono text-[13px] font-bold w-8 text-left" style={{ color: hex }}>
         {score}
       </span>
     </div>
@@ -651,7 +651,7 @@ function ConfettiBurst({ trigger }: { trigger: number }) {
 /* ─── On-fire badge ─── */
 function OnFireBadge() {
   return (
-    <span className="rl-on-fire inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold">
+    <span className="rl-on-fire inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-extrabold">
       <Flame className="w-3.5 h-3.5 rl-flame" />
       على النار — 3 استعادات متتالية
     </span>
@@ -708,7 +708,7 @@ function HeroCard({
                 </h2>
                 {onFire && <OnFireBadge />}
               </div>
-              <div className="flex items-center gap-1.5 mt-1 text-[11px] font-bold" style={{ color: rank.hex }}>
+              <div className="flex items-center gap-1.5 mt-1 text-[13px] font-bold" style={{ color: rank.hex }}>
                 {rank.icon}
                 <span>{rank.name}</span>
                 <span className="text-muted-foreground font-normal">· المستوى {level}</span>
@@ -732,7 +732,7 @@ function HeroCard({
 
         {/* XP bar */}
         <div className="mt-4">
-          <div className="flex items-center justify-between text-[10px] font-bold mb-1.5">
+          <div className="flex items-center justify-between text-[12px] font-bold mb-1.5">
             <span className="text-muted-foreground">
               تجربة (XP) — <AnimatedNumber value={employee.xp} /> /
               {" "}
@@ -795,7 +795,7 @@ function HeroStat({
 }) {
   return (
     <div className="flex flex-col items-center min-w-[70px]">
-      <div className="flex items-center gap-1 text-[9px] text-muted-foreground font-semibold">
+      <div className="flex items-center gap-1 text-[11px] text-muted-foreground font-semibold">
         <span style={{ color: hex }}>{icon}</span>
         {label}
       </div>
@@ -834,16 +834,16 @@ function MissionTile({
       }}
     >
       {done && (
-        <div className="absolute -top-1 -left-1 text-[9px] font-extrabold px-1.5 py-0.5 rounded" style={{ background: hex, color: "#0a0e1a" }}>
+        <div className="absolute -top-1 -left-1 text-[11px] font-extrabold px-1.5 py-0.5 rounded" style={{ background: hex, color: "#0a0e1a" }}>
           ✓ +{xp} XP
         </div>
       )}
       <div className="flex items-center justify-between mb-1.5">
-        <div className="flex items-center gap-1.5 text-[10px] font-bold" style={{ color: hex }}>
+        <div className="flex items-center gap-1.5 text-[12px] font-bold" style={{ color: hex }}>
           {icon}
           {label}
         </div>
-        <div className="text-[11px] font-mono font-extrabold" style={{ color: hex }}>
+        <div className="text-[13px] font-mono font-extrabold" style={{ color: hex }}>
           {current}/{target} {unit}
         </div>
       </div>
@@ -867,12 +867,12 @@ function ActivityFeed({ items }: { items: Activity[] }) {
         </div>
         <div>
           <h2 className="text-sm font-bold text-foreground">سجل البطولة</h2>
-          <p className="text-[10px] text-muted-foreground">آخر أنشطتك في المعمل</p>
+          <p className="text-[12px] text-muted-foreground">آخر أنشطتك في المعمل</p>
         </div>
       </div>
       {items.length === 0 ? (
         <div className="flex-1 flex items-center justify-center text-center">
-          <div className="text-[11px] text-muted-foreground">
+          <div className="text-[13px] text-muted-foreground">
             لم تبدأ بعد!
             <br />
             افتح أول عميل وابدأ مغامرتك
@@ -912,11 +912,11 @@ function ActivityItem({ a }: { a: Activity }) {
         {icons[a.type]}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-[11px] font-bold text-foreground truncate">{a.text}</div>
-        <div className="text-[9px] text-muted-foreground">{ago}</div>
+        <div className="text-[13px] font-bold text-foreground truncate">{a.text}</div>
+        <div className="text-[11px] text-muted-foreground">{ago}</div>
       </div>
       {a.xp > 0 && (
-        <div className="text-[10px] font-extrabold font-mono shrink-0" style={{ color: a.hex }}>
+        <div className="text-[12px] font-extrabold font-mono shrink-0" style={{ color: a.hex }}>
           +{a.xp}
         </div>
       )}
@@ -952,13 +952,13 @@ function AchievementToast({ ach, onDone }: { ach: Achievement; onDone: () => voi
         <Trophy className="w-5 h-5" />
       </div>
       <div>
-        <div className="text-[10px] text-muted-foreground font-bold">إنجاز جديد فُتح!</div>
+        <div className="text-[12px] text-muted-foreground font-bold">إنجاز جديد فُتح!</div>
         <div className="text-sm font-extrabold" style={{ color: ach.hex }}>
           {ach.name}
         </div>
-        <div className="text-[10px] text-muted-foreground">{ach.desc}</div>
+        <div className="text-[12px] text-muted-foreground">{ach.desc}</div>
       </div>
-      <div className="flex items-center gap-1 text-[10px] font-extrabold shrink-0" style={{ color: ach.hex }}>
+      <div className="flex items-center gap-1 text-[12px] font-extrabold shrink-0" style={{ color: ach.hex }}>
         <Sparkles className="w-3 h-3" />
         +50 XP
       </div>
@@ -1563,11 +1563,11 @@ export default function RecoveryLabPage() {
         <div className="flex-1">
           <h1 className="text-lg font-bold text-foreground flex items-center gap-2">
             معمل استعادة العملاء
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-dim text-cc-purple">
+            <span className="text-[12px] font-bold px-2 py-0.5 rounded-full bg-purple-dim text-cc-purple">
               LAB
             </span>
           </h1>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-[13px] text-muted-foreground">
             معمل تفاعلي لتحويل العملاء اللي ما جدّدوا إلى عملاء عائدين عبر تجارب مدروسة
           </p>
         </div>
@@ -1591,7 +1591,7 @@ export default function RecoveryLabPage() {
           </div>
           <div className="flex-1">
             <h2 className="text-sm font-bold text-foreground">الإنجازات</h2>
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-[12px] text-muted-foreground">
               فُتح {employee.unlockedAchievements.length} من {ACHIEVEMENTS.length}
             </p>
           </div>
@@ -1620,7 +1620,7 @@ export default function RecoveryLabPage() {
                 >
                   {unlocked ? a.icon : <Shield className="w-4 h-4" />}
                 </div>
-                <div className="text-[9px] font-bold text-foreground leading-tight line-clamp-2">
+                <div className="text-[11px] font-bold text-foreground leading-tight line-clamp-2">
                   {a.name}
                 </div>
               </div>
@@ -1674,7 +1674,7 @@ export default function RecoveryLabPage() {
             </div>
             <div>
               <h2 className="text-sm font-bold text-foreground">مفاعل الاستعادة</h2>
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-[12px] text-muted-foreground">
                 مراحل تدفق العملاء داخل المعمل — من التبريد إلى الاستعادة
               </p>
             </div>
@@ -1698,7 +1698,7 @@ export default function RecoveryLabPage() {
                     boxShadow: active ? `0 0 24px ${meta.hex}33` : "none",
                   }}
                 >
-                  <div className="flex items-center gap-1.5 text-[10px] font-bold w-full justify-center" style={{ color: meta.hex }}>
+                  <div className="flex items-center gap-1.5 text-[12px] font-bold w-full justify-center" style={{ color: meta.hex }}>
                     {meta.icon}
                     <span>{meta.label}</span>
                   </div>
@@ -1707,7 +1707,7 @@ export default function RecoveryLabPage() {
                     <div className="text-lg font-extrabold font-mono" style={{ color: meta.hex }}>
                       {count}
                     </div>
-                    <div className="text-[9px] text-muted-foreground leading-tight">
+                    <div className="text-[11px] text-muted-foreground leading-tight">
                       {meta.desc}
                     </div>
                   </div>
@@ -1722,7 +1722,7 @@ export default function RecoveryLabPage() {
           </div>
 
           {stageFilter !== "all" && (
-            <div className="mt-3 flex items-center gap-2 text-[11px]">
+            <div className="mt-3 flex items-center gap-2 text-[13px]">
               <span className="text-muted-foreground">تصفية نشطة:</span>
               <span
                 className="px-2 py-0.5 rounded-full font-bold"
@@ -1753,7 +1753,7 @@ export default function RecoveryLabPage() {
             </div>
             <div className="flex-1">
               <h2 className="text-sm font-bold text-foreground">الفرص الذهبية</h2>
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-[12px] text-muted-foreground">
                 أعلى 5 عملاء فرصة عودتهم عالية — ابدأ من هنا
               </p>
             </div>
@@ -1784,7 +1784,7 @@ export default function RecoveryLabPage() {
                       {g.customer_name}
                     </div>
                     <span
-                      className="text-[10px] font-extrabold font-mono px-1.5 rounded"
+                      className="text-[12px] font-extrabold font-mono px-1.5 rounded"
                       style={{
                         color: scoreHex(g.score),
                         background: `${scoreHex(g.score)}22`,
@@ -1793,12 +1793,12 @@ export default function RecoveryLabPage() {
                       {g.score}
                     </span>
                   </div>
-                  <div className="text-[10px] text-muted-foreground mb-2">
+                  <div className="text-[12px] text-muted-foreground mb-2">
                     {g.cancel_reason || "—"} · {g.days} يوم · {formatMoney(g.plan_price)}
                   </div>
                   <ScoreBar score={g.score} hex={scoreHex(g.score)} />
                   <div
-                    className="mt-2 flex items-center gap-1 text-[10px] font-semibold"
+                    className="mt-2 flex items-center gap-1 text-[12px] font-semibold"
                     style={{ color: exp.hex }}
                   >
                     {exp.icon}
@@ -1820,7 +1820,7 @@ export default function RecoveryLabPage() {
             </div>
             <div>
               <h2 className="text-sm font-bold text-foreground">حلبة التشخيص</h2>
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-[12px] text-muted-foreground">
                 توزيع أسباب عدم التجديد + التجربة الموصى بها لكل سبب
               </p>
             </div>
@@ -1858,7 +1858,7 @@ export default function RecoveryLabPage() {
                           {reason}
                         </span>
                         <span
-                          className="text-[9px] font-bold px-1.5 py-0.5 rounded"
+                          className="text-[11px] font-bold px-1.5 py-0.5 rounded"
                           style={{
                             background: `${
                               recover >= 0.8
@@ -1878,7 +1878,7 @@ export default function RecoveryLabPage() {
                           قابلية {(recover * 100).toFixed(0)}%
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 text-[10px]">
+                      <div className="flex items-center gap-2 text-[12px]">
                         <span className="text-muted-foreground">
                           {formatMoney(info.revenue)}
                         </span>
@@ -1902,7 +1902,7 @@ export default function RecoveryLabPage() {
                         return (
                           <span
                             key={t}
-                            className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                            className="inline-flex items-center gap-1 text-[12px] font-semibold px-2 py-0.5 rounded-full"
                             style={{
                               background: `${exp.hex}1f`,
                               color: exp.hex,
@@ -1929,7 +1929,7 @@ export default function RecoveryLabPage() {
             </div>
             <div>
               <h2 className="text-sm font-bold text-foreground">حقيبة التجارب</h2>
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-[12px] text-muted-foreground">
                 تتبع التجارب المُطبَّقة ومعدل نجاح كل واحدة
               </p>
             </div>
@@ -1950,10 +1950,10 @@ export default function RecoveryLabPage() {
                     {exp.icon}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-[11px] font-bold text-foreground">
+                    <div className="text-[13px] font-bold text-foreground">
                       {exp.label}
                     </div>
-                    <div className="flex items-center gap-2 text-[9px] text-muted-foreground">
+                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                       <span>طُبّقت: {u.applied}</span>
                       <span>·</span>
                       <span className="text-cc-green">
@@ -1985,7 +1985,7 @@ export default function RecoveryLabPage() {
               );
             })}
           </div>
-          <div className="mt-3 text-[9px] text-muted-foreground flex items-start gap-1">
+          <div className="mt-3 text-[11px] text-muted-foreground flex items-start gap-1">
             <Activity className="w-3 h-3 mt-0.5 shrink-0" />
             <span>
               التجارب تُحفظ محلياً على هذا الجهاز (localStorage). لربطها بقاعدة البيانات يحتاج جدول جديد.
@@ -2004,7 +2004,7 @@ export default function RecoveryLabPage() {
             <h2 className="text-sm font-bold text-foreground">
               خوارزمية الاستعادة
             </h2>
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-[12px] text-muted-foreground">
               قائمة كاملة بالعملاء المفقودين مرتبة حسب فرصة العودة — اضغط على أي عميل لفتح المعمل
             </p>
           </div>
@@ -2031,7 +2031,7 @@ export default function RecoveryLabPage() {
               <button
                 key={b}
                 onClick={() => setScoreBand(b)}
-                className="text-[10px] font-bold px-2.5 py-1 rounded-full transition-all"
+                className="text-[12px] font-bold px-2.5 py-1 rounded-full transition-all"
                 style={{
                   background: active ? `${colors[b]}33` : "var(--card)",
                   color: active ? colors[b] : "var(--foreground)",
@@ -2044,7 +2044,7 @@ export default function RecoveryLabPage() {
           })}
           <div className="flex-1" />
           <Select value={sortKey} onValueChange={(v) => setSortKey(v as typeof sortKey)}>
-            <SelectTrigger className="h-7 text-[11px] w-36">
+            <SelectTrigger className="h-7 text-[13px] w-36">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -2056,7 +2056,7 @@ export default function RecoveryLabPage() {
           {reasonFilter !== "all" && (
             <button
               onClick={() => setReasonFilter("all")}
-              className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-dim text-amber border border-amber/30 flex items-center gap-1"
+              className="text-[12px] font-bold px-2.5 py-1 rounded-full bg-amber-dim text-amber border border-amber/30 flex items-center gap-1"
             >
               {reasonFilter}
               <XCircle className="w-3 h-3" />
@@ -2094,7 +2094,7 @@ export default function RecoveryLabPage() {
                 >
                   <div className="col-span-12 sm:col-span-3 flex items-center gap-2 min-w-0">
                     <div
-                      className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-mono font-extrabold text-[11px]"
+                      className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-mono font-extrabold text-[13px]"
                       style={{ background: `${hex}1f`, color: hex }}
                     >
                       {e.score}
@@ -2103,27 +2103,27 @@ export default function RecoveryLabPage() {
                       <div className="text-xs font-bold text-foreground truncate">
                         {e.customer_name}
                       </div>
-                      <div className="text-[10px] text-muted-foreground truncate">
+                      <div className="text-[12px] text-muted-foreground truncate">
                         {e.customer_phone ? formatPhone(e.customer_phone) : e.client_code}
                       </div>
                     </div>
                   </div>
 
-                  <div className="col-span-6 sm:col-span-2 text-[10px]">
+                  <div className="col-span-6 sm:col-span-2 text-[12px]">
                     <div className="text-muted-foreground">السبب</div>
                     <div className="font-semibold text-foreground truncate">
                       {e.cancel_reason || "—"}
                     </div>
                   </div>
 
-                  <div className="col-span-3 sm:col-span-2 text-[10px]">
+                  <div className="col-span-3 sm:col-span-2 text-[12px]">
                     <div className="text-muted-foreground">المدة</div>
                     <div className="font-mono font-bold text-foreground">
                       {e.days} يوم
                     </div>
                   </div>
 
-                  <div className="col-span-3 sm:col-span-2 text-[10px]">
+                  <div className="col-span-3 sm:col-span-2 text-[12px]">
                     <div className="text-muted-foreground">القيمة</div>
                     <div className="font-mono font-bold text-foreground">
                       {formatMoney(e.plan_price)}
@@ -2132,7 +2132,7 @@ export default function RecoveryLabPage() {
 
                   <div className="col-span-8 sm:col-span-2 flex items-center gap-1.5">
                     <span
-                      className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                      className="inline-flex items-center gap-1 text-[12px] font-semibold px-1.5 py-0.5 rounded-full"
                       style={{
                         background: `${stageMeta.hex}1f`,
                         color: stageMeta.hex,
@@ -2169,7 +2169,7 @@ export default function RecoveryLabPage() {
                   <FlaskConical className="w-5 h-5 text-cc-purple" />
                   معمل العميل · {activeRenewal.customer_name}
                 </DialogTitle>
-                <DialogDescription className="text-[11px]">
+                <DialogDescription className="text-[13px]">
                   اختر تجربة استعادة وحدّد النتيجة. ستظهر كحالة في المفاعل أعلاه.
                 </DialogDescription>
               </DialogHeader>
@@ -2200,7 +2200,7 @@ export default function RecoveryLabPage() {
 
               {/* Experiment picker */}
               <div className="space-y-2">
-                <div className="text-[11px] font-bold text-foreground flex items-center gap-1.5">
+                <div className="text-[13px] font-bold text-foreground flex items-center gap-1.5">
                   <TestTube className="w-3.5 h-3.5 text-cc-purple" />
                   اختر التجربة
                 </div>
@@ -2223,20 +2223,20 @@ export default function RecoveryLabPage() {
                       >
                         {recommended && (
                           <span
-                            className="absolute top-1 left-1 text-[8px] font-bold px-1 rounded"
+                            className="absolute top-1 left-1 text-[10px] font-bold px-1 rounded"
                             style={{ background: "#10B98122", color: "#10B981" }}
                           >
                             موصى
                           </span>
                         )}
                         <div
-                          className="flex items-center gap-1.5 mb-0.5 font-bold text-[11px]"
+                          className="flex items-center gap-1.5 mb-0.5 font-bold text-[13px]"
                           style={{ color: exp.hex }}
                         >
                           {exp.icon}
                           {exp.label}
                         </div>
-                        <div className="text-[9px] text-muted-foreground leading-snug">
+                        <div className="text-[11px] text-muted-foreground leading-snug">
                           {exp.desc}
                         </div>
                       </button>
@@ -2254,11 +2254,11 @@ export default function RecoveryLabPage() {
                     border: `1px solid ${EXPERIMENTS[draftExperiment as ExperimentKey].hex}44`,
                   }}
                 >
-                  <div className="flex items-center gap-1.5 text-[10px] font-bold mb-1" style={{ color: EXPERIMENTS[draftExperiment as ExperimentKey].hex }}>
+                  <div className="flex items-center gap-1.5 text-[12px] font-bold mb-1" style={{ color: EXPERIMENTS[draftExperiment as ExperimentKey].hex }}>
                     <MessageSquare className="w-3 h-3" />
                     سكربت مقترح
                   </div>
-                  <p className="text-[11px] text-foreground leading-relaxed">
+                  <p className="text-[13px] text-foreground leading-relaxed">
                     {EXPERIMENTS[draftExperiment as ExperimentKey].script}
                   </p>
                 </div>
@@ -2266,20 +2266,20 @@ export default function RecoveryLabPage() {
 
               {/* Lab note */}
               <div className="mt-2 space-y-1">
-                <div className="text-[11px] font-bold text-foreground">
+                <div className="text-[13px] font-bold text-foreground">
                   ملاحظة المعمل
                 </div>
                 <Textarea
                   value={draftNote}
                   onChange={(e) => setDraftNote(e.target.value)}
                   placeholder="اكتب ملاحظات حول التجربة، تواريخ المتابعة، رد العميل..."
-                  className="text-[11px] min-h-[70px]"
+                  className="text-[13px] min-h-[70px]"
                 />
               </div>
 
               {/* Outcome */}
               <div className="mt-2 space-y-1">
-                <div className="text-[11px] font-bold text-foreground">النتيجة</div>
+                <div className="text-[13px] font-bold text-foreground">النتيجة</div>
                 <div className="grid grid-cols-3 gap-1.5">
                   {(["pending", "recovered", "lost"] as const).map((o) => {
                     const meta = {
@@ -2293,7 +2293,7 @@ export default function RecoveryLabPage() {
                         key={o}
                         type="button"
                         onClick={() => setDraftOutcome(o)}
-                        className="flex items-center justify-center gap-1.5 p-2 rounded-lg text-[11px] font-bold transition-all"
+                        className="flex items-center justify-center gap-1.5 p-2 rounded-lg text-[13px] font-bold transition-all"
                         style={{
                           background: active ? `${meta.hex}22` : "var(--card)",
                           color: active ? meta.hex : "var(--foreground)",
@@ -2313,7 +2313,7 @@ export default function RecoveryLabPage() {
                   <Button
                     variant="ghost"
                     onClick={resetExperiment}
-                    className="text-cc-red hover:bg-red-dim text-[11px]"
+                    className="text-cc-red hover:bg-red-dim text-[13px]"
                   >
                     إلغاء التجربة
                   </Button>
@@ -2322,7 +2322,7 @@ export default function RecoveryLabPage() {
                   variant="outline"
                   onClick={moveToFollowup}
                   disabled={!draftExperiment}
-                  className="text-[11px]"
+                  className="text-[13px]"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                   نقل إلى المتابعة
@@ -2330,7 +2330,7 @@ export default function RecoveryLabPage() {
                 <Button
                   onClick={applyExperiment}
                   disabled={!draftExperiment}
-                  className="text-[11px]"
+                  className="text-[13px]"
                 >
                   <Target className="w-3.5 h-3.5" />
                   تطبيق التجربة
@@ -2358,7 +2358,7 @@ function InfoChip({
       className="rounded-lg p-2"
       style={{ background: `${hex}11`, border: `1px solid ${hex}33` }}
     >
-      <div className="text-[9px] text-muted-foreground">{label}</div>
+      <div className="text-[11px] text-muted-foreground">{label}</div>
       <div className="text-xs font-bold font-mono truncate" style={{ color: hex }}>
         {value}
       </div>

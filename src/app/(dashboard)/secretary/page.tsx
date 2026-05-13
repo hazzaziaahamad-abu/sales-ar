@@ -339,28 +339,28 @@ function DealRow({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-xs font-bold text-foreground truncate">{d.client_name}</p>
-            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-white/[0.05] text-muted-foreground">{d.stage}</span>
+            <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-white/[0.05] text-muted-foreground">{d.stage}</span>
             {variant === "attention" && intel.attentionReason && (
-              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-300">{intel.attentionReason}</span>
+              <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-300">{intel.attentionReason}</span>
             )}
           </div>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
-            <span className="text-[10px] text-muted-foreground">{d.assigned_rep_name || "بلا مسؤول"}</span>
-            <span className="text-[10px] text-muted-foreground">•</span>
-            <span className={`text-[10px] ${staleColor} flex items-center gap-0.5`}>
+            <span className="text-[12px] text-muted-foreground">{d.assigned_rep_name || "بلا مسؤول"}</span>
+            <span className="text-[12px] text-muted-foreground">•</span>
+            <span className={`text-[12px] ${staleColor} flex items-center gap-0.5`}>
               <Clock className="w-2.5 h-2.5" /> آخر تفاعل {lastActivityLabel}
             </span>
-            <span className="text-[10px] text-muted-foreground">•</span>
-            <span className="text-[10px] text-muted-foreground">{d.cycle_days} يوم بالأنبوب</span>
+            <span className="text-[12px] text-muted-foreground">•</span>
+            <span className="text-[12px] text-muted-foreground">{d.cycle_days} يوم بالأنبوب</span>
           </div>
-          <p className="text-[10px] text-muted-foreground mt-1">
+          <p className="text-[12px] text-muted-foreground mt-1">
             <span className="text-cyan-400/80">الخطوة القادمة:</span> {intel.nextStep}
             {intel.hasNoNextStep && <span className="ml-1 text-red-400/90">⚠ بدون ملاحظة</span>}
           </p>
         </div>
         <div className="text-left shrink-0">
           <p className={`text-sm font-bold ${s.valueText}`}>{formatMoneyFull(d.deal_value)}</p>
-          <p className="text-[9px] text-muted-foreground mt-0.5">درجة {intel.score}</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">درجة {intel.score}</p>
         </div>
       </div>
 
@@ -369,20 +369,20 @@ function DealRow({
         {phone ? (
           <a
             href={`tel:${phone}`}
-            className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 transition-colors"
+            className="flex items-center gap-1 text-[12px] px-2 py-1 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 transition-colors"
             title="اتصل"
           >
             <Phone className="w-3 h-3" /> اتصل
           </a>
         ) : (
-          <span className="text-[10px] px-2 py-1 rounded-md bg-white/[0.03] text-muted-foreground/60 border border-white/[0.04]">بلا رقم</span>
+          <span className="text-[12px] px-2 py-1 rounded-md bg-white/[0.03] text-muted-foreground/60 border border-white/[0.04]">بلا رقم</span>
         )}
         {phone && (
           <a
             href={whatsappLink(phone, whatsappMessageForStage(d.stage, d.client_name))}
             target="_blank"
             rel="noreferrer"
-            className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/20 transition-colors"
+            className="flex items-center gap-1 text-[12px] px-2 py-1 rounded-md bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/20 transition-colors"
             title="واتساب"
           >
             <MessageCircle className="w-3 h-3" /> واتساب
@@ -390,21 +390,21 @@ function DealRow({
         )}
         <button
           onClick={() => onRemind(d)}
-          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 transition-colors"
+          className="flex items-center gap-1 text-[12px] px-2 py-1 rounded-md bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 transition-colors"
           title="أضف مهمة متابعة غداً"
         >
           <Bell className="w-3 h-3" /> ذكّرني
         </button>
         <button
           onClick={() => shareText(`صفقة ${d.client_name}`, buildDealShareText(d, intel, variant))}
-          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/20 transition-colors"
+          className="flex items-center gap-1 text-[12px] px-2 py-1 rounded-md bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/20 transition-colors"
           title="مشاركة الصفقة"
         >
           <Share2 className="w-3 h-3" /> مشاركة
         </button>
         <Link
           href="/sales"
-          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/[0.04] hover:bg-white/[0.08] text-muted-foreground border border-white/[0.06] transition-colors mr-auto"
+          className="flex items-center gap-1 text-[12px] px-2 py-1 rounded-md bg-white/[0.04] hover:bg-white/[0.08] text-muted-foreground border border-white/[0.06] transition-colors mr-auto"
           title="افتح في المبيعات"
         >
           <ExternalLink className="w-3 h-3" /> فتح
@@ -437,34 +437,34 @@ function PerformerCard({
   return (
     <div className={`rounded-xl ${s.bg} border ${s.border} p-3`}>
       <div className="flex items-center justify-between mb-2">
-        <p className={`text-[11px] font-bold ${s.text}`}>{title}</p>
-        <span className="text-[9px] text-muted-foreground">{data.total} موظف</span>
+        <p className={`text-[13px] font-bold ${s.text}`}>{title}</p>
+        <span className="text-[11px] text-muted-foreground">{data.total} موظف</span>
       </div>
       {!data.top && !data.bottom ? (
-        <p className="text-[10px] text-muted-foreground py-2 text-center">لا توجد بيانات</p>
+        <p className="text-[12px] text-muted-foreground py-2 text-center">لا توجد بيانات</p>
       ) : (
         <div className="space-y-1.5">
           {data.top && (
             <div className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg bg-emerald-500/[0.08] border border-emerald-500/15">
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] text-emerald-400 flex items-center gap-1">🏆 الأفضل</p>
-                <p className="text-[11px] font-bold text-foreground truncate">{data.top.name}</p>
+                <p className="text-[12px] text-emerald-400 flex items-center gap-1">🏆 الأفضل</p>
+                <p className="text-[13px] font-bold text-foreground truncate">{data.top.name}</p>
               </div>
               <div className="text-left shrink-0">
                 <p className={`text-sm font-bold ${s.text}`}>{data.top.value}</p>
-                <p className="text-[9px] text-muted-foreground">{data.top.subValue || unit}</p>
+                <p className="text-[11px] text-muted-foreground">{data.top.subValue || unit}</p>
               </div>
             </div>
           )}
           {data.bottom && data.bottom.name !== data.top?.name && (
             <div className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg bg-red-500/[0.06] border border-red-500/15">
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] text-red-400 flex items-center gap-1">📉 الأقل</p>
-                <p className="text-[11px] font-bold text-foreground truncate">{data.bottom.name}</p>
+                <p className="text-[12px] text-red-400 flex items-center gap-1">📉 الأقل</p>
+                <p className="text-[13px] font-bold text-foreground truncate">{data.bottom.name}</p>
               </div>
               <div className="text-left shrink-0">
                 <p className="text-sm font-bold text-red-400">{data.bottom.value}</p>
-                <p className="text-[9px] text-muted-foreground">{data.bottom.subValue || unit}</p>
+                <p className="text-[11px] text-muted-foreground">{data.bottom.subValue || unit}</p>
               </div>
             </div>
           )}
@@ -1207,7 +1207,7 @@ export default function SecretaryPage() {
                     <button
                       key={tab.key}
                       onClick={() => setSelectedPeriod(tab.key)}
-                      className={`text-[11px] px-3 py-1 rounded-lg transition-colors ${
+                      className={`text-[13px] px-3 py-1 rounded-lg transition-colors ${
                         selectedPeriod === tab.key
                           ? "bg-amber-500/20 text-amber-300 font-bold"
                           : "text-muted-foreground hover:text-foreground hover:bg-white/[0.04]"
@@ -1225,37 +1225,37 @@ export default function SecretaryPage() {
                     <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
                       <TrendingUp className="w-4 h-4 text-emerald-400 mx-auto mb-1" />
                       <p className="text-xl font-bold text-emerald-400">{s.office}</p>
-                      <p className="text-[10px] text-muted-foreground">مبيعات المكتب</p>
-                      {s.officeRev > 0 && <p className="text-[10px] text-emerald-400/70 mt-0.5">{formatMoneyFull(s.officeRev)}</p>}
+                      <p className="text-[12px] text-muted-foreground">مبيعات المكتب</p>
+                      {s.officeRev > 0 && <p className="text-[12px] text-emerald-400/70 mt-0.5">{formatMoneyFull(s.officeRev)}</p>}
                     </div>
                     <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/20 text-center">
                       <TrendingUp className="w-4 h-4 text-orange-400 mx-auto mb-1" />
                       <p className="text-xl font-bold text-orange-400">{s.support}</p>
-                      <p className="text-[10px] text-muted-foreground">مبيعات الدعم</p>
-                      {s.supportRev > 0 && <p className="text-[10px] text-orange-400/70 mt-0.5">{formatMoneyFull(s.supportRev)}</p>}
+                      <p className="text-[12px] text-muted-foreground">مبيعات الدعم</p>
+                      {s.supportRev > 0 && <p className="text-[12px] text-orange-400/70 mt-0.5">{formatMoneyFull(s.supportRev)}</p>}
                     </div>
                     <div className="p-3 rounded-xl bg-sky-500/10 border border-sky-500/20 text-center">
                       <RefreshCw className="w-4 h-4 text-sky-400 mx-auto mb-1" />
                       <p className="text-xl font-bold text-sky-400">{s.renewals}</p>
-                      <p className="text-[10px] text-muted-foreground">تجديدات مكتملة</p>
-                      {s.renewalRev > 0 && <p className="text-[10px] text-sky-400/70 mt-0.5">{formatMoneyFull(s.renewalRev)}</p>}
+                      <p className="text-[12px] text-muted-foreground">تجديدات مكتملة</p>
+                      {s.renewalRev > 0 && <p className="text-[12px] text-sky-400/70 mt-0.5">{formatMoneyFull(s.renewalRev)}</p>}
                     </div>
                     <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-center">
                       <Headphones className="w-4 h-4 text-rose-400 mx-auto mb-1" />
                       <p className="text-xl font-bold text-rose-400">{s.ticketsNew}</p>
-                      <p className="text-[10px] text-muted-foreground">تذاكر جديدة</p>
-                      {selectedPeriod === "today" && supportHealth.urgentCount > 0 && <p className="text-[10px] text-red-400/80 mt-0.5">🚨 {supportHealth.urgentCount} عاجلة</p>}
+                      <p className="text-[12px] text-muted-foreground">تذاكر جديدة</p>
+                      {selectedPeriod === "today" && supportHealth.urgentCount > 0 && <p className="text-[12px] text-red-400/80 mt-0.5">🚨 {supportHealth.urgentCount} عاجلة</p>}
                     </div>
                     <div className="p-3 rounded-xl bg-teal-500/10 border border-teal-500/20 text-center">
                       <CheckSquare className="w-4 h-4 text-teal-400 mx-auto mb-1" />
                       <p className="text-xl font-bold text-teal-400">{s.ticketsResolved}</p>
-                      <p className="text-[10px] text-muted-foreground">تذاكر محلولة</p>
-                      {selectedPeriod === "today" && supportHealth.avgResponse > 0 && <p className="text-[10px] text-teal-400/70 mt-0.5">⏱ {supportHealth.avgResponse}د</p>}
+                      <p className="text-[12px] text-muted-foreground">تذاكر محلولة</p>
+                      {selectedPeriod === "today" && supportHealth.avgResponse > 0 && <p className="text-[12px] text-teal-400/70 mt-0.5">⏱ {supportHealth.avgResponse}د</p>}
                     </div>
                     <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-center">
                       <Banknote className="w-4 h-4 text-cyan-400 mx-auto mb-1" />
                       <p className="text-xl font-bold text-cyan-400">{formatMoneyFull(s.totalRev)}</p>
-                      <p className="text-[10px] text-muted-foreground">إجمالي الإيرادات</p>
+                      <p className="text-[12px] text-muted-foreground">إجمالي الإيرادات</p>
                     </div>
                   </div>
                 );
@@ -1263,7 +1263,7 @@ export default function SecretaryPage() {
 
               {/* ── Top/Bottom Performers per department ── */}
               <div className="mt-4">
-                <p className="text-[11px] font-bold text-muted-foreground mb-2 flex items-center gap-1.5">
+                <p className="text-[13px] font-bold text-muted-foreground mb-2 flex items-center gap-1.5">
                   <Users className="w-3 h-3" /> أفضل وأقل أداء ({selectedPeriod === "today" ? "اليوم" : selectedPeriod === "yesterday" ? "أمس" : selectedPeriod === "week" ? "الأسبوع" : "الشهر"})
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5">
@@ -1324,56 +1324,56 @@ export default function SecretaryPage() {
               </div>
 
               {/* Office Sales */}
-              <p className="text-[10px] font-bold text-emerald-400 mb-1.5">مبيعات المكتب</p>
+              <p className="text-[12px] font-bold text-emerald-400 mb-1.5">مبيعات المكتب</p>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
                 <div className="p-2.5 rounded-xl bg-emerald-500/[0.06] border border-emerald-500/15 text-center">
                   <p className="text-lg font-bold text-emerald-400">{briefingStats.closedOffice}</p>
-                  <p className="text-[10px] text-muted-foreground">مكتملة</p>
+                  <p className="text-[12px] text-muted-foreground">مكتملة</p>
                 </div>
                 <div className="p-2.5 rounded-xl bg-emerald-500/[0.06] border border-emerald-500/15 text-center">
                   <p className="text-lg font-bold text-emerald-400">{formatMoneyFull(briefingStats.revenueOffice)}</p>
-                  <p className="text-[10px] text-muted-foreground">الإيرادات</p>
+                  <p className="text-[12px] text-muted-foreground">الإيرادات</p>
                 </div>
                 <div className="p-2.5 rounded-xl bg-violet-500/[0.06] border border-violet-500/15 text-center">
                   <p className="text-lg font-bold text-violet-400">{briefingStats.pipelineCount}</p>
-                  <p className="text-[10px] text-muted-foreground">في خط الأنابيب</p>
+                  <p className="text-[12px] text-muted-foreground">في خط الأنابيب</p>
                 </div>
               </div>
 
               {/* Support Sales */}
-              <p className="text-[10px] font-bold text-orange-400 mb-1.5">مبيعات الدعم</p>
+              <p className="text-[12px] font-bold text-orange-400 mb-1.5">مبيعات الدعم</p>
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div className="p-2.5 rounded-xl bg-orange-500/[0.06] border border-orange-500/15 text-center">
                   <p className="text-lg font-bold text-orange-400">{briefingStats.closedSupport}</p>
-                  <p className="text-[10px] text-muted-foreground">مكتملة</p>
+                  <p className="text-[12px] text-muted-foreground">مكتملة</p>
                 </div>
                 <div className="p-2.5 rounded-xl bg-orange-500/[0.06] border border-orange-500/15 text-center">
                   <p className="text-lg font-bold text-orange-400">{formatMoneyFull(briefingStats.revenueSupport)}</p>
-                  <p className="text-[10px] text-muted-foreground">الإيرادات</p>
+                  <p className="text-[12px] text-muted-foreground">الإيرادات</p>
                 </div>
               </div>
 
               {/* Renewals */}
-              <p className="text-[10px] font-bold text-sky-400 mb-1.5">التجديدات</p>
+              <p className="text-[12px] font-bold text-sky-400 mb-1.5">التجديدات</p>
               <div className="grid grid-cols-3 gap-3 mb-3">
                 <div className="p-2.5 rounded-xl bg-sky-500/[0.06] border border-sky-500/15 text-center">
                   <p className="text-lg font-bold text-sky-400">{briefingStats.completedRenewals}</p>
-                  <p className="text-[10px] text-muted-foreground">مكتمل</p>
+                  <p className="text-[12px] text-muted-foreground">مكتمل</p>
                 </div>
                 <div className="p-2.5 rounded-xl bg-amber-500/[0.06] border border-amber-500/15 text-center">
                   <p className="text-lg font-bold text-amber-400">{briefingStats.pendingRenewals}</p>
-                  <p className="text-[10px] text-muted-foreground">معلّق</p>
+                  <p className="text-[12px] text-muted-foreground">معلّق</p>
                 </div>
                 <div className="p-2.5 rounded-xl bg-sky-500/[0.06] border border-sky-500/15 text-center">
                   <p className="text-lg font-bold text-sky-400">{formatMoneyFull(briefingStats.renewalRevenue)}</p>
-                  <p className="text-[10px] text-muted-foreground">الإيرادات</p>
+                  <p className="text-[12px] text-muted-foreground">الإيرادات</p>
                 </div>
               </div>
 
               {/* Total */}
               <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-center">
                 <p className="text-xl font-bold text-cyan-400">{formatMoneyFull(briefingStats.totalRevenueMonth)}</p>
-                <p className="text-[10px] text-muted-foreground">إجمالي إيرادات الشهر (مبيعات + تجديدات)</p>
+                <p className="text-[12px] text-muted-foreground">إجمالي إيرادات الشهر (مبيعات + تجديدات)</p>
               </div>
             </div>
           </div>
@@ -1385,7 +1385,7 @@ export default function SecretaryPage() {
         id="meetings"
         title="اجتماعات اليوم"
         icon={<CalendarCheck className="w-5 h-5 text-teal-400" />}
-        badge={meetings.length > 0 ? <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-400">{meetings.filter(m => m.done).length}/{meetings.length}</span> : undefined}
+        badge={meetings.length > 0 ? <span className="text-[12px] px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-400">{meetings.filter(m => m.done).length}/{meetings.length}</span> : undefined}
         isOpen={expandedSections.meetings !== false} onToggle={toggleSection}
       >
         <div className="space-y-3">
@@ -1432,18 +1432,18 @@ export default function SecretaryPage() {
                     </button>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className={`text-sm font-bold font-mono ${isUpcoming ? "text-teal-400" : m.done ? "text-muted-foreground" : "text-foreground"}`} dir="ltr">{m.time}</span>
-                      {isUpcoming && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-400 animate-pulse">خلال {diffMin} د</span>}
+                      {isUpcoming && <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-400 animate-pulse">خلال {diffMin} د</span>}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <p className={`text-xs font-medium ${m.done ? "line-through text-muted-foreground" : "text-foreground"}`}>{m.title}</p>
                         {m.id.startsWith("auto-") && (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 flex items-center gap-0.5" title="اجتماع مُجدول تلقائياً لأداء ضعيف">
+                          <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 flex items-center gap-0.5" title="اجتماع مُجدول تلقائياً لأداء ضعيف">
                             <Sparkles className="w-2.5 h-2.5" /> تلقائي
                           </span>
                         )}
                       </div>
-                      {m.attendees && <p className="text-[10px] text-muted-foreground">{m.attendees}</p>}
+                      {m.attendees && <p className="text-[12px] text-muted-foreground">{m.attendees}</p>}
                     </div>
                     <button onClick={() => removeMeeting(m.id)} className="text-muted-foreground hover:text-red-400 text-xs transition-colors shrink-0">✕</button>
                   </div>
@@ -1461,9 +1461,9 @@ export default function SecretaryPage() {
         icon={<Thermometer className="w-5 h-5 text-orange-400" />}
         badge={!loading ? (
           <span className="flex items-center gap-1">
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-400">🔥 {hotDeals.length}</span>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300">🌤 {warmDeals.length}</span>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400">❄️ {coldDeals.length}</span>
+            <span className="text-[12px] px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-400">🔥 {hotDeals.length}</span>
+            <span className="text-[12px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300">🌤 {warmDeals.length}</span>
+            <span className="text-[12px] px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400">❄️ {coldDeals.length}</span>
           </span>
         ) : undefined}
         isOpen={expandedSections.hotCold !== false} onToggle={toggleSection}
@@ -1476,7 +1476,7 @@ export default function SecretaryPage() {
                 <div className="flex items-center gap-2 mb-2.5">
                   <Zap className="w-4 h-4 text-red-400" />
                   <p className="text-xs font-bold text-red-400">يحتاج تدخّلك الآن</p>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-300">{ownerAttention.length + repEscalation.length}</span>
+                  <span className="text-[12px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-300">{ownerAttention.length + repEscalation.length}</span>
                 </div>
                 <div className="space-y-1.5">
                   {ownerAttention.slice(0, 5).map(({ deal: d, intel }) => (
@@ -1485,7 +1485,7 @@ export default function SecretaryPage() {
                   {repEscalation.map(([rep, count]) => (
                     <div key={`esc-${rep}`} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-red-500/[0.05] border border-red-500/15">
                       <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />
-                      <p className="text-[11px] text-foreground flex-1">
+                      <p className="text-[13px] text-foreground flex-1">
                         <span className="font-bold">{rep}</span> يحمل <span className="font-bold text-red-400">{count}</span> صفقات راكدة — يستحق تصعيد
                       </p>
                     </div>
@@ -1502,21 +1502,21 @@ export default function SecretaryPage() {
                   {hotDeals.length > 0 && (
                     <button
                       onClick={() => shareText("الصفقات الساخنة", buildDealsCategoryShareText(hotDeals, "hot", "الصفقات الساخنة — قريبة من الإغلاق"))}
-                      className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/20 transition-colors"
+                      className="flex items-center gap-1 text-[12px] px-2 py-0.5 rounded-md bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/20 transition-colors"
                       title="مشاركة القائمة كاملة"
                     >
                       <Share2 className="w-3 h-3" /> مشاركة
                     </button>
                   )}
-                  <span className="text-[10px] text-muted-foreground">{hotDeals.length}</span>
+                  <span className="text-[12px] text-muted-foreground">{hotDeals.length}</span>
                 </div>
               </div>
-              {hotDeals.length === 0 ? <p className="text-[11px] text-muted-foreground px-2">لا توجد صفقات ساخنة حالياً</p> : (
+              {hotDeals.length === 0 ? <p className="text-[13px] text-muted-foreground px-2">لا توجد صفقات ساخنة حالياً</p> : (
                 <div className="space-y-1.5">
                   {hotDeals.slice(0, 5).map(({ deal: d, intel }) => (
                     <DealRow key={d.id} deal={d} intel={intel} variant="hot" onRemind={remindTomorrow} />
                   ))}
-                  {hotDeals.length > 5 && <p className="text-[10px] text-muted-foreground text-center pt-1">و {hotDeals.length - 5} أخرى — <Link href="/sales" className="text-orange-400 hover:underline">عرض الكل</Link></p>}
+                  {hotDeals.length > 5 && <p className="text-[12px] text-muted-foreground text-center pt-1">و {hotDeals.length - 5} أخرى — <Link href="/sales" className="text-orange-400 hover:underline">عرض الكل</Link></p>}
                 </div>
               )}
             </div>
@@ -1529,21 +1529,21 @@ export default function SecretaryPage() {
                   {warmDeals.length > 0 && (
                     <button
                       onClick={() => shareText("الصفقات الدافئة", buildDealsCategoryShareText(warmDeals, "warm", "الصفقات الدافئة — قابلة للإحياء"))}
-                      className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-400/20 transition-colors"
+                      className="flex items-center gap-1 text-[12px] px-2 py-0.5 rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-400/20 transition-colors"
                       title="مشاركة القائمة كاملة"
                     >
                       <Share2 className="w-3 h-3" /> مشاركة
                     </button>
                   )}
-                  <span className="text-[10px] text-muted-foreground">{warmDeals.length}</span>
+                  <span className="text-[12px] text-muted-foreground">{warmDeals.length}</span>
                 </div>
               </div>
-              {warmDeals.length === 0 ? <p className="text-[11px] text-muted-foreground px-2">لا توجد صفقات دافئة</p> : (
+              {warmDeals.length === 0 ? <p className="text-[13px] text-muted-foreground px-2">لا توجد صفقات دافئة</p> : (
                 <div className="space-y-1.5">
                   {warmDeals.slice(0, 5).map(({ deal: d, intel }) => (
                     <DealRow key={d.id} deal={d} intel={intel} variant="warm" onRemind={remindTomorrow} />
                   ))}
-                  {warmDeals.length > 5 && <p className="text-[10px] text-muted-foreground text-center pt-1">و {warmDeals.length - 5} أخرى — <Link href="/sales" className="text-amber-300 hover:underline">عرض الكل</Link></p>}
+                  {warmDeals.length > 5 && <p className="text-[12px] text-muted-foreground text-center pt-1">و {warmDeals.length - 5} أخرى — <Link href="/sales" className="text-amber-300 hover:underline">عرض الكل</Link></p>}
                 </div>
               )}
             </div>
@@ -1556,21 +1556,21 @@ export default function SecretaryPage() {
                   {coldDeals.length > 0 && (
                     <button
                       onClick={() => shareText("الصفقات الباردة", buildDealsCategoryShareText(coldDeals, "cold", "الصفقات الباردة / الراكدة"))}
-                      className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 transition-colors"
+                      className="flex items-center gap-1 text-[12px] px-2 py-0.5 rounded-md bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 transition-colors"
                       title="مشاركة القائمة كاملة"
                     >
                       <Share2 className="w-3 h-3" /> مشاركة
                     </button>
                   )}
-                  <span className="text-[10px] text-muted-foreground">{coldDeals.length}</span>
+                  <span className="text-[12px] text-muted-foreground">{coldDeals.length}</span>
                 </div>
               </div>
-              {coldDeals.length === 0 ? <p className="text-[11px] text-muted-foreground px-2">لا توجد صفقات راكدة</p> : (
+              {coldDeals.length === 0 ? <p className="text-[13px] text-muted-foreground px-2">لا توجد صفقات راكدة</p> : (
                 <div className="space-y-1.5">
                   {coldDeals.slice(0, 5).map(({ deal: d, intel }) => (
                     <DealRow key={d.id} deal={d} intel={intel} variant="cold" onRemind={remindTomorrow} />
                   ))}
-                  {coldDeals.length > 5 && <p className="text-[10px] text-muted-foreground text-center pt-1">و {coldDeals.length - 5} أخرى — <Link href="/sales" className="text-blue-400 hover:underline">عرض الكل</Link></p>}
+                  {coldDeals.length > 5 && <p className="text-[12px] text-muted-foreground text-center pt-1">و {coldDeals.length - 5} أخرى — <Link href="/sales" className="text-blue-400 hover:underline">عرض الكل</Link></p>}
                 </div>
               )}
             </div>
@@ -1585,9 +1585,9 @@ export default function SecretaryPage() {
         icon={<Headphones className="w-5 h-5 text-orange-400" />}
         badge={!loading ? (
           <span className="flex items-center gap-1">
-            {supportHealth.urgentCount > 0 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/15 text-red-400">🚨 {supportHealth.urgentCount}</span>}
-            {supportHealth.overdueCount > 0 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">⏰ {supportHealth.overdueCount}</span>}
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-400">{supportHealth.openCount} مفتوحة</span>
+            {supportHealth.urgentCount > 0 && <span className="text-[12px] px-2 py-0.5 rounded-full bg-red-500/15 text-red-400">🚨 {supportHealth.urgentCount}</span>}
+            {supportHealth.overdueCount > 0 && <span className="text-[12px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">⏰ {supportHealth.overdueCount}</span>}
+            <span className="text-[12px] px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-400">{supportHealth.openCount} مفتوحة</span>
           </span>
         ) : undefined}
         isOpen={expandedSections.supportHealth !== false} onToggle={toggleSection}
@@ -1599,27 +1599,27 @@ export default function SecretaryPage() {
               <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-center">
                 <AlertTriangle className="w-4 h-4 text-red-400 mx-auto mb-1" />
                 <p className="text-xl font-bold text-red-400">{supportHealth.urgentCount}</p>
-                <p className="text-[10px] text-muted-foreground">عاجلة مفتوحة</p>
+                <p className="text-[12px] text-muted-foreground">عاجلة مفتوحة</p>
               </div>
               <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center">
                 <Clock className="w-4 h-4 text-amber-400 mx-auto mb-1" />
                 <p className="text-xl font-bold text-amber-400">{supportHealth.overdueCount}</p>
-                <p className="text-[10px] text-muted-foreground">متأخرة &gt; 3 أيام</p>
+                <p className="text-[12px] text-muted-foreground">متأخرة &gt; 3 أيام</p>
               </div>
               <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-center">
                 <UserX className="w-4 h-4 text-purple-400 mx-auto mb-1" />
                 <p className="text-xl font-bold text-purple-400">{supportHealth.unassignedCount}</p>
-                <p className="text-[10px] text-muted-foreground">بلا مسؤول</p>
+                <p className="text-[12px] text-muted-foreground">بلا مسؤول</p>
               </div>
               <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-center">
                 <Timer className="w-4 h-4 text-cyan-400 mx-auto mb-1" />
                 <p className="text-xl font-bold text-cyan-400">{supportHealth.avgResponse > 0 ? `${supportHealth.avgResponse}د` : "—"}</p>
-                <p className="text-[10px] text-muted-foreground">متوسط الاستجابة</p>
+                <p className="text-[12px] text-muted-foreground">متوسط الاستجابة</p>
               </div>
             </div>
 
             {/* Today mini-stats */}
-            <div className="flex items-center gap-4 text-[11px] text-muted-foreground border-y border-white/[0.04] py-2">
+            <div className="flex items-center gap-4 text-[13px] text-muted-foreground border-y border-white/[0.04] py-2">
               <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-orange-400" /> جديد اليوم: <span className="font-bold text-foreground">{supportHealth.newToday}</span></span>
               <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> محلول اليوم: <span className="font-bold text-foreground">{supportHealth.resolvedToday}</span></span>
               <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-blue-400" /> إجمالي مفتوح: <span className="font-bold text-foreground">{supportHealth.openCount}</span></span>
@@ -1632,8 +1632,8 @@ export default function SecretaryPage() {
                 <div className="space-y-1">
                   {supportHealth.overloadedAgents.map(([agent, count]) => (
                     <div key={agent} className="flex items-center justify-between px-2 py-1 rounded-lg bg-white/[0.02]">
-                      <span className="text-[11px] text-foreground">{agent}</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-300 font-bold">{count} تذاكر مفتوحة</span>
+                      <span className="text-[13px] text-foreground">{agent}</span>
+                      <span className="text-[12px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-300 font-bold">{count} تذاكر مفتوحة</span>
                     </div>
                   ))}
                 </div>
@@ -1644,7 +1644,7 @@ export default function SecretaryPage() {
             <div>
               <p className="text-xs font-bold text-orange-400 mb-2 flex items-center gap-1.5"><Zap className="w-3.5 h-3.5" /> تذاكر تحتاج تدخّل</p>
               {supportHealth.attention.length === 0 ? (
-                <p className="text-[11px] text-muted-foreground px-2 py-2">لا توجد تذاكر حرجة — الوضع ممتاز 👌</p>
+                <p className="text-[13px] text-muted-foreground px-2 py-2">لا توجد تذاكر حرجة — الوضع ممتاز 👌</p>
               ) : (
                 <div className="space-y-1.5">
                   {supportHealth.attention.slice(0, 6).map(({ ticket: t, reason, severity }) => {
@@ -1657,39 +1657,39 @@ export default function SecretaryPage() {
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="text-xs font-bold text-foreground truncate">{t.client_name}</p>
-                              <span className={`text-[9px] px-1.5 py-0.5 rounded-full bg-white/[0.05] ${labelClr}`}>{t.priority}</span>
-                              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-white/[0.03] text-muted-foreground">{t.status}</span>
+                              <span className={`text-[11px] px-1.5 py-0.5 rounded-full bg-white/[0.05] ${labelClr}`}>{t.priority}</span>
+                              <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-white/[0.03] text-muted-foreground">{t.status}</span>
                             </div>
-                            <p className="text-[11px] text-foreground/85 mt-1 line-clamp-2">{t.issue}</p>
+                            <p className="text-[13px] text-foreground/85 mt-1 line-clamp-2">{t.issue}</p>
                             <div className="flex items-center gap-2 mt-1 flex-wrap">
-                              <span className="text-[10px] text-muted-foreground">{t.assigned_agent_name || "بلا مسؤول"}</span>
-                              <span className="text-[10px] text-muted-foreground">•</span>
-                              <span className={`text-[10px] ${labelClr}`}>{reason}</span>
+                              <span className="text-[12px] text-muted-foreground">{t.assigned_agent_name || "بلا مسؤول"}</span>
+                              <span className="text-[12px] text-muted-foreground">•</span>
+                              <span className={`text-[12px] ${labelClr}`}>{reason}</span>
                             </div>
                           </div>
                         </div>
                         {/* Quick actions */}
                         <div className="flex items-center gap-1 mt-2 pt-2 border-t border-white/[0.04]">
                           {phone ? (
-                            <a href={`tel:${phone}`} className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 transition-colors">
+                            <a href={`tel:${phone}`} className="flex items-center gap-1 text-[12px] px-2 py-1 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 transition-colors">
                               <Phone className="w-3 h-3" /> اتصل
                             </a>
                           ) : (
-                            <span className="text-[10px] px-2 py-1 rounded-md bg-white/[0.03] text-muted-foreground/60 border border-white/[0.04]">بلا رقم</span>
+                            <span className="text-[12px] px-2 py-1 rounded-md bg-white/[0.03] text-muted-foreground/60 border border-white/[0.04]">بلا رقم</span>
                           )}
                           {phone && (
                             <a
                               href={whatsappLink(phone, `مرحبًا ${t.client_name}، بخصوص طلبكم لدى الدعم — نتابع معكم لحلّه بأسرع وقت.`)}
                               target="_blank"
                               rel="noreferrer"
-                              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/20 transition-colors"
+                              className="flex items-center gap-1 text-[12px] px-2 py-1 rounded-md bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/20 transition-colors"
                             >
                               <MessageCircle className="w-3 h-3" /> واتساب
                             </a>
                           )}
                           <Link
                             href="/support"
-                            className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/[0.04] hover:bg-white/[0.08] text-muted-foreground border border-white/[0.06] transition-colors mr-auto"
+                            className="flex items-center gap-1 text-[12px] px-2 py-1 rounded-md bg-white/[0.04] hover:bg-white/[0.08] text-muted-foreground border border-white/[0.06] transition-colors mr-auto"
                           >
                             <ExternalLink className="w-3 h-3" /> فتح
                           </Link>
@@ -1698,7 +1698,7 @@ export default function SecretaryPage() {
                     );
                   })}
                   {supportHealth.attention.length > 6 && (
-                    <p className="text-[10px] text-muted-foreground text-center pt-1">
+                    <p className="text-[12px] text-muted-foreground text-center pt-1">
                       و {supportHealth.attention.length - 6} أخرى — <Link href="/support" className="text-orange-400 hover:underline">عرض الكل</Link>
                     </p>
                   )}
@@ -1714,7 +1714,7 @@ export default function SecretaryPage() {
         id="renewalHealth"
         title="صحة التجديدات"
         icon={<ShieldAlert className="w-5 h-5 text-sky-400" />}
-        badge={!loading && renewalHealth.overdue.length > 0 ? <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/15 text-red-400">{renewalHealth.overdue.length} متأخر</span> : undefined}
+        badge={!loading && renewalHealth.overdue.length > 0 ? <span className="text-[12px] px-2 py-0.5 rounded-full bg-red-500/15 text-red-400">{renewalHealth.overdue.length} متأخر</span> : undefined}
         isOpen={expandedSections.renewalHealth !== false} onToggle={toggleSection}
       >
         {loading ? <Skeleton className="h-32 rounded-xl" /> : (
@@ -1722,19 +1722,19 @@ export default function SecretaryPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
                 <p className="text-xl font-bold text-emerald-400">{renewalHealth.completed}</p>
-                <p className="text-[10px] text-muted-foreground">مكتمل</p>
+                <p className="text-[12px] text-muted-foreground">مكتمل</p>
               </div>
               <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-center">
                 <p className="text-xl font-bold text-red-400">{renewalHealth.cancelled}</p>
-                <p className="text-[10px] text-muted-foreground">ملغي ({renewalHealth.churnRate}%)</p>
+                <p className="text-[12px] text-muted-foreground">ملغي ({renewalHealth.churnRate}%)</p>
               </div>
               <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center">
                 <p className="text-xl font-bold text-amber-400">{renewalHealth.dueSoon.length}</p>
-                <p className="text-[10px] text-muted-foreground">يستحق خلال 7 أيام</p>
+                <p className="text-[12px] text-muted-foreground">يستحق خلال 7 أيام</p>
               </div>
               <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-center">
                 <p className="text-xl font-bold text-rose-400">{renewalHealth.overdue.length}</p>
-                <p className="text-[10px] text-muted-foreground">متأخر</p>
+                <p className="text-[12px] text-muted-foreground">متأخر</p>
               </div>
             </div>
             {renewalHealth.overdue.length > 0 && (
@@ -1745,11 +1745,11 @@ export default function SecretaryPage() {
                     <div key={r.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-red-500/[0.06] border border-red-500/15">
                       <div>
                         <p className="text-xs font-medium text-foreground">{r.customer_name}</p>
-                        <p className="text-[10px] text-muted-foreground">{r.plan_name} · {r.assigned_rep || "—"}</p>
+                        <p className="text-[12px] text-muted-foreground">{r.plan_name} · {r.assigned_rep || "—"}</p>
                       </div>
                       <div className="text-left">
                         <span className="text-xs font-bold text-red-400">{formatMoneyFull(r.plan_price)}</span>
-                        {r.customer_phone && <p className="text-[10px] text-muted-foreground font-mono" dir="ltr">{r.customer_phone}</p>}
+                        {r.customer_phone && <p className="text-[12px] text-muted-foreground font-mono" dir="ltr">{r.customer_phone}</p>}
                       </div>
                     </div>
                   ))}
@@ -1765,7 +1765,7 @@ export default function SecretaryPage() {
         id="priorities"
         title="أولويات اليوم"
         icon={<Target className="w-5 h-5 text-red-400" />}
-        badge={!loading ? <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/15 text-red-400">{priorities.filter(p => p.urgency === "high").length} عاجل</span> : undefined}
+        badge={!loading ? <span className="text-[12px] px-2 py-0.5 rounded-full bg-red-500/15 text-red-400">{priorities.filter(p => p.urgency === "high").length} عاجل</span> : undefined}
         isOpen={expandedSections.priorities !== false} onToggle={toggleSection}
       >
         {loading ? <Skeleton className="h-40 rounded-xl" /> : priorities.length === 0 ? (
@@ -1777,9 +1777,9 @@ export default function SecretaryPage() {
                 <span className="text-base">{p.icon}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium text-foreground">{p.title}</p>
-                  <p className="text-[10px] text-muted-foreground">{p.detail}</p>
+                  <p className="text-[12px] text-muted-foreground">{p.detail}</p>
                 </div>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${URGENCY_TEXT[p.urgency]} bg-white/5`}>{URGENCY_LABEL[p.urgency]}</span>
+                <span className={`text-[12px] font-bold px-2 py-0.5 rounded-full ${URGENCY_TEXT[p.urgency]} bg-white/5`}>{URGENCY_LABEL[p.urgency]}</span>
               </div>
             ))}
           </div>
@@ -1803,15 +1803,15 @@ export default function SecretaryPage() {
             <div className="grid grid-cols-3 gap-3">
               <div className="text-center p-2 rounded-lg bg-white/[0.03]">
                 <p className="text-sm font-bold text-foreground">{formatMoneyFull(goal90.remaining)}</p>
-                <p className="text-[10px] text-muted-foreground">المتبقي</p>
+                <p className="text-[12px] text-muted-foreground">المتبقي</p>
               </div>
               <div className="text-center p-2 rounded-lg bg-white/[0.03]">
                 <p className="text-sm font-bold text-foreground">{goal90.daysLeft}</p>
-                <p className="text-[10px] text-muted-foreground">يوم متبقي</p>
+                <p className="text-[12px] text-muted-foreground">يوم متبقي</p>
               </div>
               <div className="text-center p-2 rounded-lg bg-white/[0.03]">
                 <p className="text-sm font-bold text-foreground">{goal90.closedDeals}</p>
-                <p className="text-[10px] text-muted-foreground">صفقة مغلقة</p>
+                <p className="text-[12px] text-muted-foreground">صفقة مغلقة</p>
               </div>
             </div>
           </div>
@@ -1823,11 +1823,11 @@ export default function SecretaryPage() {
         id="quickTasks"
         title="مهام سريعة (أقل من 15 دقيقة)"
         icon={<Clock className="w-5 h-5 text-amber-400" />}
-        badge={quickTasks.length > 0 ? <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">{quickTasks.filter(t => t.done).length}/{quickTasks.length}</span> : undefined}
+        badge={quickTasks.length > 0 ? <span className="text-[12px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">{quickTasks.filter(t => t.done).length}/{quickTasks.length}</span> : undefined}
         isOpen={expandedSections.quickTasks !== false} onToggle={toggleSection}
       >
         <div className="space-y-3">
-          <p className="text-[10px] text-amber-400/70">مهام تحتاج إجراء فوري ولا تستغرق أكثر من 15 دقيقة — أنجزها الحين!</p>
+          <p className="text-[12px] text-amber-400/70">مهام تحتاج إجراء فوري ولا تستغرق أكثر من 15 دقيقة — أنجزها الحين!</p>
           <div className="flex gap-2">
             <input
               value={newQuickTask}
@@ -1861,7 +1861,7 @@ export default function SecretaryPage() {
               <div className="flex-1 h-2 bg-white/[0.04] rounded-full overflow-hidden">
                 <div className="h-full bg-gradient-to-l from-amber-400 to-amber-600 rounded-full transition-all" style={{ width: `${Math.round((quickTasks.filter(t => t.done).length / quickTasks.length) * 100)}%` }} />
               </div>
-              {quickTasks.every(t => t.done) && <span className="text-[10px] text-emerald-400 font-bold">ممتاز!</span>}
+              {quickTasks.every(t => t.done) && <span className="text-[12px] text-emerald-400 font-bold">ممتاز!</span>}
             </div>
           )}
         </div>
@@ -1872,7 +1872,7 @@ export default function SecretaryPage() {
         id="tasks"
         title="مهام اليوم"
         icon={<CheckSquare className="w-5 h-5 text-indigo-400" />}
-        badge={tasks.length > 0 ? <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400">{tasks.filter(t => t.done).length}/{tasks.length}</span> : undefined}
+        badge={tasks.length > 0 ? <span className="text-[12px] px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400">{tasks.filter(t => t.done).length}/{tasks.length}</span> : undefined}
         isOpen={expandedSections.tasks !== false} onToggle={toggleSection}
       >
         <div className="space-y-3">
@@ -1925,7 +1925,7 @@ export default function SecretaryPage() {
             const hasLogin = pLogins.some(l => mn(l.user_name, emp.name));
             return hasAction || hasLogin;
           }).length;
-          return activeCount > 0 ? <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-400">{activeCount} نشط</span> : undefined;
+          return activeCount > 0 ? <span className="text-[12px] px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-400">{activeCount} نشط</span> : undefined;
         })()}
         isOpen={expandedSections.attendance !== false} onToggle={toggleSection}
       >
@@ -2003,15 +2003,15 @@ export default function SecretaryPage() {
               <div className="grid grid-cols-3 gap-3">
                 <div className="rounded-lg bg-violet-500/[0.06] border border-violet-500/15 p-3 text-center">
                   <p className="text-xl font-bold text-foreground">{activeInPeriod}</p>
-                  <p className="text-[10px] text-muted-foreground">نشط</p>
+                  <p className="text-[12px] text-muted-foreground">نشط</p>
                 </div>
                 <div className="rounded-lg bg-emerald-500/[0.06] border border-emerald-500/15 p-3 text-center">
                   <p className="text-xl font-bold text-emerald-400">{withActions}</p>
-                  <p className="text-[10px] text-muted-foreground">سوّى إجراءات</p>
+                  <p className="text-[12px] text-muted-foreground">سوّى إجراءات</p>
                 </div>
                 <div className="rounded-lg bg-red-500/[0.06] border border-red-500/15 p-3 text-center">
                   <p className="text-xl font-bold text-red-400">{inactive}</p>
-                  <p className="text-[10px] text-muted-foreground">غير نشط</p>
+                  <p className="text-[12px] text-muted-foreground">غير نشط</p>
                 </div>
               </div>
 
@@ -2023,22 +2023,22 @@ export default function SecretaryPage() {
                       🏆
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[10px] text-amber-400 font-bold">الأكثر نشاطاً — {periodLabels[attendancePeriod]}</p>
+                      <p className="text-[12px] text-amber-400 font-bold">الأكثر نشاطاً — {periodLabels[attendancePeriod]}</p>
                       <p className="text-sm font-bold text-foreground">{mostActive.name}</p>
-                      {mostActive.role && <p className="text-[10px] text-muted-foreground">{mostActive.role}</p>}
+                      {mostActive.role && <p className="text-[12px] text-muted-foreground">{mostActive.role}</p>}
                     </div>
                     <div className="text-left shrink-0">
                       <p className="text-xl font-bold text-amber-400">{mostActive.count}</p>
-                      <p className="text-[9px] text-muted-foreground">إجراء</p>
+                      <p className="text-[11px] text-muted-foreground">إجراء</p>
                     </div>
                   </div>
                   {empActionRanking.length > 1 && (
                     <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-white/[0.06]">
                       {empActionRanking.slice(1, 4).map((e, i) => (
                         <div key={e.name} className="flex items-center gap-1.5 bg-white/[0.04] rounded-lg px-2.5 py-1.5 border border-white/[0.06]">
-                          <span className="text-[10px] text-muted-foreground">{i + 2}.</span>
-                          <span className="text-[11px] font-bold text-foreground">{e.name}</span>
-                          <span className="text-[10px] text-muted-foreground">{e.count}</span>
+                          <span className="text-[12px] text-muted-foreground">{i + 2}.</span>
+                          <span className="text-[13px] font-bold text-foreground">{e.name}</span>
+                          <span className="text-[12px] text-muted-foreground">{e.count}</span>
                         </div>
                       ))}
                     </div>
@@ -2062,7 +2062,7 @@ export default function SecretaryPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-bold text-foreground truncate">{emp.name}</p>
-                          {emp.role && <p className="text-[10px] text-muted-foreground">{emp.role}</p>}
+                          {emp.role && <p className="text-[12px] text-muted-foreground">{emp.role}</p>}
                         </div>
                         {lastLogin && isMobile(lastLogin.user_agent) ? (
                           <Smartphone className="w-3.5 h-3.5 text-muted-foreground/50" />
@@ -2071,7 +2071,7 @@ export default function SecretaryPage() {
                         ) : null}
                       </div>
 
-                      <div className="space-y-1 text-[10px]">
+                      <div className="space-y-1 text-[12px]">
                         <div className="flex items-center gap-1.5">
                           <Clock className="w-3 h-3 text-emerald-400" />
                           <span className="text-muted-foreground">آخر نشاط:</span>
@@ -2120,24 +2120,24 @@ export default function SecretaryPage() {
                   </h4>
                   {loginGroups.map(({ date, logins }) => (
                     <div key={date} className="space-y-1.5">
-                      <p className="text-[11px] font-bold text-muted-foreground">{formatDateGroupSec(date)}</p>
+                      <p className="text-[13px] font-bold text-muted-foreground">{formatDateGroupSec(date)}</p>
                       {logins.map(l => (
                         <div key={l.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/20 transition-colors">
                           <div className="w-2 h-2 rounded-full bg-violet-400 shrink-0" />
-                          <div className="w-7 h-7 rounded-full bg-violet-500/10 border border-violet-500/15 flex items-center justify-center text-violet-400 text-[10px] font-bold shrink-0">
+                          <div className="w-7 h-7 rounded-full bg-violet-500/10 border border-violet-500/15 flex items-center justify-center text-violet-400 text-[12px] font-bold shrink-0">
                             {l.user_name.charAt(0)}
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-bold text-foreground">{l.user_name}</p>
                             <div className="flex items-center gap-2 mt-0.5">
                               {isMobile(l.user_agent) ? (
-                                <span className="text-[9px] text-muted-foreground flex items-center gap-0.5"><Smartphone className="w-2.5 h-2.5" /> جوال</span>
+                                <span className="text-[11px] text-muted-foreground flex items-center gap-0.5"><Smartphone className="w-2.5 h-2.5" /> جوال</span>
                               ) : (
-                                <span className="text-[9px] text-muted-foreground flex items-center gap-0.5"><Monitor className="w-2.5 h-2.5" /> كمبيوتر</span>
+                                <span className="text-[11px] text-muted-foreground flex items-center gap-0.5"><Monitor className="w-2.5 h-2.5" /> كمبيوتر</span>
                               )}
                             </div>
                           </div>
-                          <span className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0">
+                          <span className="text-[13px] text-muted-foreground whitespace-nowrap shrink-0">
                             {formatTimeAgo(l.login_at)}
                           </span>
                         </div>

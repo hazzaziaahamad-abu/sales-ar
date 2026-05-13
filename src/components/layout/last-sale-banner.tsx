@@ -84,7 +84,7 @@ function SaleRow({ sale }: { sale: LastSaleInfo }) {
           <span className="font-bold text-foreground">{sale.clientName}</span>
           <span className="text-muted-foreground">—</span>
           <span className={`font-bold ${textColor}`}>{formatMoney(sale.value)}</span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/[0.06] text-muted-foreground">{TYPE_LABEL[sale.type]}</span>
+          <span className="text-[12px] px-1.5 py-0.5 rounded-full bg-white/[0.06] text-muted-foreground">{TYPE_LABEL[sale.type]}</span>
         </div>
       </div>
       <div className="flex items-center gap-1.5">

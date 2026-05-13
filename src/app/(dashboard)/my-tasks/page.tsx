@@ -807,7 +807,7 @@ export default function MyTasksPage() {
                           </div>
                           <span className={`text-sm flex-1 ${t.status === "completed" ? "text-gray-500 line-through" : "text-white"}`}>{t.title}</span>
                           {t.completed_at && (
-                            <span className="text-[10px] text-gray-500">{new Date(t.completed_at).toLocaleTimeString("ar-SA-u-ca-gregory", { hour: "2-digit", minute: "2-digit" })}</span>
+                            <span className="text-[12px] text-gray-500">{new Date(t.completed_at).toLocaleTimeString("ar-SA-u-ca-gregory", { hour: "2-digit", minute: "2-digit" })}</span>
                           )}
                         </div>
                       ))}
@@ -960,18 +960,18 @@ export default function MyTasksPage() {
           {hourlyTip.emoji}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[11px] text-indigo-400 font-medium mb-0.5">نصيحة الساعة</p>
+          <p className="text-[13px] text-indigo-400 font-medium mb-0.5">نصيحة الساعة</p>
           <p className="text-white text-sm">{hourlyTip.tip}</p>
         </div>
         {timerStats.total > 0 && (
           <div className="hidden md:flex items-center gap-3 shrink-0">
             <div className="text-center px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
               <p className="text-emerald-400 text-sm font-bold">{timerStats.earlyRate}%</p>
-              <p className="text-[10px] text-gray-400">إنجاز مبكر</p>
+              <p className="text-[12px] text-gray-400">إنجاز مبكر</p>
             </div>
             <div className="text-center px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06]">
               <p className="text-white text-sm font-bold">{timerStats.total}</p>
-              <p className="text-[10px] text-gray-400">مهام بتوقيت</p>
+              <p className="text-[12px] text-gray-400">مهام بتوقيت</p>
             </div>
           </div>
         )}
@@ -1190,10 +1190,10 @@ export default function MyTasksPage() {
                     </div>
 
                     <div className="flex items-center gap-2 mb-2 flex-wrap">
-                      <span className={`px-2.5 py-1 rounded-full text-[11px] font-medium ${pr.color} ${pr.bg}`}>{pr.label}</span>
-                      <span className={`px-2.5 py-1 rounded-full text-[11px] font-medium ${st.color} ${st.bg}`}>{st.label}</span>
+                      <span className={`px-2.5 py-1 rounded-full text-[13px] font-medium ${pr.color} ${pr.bg}`}>{pr.label}</span>
+                      <span className={`px-2.5 py-1 rounded-full text-[13px] font-medium ${st.color} ${st.bg}`}>{st.label}</span>
                       {isOverdue && (
-                        <span className="px-2.5 py-1 rounded-full text-[11px] font-medium text-red-400 bg-red-500/10 animate-pulse">⚠️ متأخرة</span>
+                        <span className="px-2.5 py-1 rounded-full text-[13px] font-medium text-red-400 bg-red-500/10 animate-pulse">⚠️ متأخرة</span>
                       )}
                     </div>
 
@@ -1312,10 +1312,10 @@ export default function MyTasksPage() {
                               </button>
                             )}
                             {task.time_estimate && !activeTimer && (
-                              <span className="text-[11px] text-gray-500">⏱ {task.time_estimate} د مقدّرة</span>
+                              <span className="text-[13px] text-gray-500">⏱ {task.time_estimate} د مقدّرة</span>
                             )}
                             {task.time_spent_minutes && (
-                              <span className="text-[11px] text-gray-500">⏳ {task.time_spent_minutes} د مستغرقة</span>
+                              <span className="text-[13px] text-gray-500">⏳ {task.time_spent_minutes} د مستغرقة</span>
                             )}
                           </div>
                         )}

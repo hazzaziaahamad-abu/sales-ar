@@ -673,7 +673,7 @@ export default function AcademyPage() {
                               <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`} />
                             )}
                           </div>
-                          <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">{feat.description}</p>
+                          <p className="text-[13px] text-muted-foreground mt-1 leading-relaxed">{feat.description}</p>
                         </div>
                       </div>
                       {isExpanded && feat.marketing_text && (
@@ -706,7 +706,7 @@ export default function AcademyPage() {
           {tips.tips.map((tip, i) => (
             <div key={i} className="flex items-start gap-3">
               <div className={`w-6 h-6 rounded-full ${colors.iconBg} flex items-center justify-center shrink-0 mt-0.5`}>
-                <span className={`text-[10px] font-bold ${colors.text}`}>{i + 1}</span>
+                <span className={`text-[12px] font-bold ${colors.text}`}>{i + 1}</span>
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">{tip}</p>
             </div>
@@ -796,7 +796,7 @@ export default function AcademyPage() {
                           {item.content}
                         </div>
                         {item.updated_by && (
-                          <p className="text-[10px] text-muted-foreground/50 mt-3">
+                          <p className="text-[12px] text-muted-foreground/50 mt-3">
                             آخر تعديل بواسطة: {item.updated_by}
                           </p>
                         )}
@@ -933,7 +933,7 @@ export default function AcademyPage() {
                             <p className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground text-center">لا توجد تعليقات بعد</p>
                           )}
                           {m.created_by && (
-                            <p className="text-[10px] text-muted-foreground/50 mt-2">بواسطة: {m.created_by}</p>
+                            <p className="text-[12px] text-muted-foreground/50 mt-2">بواسطة: {m.created_by}</p>
                           )}
                         </div>
                       );
@@ -1107,7 +1107,7 @@ export default function AcademyPage() {
             </div>
             <div>
               <Label>المحتوى التسويقي</Label>
-              <p className="text-[11px] text-muted-foreground mb-1.5">اكتب المشكلة + الحل + الفايدة — يظهر عند الضغط على الميزة</p>
+              <p className="text-[13px] text-muted-foreground mb-1.5">اكتب المشكلة + الحل + الفايدة — يظهر عند الضغط على الميزة</p>
               <Textarea
                 value={featForm.marketing_text}
                 onChange={(e) => setFeatForm({ ...featForm, marketing_text: e.target.value })}

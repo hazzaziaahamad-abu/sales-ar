@@ -465,11 +465,11 @@ export default function MarketersPage() {
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-foreground">{m.name}</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-cc-purple/15 text-cc-purple font-bold">
+                      <span className="text-[12px] px-1.5 py-0.5 rounded bg-cc-purple/15 text-cc-purple font-bold">
                         {m.commission_rate}%
                       </span>
                     </div>
-                    <div className="flex items-center justify-between text-[11px]">
+                    <div className="flex items-center justify-between text-[13px]">
                       <span className="text-muted-foreground">
                         {m.stats.closedDeals} صفقة مغلقة
                       </span>
@@ -484,7 +484,7 @@ export default function MarketersPage() {
                         style={{ width: `${barWidth}%` }}
                       />
                     </div>
-                    <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                    <div className="flex items-center justify-between text-[12px] text-muted-foreground">
                       <span>مبيعات: {formatMoney(m.stats.closedValue)}</span>
                       <span>{m.stats.totalDeals} صفقة</span>
                     </div>

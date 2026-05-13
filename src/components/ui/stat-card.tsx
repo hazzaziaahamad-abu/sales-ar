@@ -107,7 +107,7 @@ export function StatCard({ value, label, color, progress, icon, subtext, muted, 
         <div>
           <p className="text-xs text-muted-foreground font-semibold">{label}</p>
           <p className={cn("mt-2 text-[28px] font-extrabold tracking-tight font-mono", c.text)}>{value}</p>
-          {subtext && <p className="text-[11px] text-muted-foreground mt-1.5">{subtext}</p>}
+          {subtext && <p className="text-[13px] text-muted-foreground mt-1.5">{subtext}</p>}
         </div>
         {icon && (
           <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center ring-1 ring-white/8", c.bg)}>

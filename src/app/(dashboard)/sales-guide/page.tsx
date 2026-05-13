@@ -846,7 +846,7 @@ export default function SalesGuidePage() {
                       </div>
                       <div className="text-left">
                         <p className="text-2xl font-extrabold text-cyan">{s.total_points}</p>
-                        <p className="text-[10px] text-muted-foreground">نقطة</p>
+                        <p className="text-[12px] text-muted-foreground">نقطة</p>
                       </div>
                     </div>
                   );
@@ -950,15 +950,15 @@ export default function SalesGuidePage() {
                       {/* Values row */}
                       <div className="flex items-end gap-4 mt-3">
                         <div>
-                          <p className="text-[10px] text-muted-foreground">الهدف</p>
+                          <p className="text-[12px] text-muted-foreground">الهدف</p>
                           <p className="text-xl font-extrabold text-cc-green">{t.target_value.toLocaleString()}</p>
                         </div>
                         <div>
-                          <p className="text-[10px] text-muted-foreground">الحد الأدنى</p>
+                          <p className="text-[12px] text-muted-foreground">الحد الأدنى</p>
                           <p className="text-xl font-extrabold text-amber">{t.min_value.toLocaleString()}</p>
                         </div>
                         <div>
-                          <p className="text-[10px] text-muted-foreground">المتحقق</p>
+                          <p className="text-[12px] text-muted-foreground">المتحقق</p>
                           <p className={`text-xl font-extrabold ${isAboveTarget ? "text-cc-green" : isAboveMin ? "text-cyan" : "text-cc-red"}`}>
                             {actual.toLocaleString()}
                           </p>
@@ -1033,7 +1033,7 @@ export default function SalesGuidePage() {
                           </div>
                           <span className="text-xs font-bold min-w-[36px] text-left">{prog}%</span>
                         </div>
-                        <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                        <div className="flex items-center justify-between text-[12px] text-muted-foreground">
                           <span className={rank.color}>{rank.medal} {rank.rank}</span>
                           <span className="flex items-center gap-0.5">
                             <Clock className="w-3 h-3" />
@@ -1092,7 +1092,7 @@ export default function SalesGuidePage() {
                           </div>
                           <div>
                             <p className="font-bold text-foreground">{p.employee_name}</p>
-                            <span className={`text-[10px] ${rank.color}`}>{rank.medal} {rank.rank}</span>
+                            <span className={`text-[12px] ${rank.color}`}>{rank.medal} {rank.rank}</span>
                           </div>
                           <ColorBadge text={statusInfo.label} color={statusInfo.color} />
                         </div>
@@ -1140,24 +1140,24 @@ export default function SalesGuidePage() {
                       {/* Stats grid with countdown */}
                       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs text-muted-foreground">
                         <div>
-                          <span className="block text-[10px]">تاريخ البدء</span>
+                          <span className="block text-[12px]">تاريخ البدء</span>
                           <span className="text-foreground">{formatDate(p.start_date)}</span>
                         </div>
                         <div>
-                          <span className="block text-[10px]">تاريخ الانتهاء</span>
+                          <span className="block text-[12px]">تاريخ الانتهاء</span>
                           <span className="text-foreground">{formatDate(p.end_date)}</span>
                         </div>
                         <div>
-                          <span className="block text-[10px]">الأسبوع الحالي</span>
+                          <span className="block text-[12px]">الأسبوع الحالي</span>
                           <span className="text-foreground">{p.current_week}/4</span>
                         </div>
                         <div>
-                          <span className="block text-[10px]">التقدم</span>
+                          <span className="block text-[12px]">التقدم</span>
                           <span className={`text-sm font-bold ${progress >= 80 ? "text-cc-green" : progress >= 50 ? "text-amber" : "text-cc-red"}`}>{progress}%</span>
                         </div>
                         {p.status === "active" && (
                           <div>
-                            <span className="block text-[10px]">الوقت المتبقي</span>
+                            <span className="block text-[12px]">الوقت المتبقي</span>
                             <div className="flex items-center gap-1">
                               <Timer className={`w-3.5 h-3.5 ${daysLeft <= 7 ? "text-cc-red animate-pulse" : "text-cyan"}`} />
                               <span className={`font-bold ${daysLeft <= 7 ? "text-cc-red" : daysLeft <= 14 ? "text-amber" : "text-foreground"}`}>
@@ -1171,7 +1171,7 @@ export default function SalesGuidePage() {
                       {/* Time progress bar */}
                       {p.status === "active" && (
                         <div className="mt-3">
-                          <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
+                          <div className="flex items-center justify-between text-[12px] text-muted-foreground mb-1">
                             <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> الوقت المنقضي</span>
                             <span>{timeProgress}%</span>
                           </div>
@@ -1194,7 +1194,7 @@ export default function SalesGuidePage() {
 
                       {/* Performance progress bar */}
                       <div className="mt-3">
-                        <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
+                        <div className="flex items-center justify-between text-[12px] text-muted-foreground mb-1">
                           <span className="flex items-center gap-1"><Zap className="w-3 h-3" /> تقدم الأداء</span>
                           <span>{progress}% من {p.target_percentage}%</span>
                         </div>
@@ -1210,7 +1210,7 @@ export default function SalesGuidePage() {
 
                       {/* Speed comparison: time vs performance */}
                       {p.status === "active" && timeProgress > 0 && (
-                        <div className="mt-2 flex items-center gap-2 text-[10px]">
+                        <div className="mt-2 flex items-center gap-2 text-[12px]">
                           {progress >= timeProgress ? (
                             <span className="flex items-center gap-1 text-cc-green">
                               <TrendingUp className="w-3 h-3" />
@@ -1231,7 +1231,7 @@ export default function SalesGuidePage() {
                           {/* Weekly goals */}
                           {p.weekly_goals && p.weekly_goals.length > 0 && (
                             <div>
-                              <p className="text-[10px] text-muted-foreground mb-1.5">الأهداف الأسبوعية</p>
+                              <p className="text-[12px] text-muted-foreground mb-1.5">الأهداف الأسبوعية</p>
                               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                 {p.weekly_goals.map((g) => (
                                   <div
@@ -1245,7 +1245,7 @@ export default function SalesGuidePage() {
                                     }`}
                                   >
                                     <div className="flex items-center gap-1">
-                                      <span className="text-[10px] opacity-70">أسبوع {g.week}</span>
+                                      <span className="text-[12px] opacity-70">أسبوع {g.week}</span>
                                       {p.current_week > g.week && <span className="text-cc-green">✓</span>}
                                       {p.current_week === g.week && <Flame className="w-3 h-3 text-amber" />}
                                     </div>
@@ -1259,10 +1259,10 @@ export default function SalesGuidePage() {
                           <div className="flex flex-wrap gap-3">
                             {p.improvement_actions && p.improvement_actions.length > 0 && (
                               <div className="flex-1 min-w-[200px]">
-                                <p className="text-[10px] text-muted-foreground mb-1.5">إجراءات التحسين</p>
+                                <p className="text-[12px] text-muted-foreground mb-1.5">إجراءات التحسين</p>
                                 <div className="flex flex-wrap gap-1">
                                   {p.improvement_actions.map((a) => (
-                                    <span key={a} className="px-2 py-0.5 rounded-md text-[11px] bg-cc-purple/10 text-cc-purple border border-cc-purple/20">
+                                    <span key={a} className="px-2 py-0.5 rounded-md text-[13px] bg-cc-purple/10 text-cc-purple border border-cc-purple/20">
                                       {a}
                                     </span>
                                   ))}
@@ -1271,10 +1271,10 @@ export default function SalesGuidePage() {
                             )}
                             {p.evaluation_criteria && p.evaluation_criteria.length > 0 && (
                               <div className="flex-1 min-w-[200px]">
-                                <p className="text-[10px] text-muted-foreground mb-1.5">معايير التقييم</p>
+                                <p className="text-[12px] text-muted-foreground mb-1.5">معايير التقييم</p>
                                 <div className="flex flex-wrap gap-1">
                                   {p.evaluation_criteria.map((c) => (
-                                    <span key={c} className="px-2 py-0.5 rounded-md text-[11px] bg-cyan/10 text-cyan border border-cyan/20">
+                                    <span key={c} className="px-2 py-0.5 rounded-md text-[13px] bg-cyan/10 text-cyan border border-cyan/20">
                                       {c}
                                     </span>
                                   ))}
@@ -1399,7 +1399,7 @@ export default function SalesGuidePage() {
                     <span className="text-lg">{level.emoji}</span>
                     <div>
                       <p className="text-sm font-bold">{level.label}</p>
-                      <p className="text-[10px] text-muted-foreground">
+                      <p className="text-[12px] text-muted-foreground">
                         {level.minPoints}+ نقطة
                       </p>
                     </div>
@@ -2001,7 +2001,7 @@ export default function SalesGuidePage() {
                 dir="ltr"
                 className="text-right"
               />
-              <p className="text-[10px] text-muted-foreground mt-1">استخدم قيمة سالبة للخصم (مثل: -10)</p>
+              <p className="text-[12px] text-muted-foreground mt-1">استخدم قيمة سالبة للخصم (مثل: -10)</p>
             </div>
           </div>
           <DialogFooter>

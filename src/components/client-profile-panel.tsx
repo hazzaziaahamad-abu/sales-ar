@@ -47,7 +47,7 @@ function formatMoney(n: number) {
 function StatusBadge({ label, colorMap }: { label: string; colorMap: Record<string, string> }) {
   const cls = colorMap[label] || "bg-white/5 text-muted-foreground border-white/10";
   return (
-    <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${cls}`}>
+    <span className={`text-[12px] px-2 py-0.5 rounded-full border font-medium ${cls}`}>
       {label}
     </span>
   );
@@ -64,7 +64,7 @@ function SectionToggle({ title, icon, count, children }: { title: string; icon: 
         <div className="flex items-center gap-2">
           {icon}
           <span className="text-xs font-bold text-foreground">{title}</span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-bold">{count}</span>
+          <span className="text-[12px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-bold">{count}</span>
         </div>
         {open ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
       </button>
@@ -80,36 +80,36 @@ function DealCard({ deal, notes }: { deal: Deal; notes: FollowUpNote[] }) {
     <div className="rounded-lg border border-border/40 bg-card/50 p-2.5 space-y-1.5">
       <div className="flex items-center justify-between gap-2">
         <StatusBadge label={deal.stage} colorMap={STAGE_COLORS} />
-        <span className="text-[10px] text-muted-foreground">{formatDate(deal.created_at)}</span>
+        <span className="text-[12px] text-muted-foreground">{formatDate(deal.created_at)}</span>
       </div>
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-foreground">{deal.sales_type === "support" ? "دعم" : "مكتب"} · {deal.plan || "—"}</span>
         <span className="text-xs font-bold text-emerald-400">{formatMoney(deal.deal_value)}</span>
       </div>
       {deal.assigned_rep_name && (
-        <p className="text-[10px] text-muted-foreground">المندوب: {deal.assigned_rep_name}</p>
+        <p className="text-[12px] text-muted-foreground">المندوب: {deal.assigned_rep_name}</p>
       )}
       {deal.source && (
-        <p className="text-[10px] text-muted-foreground">المصدر: {deal.source}</p>
+        <p className="text-[12px] text-muted-foreground">المصدر: {deal.source}</p>
       )}
       {deal.close_date && (
-        <p className="text-[10px] text-muted-foreground">تاريخ الإغلاق: {formatDate(deal.close_date)}</p>
+        <p className="text-[12px] text-muted-foreground">تاريخ الإغلاق: {formatDate(deal.close_date)}</p>
       )}
       {deal.loss_reason && (
-        <p className="text-[10px] text-red-400">سبب الرفض: {deal.loss_reason}</p>
+        <p className="text-[12px] text-red-400">سبب الرفض: {deal.loss_reason}</p>
       )}
       {deal.notes && (
-        <p className="text-[10px] text-muted-foreground/70 line-clamp-2">{deal.notes}</p>
+        <p className="text-[12px] text-muted-foreground/70 line-clamp-2">{deal.notes}</p>
       )}
       {dealNotes.length > 0 && (
         <>
-          <button onClick={() => setShowNotes(!showNotes)} className="text-[10px] text-primary hover:underline flex items-center gap-1">
+          <button onClick={() => setShowNotes(!showNotes)} className="text-[12px] text-primary hover:underline flex items-center gap-1">
             <FileText className="w-3 h-3" /> {dealNotes.length} متابعة
           </button>
           {showNotes && (
             <div className="space-y-1 mr-2 border-r-2 border-primary/20 pr-2">
               {dealNotes.map(n => (
-                <div key={n.id} className="text-[10px]">
+                <div key={n.id} className="text-[12px]">
                   <span className="text-muted-foreground">{formatDate(n.created_at)}</span>
                   <span className="text-foreground/70 mr-1">— {n.author_name}:</span>
                   <span className="text-foreground/60">{n.note}</span>
@@ -130,33 +130,33 @@ function RenewalCard({ renewal, notes }: { renewal: Renewal; notes: FollowUpNote
     <div className="rounded-lg border border-border/40 bg-card/50 p-2.5 space-y-1.5">
       <div className="flex items-center justify-between gap-2">
         <StatusBadge label={renewal.status} colorMap={RENEWAL_COLORS} />
-        <span className="text-[10px] text-muted-foreground">{formatDate(renewal.renewal_date)}</span>
+        <span className="text-[12px] text-muted-foreground">{formatDate(renewal.renewal_date)}</span>
       </div>
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-foreground">{renewal.plan_name}</span>
         <span className="text-xs font-bold text-emerald-400">{formatMoney(renewal.plan_price)}</span>
       </div>
       {renewal.assigned_rep && (
-        <p className="text-[10px] text-muted-foreground">المسؤول: {renewal.assigned_rep}</p>
+        <p className="text-[12px] text-muted-foreground">المسؤول: {renewal.assigned_rep}</p>
       )}
       {renewal.payment_date && (
-        <p className="text-[10px] text-emerald-400/70">تاريخ الدفع: {formatDate(renewal.payment_date)}</p>
+        <p className="text-[12px] text-emerald-400/70">تاريخ الدفع: {formatDate(renewal.payment_date)}</p>
       )}
       {renewal.cancel_reason && (
-        <p className="text-[10px] text-red-400">سبب الإلغاء: {renewal.cancel_reason}</p>
+        <p className="text-[12px] text-red-400">سبب الإلغاء: {renewal.cancel_reason}</p>
       )}
       {renewal.notes && (
-        <p className="text-[10px] text-muted-foreground/70 line-clamp-2">{renewal.notes}</p>
+        <p className="text-[12px] text-muted-foreground/70 line-clamp-2">{renewal.notes}</p>
       )}
       {renewalNotes.length > 0 && (
         <>
-          <button onClick={() => setShowNotes(!showNotes)} className="text-[10px] text-primary hover:underline flex items-center gap-1">
+          <button onClick={() => setShowNotes(!showNotes)} className="text-[12px] text-primary hover:underline flex items-center gap-1">
             <FileText className="w-3 h-3" /> {renewalNotes.length} متابعة
           </button>
           {showNotes && (
             <div className="space-y-1 mr-2 border-r-2 border-primary/20 pr-2">
               {renewalNotes.map(n => (
-                <div key={n.id} className="text-[10px]">
+                <div key={n.id} className="text-[12px]">
                   <span className="text-muted-foreground">{formatDate(n.created_at)}</span>
                   <span className="text-foreground/70 mr-1">— {n.author_name}:</span>
                   <span className="text-foreground/60">{n.note}</span>
@@ -175,15 +175,15 @@ function TicketCard({ ticket }: { ticket: Ticket }) {
     <div className="rounded-lg border border-border/40 bg-card/50 p-2.5 space-y-1.5">
       <div className="flex items-center justify-between gap-2">
         <StatusBadge label={ticket.status} colorMap={TICKET_COLORS} />
-        <span className="text-[10px] text-muted-foreground">{formatDate(ticket.created_at)}</span>
+        <span className="text-[12px] text-muted-foreground">{formatDate(ticket.created_at)}</span>
       </div>
       <p className="text-xs text-foreground">{ticket.issue}</p>
-      <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+      <div className="flex items-center gap-3 text-[12px] text-muted-foreground">
         {ticket.priority && <span>الأولوية: {ticket.priority}</span>}
         {ticket.assigned_agent_name && <span>الفني: {ticket.assigned_agent_name}</span>}
       </div>
       {ticket.resolved_date && (
-        <p className="text-[10px] text-emerald-400/70">تم الحل: {formatDate(ticket.resolved_date)}</p>
+        <p className="text-[12px] text-emerald-400/70">تم الحل: {formatDate(ticket.resolved_date)}</p>
       )}
     </div>
   );
@@ -356,22 +356,22 @@ export function ClientProfilePanel({ open, onClose, initialQuery }: ClientProfil
                   </div>
                 </div>
                 {currentPlan && (
-                  <p className="text-[10px] text-primary">الباقة: {currentPlan}</p>
+                  <p className="text-[12px] text-primary">الباقة: {currentPlan}</p>
                 )}
 
                 {/* Quick Stats */}
                 <div className="grid grid-cols-3 gap-2 pt-1">
                   <div className="text-center p-1.5 rounded-lg bg-background/50">
                     <p className="text-sm font-bold text-foreground">{closedDeals}/{totalDeals}</p>
-                    <p className="text-[9px] text-muted-foreground">صفقات مغلقة</p>
+                    <p className="text-[11px] text-muted-foreground">صفقات مغلقة</p>
                   </div>
                   <div className="text-center p-1.5 rounded-lg bg-background/50">
                     <p className="text-sm font-bold text-emerald-400">{formatMoney(totalRevenue + renewalRevenue)}</p>
-                    <p className="text-[9px] text-muted-foreground">إجمالي الإيرادات</p>
+                    <p className="text-[11px] text-muted-foreground">إجمالي الإيرادات</p>
                   </div>
                   <div className="text-center p-1.5 rounded-lg bg-background/50">
                     <p className="text-sm font-bold text-foreground">{data.tickets.length}</p>
-                    <p className="text-[9px] text-muted-foreground">تذاكر دعم</p>
+                    <p className="text-[11px] text-muted-foreground">تذاكر دعم</p>
                   </div>
                 </div>
               </div>
@@ -386,7 +386,7 @@ export function ClientProfilePanel({ open, onClose, initialQuery }: ClientProfil
                   {!bioEditing ? (
                     <button
                       onClick={() => { setBioDraft(bio); setBioEditing(true); }}
-                      className="flex items-center gap-1 text-[10px] text-primary hover:underline"
+                      className="flex items-center gap-1 text-[12px] text-primary hover:underline"
                     >
                       <Pencil className="w-3 h-3" /> {bio ? "تعديل" : "إضافة"}
                     </button>
@@ -395,13 +395,13 @@ export function ClientProfilePanel({ open, onClose, initialQuery }: ClientProfil
                       <button
                         onClick={saveBio}
                         disabled={bioSaving}
-                        className="flex items-center gap-0.5 text-[10px] text-emerald-400 hover:underline disabled:opacity-50"
+                        className="flex items-center gap-0.5 text-[12px] text-emerald-400 hover:underline disabled:opacity-50"
                       >
                         <Check className="w-3 h-3" /> حفظ
                       </button>
                       <button
                         onClick={() => { setBioEditing(false); setBioDraft(bio); }}
-                        className="text-[10px] text-muted-foreground hover:underline"
+                        className="text-[12px] text-muted-foreground hover:underline"
                       >
                         إلغاء
                       </button>
@@ -420,7 +420,7 @@ export function ClientProfilePanel({ open, onClose, initialQuery }: ClientProfil
                 ) : bio ? (
                   <p className="text-xs text-foreground/70 whitespace-pre-line leading-relaxed">{bio}</p>
                 ) : (
-                  <p className="text-[10px] text-muted-foreground/50">لا توجد نبذة — اضغط "إضافة" لكتابة ملاحظات عن العميل</p>
+                  <p className="text-[12px] text-muted-foreground/50">لا توجد نبذة — اضغط "إضافة" لكتابة ملاحظات عن العميل</p>
                 )}
               </div>
 
@@ -433,7 +433,7 @@ export function ClientProfilePanel({ open, onClose, initialQuery }: ClientProfil
                 >
                   <div className="space-y-1.5 max-h-48 overflow-y-auto">
                     {data.notes.slice(0, 15).map(n => (
-                      <div key={n.id} className="flex gap-2 text-[10px] p-1.5 rounded-lg bg-muted/20">
+                      <div key={n.id} className="flex gap-2 text-[12px] p-1.5 rounded-lg bg-muted/20">
                         <div className="w-1.5 h-1.5 rounded-full bg-primary/50 mt-1.5 shrink-0" />
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5 text-muted-foreground">
@@ -493,7 +493,7 @@ export function ClientProfilePanel({ open, onClose, initialQuery }: ClientProfil
             <div className="text-center py-12">
               <Search className="w-10 h-10 text-muted-foreground/20 mx-auto mb-3" />
               <p className="text-sm text-muted-foreground">ابحث عن عميل لعرض ملخصه الكامل</p>
-              <p className="text-[10px] text-muted-foreground/60 mt-1">يشمل الصفقات، التجديدات، التذاكر، والمتابعات</p>
+              <p className="text-[12px] text-muted-foreground/60 mt-1">يشمل الصفقات، التجديدات، التذاكر، والمتابعات</p>
             </div>
           )}
         </div>

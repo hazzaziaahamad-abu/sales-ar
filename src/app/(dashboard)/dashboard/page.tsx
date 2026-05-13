@@ -189,7 +189,7 @@ export default function DashboardPage() {
             </div>
             <div className="flex-1">
               <h3 className="text-sm font-bold text-foreground">مستوى أدائي</h3>
-              <p className="text-[11px] text-muted-foreground">تقييمك بناءً على إنجازاتك الحالية</p>
+              <p className="text-[13px] text-muted-foreground">تقييمك بناءً على إنجازاتك الحالية</p>
             </div>
             <div className="text-left">
               <span className={`text-3xl font-extrabold ${myPerf.level.color} font-mono`}>{myPerf.score}</span>
@@ -209,15 +209,15 @@ export default function DashboardPage() {
           <div className="grid grid-cols-3 gap-3">
             <div className="rounded-lg bg-white/[0.04] p-2.5 text-center">
               <p className="text-lg font-bold text-cc-green">{myPerf.closedDeals}<span className="text-xs text-muted-foreground">/{myPerf.totalDeals}</span></p>
-              <p className="text-[10px] text-muted-foreground">صفقات مغلقة</p>
+              <p className="text-[12px] text-muted-foreground">صفقات مغلقة</p>
             </div>
             <div className="rounded-lg bg-white/[0.04] p-2.5 text-center">
               <p className="text-lg font-bold text-cyan">{formatMoney(myPerf.dealsValue)}</p>
-              <p className="text-[10px] text-muted-foreground">إيرادات محققة</p>
+              <p className="text-[12px] text-muted-foreground">إيرادات محققة</p>
             </div>
             <div className="rounded-lg bg-white/[0.04] p-2.5 text-center">
               <p className="text-lg font-bold text-cc-purple">{myPerf.resolvedTickets}<span className="text-xs text-muted-foreground">/{myPerf.totalTickets}</span></p>
-              <p className="text-[10px] text-muted-foreground">تذاكر محلولة</p>
+              <p className="text-[12px] text-muted-foreground">تذاكر محلولة</p>
             </div>
           </div>
         </div>
@@ -235,10 +235,10 @@ export default function DashboardPage() {
         <div className="glass-surface relative overflow-hidden rounded-[14px] p-4 sm:p-6">
           <div className="relative">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-cyan/15 bg-cyan-dim px-3 py-1 text-[11px] font-semibold text-cyan">
+              <span className="rounded-full border border-cyan/15 bg-cyan-dim px-3 py-1 text-[13px] font-semibold text-cyan">
                 Overview Signal
               </span>
-              <span className="rounded-full border border-border bg-white/[0.04] px-3 py-1 text-[11px] text-muted-foreground">
+              <span className="rounded-full border border-border bg-white/[0.04] px-3 py-1 text-[13px] text-muted-foreground">
                 القرار السريع يبدأ من هنا
               </span>
             </div>
@@ -497,7 +497,7 @@ export default function DashboardPage() {
                           style={{ width: `${project.progress}%` }}
                         />
                       </div>
-                      <span className="text-[10px] text-muted-foreground">{project.progress}%</span>
+                      <span className="text-[12px] text-muted-foreground">{project.progress}%</span>
                     </div>
                   </div>
                 </div>
@@ -546,7 +546,7 @@ export default function DashboardPage() {
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium text-foreground">{deal.client_name}</p>
-                    <p className="text-[10px] text-muted-foreground">
+                    <p className="text-[12px] text-muted-foreground">
                       {deal.assigned_rep_name} • {deal.deal_date ? formatDate(deal.deal_date) : ""}
                     </p>
                   </div>

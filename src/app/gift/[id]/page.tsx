@@ -246,7 +246,7 @@ export default function GiftPage() {
           </div>
           <div className="text-right">
             <p className="text-black text-xs font-bold leading-tight">قائمة الطلبات</p>
-            <p className="text-white text-[10px] font-bold tracking-widest bg-black/80 px-1 rounded">MENU</p>
+            <p className="text-white text-[12px] font-bold tracking-widest bg-black/80 px-1 rounded">MENU</p>
           </div>
         </div>
       </div>

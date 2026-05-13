@@ -174,12 +174,12 @@ export default function RequestsPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold text-foreground">{deal.client_name}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full ${statusBadge.color}`}>{statusBadge.text}</span>
+                      <span className={`text-[12px] px-2 py-0.5 rounded-full ${statusBadge.color}`}>{statusBadge.text}</span>
                       {deal.deal_value > 0 && (
                         <span className="text-xs font-bold text-cyan-400">{formatMoneyFull(deal.deal_value)}</span>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 mt-1 text-[11px] text-muted-foreground">
+                    <div className="flex items-center gap-3 mt-1 text-[13px] text-muted-foreground">
                       {deal.stage && <span className="text-cyan-400 font-medium">{deal.stage}</span>}
                       {deal.source && <span>• {deal.source}</span>}
                       {deal.plan && <span>• {deal.plan}</span>}

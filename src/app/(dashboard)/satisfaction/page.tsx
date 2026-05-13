@@ -340,7 +340,7 @@ export default function SatisfactionPage() {
                   className={`cc-card rounded-xl p-3 text-center border transition-all ${isActive ? `${item.activeBorder} ring-1 ring-white/10 scale-[1.03]` : `${item.border} hover:scale-[1.02]`}`}
                 >
                   <p className={`text-2xl font-black ${item.color}`}>{count}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">{item.label}</p>
+                  <p className="text-[12px] text-muted-foreground mt-0.5">{item.label}</p>
                 </button>
               );
             })}
@@ -355,12 +355,12 @@ export default function SatisfactionPage() {
               <div className="cc-card rounded-[14px] p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${style.bg} ${style.color}`}>
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] font-medium ${style.bg} ${style.color}`}>
                       {style.label}
                     </span>
                     {typeReviews.length} عميل
                   </h3>
-                  <button onClick={() => setOverviewType(null)} className="text-[10px] text-muted-foreground hover:text-foreground transition-colors">إغلاق ✕</button>
+                  <button onClick={() => setOverviewType(null)} className="text-[12px] text-muted-foreground hover:text-foreground transition-colors">إغلاق ✕</button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-80 overflow-y-auto">
                   {typeReviews.map((review) => (
@@ -378,11 +378,11 @@ export default function SatisfactionPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2 mt-0.5">
-                          {review.category && <span className="text-[9px] text-muted-foreground">{review.category}</span>}
-                          {review.review_date && <span className="text-[9px] text-muted-foreground">{review.review_date}</span>}
+                          {review.category && <span className="text-[11px] text-muted-foreground">{review.category}</span>}
+                          {review.review_date && <span className="text-[11px] text-muted-foreground">{review.review_date}</span>}
                         </div>
                         {review.comment && (
-                          <p className="text-[10px] text-muted-foreground/70 mt-1 line-clamp-2">{review.comment}</p>
+                          <p className="text-[12px] text-muted-foreground/70 mt-1 line-clamp-2">{review.comment}</p>
                         )}
                       </div>
                     </div>
@@ -592,12 +592,12 @@ export default function SatisfactionPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-bold text-foreground truncate">{review.customer_name}</p>
                         <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${style.bg} ${style.color}`}>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] font-medium ${style.bg} ${style.color}`}>
                             <Icon className="w-3 h-3" />
                             {style.label}
                           </span>
                           {review.category && (
-                            <span className="text-[10px] text-muted-foreground">{review.category}</span>
+                            <span className="text-[12px] text-muted-foreground">{review.category}</span>
                           )}
                         </div>
                       </div>
@@ -611,7 +611,7 @@ export default function SatisfactionPage() {
                         />
                       ))}
                       {review.review_date && (
-                        <span className="mr-2 text-[10px] text-muted-foreground">{review.review_date}</span>
+                        <span className="mr-2 text-[12px] text-muted-foreground">{review.review_date}</span>
                       )}
                     </div>
 
@@ -715,7 +715,7 @@ export default function SatisfactionPage() {
                       key={t.value}
                       type="button"
                       onClick={() => setForm({ ...form, type: t.value as ReviewType })}
-                      className={`px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-colors ${
+                      className={`px-3 py-1.5 rounded-lg text-[13px] font-medium border transition-colors ${
                         form.type === t.value
                           ? colorMap[t.value]
                           : "border-border text-muted-foreground hover:border-muted-foreground"
@@ -823,7 +823,7 @@ function NPSSegment({
     <div className="bg-background/50 rounded-lg border border-border p-4 text-center">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className={`text-2xl font-extrabold text-${color} mt-1`}>{percent}%</p>
-      <p className="text-[10px] text-muted-foreground mt-1">{description}</p>
+      <p className="text-[12px] text-muted-foreground mt-1">{description}</p>
     </div>
   );
 }

@@ -337,10 +337,10 @@ export default function RecentUpdatesPage() {
       {/* Header */}
       <div className="glass-surface rounded-[14px] p-5">
         <div className="flex flex-wrap items-center gap-2 mb-4">
-          <span className="rounded-full border border-cyan/15 bg-cyan-dim px-3 py-1 text-[11px] font-semibold text-cyan">
+          <span className="rounded-full border border-cyan/15 bg-cyan-dim px-3 py-1 text-[13px] font-semibold text-cyan">
             Activity Feed
           </span>
-          <span className="rounded-full border border-border bg-white/[0.04] px-3 py-1 text-[11px] text-muted-foreground">
+          <span className="rounded-full border border-border bg-white/[0.04] px-3 py-1 text-[13px] text-muted-foreground">
             تتبع جميع التحديثات في مكان واحد
           </span>
         </div>
@@ -365,7 +365,7 @@ export default function RecentUpdatesPage() {
           <Activity className="w-4 h-4" />
           التحديثات
           {items.length > 0 && (
-            <span className="text-[10px] bg-white/[0.06] rounded-full px-2 py-0.5">{items.length}</span>
+            <span className="text-[12px] bg-white/[0.06] rounded-full px-2 py-0.5">{items.length}</span>
           )}
         </button>
         <button
@@ -379,7 +379,7 @@ export default function RecentUpdatesPage() {
           <ScrollText className="w-4 h-4" />
           سجل التتبع
           {logs.length > 0 && (
-            <span className="text-[10px] bg-white/[0.06] rounded-full px-2 py-0.5">{logs.length}</span>
+            <span className="text-[12px] bg-white/[0.06] rounded-full px-2 py-0.5">{logs.length}</span>
           )}
         </button>
         <button
@@ -393,7 +393,7 @@ export default function RecentUpdatesPage() {
           <GraduationCap className="w-4 h-4" />
           سجل الأكاديمية
           {trainingSessions.length > 0 && (
-            <span className="text-[10px] bg-white/[0.06] rounded-full px-2 py-0.5">{trainingSessions.length}</span>
+            <span className="text-[12px] bg-white/[0.06] rounded-full px-2 py-0.5">{trainingSessions.length}</span>
           )}
         </button>
       </div>
@@ -472,7 +472,7 @@ export default function RecentUpdatesPage() {
                 <p className="text-xl font-extrabold text-foreground font-mono">
                   {items.length}
                 </p>
-                <p className="text-[11px] text-muted-foreground mt-1">الكل</p>
+                <p className="text-[13px] text-muted-foreground mt-1">الكل</p>
               </button>
               {uniqueSections.map((sec) => {
                 const Icon = SECTION_ICONS[sec.section] || CalendarDays;
@@ -502,11 +502,11 @@ export default function RecentUpdatesPage() {
                     <p className="text-lg font-extrabold text-foreground font-mono">
                       {counts?.total || 0}
                     </p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                    <p className="text-[13px] text-muted-foreground mt-0.5">
                       {sec.section_label}
                     </p>
                     {(counts?.today || 0) > 0 && (
-                      <p className="text-[10px] text-cyan mt-0.5">
+                      <p className="text-[12px] text-cyan mt-0.5">
                         +{counts.today} اليوم
                       </p>
                     )}
@@ -526,7 +526,7 @@ export default function RecentUpdatesPage() {
                 <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-bold text-red-400 flex items-center gap-2">
                     موظفين بدون تحديثات خلال آخر 24 ساعة
-                    <span className="text-[10px] bg-red-500/15 rounded-full px-2 py-0.5 font-bold">{inactiveEmployees.length}</span>
+                    <span className="text-[12px] bg-red-500/15 rounded-full px-2 py-0.5 font-bold">{inactiveEmployees.length}</span>
                   </h3>
                   <div className="flex flex-wrap gap-2 mt-3">
                     {inactiveEmployees.map(emp => (
@@ -536,7 +536,7 @@ export default function RecentUpdatesPage() {
                         </div>
                         <div>
                           <p className="text-xs font-semibold text-foreground">{emp.name}</p>
-                          {emp.role && <p className="text-[10px] text-muted-foreground">{emp.role}</p>}
+                          {emp.role && <p className="text-[12px] text-muted-foreground">{emp.role}</p>}
                         </div>
                       </div>
                     ))}
@@ -566,7 +566,7 @@ export default function RecentUpdatesPage() {
             <div key={group.date}>
               <div className="flex items-center gap-3 mb-3">
                 <h3 className="text-sm font-bold text-foreground">{group.date}</h3>
-                <span className="text-[11px] text-muted-foreground bg-white/[0.04] rounded-full px-2.5 py-0.5">
+                <span className="text-[13px] text-muted-foreground bg-white/[0.04] rounded-full px-2.5 py-0.5">
                   {group.items.length} تحديث
                 </span>
                 <div className="flex-1 h-px bg-border" />
@@ -593,7 +593,7 @@ export default function RecentUpdatesPage() {
                             {item.title}
                           </p>
                           <span
-                            className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                            className={`inline-flex items-center gap-1 text-[12px] font-medium px-1.5 py-0.5 rounded-full ${
                               item.action === "created"
                                 ? "bg-emerald-500/10 text-emerald-400"
                                 : "bg-amber-500/10 text-amber-400"
@@ -615,7 +615,7 @@ export default function RecentUpdatesPage() {
                             </span>
                           )}
                           {item.modified_by && item.user_name && (
-                            <span className="text-muted-foreground/30 text-[10px]">|</span>
+                            <span className="text-muted-foreground/30 text-[12px]">|</span>
                           )}
                           {item.user_name && (
                             <span className="inline-flex items-center gap-1 text-xs text-cyan-400/70">
@@ -623,7 +623,7 @@ export default function RecentUpdatesPage() {
                             </span>
                           )}
                           {(item.modified_by || item.user_name) && item.subtitle && (
-                            <span className="text-muted-foreground/30 text-[10px]">|</span>
+                            <span className="text-muted-foreground/30 text-[12px]">|</span>
                           )}
                           {item.subtitle && (
                             <p className="text-xs text-muted-foreground truncate max-w-[200px]">
@@ -640,7 +640,7 @@ export default function RecentUpdatesPage() {
                             "cyan"
                           }
                         />
-                        <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                        <span className="text-[13px] text-muted-foreground whitespace-nowrap">
                           {formatTime(item.timestamp)}
                         </span>
                       </div>
@@ -669,7 +669,7 @@ export default function RecentUpdatesPage() {
                     </div>
                   </div>
                   <p className="text-2xl font-extrabold text-foreground font-mono">{logActionCounts[action]}</p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">{config.label}</p>
+                  <p className="text-[13px] text-muted-foreground mt-0.5">{config.label}</p>
                 </div>
               );
             })}
@@ -722,7 +722,7 @@ export default function RecentUpdatesPage() {
             <div key={group.date}>
               <div className="flex items-center gap-3 mb-3">
                 <h3 className="text-sm font-bold text-foreground">{group.date}</h3>
-                <span className="text-[11px] text-muted-foreground bg-white/[0.04] rounded-full px-2.5 py-0.5">
+                <span className="text-[13px] text-muted-foreground bg-white/[0.04] rounded-full px-2.5 py-0.5">
                   {group.items.length} عملية
                 </span>
                 <div className="flex-1 h-px bg-border" />
@@ -755,7 +755,7 @@ export default function RecentUpdatesPage() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
-                                <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${config.bg}`}>
+                                <span className={`inline-flex items-center gap-1 text-[12px] font-medium px-1.5 py-0.5 rounded-full ${config.bg}`}>
                                   <ActionIcon className="w-2.5 h-2.5" />
                                   {config.label}
                                 </span>
@@ -767,25 +767,25 @@ export default function RecentUpdatesPage() {
                                 <p className="text-xs text-muted-foreground mt-0.5 truncate">{log.details}</p>
                               )}
                               <div className="flex items-center gap-2 mt-1">
-                                <span className="text-[10px] text-muted-foreground/70">
+                                <span className="text-[12px] text-muted-foreground/70">
                                   {log.section_label}
                                 </span>
                                 {log.user_name && (
                                   <>
-                                    <span className="text-[10px] text-muted-foreground/40">|</span>
-                                    <span className="inline-flex items-center gap-0.5 text-[10px] text-cyan-400/70">
+                                    <span className="text-[12px] text-muted-foreground/40">|</span>
+                                    <span className="inline-flex items-center gap-0.5 text-[12px] text-cyan-400/70">
                                       <User className="w-2.5 h-2.5" />
                                       {log.user_name}
                                     </span>
                                   </>
                                 )}
-                                <span className="text-[10px] text-muted-foreground/40">|</span>
-                                <span className="text-[10px] text-muted-foreground/70">
+                                <span className="text-[12px] text-muted-foreground/40">|</span>
+                                <span className="text-[12px] text-muted-foreground/70">
                                   {formatFullTime(log.created_at)}
                                 </span>
                               </div>
                             </div>
-                            <span className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0">
+                            <span className="text-[13px] text-muted-foreground whitespace-nowrap shrink-0">
                               {formatTime(log.created_at)}
                             </span>
                           </div>
@@ -859,7 +859,7 @@ export default function RecentUpdatesPage() {
                   <div className="flex items-center gap-2 mb-3">
                     <CalendarDays className="w-3.5 h-3.5 text-muted-foreground" />
                     <span className="text-xs font-semibold text-muted-foreground">{dateLabel}</span>
-                    <span className="text-[10px] text-muted-foreground">({sessions.length})</span>
+                    <span className="text-[12px] text-muted-foreground">({sessions.length})</span>
                   </div>
                   <div className="space-y-2">
                     {sessions.map((s) => (
@@ -875,7 +875,7 @@ export default function RecentUpdatesPage() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <span className="text-sm font-bold text-foreground">{s.topic_title}</span>
-                              <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
+                              <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-medium ${
                                 s.status === "completed"
                                   ? "bg-emerald-500/15 text-emerald-400"
                                   : "bg-orange-500/15 text-orange-400"
@@ -888,15 +888,15 @@ export default function RecentUpdatesPage() {
                                 <User className="w-3 h-3" />
                                 {s.user_name}
                               </span>
-                              <span className="text-[10px] text-muted-foreground">
+                              <span className="text-[12px] text-muted-foreground">
                                 {s.platform === "reservations" ? "حجوزات" : "منيو"}
                               </span>
                               {s.message_count > 0 && (
-                                <span className="text-[10px] text-muted-foreground">{s.message_count} رسالة</span>
+                                <span className="text-[12px] text-muted-foreground">{s.message_count} رسالة</span>
                               )}
                             </div>
                           </div>
-                          <span className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0">
+                          <span className="text-[13px] text-muted-foreground whitespace-nowrap shrink-0">
                             {formatTime(s.started_at)}
                           </span>
                         </div>

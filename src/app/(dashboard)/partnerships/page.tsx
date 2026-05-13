@@ -406,7 +406,7 @@ export default function PartnershipsPage() {
                     </div>
 
                     {p.description && (
-                      <p className="text-[11px] text-muted-foreground pr-12 leading-relaxed">
+                      <p className="text-[13px] text-muted-foreground pr-12 leading-relaxed">
                         {p.description}
                       </p>
                     )}

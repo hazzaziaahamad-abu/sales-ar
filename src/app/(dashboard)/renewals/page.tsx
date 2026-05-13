@@ -747,12 +747,12 @@ export default function RenewalsPage() {
                   <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-l from-amber/[0.08] via-cc-purple/[0.05] to-transparent border border-amber/15">
                     <span className="text-lg">🔥</span>
                     <div className="flex-1">
-                      <p className="text-[11px] font-medium text-amber italic leading-tight">"{q.text}"</p>
-                      <p className="text-[10px] text-cc-purple mt-0.5 font-semibold">📖 {q.author}</p>
+                      <p className="text-[13px] font-medium text-amber italic leading-tight">"{q.text}"</p>
+                      <p className="text-[12px] text-cc-purple mt-0.5 font-semibold">📖 {q.author}</p>
                     </div>
                     <button
                       onClick={toggleCommitment}
-                      className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all ${
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[12px] font-semibold transition-all ${
                         hasCommitted
                           ? "bg-green-500/15 text-green-600 border border-green-500/30"
                           : "bg-muted/50 text-muted-foreground border border-border hover:bg-amber/10 hover:text-amber hover:border-amber/30"
@@ -761,7 +761,7 @@ export default function RenewalsPage() {
                       <ThumbsUp className={`w-3 h-3 ${hasCommitted ? "fill-green-500" : ""}`} />
                       {hasCommitted ? "ملتزم" : "ألتزم"}
                       {commitments.length > 0 && (
-                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber/20 text-amber text-[9px] font-bold">
+                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber/20 text-amber text-[11px] font-bold">
                           {commitments.length}
                         </span>
                       )}
@@ -770,7 +770,7 @@ export default function RenewalsPage() {
                   {commitments.length > 0 && (
                     <div className="mt-1 flex flex-wrap gap-1 px-3">
                       {commitments.map((c) => (
-                        <span key={c.user_name} className="text-[9px] px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-600 border border-green-500/20">
+                        <span key={c.user_name} className="text-[11px] px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-600 border border-green-500/20">
                           {c.user_name}
                         </span>
                       ))}
@@ -806,7 +806,7 @@ export default function RenewalsPage() {
               }`}
             >
               {tab.label}
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${active ? "bg-cyan/20" : "bg-white/[0.05]"}`}>
+              <span className={`text-[12px] px-1.5 py-0.5 rounded-full ${active ? "bg-cyan/20" : "bg-white/[0.05]"}`}>
                 {tab.count}
               </span>
             </button>
@@ -897,7 +897,7 @@ export default function RenewalsPage() {
             >
               <CheckCircle2 className="w-5 h-5 text-cc-green mx-auto mb-1" />
               <p className="text-2xl font-bold text-cc-green">{achievementSummary.completed}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">تجديد مكتمل</p>
+              <p className="text-[12px] text-muted-foreground mt-0.5">تجديد مكتمل</p>
             </button>
             <button
               onClick={() => { setSummaryFilter(summaryFilter === "revenue" ? null : "revenue"); setStatusFilter(null); document.getElementById("renewals-table")?.scrollIntoView({ behavior: "smooth" }); }}
@@ -907,7 +907,7 @@ export default function RenewalsPage() {
             >
               <TrendingUp className="w-5 h-5 text-cyan mx-auto mb-1" />
               <p className="text-2xl font-bold text-cyan">{formatMoneyFull(achievementSummary.completedRevenue)}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">إيرادات محققة</p>
+              <p className="text-[12px] text-muted-foreground mt-0.5">إيرادات محققة</p>
             </button>
             <button
               onClick={() => { setSummaryFilter(summaryFilter === "contacted" ? null : "contacted"); setStatusFilter(null); document.getElementById("renewals-table")?.scrollIntoView({ behavior: "smooth" }); }}
@@ -917,7 +917,7 @@ export default function RenewalsPage() {
             >
               <Users className="w-5 h-5 text-cc-purple mx-auto mb-1" />
               <p className="text-2xl font-bold text-cc-purple">{achievementSummary.contacted}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">تم التواصل</p>
+              <p className="text-[12px] text-muted-foreground mt-0.5">تم التواصل</p>
             </button>
             <button
               onClick={() => { setSummaryFilter(summaryFilter === "success" ? null : "success"); setStatusFilter(null); document.getElementById("renewals-table")?.scrollIntoView({ behavior: "smooth" }); }}
@@ -927,7 +927,7 @@ export default function RenewalsPage() {
             >
               <Zap className="w-5 h-5 text-amber mx-auto mb-1" />
               <p className="text-2xl font-bold text-amber">{achievementSummary.successRate}%</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">نسبة النجاح</p>
+              <p className="text-[12px] text-muted-foreground mt-0.5">نسبة النجاح</p>
             </button>
             <button
               onClick={() => { setSummaryFilter(summaryFilter === "lost" ? null : "lost"); setStatusFilter(null); document.getElementById("renewals-table")?.scrollIntoView({ behavior: "smooth" }); }}
@@ -937,7 +937,7 @@ export default function RenewalsPage() {
             >
               <TrendingDown className="w-5 h-5 text-cc-red mx-auto mb-1" />
               <p className="text-2xl font-bold text-cc-red">{formatMoneyFull(achievementSummary.lostRevenue)}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">إيرادات مفقودة</p>
+              <p className="text-[12px] text-muted-foreground mt-0.5">إيرادات مفقودة</p>
             </button>
           </div>
 
@@ -946,7 +946,7 @@ export default function RenewalsPage() {
             {/* Success rate bar */}
             <div className="flex-1 min-w-[200px]">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[11px] text-muted-foreground">معدل الإنجاز</span>
+                <span className="text-[13px] text-muted-foreground">معدل الإنجاز</span>
                 <span className={`text-xs font-bold ${
                   achievementSummary.successRate >= 70 ? "text-cc-green" :
                   achievementSummary.successRate >= 40 ? "text-amber" : "text-cc-red"
@@ -967,14 +967,14 @@ export default function RenewalsPage() {
             {achievementSummary.avgDealValue > 0 && (
               <div className="text-center px-3 py-1.5 rounded-lg bg-white/[0.05] border border-white/[0.06]">
                 <p className="text-xs font-bold text-foreground">{formatMoneyFull(achievementSummary.avgDealValue)}</p>
-                <p className="text-[10px] text-muted-foreground">متوسط القيمة</p>
+                <p className="text-[12px] text-muted-foreground">متوسط القيمة</p>
               </div>
             )}
 
             {achievementSummary.topRep && (
               <div className="text-center px-3 py-1.5 rounded-lg bg-amber/10 border border-amber/20">
                 <p className="text-xs font-bold text-amber">🏆 {achievementSummary.topRep.name}</p>
-                <p className="text-[10px] text-muted-foreground">{achievementSummary.topRep.count} تجديد</p>
+                <p className="text-[12px] text-muted-foreground">{achievementSummary.topRep.count} تجديد</p>
               </div>
             )}
           </div>
@@ -982,13 +982,13 @@ export default function RenewalsPage() {
           {/* Plan/Package breakdown */}
           {achievementSummary.planBreakdown.length > 0 && (
             <div className="mt-4 pt-4 border-t border-white/[0.06]">
-              <p className="text-[11px] text-muted-foreground mb-2.5 font-medium">📦 توزيع الباقات المنجزة</p>
+              <p className="text-[13px] text-muted-foreground mb-2.5 font-medium">📦 توزيع الباقات المنجزة</p>
               <div className="flex flex-wrap gap-2">
                 {achievementSummary.planBreakdown.map(p => (
                   <div key={p.plan} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.06]">
                     <span className="text-xs font-bold text-cc-green">{p.count}</span>
                     <span className="text-xs text-foreground">{p.plan}</span>
-                    <span className="text-[10px] text-muted-foreground">({formatMoneyFull(p.revenue)})</span>
+                    <span className="text-[12px] text-muted-foreground">({formatMoneyFull(p.revenue)})</span>
                   </div>
                 ))}
               </div>
@@ -1083,13 +1083,13 @@ export default function RenewalsPage() {
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-cc-red/10 flex items-center justify-center relative">
                   <Bell className="w-4 h-4 text-cc-red" />
-                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-cc-red text-white text-[9px] font-bold flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-cc-red text-white text-[11px] font-bold flex items-center justify-center">
                     {totalAlerts}
                   </span>
                 </div>
                 <div className="text-right">
                   <h3 className="text-sm font-bold text-foreground">تنبيهات التجديدات</h3>
-                  <p className="text-[10px] text-muted-foreground">
+                  <p className="text-[12px] text-muted-foreground">
                     {overdue.length > 0 && <span className="text-cc-red font-semibold">{overdue.length} متأخر</span>}
                     {overdue.length > 0 && urgent.length > 0 && " · "}
                     {urgent.length > 0 && <span className="text-amber font-semibold">{urgent.length} خلال أسبوع</span>}
@@ -1124,22 +1124,22 @@ export default function RenewalsPage() {
                         : `📋 ${alert.renewal.customer_name} — بدون متابعة منذ ${alert.days} يوم`}
                     </p>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-semibold ${
+                      <span className={`text-[12px] px-1.5 py-0.5 rounded-full border font-semibold ${
                         alert.type === "overdue" ? "bg-cc-red/10 border-cc-red/30 text-cc-red" :
                         alert.type === "urgent" ? "bg-amber/10 border-amber/30 text-amber" :
                         "bg-cc-blue/10 border-cc-blue/30 text-cc-blue"
                       }`}>
                         {alert.type === "overdue" ? "متأخر" : alert.type === "urgent" ? "عاجل" : "راكد"}
                       </span>
-                      <span className="text-[10px] text-muted-foreground">{alert.renewal.plan_name} · {formatMoneyFull(alert.renewal.plan_price)}</span>
+                      <span className="text-[12px] text-muted-foreground">{alert.renewal.plan_name} · {formatMoneyFull(alert.renewal.plan_price)}</span>
                       {alert.renewal.assigned_rep && (
-                        <span className="text-[10px] text-muted-foreground">• {alert.renewal.assigned_rep}</span>
+                        <span className="text-[12px] text-muted-foreground">• {alert.renewal.assigned_rep}</span>
                       )}
                     </div>
                   </div>
                   <button
                     onClick={() => openEditModal(alert.renewal)}
-                    className="text-[10px] px-2.5 py-1.5 rounded-lg bg-cyan/10 text-cyan border border-cyan/30 hover:bg-cyan/20 transition-colors font-medium shrink-0"
+                    className="text-[12px] px-2.5 py-1.5 rounded-lg bg-cyan/10 text-cyan border border-cyan/30 hover:bg-cyan/20 transition-colors font-medium shrink-0"
                   >
                     متابعة
                   </button>
@@ -1148,7 +1148,7 @@ export default function RenewalsPage() {
             </div>
             {totalAlerts > 12 && (
               <div className="px-4 py-2 text-center border-t border-border/30">
-                <span className="text-[10px] text-muted-foreground">و {totalAlerts - 12} تنبيه آخر...</span>
+                <span className="text-[12px] text-muted-foreground">و {totalAlerts - 12} تنبيه آخر...</span>
               </div>
             )}
           </div>
@@ -1267,7 +1267,7 @@ export default function RenewalsPage() {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-foreground">الهدف اليومي</h3>
-                  <span className="text-[10px] text-muted-foreground">
+                  <span className="text-[12px] text-muted-foreground">
                     {new Date().toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "long", day: "numeric", month: "short" })}
                   </span>
                 </div>
@@ -1280,7 +1280,7 @@ export default function RenewalsPage() {
                 </span>
                 <button
                   onClick={shareReport}
-                  className="flex items-center gap-1 text-[10px] px-2 py-1.5 rounded-lg border border-cc-purple/30 text-cc-purple hover:bg-cc-purple/10 transition-colors"
+                  className="flex items-center gap-1 text-[12px] px-2 py-1.5 rounded-lg border border-cc-purple/30 text-cc-purple hover:bg-cc-purple/10 transition-colors"
                   title="مشاركة التقرير"
                 >
                   <Share2 className="w-3 h-3" />
@@ -1288,7 +1288,7 @@ export default function RenewalsPage() {
                 </button>
                 <button
                   onClick={exportReport}
-                  className="flex items-center gap-1 text-[10px] px-2 py-1.5 rounded-lg border border-cyan/30 text-cyan hover:bg-cyan/10 transition-colors"
+                  className="flex items-center gap-1 text-[12px] px-2 py-1.5 rounded-lg border border-cyan/30 text-cyan hover:bg-cyan/10 transition-colors"
                   title="تحميل التقرير"
                 >
                   <Download className="w-3 h-3" />
@@ -1296,7 +1296,7 @@ export default function RenewalsPage() {
                 </button>
                 <button
                   onClick={deselectAll}
-                  className="text-[10px] text-muted-foreground hover:text-cc-red transition-colors"
+                  className="text-[12px] text-muted-foreground hover:text-cc-red transition-colors"
                 >
                   مسح
                 </button>
@@ -1318,7 +1318,7 @@ export default function RenewalsPage() {
                 ))}
               </div>
               <div className="flex items-center justify-between mt-1">
-                <span className="text-[10px] text-muted-foreground">{completed} / {total}</span>
+                <span className="text-[12px] text-muted-foreground">{completed} / {total}</span>
                 <span className={`text-xs font-extrabold ${
                   allDone ? "text-cc-green" : rate >= 50 ? "text-amber" : "text-cyan"
                 }`}>
@@ -1331,17 +1331,17 @@ export default function RenewalsPage() {
               <div className="text-center p-2.5 rounded-lg bg-card/50 border border-border/30">
                 <p className="text-lg mb-0.5">{allDone ? "🏆" : timeUp ? "⏰" : hoursLeft < 2 ? "😰" : "🎯"}</p>
                 <p className="text-xl font-extrabold text-cyan">{total}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">الهدف</p>
+                <p className="text-[12px] text-muted-foreground mt-0.5">الهدف</p>
               </div>
               <div className="text-center p-2.5 rounded-lg bg-card/50 border border-border/30">
                 <p className="text-lg mb-0.5">{completed > 0 ? "✅" : "⭕"}</p>
                 <p className="text-xl font-extrabold text-cc-green">{completed}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">مكتمل</p>
+                <p className="text-[12px] text-muted-foreground mt-0.5">مكتمل</p>
               </div>
               <div className="text-center p-2.5 rounded-lg bg-card/50 border border-border/30">
                 <p className="text-lg mb-0.5">{remaining === 0 ? "🎉" : remaining <= 2 ? "💪" : "⏳"}</p>
                 <p className={`text-xl font-extrabold ${remaining > 0 ? "text-amber" : "text-cc-green"}`}>{remaining}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">متبقي</p>
+                <p className="text-[12px] text-muted-foreground mt-0.5">متبقي</p>
               </div>
               <div className={`text-center p-2.5 rounded-lg border ${
                 allDone ? "bg-cc-green/10 border-cc-green/30" : timeUp ? "bg-red-500/10 border-red-500/30" : hoursLeft < 2 ? "bg-amber/10 border-amber/30" : "bg-card/50 border-border/30"
@@ -1352,7 +1352,7 @@ export default function RenewalsPage() {
                 }`}>
                   {allDone ? "تم!" : timeUp ? "انتهى" : `${hoursLeft}:${String(minutesLeft).padStart(2, "0")}:${String(secondsLeft).padStart(2, "0")}`}
                 </p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">{allDone ? "أنجزت الهدف" : "الوقت المتبقي"}</p>
+                <p className="text-[12px] text-muted-foreground mt-0.5">{allDone ? "أنجزت الهدف" : "الوقت المتبقي"}</p>
               </div>
             </div>
           </div>
@@ -1370,7 +1370,7 @@ export default function RenewalsPage() {
           />
           <button
             onClick={selectAllVisible}
-            className="text-[10px] px-2.5 py-1.5 rounded-lg border border-cyan/30 text-cyan hover:bg-cyan/10 transition-colors whitespace-nowrap"
+            className="text-[12px] px-2.5 py-1.5 rounded-lg border border-cyan/30 text-cyan hover:bg-cyan/10 transition-colors whitespace-nowrap"
             title="تحديد الكل كهدف يومي"
           >
             <SquareCheck className="w-3 h-3 inline-block ml-1" />
@@ -1451,12 +1451,12 @@ export default function RenewalsPage() {
                         {renewal.customer_name}
                       </button>
                       {isTarget && !isTargetDone && (
-                        <span className="mr-1.5 inline-block text-[9px] px-1.5 py-0.5 rounded bg-cyan/10 text-cyan font-medium">
+                        <span className="mr-1.5 inline-block text-[11px] px-1.5 py-0.5 rounded bg-cyan/10 text-cyan font-medium">
                           هدف اليوم
                         </span>
                       )}
                       {isTargetDone && (
-                        <span className="mr-1.5 inline-block text-[9px] px-1.5 py-0.5 rounded bg-cc-green/15 text-cc-green font-medium">
+                        <span className="mr-1.5 inline-block text-[11px] px-1.5 py-0.5 rounded bg-cc-green/15 text-cc-green font-medium">
                           تم الإنجاز
                         </span>
                       )}
@@ -1487,10 +1487,10 @@ export default function RenewalsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-center gap-1.5">
-                        <span className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-medium ${badge.bg} ${badge.color}`}>
+                        <span className={`inline-block px-2.5 py-1 rounded-full text-[12px] font-medium ${badge.bg} ${badge.color}`}>
                           {badge.text}
                           {renewal.status === "ملغي بسبب" && renewal.cancel_reason && (
-                            <span className="mr-1 text-[9px] opacity-70">({renewal.cancel_reason})</span>
+                            <span className="mr-1 text-[11px] opacity-70">({renewal.cancel_reason})</span>
                           )}
                         </span>
                         {renewal.status === "ملغي بسبب" && ["قلة الاستخدام", "الادارة رفضت", "مشكلات تقنية", "مو حاب يجدد بدون سبب"].includes(renewal.cancel_reason || "") && (
@@ -1513,7 +1513,7 @@ export default function RenewalsPage() {
                             const daysSince = Math.floor((Date.now() - new Date(renewal.updated_at).getTime()) / 86400000);
                             if (daysSince < 3) return null;
                             return (
-                              <span className={`absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[9px] font-bold px-1 ${
+                              <span className={`absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[11px] font-bold px-1 ${
                                 daysSince >= 7 ? "bg-red-500 text-white" : "bg-amber-500 text-white"
                               }`} title={`${daysSince} يوم بدون تحديث`}>
                                 {daysSince}
@@ -1671,7 +1671,7 @@ export default function RenewalsPage() {
             <div className="flex items-center gap-2">
               <Archive className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm font-bold text-muted-foreground">التجديدات المغلقة نهائياً</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted/30 text-muted-foreground font-medium">
+              <span className="text-[12px] px-2 py-0.5 rounded-full bg-muted/30 text-muted-foreground font-medium">
                 {closedForeverRenewals.length}
               </span>
             </div>
@@ -1712,7 +1712,7 @@ export default function RenewalsPage() {
                         <TableCell className="font-bold text-cc-red text-xs">{formatMoneyFull(renewal.plan_price)}</TableCell>
                         <TableCell className="text-muted-foreground text-xs">{formatDate(renewal.renewal_date)}</TableCell>
                         <TableCell>
-                          <span className="inline-block px-2.5 py-1 rounded-full text-[10px] font-medium bg-red-dim text-cc-red">
+                          <span className="inline-block px-2.5 py-1 rounded-full text-[12px] font-medium bg-red-dim text-cc-red">
                             {renewal.cancel_reason || "ملغي"}
                           </span>
                         </TableCell>
