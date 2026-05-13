@@ -417,7 +417,7 @@ function PermissionsPanel() {
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-medium text-foreground">{k.label_ar}</p>
                         <span
-                          className={`text-[10px] px-1.5 py-0.5 rounded-full bg-${catColor}-500/10 text-${catColor}-400`}
+                          className={`text-[12px] px-1.5 py-0.5 rounded-full bg-${catColor}-500/10 text-${catColor}-400`}
                         >
                           {k.category === "sales_visibility"
                             ? "رؤية المبيعات"
@@ -623,7 +623,7 @@ function WeeklyMeeting() {
                     <div className="flex items-start justify-between gap-2">
                       <p className="text-sm text-foreground">{d.decision_text}</p>
                       <span
-                        className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full ${
+                        className={`shrink-0 text-[12px] px-2 py-0.5 rounded-full ${
                           d.status === "completed"
                             ? "bg-emerald-500/10 text-emerald-400"
                             : d.status === "cancelled"
@@ -641,7 +641,7 @@ function WeeklyMeeting() {
                     {d.notes_ar && (
                       <p className="text-xs text-muted-foreground mt-1">{d.notes_ar}</p>
                     )}
-                    <p className="text-[10px] text-muted-foreground/60 mt-1">
+                    <p className="text-[12px] text-muted-foreground/60 mt-1">
                       {d.decided_by_profile?.name || "—"} •{" "}
                       {new Date(d.created_at).toLocaleDateString("ar-SA")}
                     </p>

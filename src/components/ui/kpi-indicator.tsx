@@ -23,7 +23,7 @@ export function KPIIndicator({
     <span className="inline-flex items-center gap-1.5">
       <span className={`${dotSize} rounded-full ${styles.dot}`} />
       {showLabel && (
-        <span className={`text-[10px] font-medium ${styles.text}`}>
+        <span className={`text-[12px] font-medium ${styles.text}`}>
           {styles.label}
         </span>
       )}

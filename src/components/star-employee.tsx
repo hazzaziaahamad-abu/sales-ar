@@ -46,7 +46,7 @@ export function StarEmployeeCard({ deals }: { deals: Deal[] }) {
           </div>
           <div className="flex-1">
             <h3 className="text-sm font-bold text-foreground">نجم الفترة</h3>
-            <p className="text-[10px] text-muted-foreground">أفضل موظف أداءً في المبيعات</p>
+            <p className="text-[12px] text-muted-foreground">أفضل موظف أداءً في المبيعات</p>
           </div>
           <div className="text-3xl">👑</div>
         </div>
@@ -76,28 +76,28 @@ export function StarEmployeeCard({ deals }: { deals: Deal[] }) {
         <div className="grid grid-cols-3 gap-2 mb-4">
           <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3 text-center">
             <p className="text-xl font-extrabold text-cc-green">{star.closedDeals}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">صفقة مغلقة</p>
+            <p className="text-[12px] text-muted-foreground mt-0.5">صفقة مغلقة</p>
           </div>
           <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3 text-center">
             <p className="text-xl font-extrabold text-cyan">{formatMoney(star.revenue)}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">إيرادات</p>
+            <p className="text-[12px] text-muted-foreground mt-0.5">إيرادات</p>
           </div>
           <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3 text-center">
             <p className="text-xl font-extrabold text-cc-purple">{star.winRate}%</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">نسبة إغلاق</p>
+            <p className="text-[12px] text-muted-foreground mt-0.5">نسبة إغلاق</p>
           </div>
         </div>
 
         {/* Badges */}
         {star.badges.length > 0 && (
           <div>
-            <p className="text-[10px] text-muted-foreground mb-1.5 font-medium">الشارات المحققة</p>
+            <p className="text-[12px] text-muted-foreground mb-1.5 font-medium">الشارات المحققة</p>
             <div className="flex flex-wrap gap-1.5">
               {star.badges.map((badge) => (
                 <span
                   key={badge.id}
                   title={badge.description}
-                  className="text-[10px] px-2 py-1 rounded-full bg-amber/10 border border-amber/20 text-amber font-medium cursor-default"
+                  className="text-[12px] px-2 py-1 rounded-full bg-amber/10 border border-amber/20 text-amber font-medium cursor-default"
                 >
                   {badge.emoji} {badge.label}
                 </span>
@@ -124,7 +124,7 @@ export function Leaderboard({ deals }: { deals: Deal[] }) {
         </div>
         <div>
           <h3 className="text-sm font-bold text-foreground">لوحة المتصدرين</h3>
-          <p className="text-[10px] text-muted-foreground">ترتيب الأداء الحي للفريق</p>
+          <p className="text-[12px] text-muted-foreground">ترتيب الأداء الحي للفريق</p>
         </div>
       </div>
 
@@ -159,17 +159,17 @@ export function Leaderboard({ deals }: { deals: Deal[] }) {
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs font-bold text-foreground truncate">{entry.name}</span>
                   {entry.streak >= 3 && (
-                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-orange-400/10 text-orange-400 border border-orange-400/20 font-bold flex items-center gap-0.5">
+                    <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-orange-400/10 text-orange-400 border border-orange-400/20 font-bold flex items-center gap-0.5">
                       <Flame className="w-2.5 h-2.5" />
                       {entry.streak}
                     </span>
                   )}
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-[10px] text-muted-foreground">{entry.closedDeals} صفقة</span>
-                  <span className="text-[10px] text-cyan font-medium">{formatMoney(entry.revenue)}</span>
+                  <span className="text-[12px] text-muted-foreground">{entry.closedDeals} صفقة</span>
+                  <span className="text-[12px] text-cyan font-medium">{formatMoney(entry.revenue)}</span>
                   {entry.badges.length > 0 && (
-                    <span className="text-[10px]" title={entry.badges.map(b => b.label).join("، ")}>
+                    <span className="text-[12px]" title={entry.badges.map(b => b.label).join("، ")}>
                       {entry.badges.slice(0, 3).map(b => b.emoji).join("")}
                       {entry.badges.length > 3 && `+${entry.badges.length - 3}`}
                     </span>
@@ -187,7 +187,7 @@ export function Leaderboard({ deals }: { deals: Deal[] }) {
                   }`}>
                     {entry.score}
                   </span>
-                  <span className="text-[9px] text-muted-foreground">نقطة</span>
+                  <span className="text-[11px] text-muted-foreground">نقطة</span>
                 </div>
                 {/* Score bar */}
                 <div className="w-16 h-1.5 bg-white/[0.06] rounded-full overflow-hidden mt-1">
@@ -232,7 +232,7 @@ export function BadgesShowcase({ deals, repName }: { deals: Deal[]; repName?: st
       <div className="flex items-center gap-2 mb-3">
         <Medal className="w-4 h-4 text-amber" />
         <h3 className="text-sm font-bold text-foreground">شارات {entry.name}</h3>
-        <span className="text-[10px] text-muted-foreground">({earned.length} شارة)</span>
+        <span className="text-[12px] text-muted-foreground">({earned.length} شارة)</span>
       </div>
       <div className="flex flex-wrap gap-2">
         {earned.map((badge) => (
@@ -243,8 +243,8 @@ export function BadgesShowcase({ deals, repName }: { deals: Deal[]; repName?: st
           >
             <span className="text-sm">{badge.emoji}</span>
             <div>
-              <p className="text-[10px] font-bold text-amber">{badge.label}</p>
-              <p className="text-[9px] text-muted-foreground">{badge.description}</p>
+              <p className="text-[12px] font-bold text-amber">{badge.label}</p>
+              <p className="text-[11px] text-muted-foreground">{badge.description}</p>
             </div>
           </div>
         ))}

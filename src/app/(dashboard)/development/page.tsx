@@ -296,7 +296,7 @@ export default function DevelopmentPage() {
                 {/* Progress */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[11px] text-muted-foreground">التقدم</span>
+                    <span className="text-[13px] text-muted-foreground">التقدم</span>
                     <span className="text-xs font-bold text-foreground">
                       {formatPercent(proj.progress)}
                     </span>

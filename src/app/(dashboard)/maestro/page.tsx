@@ -297,7 +297,7 @@ export default function MaestroPage() {
           <div className="w-full h-2 rounded-full bg-white/5 mt-2 overflow-hidden">
             <div className={`h-full rounded-full bg-gradient-to-l ${energyColor} transition-all duration-700`} style={{ width: `${energyPct}%` }} />
           </div>
-          <p className="text-[10px] text-muted-foreground mt-1">{energyLabel}</p>
+          <p className="text-[12px] text-muted-foreground mt-1">{energyLabel}</p>
         </div>
 
         {/* Tasks Counter */}
@@ -307,7 +307,7 @@ export default function MaestroPage() {
             <CheckCircle className="w-4 h-4 text-violet-400" />
           </div>
           <div className="text-2xl font-bold text-foreground">{doneTasks}<span className="text-sm text-muted-foreground">/{totalTasks}</span></div>
-          <p className="text-[10px] text-muted-foreground mt-1">مكتملة من الإجمالي</p>
+          <p className="text-[12px] text-muted-foreground mt-1">مكتملة من الإجمالي</p>
         </div>
 
         {/* Hourly Rate */}
@@ -317,7 +317,7 @@ export default function MaestroPage() {
             <Clock className="w-4 h-4 text-cyan-400" />
           </div>
           <div className="text-2xl font-bold text-foreground">{hourlyRate}</div>
-          <p className="text-[10px] text-muted-foreground mt-1">مهمة / ساعة</p>
+          <p className="text-[12px] text-muted-foreground mt-1">مهمة / ساعة</p>
         </div>
 
         {/* Time Left */}
@@ -327,7 +327,7 @@ export default function MaestroPage() {
             <Timer className="w-4 h-4 text-amber-400" />
           </div>
           <div className="text-2xl font-bold text-foreground">{hoursLeft.toFixed(1)}<span className="text-sm text-muted-foreground"> ساعة</span></div>
-          <p className="text-[10px] text-muted-foreground mt-1">لنهاية يوم العمل</p>
+          <p className="text-[12px] text-muted-foreground mt-1">لنهاية يوم العمل</p>
         </div>
       </div>
 
@@ -409,7 +409,7 @@ export default function MaestroPage() {
             <h2 className={`text-sm font-semibold mb-3 flex items-center gap-2 ${catMeta.color}`}>
               <Icon className="w-4 h-4" />
               {catMeta.label}
-              <span className="text-[10px] text-muted-foreground font-normal mr-auto">
+              <span className="text-[12px] text-muted-foreground font-normal mr-auto">
                 {catTasks.filter((t) => t.done).length}/{catTasks.length}
               </span>
             </h2>
@@ -445,7 +445,7 @@ export default function MaestroPage() {
                           {t.text}
                         </span>
                       )}
-                      <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${PRIORITY_META[t.priority].bg} ${PRIORITY_META[t.priority].color}`}>
+                      <span className={`text-[11px] px-1.5 py-0.5 rounded-full ${PRIORITY_META[t.priority].bg} ${PRIORITY_META[t.priority].color}`}>
                         {PRIORITY_META[t.priority].label}
                       </span>
                       {!t.done && (
@@ -459,7 +459,7 @@ export default function MaestroPage() {
                     </div>
                     {cd.urgency !== "none" && (
                       <div className="mr-6 mt-1">
-                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border ${COUNTDOWN_COLORS[cd.urgency]} ${cd.urgency === "passed" || cd.urgency === "critical" ? "animate-pulse" : ""}`}>
+                        <span className={`inline-flex items-center gap-1 text-[12px] font-bold px-2 py-0.5 rounded-md border ${COUNTDOWN_COLORS[cd.urgency]} ${cd.urgency === "passed" || cd.urgency === "critical" ? "animate-pulse" : ""}`}>
                           <CdIcon className="w-3 h-3" />
                           {cd.label}
                           {t.dueDate && <span className="font-normal opacity-70 mr-1">({t.dueDate}{t.dueTime ? ` ${t.dueTime}` : ""})</span>}
@@ -500,7 +500,7 @@ export default function MaestroPage() {
           <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
             <Trophy className="w-4 h-4 text-amber-400" />
             إنجازات اليوم
-            {wins.length > 0 && <span className="text-[10px] text-amber-400 mr-1">{wins.length}</span>}
+            {wins.length > 0 && <span className="text-[12px] text-amber-400 mr-1">{wins.length}</span>}
           </h2>
           <div className="flex gap-2 mb-3">
             <Input

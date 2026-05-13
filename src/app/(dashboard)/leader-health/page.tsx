@@ -517,7 +517,7 @@ function HeroCard({ currentDay }: { currentDay: number }) {
         style={{ background: "radial-gradient(circle, rgba(201,169,97,0.12), transparent 70%)" }}
       />
       <div className="relative">
-        <div className="text-[11px] tracking-[3px] text-[#c9a961] mb-3.5 font-medium">DAY · COUNTER</div>
+        <div className="text-[13px] tracking-[3px] text-[#c9a961] mb-3.5 font-medium">DAY · COUNTER</div>
         <h2 className="font-bold text-3xl leading-tight mb-2">الانضباط أقوى من العزيمة</h2>
         <p className="text-[#8a92a3] text-sm mb-7">رحلتك نحو نسخة أفضل من نفسك تبدأ بقرار يومي</p>
         <div className="flex items-baseline gap-3 mb-6">
@@ -573,7 +573,7 @@ function WeightCard({
           { label: "الهدف", val: targetW },
         ].map((s, i) => (
           <div key={i} className="text-center py-3.5 px-2 bg-[#0f131c] border border-[#2a3242] rounded-xl">
-            <div className="text-[11px] text-[#8a92a3] mb-1.5 tracking-wide">{s.label}</div>
+            <div className="text-[13px] text-[#8a92a3] mb-1.5 tracking-wide">{s.label}</div>
             <div className="font-semibold text-xl">
               {s.val ? arabicNum(s.val) : "—"}
               <span className="text-xs text-[#8a92a3] mr-1">كجم</span>
@@ -687,7 +687,7 @@ function ProhibitionsSection({
               <div className="text-3xl mb-1.5 opacity-85">{p.icon}</div>
               <div className="text-[13px] font-medium mb-1">{p.name}</div>
               <div
-                className={`text-[11px] ${
+                className={`text-[13px] ${
                   status === "kept" ? "text-[#4ec77a]" : status === "broken" ? "text-[#e15d5d]" : "text-[#8a92a3]"
                 }`}
               >
@@ -849,7 +849,7 @@ function MilestoneCard({
           style={{ background: "linear-gradient(90deg, transparent, #c9a961, transparent)" }}
         />
       )}
-      <div className={`text-[11px] tracking-wider mb-2 ${tagColor}`}>{milestone.tag.toUpperCase()}</div>
+      <div className={`text-[13px] tracking-wider mb-2 ${tagColor}`}>{milestone.tag.toUpperCase()}</div>
       <div className="font-semibold text-lg mb-1">{milestone.tag}</div>
       <div className="text-sm text-[#8a92a3] mb-4">{milestone.period}</div>
       <div className="text-4xl leading-none bg-gradient-to-b from-[#e6c577] to-[#8a7340] bg-clip-text text-transparent font-extrabold">
@@ -908,7 +908,7 @@ function Calendar({ state }: { state: ChallengeState }) {
         <>
           <div className="grid gap-1.5" style={{ gridTemplateColumns: "repeat(15, minmax(0, 1fr))" }}>
             {data.days.map((d, i) => {
-              const baseStyle = "aspect-square rounded-md grid place-items-center text-[11px] cursor-pointer transition hover:scale-110";
+              const baseStyle = "aspect-square rounded-md grid place-items-center text-[13px] cursor-pointer transition hover:scale-110";
               let cls = `${baseStyle} bg-[#0f131c] border border-[#2a3242] text-[#5a6273]`;
               if (d.cls === "completed") cls = `${baseStyle} text-[#1a1410] font-semibold border border-[#c9a961]`;
               else if (d.cls === "partial") cls = `${baseStyle} border border-[#8a7340] text-[#e6c577] bg-[#c9a961]/20`;
@@ -1113,7 +1113,7 @@ function SlumpBreakerSection({
             onChange={(e) => setSleep(parseInt(e.target.value, 10))}
             className="w-full accent-[#c9a961]"
           />
-          <div className="flex justify-between text-[10px] text-[#5a6273] mt-1">
+          <div className="flex justify-between text-[12px] text-[#5a6273] mt-1">
             <span>{arabicNum(4)}</span>
             <span>{arabicNum(10)}</span>
           </div>
@@ -1133,7 +1133,7 @@ function SlumpBreakerSection({
                 key={i}
                 type="button"
                 onClick={() => setWater(i)}
-                className="h-7 rounded-md text-[10px] font-mono transition"
+                className="h-7 rounded-md text-[12px] font-mono transition"
                 style={{
                   background: water === i ? "#c9a961" : "#0f131c",
                   color: water === i ? "#1a1410" : "#8a92a3",
@@ -1162,7 +1162,7 @@ function SlumpBreakerSection({
               <button
                 key={opt.id}
                 onClick={() => setStood(opt.id)}
-                className="px-2 py-2 rounded-lg text-[11px] transition"
+                className="px-2 py-2 rounded-lg text-[13px] transition"
                 style={{
                   background: stood === opt.id ? `${opt.hex}22` : "#0f131c",
                   color: stood === opt.id ? opt.hex : "#8a92a3",
@@ -1183,7 +1183,7 @@ function SlumpBreakerSection({
             <span>🩺</span>
             التشخيص
           </h3>
-          <span className="text-[10px] text-[#8a92a3]">
+          <span className="text-[12px] text-[#8a92a3]">
             كسرت الخمول اليوم {arabicNum(slumpsToday)} مرة
           </span>
         </div>
@@ -1286,7 +1286,7 @@ function SlumpBurstModal({ onClose, onComplete }: { onClose: () => void; onCompl
       >
         {!done ? (
           <>
-            <div className="text-[11px] tracking-[3px] text-[#c9a961] mb-3 font-medium">SLUMP BREAKER</div>
+            <div className="text-[13px] tracking-[3px] text-[#c9a961] mb-3 font-medium">SLUMP BREAKER</div>
             <div className="text-7xl mb-4">{exercise.emoji}</div>
             <h2 className="font-semibold text-2xl mb-6">{exercise.name}</h2>
 
@@ -1324,7 +1324,7 @@ function SlumpBurstModal({ onClose, onComplete }: { onClose: () => void; onCompl
                 ✓ خلصت
               </button>
             </div>
-            <button onClick={onClose} className="mt-3 text-[11px] text-[#5a6273] hover:text-[#8a92a3]">
+            <button onClick={onClose} className="mt-3 text-[13px] text-[#5a6273] hover:text-[#8a92a3]">
               إلغاء
             </button>
           </>
@@ -1448,13 +1448,13 @@ function ExercisesSection({
               <div className="text-[13px] font-mono mb-1.5" style={{ color: day.hex }}>
                 {ex.reps}
               </div>
-              {ex.tip && <div className="text-[11px] text-[#8a92a3] leading-relaxed">{ex.tip}</div>}
+              {ex.tip && <div className="text-[13px] text-[#8a92a3] leading-relaxed">{ex.tip}</div>}
             </button>
           );
         })}
       </div>
 
-      <div className="mt-3 text-[11px] text-[#8a92a3] text-center">
+      <div className="mt-3 text-[13px] text-[#8a92a3] text-center">
         التمارين تُحفظ ضمن سجل اليوم. ابدأ بالمستوى المبتدئ أول أسبوعين ثم انتقل لجدول الأيام.
       </div>
     </div>
@@ -1689,11 +1689,11 @@ function MealCard({ meal }: { meal: Meal }) {
       <div className="font-semibold text-[15px] mb-1">{meal.name}</div>
       <div className="text-xs text-[#8a92a3] leading-relaxed mb-3">{meal.desc}</div>
       <div className="flex gap-1.5 flex-wrap">
-        <span className="text-[10px] px-2 py-1 rounded-md text-[#c9a961] border border-[#8a7340] bg-[#0f131c]">
+        <span className="text-[12px] px-2 py-1 rounded-md text-[#c9a961] border border-[#8a7340] bg-[#0f131c]">
           {meal.cal} سعرة
         </span>
         {meal.tags.map((t, i) => (
-          <span key={i} className="text-[10px] px-2 py-1 rounded-md text-[#8a92a3] border border-[#2a3242] bg-[#0f131c]">
+          <span key={i} className="text-[12px] px-2 py-1 rounded-md text-[#8a92a3] border border-[#2a3242] bg-[#0f131c]">
             {t}
           </span>
         ))}

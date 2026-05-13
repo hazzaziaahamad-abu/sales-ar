@@ -244,15 +244,15 @@ export default function UsersPage() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-sm font-semibold text-foreground">{u.name}</p>
                         {u.is_super_admin && (
-                          <Badge variant="outline" className="text-[10px] border-cyan/30 text-cyan">مدير عام</Badge>
+                          <Badge variant="outline" className="text-[12px] border-cyan/30 text-cyan">مدير عام</Badge>
                         )}
                       </div>
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                        <span className="text-[11px] text-muted-foreground">{u.email}</span>
+                        <span className="text-[13px] text-muted-foreground">{u.email}</span>
                         <span className="text-white/10 hidden sm:inline">·</span>
-                        <span className="text-[11px] text-muted-foreground hidden sm:inline">{u.organizations?.name_ar}</span>
+                        <span className="text-[13px] text-muted-foreground hidden sm:inline">{u.organizations?.name_ar}</span>
                         <span className="text-white/10 hidden sm:inline">·</span>
-                        <span className="text-[11px] text-cyan/70 hidden sm:inline">
+                        <span className="text-[13px] text-cyan/70 hidden sm:inline">
                           {u.is_super_admin ? "كل الصفحات" : `${pages.length} صفحة`}
                         </span>
                       </div>
@@ -323,7 +323,7 @@ export default function UsersPage() {
                       <div className="rounded-[14px] bg-indigo-500/5 border border-indigo-500/15 p-3 flex items-center gap-3">
                         <Link2 className="w-4 h-4 text-indigo-400 shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <p className="text-[11px] text-muted-foreground mb-0.5">رابط الدخول</p>
+                          <p className="text-[13px] text-muted-foreground mb-0.5">رابط الدخول</p>
                           <p className="text-xs text-indigo-300 truncate" dir="ltr">{getLoginUrl()}</p>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
@@ -352,7 +352,7 @@ export default function UsersPage() {
                       </div>
 
                       <div className="rounded-[14px] bg-white/[0.02] border border-border p-3">
-                        <p className="text-[11px] text-muted-foreground mb-2">الصفحات المسموح بها:</p>
+                        <p className="text-[13px] text-muted-foreground mb-2">الصفحات المسموح بها:</p>
                         {u.is_super_admin ? (
                           <p className="text-xs text-cyan">كل الصفحات (مدير عام)</p>
                         ) : pages.length > 0 ? (
@@ -360,7 +360,7 @@ export default function UsersPage() {
                             {pages.map((slug) => (
                               <span
                                 key={slug}
-                                className="text-[11px] bg-cyan/10 text-cyan border border-cyan/20 rounded-lg px-2 py-1"
+                                className="text-[13px] bg-cyan/10 text-cyan border border-cyan/20 rounded-lg px-2 py-1"
                               >
                                 {getPageLabel(slug)}
                               </span>
@@ -420,7 +420,7 @@ export default function UsersPage() {
                 placeholder={editingUser ? "اتركها فارغة إذا لا تريد التغيير" : "••••••••"}
               />
               {editingUser && (
-                <p className="text-[10px] text-muted-foreground">اتركها فارغة إذا لا تريد تغيير كلمة المرور</p>
+                <p className="text-[12px] text-muted-foreground">اتركها فارغة إذا لا تريد تغيير كلمة المرور</p>
               )}
             </div>
 
@@ -460,7 +460,7 @@ export default function UsersPage() {
                   </button>
                 ))}
               </div>
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-[12px] text-muted-foreground">
                 المستخدم سيتمكن فقط من رؤية الصفحات المحددة
               </p>
             </div>

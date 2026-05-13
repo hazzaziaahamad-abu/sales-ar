@@ -139,7 +139,7 @@ export function AssignTaskModal({
                 <span className="text-gray-400">العميل:</span>
                 <span className="text-white font-medium">{clientName}</span>
                 {clientPhone && <span className="text-gray-500 text-xs">({clientPhone})</span>}
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                <span className={`px-2 py-0.5 rounded-full text-[12px] font-medium ${
                   entityType === "deal" ? "bg-emerald-500/10 text-emerald-400" : "bg-sky-500/10 text-sky-400"
                 }`}>
                   {entityType === "deal" ? "صفقة" : entityType === "renewal" ? "تجديد" : "تذكرة"}

@@ -153,7 +153,7 @@ export function AIChatPanel({ isOpen, onClose }: AIChatPanelProps) {
                 <button
                   key={i}
                   onClick={() => sendMessage(q)}
-                  className="px-3 py-1.5 bg-muted rounded-full text-[11px] text-muted-foreground hover:text-cyan hover:bg-cyan-dim transition-colors"
+                  className="px-3 py-1.5 bg-muted rounded-full text-[13px] text-muted-foreground hover:text-cyan hover:bg-cyan-dim transition-colors"
                 >
                   {q}
                 </button>

@@ -611,12 +611,12 @@ export default function SupportPage() {
             </p>
             <div className="flex items-center gap-2 mt-2">
               <span className="text-xs text-cyan font-medium">{dailyQuote.author}</span>
-              <span className="text-[10px] text-muted-foreground">— {dailyQuote.book}</span>
+              <span className="text-[12px] text-muted-foreground">— {dailyQuote.book}</span>
             </div>
           </div>
           <button
             onClick={toggleCommitment}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all shrink-0 ${
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[12px] font-semibold transition-all shrink-0 ${
               hasCommitted
                 ? "bg-green-500/15 text-green-600 border border-green-500/30"
                 : "bg-muted/50 text-muted-foreground border border-border hover:bg-cyan/10 hover:text-cyan hover:border-cyan/30"
@@ -625,7 +625,7 @@ export default function SupportPage() {
             <ThumbsUp className={`w-3 h-3 ${hasCommitted ? "fill-green-500" : ""}`} />
             {hasCommitted ? "ملتزم" : "ألتزم"}
             {commitments.length > 0 && (
-              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-cyan/20 text-cyan text-[9px] font-bold">
+              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-cyan/20 text-cyan text-[11px] font-bold">
                 {commitments.length}
               </span>
             )}
@@ -634,7 +634,7 @@ export default function SupportPage() {
         {commitments.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1 px-12">
             {commitments.map((c) => (
-              <span key={c.user_name} className="text-[9px] px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-600 border border-green-500/20">
+              <span key={c.user_name} className="text-[11px] px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-600 border border-green-500/20">
                 {c.user_name}
               </span>
             ))}
@@ -769,7 +769,7 @@ export default function SupportPage() {
           <div className="flex items-center gap-2 mb-4">
             <BarChart3 className="w-5 h-5 text-amber" />
             <h3 className="text-sm font-bold text-foreground">تحليل المشاكل المتكررة</h3>
-            <span className="text-[10px] text-muted-foreground mr-auto">{issueAnalytics.totalCategorized} تذكرة مصنّفة</span>
+            <span className="text-[12px] text-muted-foreground mr-auto">{issueAnalytics.totalCategorized} تذكرة مصنّفة</span>
           </div>
 
           {/* Category breakdown */}
@@ -793,16 +793,16 @@ export default function SupportPage() {
                 >
                   <span className="text-lg">{TICKET_CATEGORIES[cat]?.icon || "📋"}</span>
                   <p className="text-xl font-bold text-foreground mt-1">{data.total}</p>
-                  <p className="text-[10px] text-muted-foreground">{cat}</p>
+                  <p className="text-[12px] text-muted-foreground">{cat}</p>
                   <div className="mt-1.5 h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
                     <div
                       className={`h-full rounded-full ${resRate >= 70 ? "bg-emerald-500" : resRate >= 40 ? "bg-amber-500" : "bg-red-500"}`}
                       style={{ width: `${resRate}%` }}
                     />
                   </div>
-                  <p className="text-[9px] text-muted-foreground mt-0.5">حل {resRate}%</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">حل {resRate}%</p>
                   {data.urgent > 0 && (
-                    <span className="inline-block mt-1 text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-400">{data.urgent} عاجل</span>
+                    <span className="inline-block mt-1 text-[11px] px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-400">{data.urgent} عاجل</span>
                   )}
                 </button>
               );
@@ -864,7 +864,7 @@ export default function SupportPage() {
               <div className="flex items-center gap-2 mb-4">
                 <div className="w-2 h-2 rounded-full bg-cc-blue" />
                 <h3 className="text-sm font-bold text-foreground">الخدمات الأكثر طلباً</h3>
-                <span className="text-[10px] text-muted-foreground mr-auto">{issueAnalytics.totalServices} طلب خدمة</span>
+                <span className="text-[12px] text-muted-foreground mr-auto">{issueAnalytics.totalServices} طلب خدمة</span>
               </div>
               <div className="space-y-2.5">
                 {issueAnalytics.sortedServices.map(([cat, data]) => {
@@ -879,7 +879,7 @@ export default function SupportPage() {
                         </span>
                         <span className="flex items-center gap-2">
                           <span className="text-muted-foreground">{data.total} طلب</span>
-                          <span className={`text-[10px] font-bold ${resRate >= 70 ? "text-cc-green" : resRate >= 40 ? "text-amber" : "text-cc-red"}`}>
+                          <span className={`text-[12px] font-bold ${resRate >= 70 ? "text-cc-green" : resRate >= 40 ? "text-amber" : "text-cc-red"}`}>
                             انجاز {resRate}%
                           </span>
                         </span>
@@ -914,7 +914,7 @@ export default function SupportPage() {
               <div className="flex items-center gap-2 mb-4">
                 <div className="w-2 h-2 rounded-full bg-cc-red" />
                 <h3 className="text-sm font-bold text-foreground">المشاكل الأكثر تكراراً</h3>
-                <span className="text-[10px] text-muted-foreground mr-auto">{issueAnalytics.totalProblems} مشكلة</span>
+                <span className="text-[12px] text-muted-foreground mr-auto">{issueAnalytics.totalProblems} مشكلة</span>
               </div>
               <div className="space-y-2.5">
                 {issueAnalytics.sortedProblems.map(([cat, data]) => {
@@ -929,7 +929,7 @@ export default function SupportPage() {
                         </span>
                         <span className="flex items-center gap-2">
                           <span className="text-muted-foreground">{data.total} مشكلة</span>
-                          <span className={`text-[10px] font-bold ${resRate >= 70 ? "text-cc-green" : resRate >= 40 ? "text-amber" : "text-cc-red"}`}>
+                          <span className={`text-[12px] font-bold ${resRate >= 70 ? "text-cc-green" : resRate >= 40 ? "text-amber" : "text-cc-red"}`}>
                             حل {resRate}%
                           </span>
                         </span>
@@ -1010,7 +1010,7 @@ export default function SupportPage() {
             <button
               onClick={handleShareTable}
               disabled={isTableExporting}
-              className="mr-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-muted-foreground hover:text-cyan hover:bg-cyan/10 transition-colors disabled:opacity-50 border border-transparent hover:border-cyan/20"
+              className="mr-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium text-muted-foreground hover:text-cyan hover:bg-cyan/10 transition-colors disabled:opacity-50 border border-transparent hover:border-cyan/20"
               title="مشاركة الجدول كصورة"
             >
               {isTableExporting ? (
@@ -1099,7 +1099,7 @@ export default function SupportPage() {
                     {ticket.ticket_number}
                   </TableCell>
                   <TableCell className="text-right text-xs">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] font-medium ${
                       (ticket.request_type || "problem") === "service"
                         ? "bg-cc-blue/10 text-cc-blue"
                         : "bg-cc-red/10 text-cc-red"
@@ -1112,19 +1112,19 @@ export default function SupportPage() {
                   </TableCell>
                   <TableCell className="text-right text-xs text-muted-foreground">
                     <div>{ticket.open_date ? formatDate(ticket.open_date) : "—"}</div>
-                    {ticket.open_time && <div className="text-[10px] text-muted-foreground/70" dir="ltr">{ticket.open_time}</div>}
+                    {ticket.open_time && <div className="text-[12px] text-muted-foreground/70" dir="ltr">{ticket.open_time}</div>}
                   </TableCell>
                   <TableCell className="text-right text-xs text-muted-foreground" dir="ltr">
                     {ticket.client_phone ? formatPhone(ticket.client_phone) : "—"}
                   </TableCell>
                   <TableCell className="text-right text-xs">
                     {ticket.issue_category ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan/10 text-cyan text-[10px] font-medium">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan/10 text-cyan text-[12px] font-medium">
                         {TICKET_CATEGORIES[ticket.issue_category]?.icon} {ticket.issue_category}
                       </span>
                     ) : <span className="text-muted-foreground">—</span>}
                     {ticket.issue_subcategory && (
-                      <p className="text-[10px] text-muted-foreground mt-0.5">{ticket.issue_subcategory}</p>
+                      <p className="text-[12px] text-muted-foreground mt-0.5">{ticket.issue_subcategory}</p>
                     )}
                   </TableCell>
                   <TableCell className="text-right text-xs max-w-[200px] truncate">
@@ -1196,10 +1196,10 @@ export default function SupportPage() {
           </div>
           <div className="flex-1">
             <h3 className="text-sm font-bold text-foreground">سجل التتبع</h3>
-            <p className="text-[11px] text-muted-foreground">جميع العمليات على التذاكر (إضافة، تعديل، حذف)</p>
+            <p className="text-[13px] text-muted-foreground">جميع العمليات على التذاكر (إضافة، تعديل، حذف)</p>
           </div>
           {activityLogs.length > 0 && (
-            <span className="text-[10px] bg-orange-500/10 text-orange-400 rounded-full px-2.5 py-0.5 font-medium">
+            <span className="text-[12px] bg-orange-500/10 text-orange-400 rounded-full px-2.5 py-0.5 font-medium">
               {activityLogs.length}
             </span>
           )}
@@ -1229,7 +1229,7 @@ export default function SupportPage() {
               ))}
               <button
                 onClick={loadActivityLogs}
-                className="mr-auto text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                className="mr-auto text-[13px] text-muted-foreground hover:text-foreground transition-colors"
               >
                 تحديث
               </button>
@@ -1299,7 +1299,7 @@ export default function SupportPage() {
                             </div>
                           </div>
                           <p className="text-lg font-extrabold text-foreground font-mono">{count}</p>
-                          <p className="text-[10px] text-muted-foreground">{config.label}</p>
+                          <p className="text-[12px] text-muted-foreground">{config.label}</p>
                         </div>
                       );
                     })}
@@ -1329,10 +1329,10 @@ export default function SupportPage() {
                             <TableRow key={log.id}>
                               <TableCell className="text-right text-xs">
                                 <div className="text-foreground">{dateStr}</div>
-                                <div className="text-[10px] text-muted-foreground/70">{timeStr}</div>
+                                <div className="text-[12px] text-muted-foreground/70">{timeStr}</div>
                               </TableCell>
                               <TableCell className="text-right">
-                                <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-full ${config.bg}`}>
+                                <span className={`inline-flex items-center gap-1 text-[12px] font-medium px-2 py-1 rounded-full ${config.bg}`}>
                                   <ActionIcon className="w-3 h-3" />
                                   {config.label}
                                 </span>
@@ -1358,7 +1358,7 @@ export default function SupportPage() {
                     </Table>
                   </div>
                   {filtered.length > 50 && (
-                    <p className="text-center text-[11px] text-muted-foreground">يتم عرض آخر 50 عملية من أصل {filtered.length}</p>
+                    <p className="text-center text-[13px] text-muted-foreground">يتم عرض آخر 50 عملية من أصل {filtered.length}</p>
                   )}
                 </div>
               );

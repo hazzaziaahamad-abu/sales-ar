@@ -65,7 +65,7 @@ export function KPICard({ label, value, target, status, icon }: KPICardProps) {
           <StatusIcon className="w-3.5 h-3.5" />
           {status === "excellent" ? "ممتاز" : status === "improving" ? "تحسن" : "متأخر"}
         </span>
-        <span className="text-[11px] text-muted-foreground">
+        <span className="text-[13px] text-muted-foreground">
           الهدف: <span className="font-mono">{target}</span>
         </span>
       </div>

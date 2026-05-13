@@ -99,7 +99,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="text-center text-[10px] text-[#A0B1C5]/50 mt-6">
+        <p className="text-center text-[12px] text-[#A0B1C5]/50 mt-6">
           لوحة التحكم &copy; {new Date().getFullYear()}
         </p>
       </div>

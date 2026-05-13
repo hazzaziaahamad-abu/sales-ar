@@ -171,7 +171,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 </div>
                 <div className="flex-1 text-right min-w-0">
                   <p className="text-xs font-semibold text-foreground truncate">{activeOrg?.nameAr || "المنظمة"}</p>
-                  <p className="text-[10px] text-muted-foreground">{activeOrg?.name || ""}</p>
+                  <p className="text-[12px] text-muted-foreground">{activeOrg?.name || ""}</p>
                 </div>
                 <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground transition-transform", orgMenuOpen && "rotate-180")} />
               </button>
@@ -200,7 +200,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                       </div>
                       <div className="flex-1 text-right min-w-0">
                         <p className={cn("text-xs font-semibold truncate", o.id === activeOrgId ? "text-foreground" : "text-muted-foreground")}>{o.nameAr}</p>
-                        <p className="text-[10px] text-muted-foreground">{o.name}</p>
+                        <p className="text-[12px] text-muted-foreground">{o.name}</p>
                       </div>
                       {o.id === activeOrgId && (
                         <div className="w-1.5 h-1.5 rounded-full bg-cyan shrink-0" />
@@ -219,7 +219,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 </div>
                 <div className="flex-1 text-right min-w-0">
                   <p className="text-xs font-semibold text-foreground truncate">{activeOrg?.nameAr || "المنظمة"}</p>
-                  <p className="text-[10px] text-muted-foreground">{activeOrg?.name || ""}</p>
+                  <p className="text-[12px] text-muted-foreground">{activeOrg?.name || ""}</p>
                 </div>
               </div>
             )
@@ -260,7 +260,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 </span>
                 <span className="flex-1 font-semibold">{item.label}</span>
                 {item.slug === "requests" && pendingCount > 0 && (
-                  <span className="min-w-[22px] h-[22px] flex items-center justify-center rounded-full bg-red-500 text-white text-[11px] font-bold px-1.5 animate-pulse">
+                  <span className="min-w-[22px] h-[22px] flex items-center justify-center rounded-full bg-red-500 text-white text-[13px] font-bold px-1.5 animate-pulse">
                     {pendingCount}
                   </span>
                 )}

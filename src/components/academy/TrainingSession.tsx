@@ -238,9 +238,9 @@ function clearSession() {
 
 function formatMessage(text: string) {
   return text
-    .replace(/\[✅ ([^\]]+)\]/g, '<span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-medium my-1">✅ $1</span>')
-    .replace(/\[📝 ([^\]]+)\]/g, '<span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-cyan/10 border border-cyan/20 text-cyan text-[11px] font-medium my-1">📝 $1</span>')
-    .replace(/\[💡 ([^\]]+)\]/g, '<span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-amber/10 border border-amber/20 text-amber text-[11px] font-medium my-1">💡 $1</span>')
+    .replace(/\[✅ ([^\]]+)\]/g, '<span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[13px] font-medium my-1">✅ $1</span>')
+    .replace(/\[📝 ([^\]]+)\]/g, '<span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-cyan/10 border border-cyan/20 text-cyan text-[13px] font-medium my-1">📝 $1</span>')
+    .replace(/\[💡 ([^\]]+)\]/g, '<span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-amber/10 border border-amber/20 text-amber text-[13px] font-medium my-1">💡 $1</span>')
     .replace(/## 📋 تقييم الجلسة التدريبية/g, '<div class="mt-3 mb-2 px-3 py-2 rounded-lg bg-gradient-to-l from-cyan/10 to-cc-purple/10 border border-cyan/20"><span class="text-sm font-bold text-cyan">📋 تقييم الجلسة التدريبية</span></div>')
     .replace(/## (.+)/g, '<h3 class="text-sm font-bold text-foreground mt-3 mb-1">$1</h3>')
     .replace(/### (.+)/g, '<h4 class="text-xs font-bold text-foreground/80 mt-2 mb-1">$1</h4>')
@@ -346,7 +346,7 @@ function ChatSession({ topic, platform, savedMessages, onReset }: { topic: strin
           </div>
           <div>
             <h3 className="text-sm font-bold text-foreground">جلسة تدريبية: {topicInfo.title}</h3>
-            <p className="text-[10px] text-muted-foreground">مدرب ذكي — تفاعل كأنك مع عميل حقيقي</p>
+            <p className="text-[12px] text-muted-foreground">مدرب ذكي — تفاعل كأنك مع عميل حقيقي</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -504,7 +504,7 @@ export function TrainingSession({ onBack, platform = "menu" }: TrainingSessionPr
                 </div>
                 <div>
                   <p className="text-sm font-bold text-foreground">جلسة سابقة: {savedTopicInfo.title}</p>
-                  <p className="text-[10px] text-muted-foreground">{saved.messages.length} رسالة — {new Date(saved.savedAt).toLocaleTimeString("ar-SA-u-ca-gregory", { hour: "2-digit", minute: "2-digit" })}</p>
+                  <p className="text-[12px] text-muted-foreground">{saved.messages.length} رسالة — {new Date(saved.savedAt).toLocaleTimeString("ar-SA-u-ca-gregory", { hour: "2-digit", minute: "2-digit" })}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -534,7 +534,7 @@ export function TrainingSession({ onBack, platform = "menu" }: TrainingSessionPr
               <div key={s.step} className="flex items-center gap-2.5 p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
                 <span className="text-lg">{s.icon}</span>
                 <div>
-                  <span className="text-[10px] text-cyan font-bold">خطوة {s.step}</span>
+                  <span className="text-[12px] text-cyan font-bold">خطوة {s.step}</span>
                   <p className="text-xs text-foreground">{s.text}</p>
                 </div>
               </div>
@@ -560,7 +560,7 @@ export function TrainingSession({ onBack, platform = "menu" }: TrainingSessionPr
                 </div>
                 <div>
                   <p className={cn("text-sm font-bold", topic.color)}>{topic.title}</p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{topic.desc}</p>
+                  <p className="text-[13px] text-muted-foreground mt-0.5 leading-relaxed">{topic.desc}</p>
                 </div>
               </button>
             );
