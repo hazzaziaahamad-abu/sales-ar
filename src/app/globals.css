@@ -175,6 +175,11 @@
       linear-gradient(90deg, rgba(40, 58, 82, 0.12) 1px, transparent 1px);
     background-size: 22px 22px;
   }
+
+  /* Drop the grid in light themes — the dim blue lines look harsh on white */
+  [data-theme-light="true"] .panel-grid {
+    background-image: none;
+  }
 }
 
 /* Scrollbar styling */
