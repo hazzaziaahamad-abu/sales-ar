@@ -18,6 +18,7 @@ import {
   Shield,
   LogOut,
   ChevronDown,
+  ChevronLeft,
   Upload,
   ClipboardList,
   BookOpen,
@@ -44,40 +45,42 @@ import { useAuth } from "@/lib/auth-context";
 import { countPendingDeals } from "@/lib/supabase/db";
 
 export const NAV_ITEMS = [
-  { label: "نظرة عامة", href: "/dashboard", slug: "dashboard", icon: LayoutDashboard, color: "cyan" },
-  { label: "لوحة المدير", href: "/manager", slug: "manager", icon: Briefcase, color: "violet" },
-  { label: "التحديثات الأخيرة", href: "/recent-updates", slug: "recent-updates", icon: History, color: "cyan" },
-  { label: "السكرتير التنفيذي", href: "/secretary", slug: "secretary", icon: BrainCircuit, color: "violet" },
-  { label: "قائمة الطلبات", href: "/requests", slug: "requests", icon: Inbox, color: "violet" },
-  { label: "مبيعات المكتب", href: "/sales", slug: "sales", icon: TrendingUp, color: "emerald" },
-  { label: "مبيعات الدعم", href: "/support-sales", slug: "support-sales", icon: TrendingUp, color: "orange" },
-  { label: "الدعم", href: "/support", slug: "support", icon: Headphones, color: "orange" },
+  { label: "نظرة عامة", href: "/dashboard", slug: "dashboard", icon: LayoutDashboard, color: "cyan", group: "عام" },
+  { label: "لوحة المدير", href: "/manager", slug: "manager", icon: Briefcase, color: "violet", group: "عام" },
+  { label: "التحديثات الأخيرة", href: "/recent-updates", slug: "recent-updates", icon: History, color: "cyan", group: "عام" },
+  { label: "السكرتير التنفيذي", href: "/secretary", slug: "secretary", icon: BrainCircuit, color: "violet", group: "الإدارة التنفيذية" },
+  { label: "قائمة الطلبات", href: "/requests", slug: "requests", icon: Inbox, color: "violet", group: "الإدارة التنفيذية" },
+  { label: "مبيعات المكتب", href: "/sales", slug: "sales", icon: TrendingUp, color: "emerald", group: "المبيعات والدعم" },
+  { label: "مبيعات الدعم", href: "/support-sales", slug: "support-sales", icon: TrendingUp, color: "orange", group: "المبيعات والدعم" },
+  { label: "الدعم", href: "/support", slug: "support", icon: Headphones, color: "orange", group: "المبيعات والدعم" },
   // Hidden: merged into "مهامي" — { label: "دليل المبيعات", href: "/sales-guide", slug: "sales-guide", icon: BookOpen, color: "amber" },
-  { label: "الاجتماع الأسبوعي", href: "/weekly", slug: "weekly", icon: ClipboardList, color: "violet" },
-  { label: "التجديدات", href: "/renewals", slug: "renewals", icon: RefreshCw, color: "sky" },
-  { label: "تحسين التجديدات", href: "/renewal-boost", slug: "renewal-boost", icon: Zap, color: "amber" },
-  { label: "معمل الاستعادة", href: "/recovery-lab", slug: "recovery-lab", icon: FlaskConical, color: "violet" },
-  { label: "رضا العملاء", href: "/satisfaction", slug: "satisfaction", icon: Heart, color: "rose" },
-  { label: "قائمة الاستهداف", href: "/targeting", slug: "targeting", icon: Target, color: "fuchsia" },
-  { label: "بوكس الهدايا", href: "/gifts", slug: "gifts", icon: Gift, color: "amber" },
-  { label: "إدارة المهام", href: "/tasks", slug: "tasks", icon: ListTodo, color: "indigo" },
-  { label: "مهامي", href: "/my-tasks", slug: "my-tasks", icon: UserCheck, color: "cyan" },
-  { label: "التطويرات", href: "/development", slug: "development", icon: Code, color: "indigo" },
-  { label: "الشراكات", href: "/partnerships", slug: "partnerships", icon: Handshake, color: "teal" },
-  { label: "المسوقين", href: "/marketers", slug: "marketers", icon: Megaphone, color: "pink" },
-  { label: "الفريق", href: "/team", slug: "team", icon: Users, color: "blue" },
-  { label: "أكاديمية التعلم", href: "/learning-academy", slug: "learning-academy", icon: GraduationCap, color: "emerald" },
-  { label: "الباقات", href: "/packages", slug: "packages", icon: Package, color: "violet" },
-  { label: "الأكاديمية", href: "/academy", slug: "academy", icon: GraduationCap, color: "amber" },
-  { label: "المالية", href: "/finance", slug: "finance", icon: Banknote, color: "lime" },
-  { label: "رفع الملفات", href: "/upload", slug: "upload", icon: Upload, color: "slate" },
-  { label: "الحوكمة", href: "/governance", slug: "governance", icon: ShieldCheck, color: "indigo" },
-  { label: "إدارة المستخدمين", href: "/users", slug: "users", icon: Shield, color: "red" },
-  { label: "مراقبة المنافسين", href: "/competitors", slug: "competitors", icon: Radar, color: "rose" },
-  { label: "Maestro", href: "/maestro", slug: "maestro", icon: Flame, color: "amber" },
-  { label: "المظهر", href: "/appearance", slug: "appearance", icon: Palette, color: "violet" },
-  { label: "صحة القائد", href: "/leader-health", slug: "leader-health", icon: HeartPulse, color: "amber" },
+  { label: "الاجتماع الأسبوعي", href: "/weekly", slug: "weekly", icon: ClipboardList, color: "violet", group: "المتابعة" },
+  { label: "التجديدات", href: "/renewals", slug: "renewals", icon: RefreshCw, color: "sky", group: "المتابعة" },
+  { label: "تحسين التجديدات", href: "/renewal-boost", slug: "renewal-boost", icon: Zap, color: "amber", group: "المتابعة" },
+  { label: "معمل الاستعادة", href: "/recovery-lab", slug: "recovery-lab", icon: FlaskConical, color: "violet", group: "المتابعة" },
+  { label: "رضا العملاء", href: "/satisfaction", slug: "satisfaction", icon: Heart, color: "rose", group: "العملاء" },
+  { label: "قائمة الاستهداف", href: "/targeting", slug: "targeting", icon: Target, color: "fuchsia", group: "العملاء" },
+  { label: "بوكس الهدايا", href: "/gifts", slug: "gifts", icon: Gift, color: "amber", group: "العملاء" },
+  { label: "إدارة المهام", href: "/tasks", slug: "tasks", icon: ListTodo, color: "indigo", group: "المهام" },
+  { label: "مهامي", href: "/my-tasks", slug: "my-tasks", icon: UserCheck, color: "cyan", group: "المهام" },
+  { label: "التطويرات", href: "/development", slug: "development", icon: Code, color: "indigo", group: "الفريق والتطوير" },
+  { label: "الشراكات", href: "/partnerships", slug: "partnerships", icon: Handshake, color: "teal", group: "الفريق والتطوير" },
+  { label: "المسوقين", href: "/marketers", slug: "marketers", icon: Megaphone, color: "pink", group: "الفريق والتطوير" },
+  { label: "الفريق", href: "/team", slug: "team", icon: Users, color: "blue", group: "الفريق والتطوير" },
+  { label: "أكاديمية التعلم", href: "/learning-academy", slug: "learning-academy", icon: GraduationCap, color: "emerald", group: "الفريق والتطوير" },
+  { label: "الباقات", href: "/packages", slug: "packages", icon: Package, color: "violet", group: "النظام" },
+  { label: "الأكاديمية", href: "/academy", slug: "academy", icon: GraduationCap, color: "amber", group: "النظام" },
+  { label: "المالية", href: "/finance", slug: "finance", icon: Banknote, color: "lime", group: "النظام" },
+  { label: "رفع الملفات", href: "/upload", slug: "upload", icon: Upload, color: "slate", group: "النظام" },
+  { label: "الحوكمة", href: "/governance", slug: "governance", icon: ShieldCheck, color: "indigo", group: "النظام" },
+  { label: "إدارة المستخدمين", href: "/users", slug: "users", icon: Shield, color: "red", group: "النظام" },
+  { label: "مراقبة المنافسين", href: "/competitors", slug: "competitors", icon: Radar, color: "rose", group: "النظام" },
+  { label: "Maestro", href: "/maestro", slug: "maestro", icon: Flame, color: "amber", group: "النظام" },
+  { label: "المظهر", href: "/appearance", slug: "appearance", icon: Palette, color: "violet", group: "النظام" },
+  { label: "صحة القائد", href: "/leader-health", slug: "leader-health", icon: HeartPulse, color: "amber", group: "النظام" },
 ];
+
+const NAV_GROUPS = ["عام", "الإدارة التنفيذية", "المبيعات والدعم", "المتابعة", "العملاء", "المهام", "الفريق والتطوير", "النظام"];
 
 const COLOR_MAP: Record<string, { bg: string; text: string; ring: string; gradFrom: string; border: string; shadow: string; bar: string }> = {
   cyan:    { bg: "bg-cyan-500/15",    text: "text-cyan-400",    ring: "ring-cyan-500/20",    gradFrom: "from-cyan-500/[0.12]",    border: "border-cyan-500/[0.15]",    shadow: "shadow-[0_0_20px_rgba(0,212,255,0.08)]",   bar: "from-cyan-400 via-cyan-400 to-cyan-600" },
@@ -107,6 +110,11 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const { user, loading, signOut, activeOrgId, switchOrg, orgs } = useAuth();
   const [orgMenuOpen, setOrgMenuOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+
+  const toggleGroup = (group: string) => {
+    setCollapsedGroups((prev) => ({ ...prev, [group]: !prev[group] }));
+  };
 
   useEffect(() => {
     countPendingDeals().then(setPendingCount).catch(() => {});
@@ -229,44 +237,84 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 py-4 px-3 space-y-1.5 overflow-y-auto">
-          {visibleItems.map((item) => {
-            const isActive =
-              pathname === item.href ||
-              (item.href !== "/dashboard" && pathname.startsWith(item.href));
-            const Icon = item.icon;
-            const c = COLOR_MAP[item.color] || COLOR_MAP.cyan;
+        <nav className="flex-1 py-3 px-3 overflow-y-auto">
+          {NAV_GROUPS.map((group) => {
+            const groupItems = visibleItems.filter((item) => item.group === group);
+            if (groupItems.length === 0) return null;
+            const isCollapsed = collapsedGroups[group] ?? false;
+            const hasActiveItem = groupItems.some(
+              (item) => pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))
+            );
 
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={onClose}
-                className={cn(
-                  "group relative flex items-center gap-3.5 overflow-hidden rounded-[12px] px-3.5 py-3 text-[14px] transition-all duration-200",
-                  isActive
-                    ? `bg-gradient-to-l ${c.gradFrom} to-transparent text-foreground font-bold border ${c.border}`
-                    : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground border border-transparent"
-                )}
-              >
-                {isActive && (
-                  <span className={cn("absolute inset-y-2 right-0.5 w-[3px] rounded-full bg-gradient-to-b", c.bar)} />
-                )}
-                <span
+              <div key={group} className="mb-1">
+                <button
+                  onClick={() => toggleGroup(group)}
                   className={cn(
-                    "flex h-10 w-10 items-center justify-center rounded-[14px] transition-all duration-200",
-                    isActive ? `${c.bg} ${c.text} ring-1 ${c.ring}` : `bg-white/[0.05] ${c.text}/60 group-hover:${c.text} group-hover:bg-white/[0.10]`
+                    "w-full flex items-center gap-2 px-3 py-2 text-[12px] font-bold rounded-lg transition-colors",
+                    hasActiveItem && isCollapsed
+                      ? "text-cyan-400"
+                      : "text-muted-foreground/70 hover:text-muted-foreground"
                   )}
                 >
-                  <Icon className="w-5 h-5" />
-                </span>
-                <span className="flex-1 font-semibold">{item.label}</span>
-                {item.slug === "requests" && pendingCount > 0 && (
-                  <span className="min-w-[22px] h-[22px] flex items-center justify-center rounded-full bg-red-500 text-white text-[13px] font-bold px-1.5 animate-pulse">
-                    {pendingCount}
-                  </span>
-                )}
-              </Link>
+                  <ChevronLeft
+                    className={cn(
+                      "w-3.5 h-3.5 transition-transform duration-200",
+                      !isCollapsed && "-rotate-90"
+                    )}
+                  />
+                  <span>{group}</span>
+                  {isCollapsed && hasActiveItem && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 mr-auto" />
+                  )}
+                </button>
+                <div
+                  className={cn(
+                    "space-y-1 overflow-hidden transition-all duration-200",
+                    isCollapsed ? "max-h-0 opacity-0" : "max-h-[2000px] opacity-100"
+                  )}
+                >
+                  {groupItems.map((item) => {
+                    const isActive =
+                      pathname === item.href ||
+                      (item.href !== "/dashboard" && pathname.startsWith(item.href));
+                    const Icon = item.icon;
+                    const c = COLOR_MAP[item.color] || COLOR_MAP.cyan;
+
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={onClose}
+                        className={cn(
+                          "group relative flex items-center gap-3.5 overflow-hidden rounded-[12px] px-3.5 py-3 text-[14px] transition-all duration-200",
+                          isActive
+                            ? `bg-gradient-to-l ${c.gradFrom} to-transparent text-foreground font-bold border ${c.border}`
+                            : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground border border-transparent"
+                        )}
+                      >
+                        {isActive && (
+                          <span className={cn("absolute inset-y-2 right-0.5 w-[3px] rounded-full bg-gradient-to-b", c.bar)} />
+                        )}
+                        <span
+                          className={cn(
+                            "flex h-10 w-10 items-center justify-center rounded-[14px] transition-all duration-200",
+                            isActive ? `${c.bg} ${c.text} ring-1 ${c.ring}` : `bg-white/[0.05] ${c.text}/60 group-hover:${c.text} group-hover:bg-white/[0.10]`
+                          )}
+                        >
+                          <Icon className="w-5 h-5" />
+                        </span>
+                        <span className="flex-1 font-semibold">{item.label}</span>
+                        {item.slug === "requests" && pendingCount > 0 && (
+                          <span className="min-w-[22px] h-[22px] flex items-center justify-center rounded-full bg-red-500 text-white text-[13px] font-bold px-1.5 animate-pulse">
+                            {pendingCount}
+                          </span>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
             );
           })}
         </nav>
