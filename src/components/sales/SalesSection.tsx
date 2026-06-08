@@ -76,6 +76,7 @@ import {
   Bell,
   AlertTriangle,
   PhoneCall,
+  ChevronDown,
 } from "lucide-react";
 
 /* ─── Stage badge color mapping ─── */
@@ -235,6 +236,23 @@ export function SalesSection({ salesType }: SalesPageProps) {
       return saved ? new Set(JSON.parse(saved)) : new Set();
     } catch { return new Set(); }
   });
+
+  /* deals-table collapse — persisted per sales type */
+  const dealsTableKey = `sales_deals_table_open_${salesType}`;
+  const [dealsTableOpen, setDealsTableOpen] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    try {
+      const saved = localStorage.getItem(dealsTableKey);
+      return saved === null ? true : saved === "1";
+    } catch { return true; }
+  });
+  function toggleDealsTable() {
+    setDealsTableOpen((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(dealsTableKey, next ? "1" : "0"); } catch {}
+      return next;
+    });
+  }
 
   /* daily target selection — persisted per day in localStorage */
   const salesTodayKey = `sales_daily_target_${salesType}_${todayLocal()}`;
@@ -1481,7 +1499,22 @@ export function SalesSection({ salesType }: SalesPageProps) {
       })()}
 
       {/* ─── Deals Table ─── */}
-      <div id="sales-table" className="cc-card rounded-2xl overflow-x-auto">
+      <div id="sales-table" className="cc-card rounded-2xl overflow-hidden">
+        <button
+          type="button"
+          onClick={toggleDealsTable}
+          aria-expanded={dealsTableOpen}
+          aria-controls="sales-table-body"
+          className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-white/[0.03] transition-colors text-right"
+        >
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-bold text-foreground">قائمة الصفقات</h3>
+            <span className="text-[12px] text-muted-foreground">({filteredDeals.length})</span>
+          </div>
+          <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${dealsTableOpen ? "" : "-rotate-90"}`} />
+        </button>
+        {dealsTableOpen && (
+        <div id="sales-table-body" className="overflow-x-auto border-t border-border">
         <div className="p-4 pb-0 flex items-center gap-3">
           <Input
             value={clientSearch}
@@ -1689,6 +1722,8 @@ export function SalesSection({ salesType }: SalesPageProps) {
             )}
           </TableBody>
         </Table>
+        </div>
+        )}
       </div>
 
       {/* ─── Sales Team Performance ─── */}
