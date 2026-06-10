@@ -481,7 +481,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const repOnlyDeals = repFilter ? deals.filter((d) => d.assigned_rep_name === repFilter) : deals;
   const achievementItems = useMemo(() => repOnlyDeals.map(d => ({
     id: d.id,
-    updated_at: d.deal_date || d.created_at,
+    updated_at: d.updated_at,
     value: d.deal_value,
     isCompleted: d.stage === "مكتملة",
     isCancelled: d.stage === "مرفوض مع سبب" || d.stage === "كنسل التجربة",
