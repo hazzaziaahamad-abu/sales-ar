@@ -39,6 +39,7 @@ import {
   FlaskConical,
   HeartPulse,
   Briefcase,
+  BarChart2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
@@ -78,6 +79,7 @@ export const NAV_ITEMS = [
   { label: "Maestro", href: "/maestro", slug: "maestro", icon: Flame, color: "amber", group: "النظام" },
   { label: "المظهر", href: "/appearance", slug: "appearance", icon: Palette, color: "violet", group: "النظام" },
   { label: "صحة القائد", href: "/leader-health", slug: "leader-health", icon: HeartPulse, color: "amber", group: "النظام" },
+  { label: "تحليلات الزيارات", href: "/analytics", slug: "analytics", icon: BarChart2, color: "cyan", group: "النظام" },
 ];
 
 const NAV_GROUPS = ["عام", "الإدارة التنفيذية", "المبيعات والدعم", "المتابعة", "العملاء", "المهام", "الفريق والتطوير", "النظام"];

@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { fetchDeals, fetchSalesTargets, fetchSalesActivities, fetchTickets, fetchMentionNotifications, markMentionNotificationsRead, fetchRecentFollowUpNotes } from "@/lib/supabase/db";
 import type { AppNotification } from "@/types";
 import { CCThemeProvider } from "@/lib/theme-context";
+import { PageTracker } from "@/components/layout/page-tracker";
 
 const PAGE_SLUG_MAP: Record<string, string> = {
   "/dashboard": "dashboard",
@@ -280,6 +281,7 @@ export default function DashboardLayout({
     <AuthProvider>
     <TopbarProvider>
       <MentionNotifLoader onLoad={addNotifications} />
+      <PageTracker />
       <SaleCelebration />
       <WelcomePopup />
       <div className="min-h-screen bg-background panel-grid">

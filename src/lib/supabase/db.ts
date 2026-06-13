@@ -2809,3 +2809,34 @@ export async function createNewWeeklyMeeting(weekLabel: string, weekStart: strin
   if (error) throw error;
   return row as WeeklyMeetingRow;
 }
+
+// ─── PAGE VISITS ─────────────────────────────────────────────────────────────
+
+export async function logPageVisit(page: string, userName?: string): Promise<void> {
+  try {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from("page_visits").insert({
+      org_id: getOrgId(),
+      user_id: user.id,
+      user_name: userName || user.email,
+      page,
+    });
+  } catch {
+    // Never break the app
+  }
+}
+
+export async function fetchPageVisits(days = 30): Promise<{ page: string; user_name: string; visited_at: string }[]> {
+  const supabase = createClient();
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const { data } = await supabase
+    .from("page_visits")
+    .select("page, user_name, visited_at")
+    .eq("org_id", getOrgId())
+    .gte("visited_at", since)
+    .order("visited_at", { ascending: false });
+  return (data || []) as { page: string; user_name: string; visited_at: string }[];
+}
+
