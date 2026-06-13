@@ -1,6 +1,6 @@
 import { createClient } from "./client";
 import { todayLocal } from "@/lib/utils/format";
-import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, MonthlyBudget, StartupCost, Marketer, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating, FollowUpNote, MentionNotification, PendingDeal, TargetClient, GiftOffer, EmployeeTask, Package, AcademyContent, LearningStage, LearningLesson, LearningQuiz, ActivityLog, TrainingKnowledge, ProductFeature, TrainingSessionLog } from "@/types";
+import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, MonthlyBudget, StartupCost, Marketer, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating, FollowUpNote, MentionNotification, PendingDeal, TargetClient, GiftOffer, EmployeeTask, Package, AcademyContent, LearningStage, LearningLesson, LearningQuiz, ActivityLog, TrainingKnowledge, ProductFeature, TrainingSessionLog, MarketingPlan, PlanAxis, PlanIdea } from "@/types";
 
 const DEFAULT_ORG = "00000000-0000-0000-0000-000000000001";
 
@@ -2840,3 +2840,149 @@ export async function fetchPageVisits(days = 30): Promise<{ page: string; user_n
   return (data || []) as { page: string; user_name: string; visited_at: string }[];
 }
 
+// ─── MARKETING PLANS ─────────────────────────────────────────────────────────
+
+export async function fetchMarketingPlans(): Promise<MarketingPlan[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("marketing_plans")
+    .select("*")
+    .eq("org_id", getOrgId())
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as MarketingPlan[];
+}
+
+export async function fetchMarketingPlan(id: string): Promise<MarketingPlan> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from("marketing_plans").select("*").eq("id", id).single();
+  if (error) throw error;
+  return data as MarketingPlan;
+}
+
+export async function createMarketingPlan(plan: Partial<MarketingPlan>): Promise<MarketingPlan> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("marketing_plans")
+    .insert({ ...plan, org_id: getOrgId() })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as MarketingPlan;
+}
+
+export async function updateMarketingPlan(id: string, updates: Partial<MarketingPlan>): Promise<MarketingPlan> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("marketing_plans")
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as MarketingPlan;
+}
+
+export async function deleteMarketingPlan(id: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from("marketing_plans").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function fetchPlanAxes(planId: string): Promise<PlanAxis[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("plan_axes")
+    .select("*")
+    .eq("plan_id", planId)
+    .order("sort_order", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as PlanAxis[];
+}
+
+export async function createPlanAxis(axis: Partial<PlanAxis>): Promise<PlanAxis> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from("plan_axes").insert(axis).select().single();
+  if (error) throw error;
+  return data as PlanAxis;
+}
+
+export async function updatePlanAxis(id: string, updates: Partial<PlanAxis>): Promise<PlanAxis> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from("plan_axes").update(updates).eq("id", id).select().single();
+  if (error) throw error;
+  return data as PlanAxis;
+}
+
+export async function deletePlanAxis(id: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from("plan_axes").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function fetchPlanIdeas(planId: string): Promise<PlanIdea[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("plan_ideas")
+    .select("*")
+    .eq("plan_id", planId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as PlanIdea[];
+}
+
+export async function createPlanIdea(idea: Partial<PlanIdea>): Promise<PlanIdea> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from("plan_ideas").insert(idea).select().single();
+  if (error) throw error;
+  return data as PlanIdea;
+}
+
+export async function updatePlanIdea(id: string, updates: Partial<PlanIdea>): Promise<PlanIdea> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from("plan_ideas").update(updates).eq("id", id).select().single();
+  if (error) throw error;
+  return data as PlanIdea;
+}
+
+export async function deletePlanIdea(id: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from("plan_ideas").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function convertIdeaToTask(idea: PlanIdea, assignedTo: string, assignedToName: string, assignedByName: string, clientName: string, dueDate: string): Promise<EmployeeTask> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("employee_tasks")
+    .insert({
+      org_id: getOrgId(),
+      title: idea.title,
+      description: idea.description || "",
+      task_type: "general",
+      priority: "medium",
+      status: "pending",
+      assigned_to: assignedTo,
+      assigned_to_name: assignedToName,
+      assigned_by_name: assignedByName,
+      client_name: clientName,
+      due_date: dueDate,
+      source_plan_idea_id: idea.id,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  await supabase.from("plan_ideas").update({ status: "converted" }).eq("id", idea.id);
+  return data as EmployeeTask;
+}
+
+export async function fetchTasksByIdeaIds(ideaIds: string[]): Promise<EmployeeTask[]> {
+  if (ideaIds.length === 0) return [];
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("employee_tasks")
+    .select("*")
+    .in("source_plan_idea_id", ideaIds);
+  if (error) throw error;
+  return (data ?? []) as EmployeeTask[];
+}

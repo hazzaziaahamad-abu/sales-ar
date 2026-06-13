@@ -79,6 +79,7 @@ export const NAV_ITEMS = [
   { label: "Maestro", href: "/maestro", slug: "maestro", icon: Flame, color: "amber", group: "النظام" },
   { label: "المظهر", href: "/appearance", slug: "appearance", icon: Palette, color: "violet", group: "النظام" },
   { label: "صحة القائد", href: "/leader-health", slug: "leader-health", icon: HeartPulse, color: "amber", group: "النظام" },
+  { label: "الخطط التسويقية", href: "/marketing-plans", slug: "marketing-plans", icon: Megaphone, color: "violet", group: "المبيعات والدعم" },
   { label: "تحليلات الزيارات", href: "/analytics", slug: "analytics", icon: BarChart2, color: "cyan", group: "النظام" },
 ];
 

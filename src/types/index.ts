@@ -521,8 +521,46 @@ export interface EmployeeTask {
   time_estimate?: number;
   time_started_at?: string;
   time_spent_minutes?: number;
+  source_plan_idea_id?: string;
   created_at: string;
   updated_at: string;
+}
+
+// ─── MARKETING PLANS ─────────────────────────────────────────────────────────
+
+export interface MarketingPlan {
+  id: string;
+  org_id: string;
+  title: string;
+  segment: string;
+  related_product?: string;
+  objective?: string;
+  market_notes?: string;
+  start_date?: string;
+  end_date?: string;
+  status: "draft" | "in_progress" | "done" | "archived";
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlanAxis {
+  id: string;
+  plan_id: string;
+  title: string;
+  description?: string;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface PlanIdea {
+  id: string;
+  plan_id: string;
+  axis_id?: string;
+  content_type: "story" | "video" | "post" | "whatsapp" | "gift_card" | "other";
+  title: string;
+  description?: string;
+  status: "idea" | "converted" | "done";
+  created_at: string;
 }
 
 export interface GiftOffer {
