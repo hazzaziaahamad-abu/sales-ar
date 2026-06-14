@@ -2986,3 +2986,110 @@ export async function fetchTasksByIdeaIds(ideaIds: string[]): Promise<EmployeeTa
   if (error) throw error;
   return (data ?? []) as EmployeeTask[];
 }
+
+// ─── SALES KPI / LEADS ──────────────────────────────────────────────────────
+
+export interface SalesLead {
+  id: string;
+  org_id: string;
+  client_name: string;
+  phone?: string;
+  source: string;
+  status: string;
+  product?: string;
+  package_name?: string;
+  deal_value: number;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+  stages?: SalesLeadStage[];
+}
+
+export interface SalesLeadStage {
+  id: string;
+  lead_id: string;
+  stage_number: number;
+  stage_name: string;
+  stage_weight: number;
+  assigned_to?: string;
+  assigned_name?: string;
+  completed_at?: string;
+  notes?: string;
+  created_at: string;
+}
+
+export async function fetchSalesLeads(): Promise<SalesLead[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("sales_leads")
+    .select("*, stages:sales_lead_stages(*)")
+    .eq("org_id", getOrgId())
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as SalesLead[];
+}
+
+export async function createSalesLead(lead: Partial<SalesLead>): Promise<SalesLead> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("sales_leads")
+    .insert({ ...lead, org_id: getOrgId() })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as SalesLead;
+}
+
+export async function updateSalesLead(id: string, updates: Partial<SalesLead>): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("sales_leads")
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteSalesLead(id: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from("sales_leads").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function fetchLeadStages(leadId: string): Promise<SalesLeadStage[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("sales_lead_stages")
+    .select("*")
+    .eq("lead_id", leadId)
+    .order("stage_number", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as SalesLeadStage[];
+}
+
+export async function upsertLeadStage(leadId: string, stageNumber: number, stageName: string, stageWeight: number, assignedTo: string, assignedName: string): Promise<void> {
+  const supabase = createClient();
+  const { data: existing } = await supabase
+    .from("sales_lead_stages")
+    .select("id")
+    .eq("lead_id", leadId)
+    .eq("stage_number", stageNumber)
+    .maybeSingle();
+
+  if (existing) {
+    await supabase.from("sales_lead_stages").update({
+      assigned_to: assignedTo,
+      assigned_name: assignedName,
+      completed_at: new Date().toISOString(),
+    }).eq("id", existing.id);
+  } else {
+    await supabase.from("sales_lead_stages").insert({
+      lead_id: leadId,
+      stage_number: stageNumber,
+      stage_name: stageName,
+      stage_weight: stageWeight,
+      assigned_to: assignedTo,
+      assigned_name: assignedName,
+      completed_at: new Date().toISOString(),
+    });
+  }
+}
