@@ -9,6 +9,7 @@ import {
   Users, Banknote, BarChart3, Phone, ArrowLeft, ArrowRight,
   MessageCircle, Bell, ExternalLink, Zap, CloudSun, Thermometer,
   Headphones, UserX, Timer, Share2, LogIn, Smartphone, Monitor, Activity,
+  Copy, Image,
 } from "lucide-react";
 import { fetchDeals, fetchRenewals, fetchEmployees, fetchRecentFollowUpNotes, upsertSalesGuideSetting, fetchSalesGuideSettings, fetchTickets, fetchUserLoginLogs, fetchActivityLogs, type UserLoginLog } from "@/lib/supabase/db";
 import type { ActivityLog } from "@/types";
@@ -302,6 +303,63 @@ async function shareText(title: string, text: string): Promise<void> {
   } catch {
     alert("تعذرت المشاركة — يرجى المحاولة يدويًا.");
   }
+}
+
+function copyText(text: string) {
+  navigator.clipboard.writeText(text);
+}
+
+function shareWhatsApp(text: string) {
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+}
+
+async function shareAsImage(ref: React.RefObject<HTMLElement | null>) {
+  if (!ref.current) return;
+  try {
+    const { toPng } = await import("html-to-image");
+    const dataUrl = await toPng(ref.current, {
+      backgroundColor: "#0c0e14",
+      pixelRatio: 2,
+      style: { padding: "16px", borderRadius: "16px" },
+    });
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    const file = new File([blob], "deals-report.png", { type: "image/png" });
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ title: "تقرير الصفقات", files: [file] });
+    } else {
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      alert("تم نسخ الصورة!");
+    }
+  } catch { /* ignore */ }
+}
+
+function ShareActions({ text, color, sectionRef }: { text: string; color: string; sectionRef: React.RefObject<HTMLElement | null> }) {
+  const [copied, setCopied] = useState(false);
+  const colors: Record<string, string> = {
+    orange: "bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border-orange-500/20",
+    amber: "bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-400/20",
+    blue: "bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border-blue-500/20",
+  };
+  const cls = colors[color] || colors.orange;
+  return (
+    <div className="flex items-center gap-1">
+      <button onClick={() => shareWhatsApp(text)} className={`flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-md border transition-colors ${cls}`} title="واتساب">
+        <Share2 className="w-3 h-3" />
+      </button>
+      <button
+        onClick={() => { copyText(text); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
+        className={`flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-md border transition-colors ${cls}`}
+        title="نسخ"
+      >
+        <Copy className="w-3 h-3" />
+        {copied && <span className="text-[10px]">✓</span>}
+      </button>
+      <button onClick={() => shareAsImage(sectionRef)} className={`flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-md border transition-colors ${cls}`} title="صورة">
+        <Image className="w-3 h-3" />
+      </button>
+    </div>
+  );
 }
 
 /* ─── DealRow: compact deal card with quick actions ─── */
@@ -624,6 +682,33 @@ export default function SecretaryPage() {
       .sort((a, b) => b.deal.cycle_days - a.deal.cycle_days),
     [dealsWithIntel]
   );
+
+  const hotColdRef = useRef<HTMLDivElement>(null);
+  const [hotColdCopied, setHotColdCopied] = useState(false);
+
+  const buildAllDealsReport = useCallback(() => {
+    const today = new Date().toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    let msg = `📊 *تقرير الصفقات الساخنة والباردة*\n📅 ${today}\n${"─".repeat(30)}\n`;
+    msg += `🔥 ساخنة: ${hotDeals.length} | 🌤 دافئة: ${warmDeals.length} | ❄️ باردة: ${coldDeals.length}\n\n`;
+
+    const addSection = (items: typeof hotDeals, emoji: string, title: string) => {
+      if (items.length === 0) return;
+      msg += `── ${emoji} *${title}* ──\n`;
+      items.forEach(({ deal: d, intel }, i) => {
+        const last = intel.daysSinceActivity === 0 ? "اليوم" : intel.daysSinceActivity === 1 ? "أمس" : `قبل ${intel.daysSinceActivity} يوم`;
+        msg += `${i + 1}. *${d.client_name}*`;
+        if (d.assigned_rep_name) msg += ` — ${d.assigned_rep_name}`;
+        msg += `\n   ${d.stage} • ${formatMoneyFull(d.deal_value)} • آخر تفاعل ${last}`;
+        msg += `\n   ↪ ${intel.nextStep}\n`;
+      });
+      msg += `\n`;
+    };
+
+    addSection(hotDeals, "🔥", "ساخنة — قريبة من الإغلاق");
+    addSection(warmDeals, "🌤", "دافئة — قابلة للإحياء");
+    addSection(coldDeals, "❄️", "باردة / راكدة");
+    return msg;
+  }, [hotDeals, warmDeals, coldDeals]);
   const ownerAttention = useMemo(
     () => dealsWithIntel
       .filter(x => x.intel.needsAttention)
@@ -1470,6 +1555,31 @@ export default function SecretaryPage() {
       >
         {loading ? <Skeleton className="h-32 rounded-xl" /> : (
           <div className="space-y-5">
+            {/* Share all deals buttons */}
+            {(hotDeals.length > 0 || warmDeals.length > 0 || coldDeals.length > 0) && (
+              <div className="flex flex-wrap gap-2 justify-end">
+                <button
+                  onClick={() => shareAsImage(hotColdRef)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-medium bg-violet-500/15 text-violet-400 border border-violet-500/30 hover:bg-violet-500/25 transition-colors"
+                >
+                  <Image className="w-3.5 h-3.5" /> مشاركة كصورة
+                </button>
+                <button
+                  onClick={() => { copyText(buildAllDealsReport()); setHotColdCopied(true); setTimeout(() => setHotColdCopied(false), 2000); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-medium bg-white/[0.06] text-muted-foreground border border-border hover:bg-white/[0.10] transition-colors"
+                >
+                  <Copy className="w-3.5 h-3.5" /> {hotColdCopied ? "تم النسخ!" : "نسخ"}
+                </button>
+                <button
+                  onClick={() => shareWhatsApp(buildAllDealsReport())}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-medium bg-green-500/15 text-green-400 border border-green-500/30 hover:bg-green-500/25 transition-colors"
+                >
+                  <Share2 className="w-3.5 h-3.5" /> واتساب
+                </button>
+              </div>
+            )}
+
+            <div ref={hotColdRef} className="space-y-5">
             {/* Owner Attention Banner */}
             {(ownerAttention.length > 0 || repEscalation.length > 0) && (
               <div className="rounded-xl bg-gradient-to-l from-red-500/10 to-orange-500/5 border border-red-500/25 p-3">
@@ -1574,6 +1684,7 @@ export default function SecretaryPage() {
                 </div>
               )}
             </div>
+          </div>
           </div>
         )}
       </Section>
