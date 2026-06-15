@@ -522,7 +522,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const totalPages = Math.max(1, Math.ceil(filteredDeals.length / DEALS_PER_PAGE));
   const paginatedDeals = filteredDeals.slice((currentPage - 1) * DEALS_PER_PAGE, currentPage * DEALS_PER_PAGE);
 
-  useEffect(() => { setCurrentPage(1); }, [clientSearch, stageFilter, achieveFilter, selectedRep]);
+  useEffect(() => { setCurrentPage(1); }, [clientSearch, stageFilter, achieveFilter, repFilter]);
 
   useEffect(() => {
     setLoading(true);
