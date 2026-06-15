@@ -57,6 +57,35 @@ function ConfettiPiece({ index }: { index: number }) {
   );
 }
 
+function playBellSound() {
+  try {
+    const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+
+    const strikes = [
+      { freq: 830, time: 0 },
+      { freq: 1046, time: 0.15 },
+      { freq: 1318, time: 0.3 },
+    ];
+
+    strikes.forEach(({ freq, time }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + time);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime + time);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + time + 1.2);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + time);
+      osc.stop(ctx.currentTime + time + 1.2);
+    });
+
+    setTimeout(() => ctx.close(), 3000);
+  } catch {
+    // Audio not supported
+  }
+}
+
 export function SaleCelebration() {
   const [event, setEvent] = useState<CelebrationEvent | null>(null);
   const [visible, setVisible] = useState(false);
@@ -71,6 +100,7 @@ export function SaleCelebration() {
       processedRef.current = new Set(arr.slice(-25));
     }
 
+    playBellSound();
     setEvent(e);
     setVisible(true);
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -217,7 +247,7 @@ export function SaleCelebration() {
           </div>
 
           <div className="relative rounded-2xl border-2 border-yellow-400/40 bg-gradient-to-b from-yellow-400/10 via-background/95 to-background/95 backdrop-blur-xl p-6 text-center shadow-2xl shadow-yellow-400/10">
-            <div className="text-5xl mb-3">🎉</div>
+            <div className="text-5xl mb-3">🔔🎉</div>
             <p className="text-lg font-bold text-yellow-400 mb-1">
               بيعة جديدة!
             </p>
