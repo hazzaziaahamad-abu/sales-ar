@@ -60,6 +60,7 @@ import {
   Zap,
   Rocket,
   Shield,
+  Search,
 } from "lucide-react";
 
 const CLOSED_FOREVER_REASONS = new Set([
@@ -1079,6 +1080,7 @@ export default function RecoveryLabPage() {
     "all"
   );
   const [sortKey, setSortKey] = useState<"score" | "value" | "recent">("score");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [activeRenewal, setActiveRenewal] = useState<Renewal | null>(null);
   const [draftExperiment, setDraftExperiment] = useState<ExperimentKey | "">("");
@@ -1236,13 +1238,17 @@ export default function RecoveryLabPage() {
     else if (scoreBand === "warm")
       list = list.filter((e) => e.score >= 40 && e.score < 70);
     else if (scoreBand === "cold") list = list.filter((e) => e.score < 40);
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      list = list.filter((e) => e.customer_name.toLowerCase().includes(q) || (e.customer_phone && e.customer_phone.replace(/\s+/g, "").includes(q.replace(/\s+/g, ""))));
+    }
 
     if (sortKey === "score") list.sort((a, b) => b.score - a.score);
     else if (sortKey === "value")
       list.sort((a, b) => (b.plan_price || 0) - (a.plan_price || 0));
     else list.sort((a, b) => a.days - b.days);
     return list;
-  }, [enriched, stageFilter, reasonFilter, scoreBand, sortKey]);
+  }, [enriched, stageFilter, reasonFilter, scoreBand, sortKey, searchQuery]);
 
   const goldenList = useMemo(
     () =>
@@ -2043,6 +2049,15 @@ export default function RecoveryLabPage() {
             );
           })}
           <div className="flex-1" />
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="ابحث باسم العميل أو الجوال..."
+              className="h-7 text-[13px] w-44 rounded-lg bg-white/[0.06] border border-border pr-8 pl-2.5 py-1 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-cyan/50"
+            />
+          </div>
           <Select value={sortKey} onValueChange={(v) => setSortKey(v as typeof sortKey)}>
             <SelectTrigger className="h-7 text-[13px] w-36">
               <SelectValue />
