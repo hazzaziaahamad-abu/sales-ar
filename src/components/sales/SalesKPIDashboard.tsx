@@ -491,9 +491,8 @@ function AddLeadModal({ onClose }: { onClose: () => void }) {
             <div>
               <label className="text-xs font-semibold text-muted-foreground block mb-1">المنتج</label>
               <select value={form.product} onChange={(e) => setForm({ ...form, product: e.target.value })} className="w-full rounded-lg bg-white/[0.06] border border-border px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-orange-500/50">
-                <option value="menu">MENU</option>
-                <option value="nahjez">نحجز</option>
-                <option value="daraa">درع</option>
+                <option value="menu">المنيو</option>
+                <option value="cashier">الكاشير</option>
               </select>
             </div>
           </div>
