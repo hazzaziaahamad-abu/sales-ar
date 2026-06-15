@@ -347,6 +347,34 @@ export default function SupportPage() {
     setCopiedTickets(true);
     setTimeout(() => setCopiedTickets(false), 2000);
   }
+
+  const statusCardsRef = useRef<HTMLDivElement>(null);
+  const [isCardsExporting, setIsCardsExporting] = useState(false);
+
+  async function shareStatusCardsAsImage() {
+    if (!statusCardsRef.current || isCardsExporting) return;
+    setIsCardsExporting(true);
+    try {
+      const { toPng } = await import("html-to-image");
+      const dataUrl = await toPng(statusCardsRef.current, {
+        backgroundColor: "#0c0e14",
+        pixelRatio: 2,
+        style: { padding: "16px", borderRadius: "16px" },
+      });
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const file = new File([blob], "support-status.png", { type: "image/png" });
+
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ title: "حالة تذاكر الدعم", files: [file] });
+      } else {
+        await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+        setCopiedTickets(true);
+        setTimeout(() => setCopiedTickets(false), 2000);
+      }
+    } catch { /* ignore */ }
+    setIsCardsExporting(false);
+  }
   const countUrgent = agentFilteredTickets.filter((t) => t.priority === "عاجل").length;
   const countProblems = agentFilteredTickets.filter((t) => (t.request_type || "problem") === "problem").length;
   const countServices = agentFilteredTickets.filter((t) => t.request_type === "service").length;
@@ -719,7 +747,15 @@ export default function SupportPage() {
 
       {/* -------- Status Cards -------- */}
       {!loading && (countOpen > 0 || countInProgress > 0) && (
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-2 flex-wrap">
+          <button
+            onClick={shareStatusCardsAsImage}
+            disabled={isCardsExporting}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-violet-500/15 text-violet-400 border border-violet-500/30 hover:bg-violet-500/25 transition-colors disabled:opacity-50"
+          >
+            <Download className="w-3.5 h-3.5" />
+            {isCardsExporting ? "جاري التصوير..." : "مشاركة كصورة"}
+          </button>
           <button
             onClick={copyOpenTicketsReport}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-white/[0.06] text-muted-foreground border border-border hover:bg-white/[0.10] transition-colors"
@@ -736,7 +772,7 @@ export default function SupportPage() {
           </button>
         </div>
       )}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div ref={statusCardsRef} className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {loading ? (
           Array.from({ length: 4 }).map((_, index) => <SupportStatSkeleton key={index} />)
         ) : (
