@@ -301,10 +301,9 @@ export default function SupportPage() {
   const countInProgress = inProgressTickets.length;
   const countResolved = agentFilteredTickets.filter((t) => t.status === "محلول").length;
 
-  function shareOpenTicketsWhatsApp() {
-    const pending = [...openTickets, ...inProgressTickets];
-    if (pending.length === 0) return;
+  const [copiedTickets, setCopiedTickets] = useState(false);
 
+  function buildOpenTicketsReport() {
     const today = new Date().toLocaleDateString("ar-SA", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
     let msg = `📋 *تقرير التذاكر المفتوحة*\n📅 ${today}\n${"─".repeat(25)}\n\n`;
     msg += `🔴 مفتوحة: ${countOpen}\n🟡 قيد الحل: ${countInProgress}\n\n`;
@@ -333,9 +332,20 @@ export default function SupportPage() {
         msg += `\n`;
       });
     }
+    return msg;
+  }
 
-    const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+  function shareOpenTicketsWhatsApp() {
+    if (countOpen + countInProgress === 0) return;
+    const url = `https://wa.me/?text=${encodeURIComponent(buildOpenTicketsReport())}`;
     window.open(url, "_blank");
+  }
+
+  function copyOpenTicketsReport() {
+    if (countOpen + countInProgress === 0) return;
+    navigator.clipboard.writeText(buildOpenTicketsReport());
+    setCopiedTickets(true);
+    setTimeout(() => setCopiedTickets(false), 2000);
   }
   const countUrgent = agentFilteredTickets.filter((t) => t.priority === "عاجل").length;
   const countProblems = agentFilteredTickets.filter((t) => (t.request_type || "problem") === "problem").length;
@@ -709,13 +719,20 @@ export default function SupportPage() {
 
       {/* -------- Status Cards -------- */}
       {!loading && (countOpen > 0 || countInProgress > 0) && (
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={copyOpenTicketsReport}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-white/[0.06] text-muted-foreground border border-border hover:bg-white/[0.10] transition-colors"
+          >
+            <Download className="w-3.5 h-3.5" />
+            {copiedTickets ? "تم النسخ!" : "نسخ التقرير"}
+          </button>
           <button
             onClick={shareOpenTicketsWhatsApp}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-green-500/15 text-green-400 border border-green-500/30 hover:bg-green-500/25 transition-colors"
           >
             <Share2 className="w-3.5 h-3.5" />
-            مشاركة المفتوحة عبر واتساب ({countOpen + countInProgress})
+            واتساب ({countOpen + countInProgress})
           </button>
         </div>
       )}
