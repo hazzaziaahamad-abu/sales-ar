@@ -80,10 +80,9 @@ function SaleRow({ sale }: { sale: LastSaleInfo }) {
       <div className="flex items-center gap-2 min-w-0 flex-1">
         <Trophy className={`w-4 h-4 ${iconColor} shrink-0`} />
         <div className="flex items-center gap-1.5 flex-wrap text-xs min-w-0">
-          <span className="text-muted-foreground shrink-0">آخر مبيعة:</span>
+          <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-white/[0.08] text-muted-foreground shrink-0 font-medium">{TYPE_LABEL[sale.type]}</span>
           <span className="font-bold text-foreground truncate max-w-[80px] sm:max-w-none">{sale.clientName}</span>
           <span className={`font-bold ${textColor} shrink-0`}>{formatMoney(sale.value)}</span>
-          <span className="text-[11px] sm:text-[12px] px-1.5 py-0.5 rounded-full bg-white/[0.06] text-muted-foreground shrink-0 hidden sm:inline">{TYPE_LABEL[sale.type]}</span>
         </div>
       </div>
       <div className="flex items-center gap-1 shrink-0">
