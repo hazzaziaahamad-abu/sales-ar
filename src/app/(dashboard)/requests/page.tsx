@@ -15,9 +15,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { CheckCircle, XCircle, Clock, Inbox, Copy, ExternalLink, BarChart2 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import SalesKPIDashboard from "@/components/sales/SalesKPIDashboard";
+import { CheckCircle, XCircle, Clock, Inbox, Copy, ExternalLink } from "lucide-react";
 
 export default function RequestsPage() {
   const { activeOrgId: orgId, user: authUser } = useAuth();
@@ -25,7 +23,6 @@ export default function RequestsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"pending" | "approved" | "rejected" | "all">("pending");
   const [processing, setProcessing] = useState<string | null>(null);
-  const [mainTab, setMainTab] = useState<"requests" | "kpi">("requests");
 
   /* Detail modal */
   const [detailDeal, setDetailDeal] = useState<PendingDeal | null>(null);
@@ -91,167 +88,133 @@ export default function RequestsPage() {
         </div>
 
         {/* Copy submission link */}
-        {mainTab === "requests" && (
-          <div className="flex items-center gap-2 overflow-hidden">
-            <div className="flex items-center gap-1.5 px-3 py-2 rounded-[14px] bg-white/[0.04] border border-white/[0.08] text-xs text-muted-foreground min-w-0 flex-1 sm:flex-initial sm:max-w-[300px]">
-              <ExternalLink className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate" dir="ltr">{submitLink}</span>
-            </div>
-            <Button variant="outline" size="sm" onClick={copyLink} className="gap-1.5 shrink-0">
-              <Copy className="w-3.5 h-3.5" />
-              {copied ? "تم النسخ!" : "نسخ الرابط"}
-            </Button>
+        <div className="flex items-center gap-2 overflow-hidden">
+          <div className="flex items-center gap-1.5 px-3 py-2 rounded-[14px] bg-white/[0.04] border border-white/[0.08] text-xs text-muted-foreground min-w-0 flex-1 sm:flex-initial sm:max-w-[300px]">
+            <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate" dir="ltr">{submitLink}</span>
           </div>
-        )}
+          <Button variant="outline" size="sm" onClick={copyLink} className="gap-1.5 shrink-0">
+            <Copy className="w-3.5 h-3.5" />
+            {copied ? "تم النسخ!" : "نسخ الرابط"}
+          </Button>
+        </div>
       </div>
 
-      {/* Main Tabs: Requests vs KPI */}
-      <div className="flex gap-1 p-1 rounded-xl bg-white/[0.04] w-fit">
-        <button
-          onClick={() => setMainTab("requests")}
-          className={cn(
-            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors",
-            mainTab === "requests" ? "bg-violet-500/20 text-violet-400" : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          <Inbox className="w-4 h-4" />
-          الطلبات
-        </button>
-        <button
-          onClick={() => setMainTab("kpi")}
-          className={cn(
-            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors",
-            mainTab === "kpi" ? "bg-orange-500/20 text-orange-400" : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          <BarChart2 className="w-4 h-4" />
-          KPI مبيعات الدعم
-        </button>
+      {/* Filter tabs */}
+      <div className="flex flex-wrap gap-2">
+        {([
+          { key: "pending", label: "معلّقة", icon: <Clock className="w-3.5 h-3.5" />, color: "amber" },
+          { key: "approved", label: "مقبولة", icon: <CheckCircle className="w-3.5 h-3.5" />, color: "green" },
+          { key: "rejected", label: "مرفوضة", icon: <XCircle className="w-3.5 h-3.5" />, color: "red" },
+          { key: "all", label: "الكل", icon: <Inbox className="w-3.5 h-3.5" />, color: "cyan" },
+        ] as const).map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setFilter(tab.key)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-[14px] text-xs font-medium transition-all ${
+              filter === tab.key
+                ? `bg-${tab.color}-500/15 text-${tab.color}-400 ring-1 ring-${tab.color}-500/30`
+                : "bg-white/[0.04] text-muted-foreground hover:bg-white/[0.07]"
+            }`}
+          >
+            {tab.icon}
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {/* KPI Tab */}
-      {mainTab === "kpi" && <SalesKPIDashboard />}
-
-      {/* Requests Tab */}
-      {mainTab === "requests" && (
-        <>
-          {/* Filter tabs */}
-          <div className="flex flex-wrap gap-2">
-            {([
-              { key: "pending", label: "معلّقة", icon: <Clock className="w-3.5 h-3.5" />, color: "amber" },
-              { key: "approved", label: "مقبولة", icon: <CheckCircle className="w-3.5 h-3.5" />, color: "green" },
-              { key: "rejected", label: "مرفوضة", icon: <XCircle className="w-3.5 h-3.5" />, color: "red" },
-              { key: "all", label: "الكل", icon: <Inbox className="w-3.5 h-3.5" />, color: "cyan" },
-            ] as const).map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setFilter(tab.key)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-[14px] text-xs font-medium transition-all ${
-                  filter === tab.key
-                    ? `bg-${tab.color}-500/15 text-${tab.color}-400 ring-1 ring-${tab.color}-500/30`
-                    : "bg-white/[0.04] text-muted-foreground hover:bg-white/[0.07]"
-                }`}
-              >
-                {tab.icon}
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Cards */}
-          {loading ? (
-            <div className="grid gap-3">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="cc-card rounded-[14px] p-5">
-                  <div className="flex items-center gap-3">
-                    <Skeleton className="w-10 h-10 rounded-lg" />
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-3 w-48" />
-                    </div>
-                    <Skeleton className="h-8 w-20 rounded-lg" />
-                  </div>
+      {/* Cards */}
+      {loading ? (
+        <div className="grid gap-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="cc-card rounded-[14px] p-5">
+              <div className="flex items-center gap-3">
+                <Skeleton className="w-10 h-10 rounded-lg" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-48" />
                 </div>
-              ))}
-            </div>
-          ) : deals.length === 0 ? (
-            <div className="cc-card rounded-2xl p-12 text-center">
-              <div className="w-16 h-16 mx-auto rounded-2xl bg-violet-500/10 flex items-center justify-center mb-4">
-                <Inbox className="w-8 h-8 text-violet-400/50" />
+                <Skeleton className="h-8 w-20 rounded-lg" />
               </div>
-              <h3 className="text-sm font-bold text-foreground">لا توجد طلبات {filter === "pending" ? "معلّقة" : ""}</h3>
-              <p className="text-xs text-muted-foreground mt-1">شارك رابط النموذج ليتمكن الفريق من إرسال طلبات جديدة</p>
             </div>
-          ) : (
-            <div className="grid gap-3">
-              {deals.map((deal) => {
-                const isPending = deal.status === "pending";
-                const isApproved = deal.status === "approved";
-                const statusColors = isPending ? "border-amber-500/20 bg-amber-500/[0.03]" : isApproved ? "border-emerald-500/20 bg-emerald-500/[0.03]" : "border-red-500/20 bg-red-500/[0.03]";
-                const statusBadge = isPending
-                  ? { text: "معلّقة", color: "bg-amber-500/15 text-amber-400" }
-                  : isApproved
-                  ? { text: "مقبولة", color: "bg-emerald-500/15 text-emerald-400" }
-                  : { text: "مرفوضة", color: "bg-red-500/15 text-red-400" };
+          ))}
+        </div>
+      ) : deals.length === 0 ? (
+        <div className="cc-card rounded-2xl p-12 text-center">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-violet-500/10 flex items-center justify-center mb-4">
+            <Inbox className="w-8 h-8 text-violet-400/50" />
+          </div>
+          <h3 className="text-sm font-bold text-foreground">لا توجد طلبات {filter === "pending" ? "معلّقة" : ""}</h3>
+          <p className="text-xs text-muted-foreground mt-1">شارك رابط النموذج ليتمكن الفريق من إرسال طلبات جديدة</p>
+        </div>
+      ) : (
+        <div className="grid gap-3">
+          {deals.map((deal) => {
+            const isPending = deal.status === "pending";
+            const isApproved = deal.status === "approved";
+            const statusColors = isPending ? "border-amber-500/20 bg-amber-500/[0.03]" : isApproved ? "border-emerald-500/20 bg-emerald-500/[0.03]" : "border-red-500/20 bg-red-500/[0.03]";
+            const statusBadge = isPending
+              ? { text: "معلّقة", color: "bg-amber-500/15 text-amber-400" }
+              : isApproved
+              ? { text: "مقبولة", color: "bg-emerald-500/15 text-emerald-400" }
+              : { text: "مرفوضة", color: "bg-red-500/15 text-red-400" };
 
-                return (
-                  <div
-                    key={deal.id}
-                    onClick={() => setDetailDeal(deal)}
-                    className={`cc-card rounded-[14px] p-5 border cursor-pointer hover:border-white/20 transition-all ${statusColors}`}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold ${
-                        deal.sales_type === "support" ? "bg-orange-500/15 text-orange-400" : "bg-emerald-500/15 text-emerald-400"
-                      }`}>
-                        {deal.sales_type === "support" ? "د" : "م"}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-foreground">{deal.client_name}</span>
-                          <span className={`text-[12px] px-2 py-0.5 rounded-full ${statusBadge.color}`}>{statusBadge.text}</span>
-                          {deal.deal_value > 0 && (
-                            <span className="text-xs font-bold text-cyan-400">{formatMoneyFull(deal.deal_value)}</span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-3 mt-1 text-[13px] text-muted-foreground">
-                          {deal.stage && <span className="text-cyan-400 font-medium">{deal.stage}</span>}
-                          {deal.source && <span>• {deal.source}</span>}
-                          {deal.plan && <span>• {deal.plan}</span>}
-                          {deal.submitter_name && <span>• بواسطة: {deal.submitter_name}</span>}
-                          <span>• {formatDate(deal.created_at)}</span>
-                        </div>
-                      </div>
-                      {isPending && (
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <Button
-                            size="sm"
-                            className="gap-1 bg-emerald-600 hover:bg-emerald-500 text-white"
-                            onClick={(e) => { e.stopPropagation(); handleApprove(deal.id); }}
-                            disabled={processing === deal.id}
-                          >
-                            <CheckCircle className="w-3.5 h-3.5" />
-                            قبول
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            className="gap-1"
-                            onClick={(e) => { e.stopPropagation(); handleReject(deal.id); }}
-                            disabled={processing === deal.id}
-                          >
-                            <XCircle className="w-3.5 h-3.5" />
-                            رفض
-                          </Button>
-                        </div>
+            return (
+              <div
+                key={deal.id}
+                onClick={() => setDetailDeal(deal)}
+                className={`cc-card rounded-[14px] p-5 border cursor-pointer hover:border-white/20 transition-all ${statusColors}`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold ${
+                    deal.sales_type === "support" ? "bg-orange-500/15 text-orange-400" : "bg-emerald-500/15 text-emerald-400"
+                  }`}>
+                    {deal.sales_type === "support" ? "د" : "م"}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-foreground">{deal.client_name}</span>
+                      <span className={`text-[12px] px-2 py-0.5 rounded-full ${statusBadge.color}`}>{statusBadge.text}</span>
+                      {deal.deal_value > 0 && (
+                        <span className="text-xs font-bold text-cyan-400">{formatMoneyFull(deal.deal_value)}</span>
                       )}
                     </div>
+                    <div className="flex items-center gap-3 mt-1 text-[13px] text-muted-foreground">
+                      {deal.stage && <span className="text-cyan-400 font-medium">{deal.stage}</span>}
+                      {deal.source && <span>• {deal.source}</span>}
+                      {deal.plan && <span>• {deal.plan}</span>}
+                      {deal.submitter_name && <span>• بواسطة: {deal.submitter_name}</span>}
+                      <span>• {formatDate(deal.created_at)}</span>
+                    </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </>
+                  {isPending && (
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Button
+                        size="sm"
+                        className="gap-1 bg-emerald-600 hover:bg-emerald-500 text-white"
+                        onClick={(e) => { e.stopPropagation(); handleApprove(deal.id); }}
+                        disabled={processing === deal.id}
+                      >
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        قبول
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="gap-1"
+                        onClick={(e) => { e.stopPropagation(); handleReject(deal.id); }}
+                        disabled={processing === deal.id}
+                      >
+                        <XCircle className="w-3.5 h-3.5" />
+                        رفض
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
 
       {/* Detail Modal */}

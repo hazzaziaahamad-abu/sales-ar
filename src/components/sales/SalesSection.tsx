@@ -16,6 +16,7 @@ import { formatMoney, formatMoneyFull, formatDate, formatPhone, formatPercent, t
 import { FollowUpLogButton } from "@/components/follow-up-log";
 import { ClientProfilePanel } from "@/components/client-profile-panel";
 import { AchievementSummary } from "@/components/achievement-summary";
+import SalesKPIDashboard from "@/components/sales/SalesKPIDashboard";
 import { getKpiStatus, KPI_STATUS_STYLES, KPI_TARGETS } from "@/lib/utils/constants";
 import { StatCard } from "@/components/ui/stat-card";
 import { KPICard } from "@/components/ui/kpi-card";
@@ -1850,6 +1851,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
         <TabsList className="bg-card border border-border">
           <TabsTrigger value="kpis">مؤشرات المبيعات</TabsTrigger>
           <TabsTrigger value="kpis-full">مؤشرات الأداء KPIs</TabsTrigger>
+          {!isOffice && <TabsTrigger value="sales-kpi">KPI مبيعات الدعم</TabsTrigger>}
           <TabsTrigger value="renewals">التجديدات</TabsTrigger>
           <TabsTrigger value="satisfaction">رضا العملاء</TabsTrigger>
         </TabsList>
@@ -2077,6 +2079,13 @@ export function SalesSection({ salesType }: SalesPageProps) {
             </Link>
           </div>
         </TabsContent>
+
+        {/* Tab: KPI مبيعات الدعم — support only */}
+        {!isOffice && (
+          <TabsContent value="sales-kpi" className="space-y-6">
+            <SalesKPIDashboard />
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* ─── Add / Edit Deal Modal ─── */}
