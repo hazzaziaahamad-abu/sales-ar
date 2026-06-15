@@ -82,7 +82,7 @@ export function Topbar({ unreadCount = 0, onBellClick, onMenuClick }: TopbarProp
     : "";
 
   return (
-    <div className="sticky top-0 z-40 px-3 sm:px-6 pt-3 space-y-2">
+    <div className="sticky top-0 z-40 px-3 sm:px-6 pt-3 space-y-2 overflow-hidden">
       <div className="glass-surface flex items-center justify-between rounded-[20px] sm:rounded-[26px] px-3 sm:px-5 py-3 sm:py-4 gap-3">
         {/* Left side: hamburger (mobile) + title */}
         <div className="flex items-center gap-3 min-w-0 flex-1">

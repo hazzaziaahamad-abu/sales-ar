@@ -76,20 +76,19 @@ function SaleRow({ sale }: { sale: LastSaleInfo }) {
   const iconColor = hours < 12 ? "text-emerald-400" : hours < 24 ? "text-amber-400" : "text-red-400";
 
   return (
-    <div className={`rounded-xl bg-gradient-to-l ${urgencyColor} border px-4 py-2.5 flex items-center justify-between gap-3 flex-wrap`}>
-      <div className="flex items-center gap-2.5">
+    <div className={`rounded-xl bg-gradient-to-l ${urgencyColor} border px-3 sm:px-4 py-2.5 flex items-center justify-between gap-2 sm:gap-3 overflow-hidden`}>
+      <div className="flex items-center gap-2 min-w-0 flex-1">
         <Trophy className={`w-4 h-4 ${iconColor} shrink-0`} />
-        <div className="flex items-center gap-1.5 flex-wrap text-xs">
-          <span className="text-muted-foreground">آخر مبيعة:</span>
-          <span className="font-bold text-foreground">{sale.clientName}</span>
-          <span className="text-muted-foreground">—</span>
-          <span className={`font-bold ${textColor}`}>{formatMoney(sale.value)}</span>
-          <span className="text-[12px] px-1.5 py-0.5 rounded-full bg-white/[0.06] text-muted-foreground">{TYPE_LABEL[sale.type]}</span>
+        <div className="flex items-center gap-1.5 flex-wrap text-xs min-w-0">
+          <span className="text-muted-foreground shrink-0">آخر مبيعة:</span>
+          <span className="font-bold text-foreground truncate max-w-[80px] sm:max-w-none">{sale.clientName}</span>
+          <span className={`font-bold ${textColor} shrink-0`}>{formatMoney(sale.value)}</span>
+          <span className="text-[11px] sm:text-[12px] px-1.5 py-0.5 rounded-full bg-white/[0.06] text-muted-foreground shrink-0 hidden sm:inline">{TYPE_LABEL[sale.type]}</span>
         </div>
       </div>
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1 shrink-0">
         <Clock className={`w-3.5 h-3.5 ${iconColor}`} />
-        <span className={`text-xs font-bold ${textColor}`}>مضى {elapsed}</span>
+        <span className={`text-[11px] sm:text-xs font-bold ${textColor} whitespace-nowrap`}>مضى {elapsed}</span>
       </div>
     </div>
   );
