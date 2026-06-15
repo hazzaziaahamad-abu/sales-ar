@@ -474,6 +474,8 @@ export function SalesSection({ salesType }: SalesPageProps) {
   /* card filter */
   const [stageFilter, setStageFilter] = useState<string | null>(null);
   const [clientSearch, setClientSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const DEALS_PER_PAGE = 20;
   const [repFilter, setRepFilter] = useState<string | null>(null);
 
   /* achievement summary filter */
@@ -516,6 +518,11 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const filteredDeals = clientSearch
     ? baseFilteredDeals.filter((d) => d.client_name.toLowerCase().includes(clientSearch.toLowerCase()) || (d.client_code && d.client_code.toLowerCase().includes(clientSearch.toLowerCase())) || (d.client_phone && d.client_phone.includes(clientSearch)))
     : baseFilteredDeals;
+
+  const totalPages = Math.max(1, Math.ceil(filteredDeals.length / DEALS_PER_PAGE));
+  const paginatedDeals = filteredDeals.slice((currentPage - 1) * DEALS_PER_PAGE, currentPage * DEALS_PER_PAGE);
+
+  useEffect(() => { setCurrentPage(1); }, [clientSearch, stageFilter, achieveFilter, selectedRep]);
 
   useEffect(() => {
     setLoading(true);
@@ -1574,7 +1581,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredDeals.map((deal) => {
+              paginatedDeals.map((deal) => {
                 const isTarget = dailyTargetIds.has(deal.id);
                 const isTargetDone = isTarget && deal.stage === "مكتملة";
                 return (
@@ -1723,6 +1730,54 @@ export function SalesSection({ salesType }: SalesPageProps) {
             )}
           </TableBody>
         </Table>
+        {/* Pagination */}
+        {filteredDeals.length > DEALS_PER_PAGE && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+            <span className="text-xs text-muted-foreground">
+              عرض {((currentPage - 1) * DEALS_PER_PAGE) + 1}–{Math.min(currentPage * DEALS_PER_PAGE, filteredDeals.length)} من {filteredDeals.length}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium border border-border hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                السابق
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                .reduce<(number | string)[]>((acc, p, i, arr) => {
+                  if (i > 0 && (arr[i - 1] as number) < p - 1) acc.push("...");
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, i) =>
+                  typeof p === "string" ? (
+                    <span key={`dot-${i}`} className="px-1.5 text-xs text-muted-foreground">…</span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => setCurrentPage(p)}
+                      className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${
+                        currentPage === p
+                          ? "bg-cyan/15 text-cyan border border-cyan/30"
+                          : "border border-border hover:bg-white/[0.06] text-muted-foreground"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  )
+                )}
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium border border-border hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                التالي
+              </button>
+            </div>
+          </div>
+        )}
         </div>
         )}
       </div>
