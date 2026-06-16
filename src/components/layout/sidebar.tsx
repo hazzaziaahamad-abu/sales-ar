@@ -85,7 +85,7 @@ export const NAV_ITEMS = [
   { label: "تحليلات الزيارات", href: "/analytics", slug: "analytics", icon: BarChart2, color: "cyan", group: "النظام" },
 ];
 
-const NAV_GROUPS = ["عام", "الإدارة التنفيذية", "المبيعات والدعم", "المتابعة", "العملاء", "المهام", "الفريق والتطوير", "النظام"];
+const NAV_GROUPS = ["عام", "الإدارة التنفيذية", "المبيعات والدعم", "المتابعة", "العملاء", "المهام", "الفريق والتطوير", "تقرير الأداء", "النظام"];
 
 const COLOR_MAP: Record<string, { bg: string; text: string; ring: string; gradFrom: string; border: string; shadow: string; bar: string }> = {
   cyan:    { bg: "bg-cyan-500/15",    text: "text-cyan-400",    ring: "ring-cyan-500/20",    gradFrom: "from-cyan-500/[0.12]",    border: "border-cyan-500/[0.15]",    shadow: "shadow-[0_0_20px_rgba(0,212,255,0.08)]",   bar: "from-cyan-400 via-cyan-400 to-cyan-600" },
