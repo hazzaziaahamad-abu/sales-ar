@@ -24,6 +24,7 @@ const STAGE_COLORS: Record<string, string> = {
 const RENEWAL_COLORS: Record<string, string> = {
   "مكتمل": "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
   "مجدول": "bg-sky-500/15 text-sky-400 border-sky-500/20",
+  "مجدول تجديد": "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
   "جاري المتابعة": "bg-amber-500/15 text-amber-400 border-amber-500/20",
   "انتظار الدفع": "bg-orange-500/15 text-orange-400 border-orange-500/20",
   "ملغي بسبب": "bg-red-500/15 text-red-400 border-red-500/20",

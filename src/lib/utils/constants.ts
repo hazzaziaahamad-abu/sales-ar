@@ -44,9 +44,10 @@ export const REVIEW_TYPES = [
   { value: "unsatisfied", label: "غير راضي" },
 ] as const;
 
-export const RENEWAL_STATUSES = ["مجدول", "جاري المتابعة", "انتظار الدفع", "مكتمل", "ملغي بسبب", "إيقاف مؤقت", "الرقم غلط", "مافي تجاوب", "مؤجل مؤقتاً", "تواصل وقت آخر", "متردد"] as const;
+export const RENEWAL_STATUSES = ["مجدول", "مجدول تجديد", "جاري المتابعة", "انتظار الدفع", "مكتمل", "ملغي بسبب", "إيقاف مؤقت", "الرقم غلط", "مافي تجاوب", "مؤجل مؤقتاً", "تواصل وقت آخر", "متردد"] as const;
 export const RENEWAL_STATUS_COLORS: Record<string, string> = {
   "مجدول": "cc-blue",
+  "مجدول تجديد": "cc-green",
   "جاري المتابعة": "amber",
   "انتظار الدفع": "cc-purple",
   "مكتمل": "cc-green",

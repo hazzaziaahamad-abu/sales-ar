@@ -100,6 +100,7 @@ function isClosedForever(r: Renewal): boolean {
 /* ─── Status badge color mapping ─── */
 const STATUS_BADGE: Record<string, { text: string; color: string; bg: string }> = {
   "مجدول": { text: "مجدول", color: "text-cc-blue", bg: "bg-blue-dim" },
+  "مجدول تجديد": { text: "مجدول تجديد", color: "text-cc-green", bg: "bg-green-dim" },
   "جاري المتابعة": { text: "جاري المتابعة", color: "text-amber", bg: "bg-amber-dim" },
   "انتظار الدفع": { text: "انتظار الدفع", color: "text-cc-purple", bg: "bg-purple-dim" },
   "مكتمل": { text: "مكتمل", color: "text-cc-green", bg: "bg-green-dim" },
@@ -346,7 +347,7 @@ export default function RenewalsPage() {
   const [clientSearch, setClientSearch] = useState("");
   const [repFilter, setRepFilter] = useState<string | null>(null);
   const [showClosed, setShowClosed] = useState(false);
-  const PENDING_STATUSES = new Set(["مجدول", "جاري المتابعة", "انتظار الدفع"]);
+  const PENDING_STATUSES = new Set(["مجدول", "مجدول تجديد", "جاري المتابعة", "انتظار الدفع"]);
   const repFilteredRenewals = repFilter
     ? monthRenewals.filter((r) => r.assigned_rep === repFilter)
     : monthRenewals;
@@ -401,7 +402,7 @@ export default function RenewalsPage() {
     const total = analyticsBase.length;
     const renewed = analyticsBase.filter((r) => r.status === "مكتمل").length;
     const cancelled = analyticsBase.filter((r) => r.status === "ملغي بسبب").length;
-    const scheduled = analyticsBase.filter((r) => r.status === "مجدول").length;
+    const scheduled = analyticsBase.filter((r) => r.status === "مجدول" || r.status === "مجدول تجديد").length;
     const following = analyticsBase.filter((r) => r.status === "جاري المتابعة").length;
     const waiting = analyticsBase.filter((r) => r.status === "انتظار الدفع").length;
     const renewalRate = total > 0 ? Math.round((renewed / total) * 100) : 0;
@@ -1062,7 +1063,7 @@ export default function RenewalsPage() {
       {!loading && (() => {
         const now = new Date();
         now.setHours(0, 0, 0, 0);
-        const activeStatuses = new Set(["مجدول", "جاري المتابعة", "انتظار الدفع", "مؤجل مؤقتاً", "تواصل وقت آخر", "متردد"]);
+        const activeStatuses = new Set(["مجدول", "مجدول تجديد", "جاري المتابعة", "انتظار الدفع", "مؤجل مؤقتاً", "تواصل وقت آخر", "متردد"]);
         const activeRenewals = (repFilter ? renewals.filter(r => r.assigned_rep === repFilter) : renewals)
           .filter(r => activeStatuses.has(r.status));
 

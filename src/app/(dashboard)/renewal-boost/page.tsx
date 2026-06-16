@@ -225,6 +225,7 @@ function SimpleBar({ value, max, color, height = 8 }: { value: number; max: numb
 /* ─── STATUS BADGE ─── */
 const STATUS_BADGE: Record<string, { color: string; bg: string }> = {
   "مجدول": { color: "text-cc-blue", bg: "bg-blue-dim" },
+  "مجدول تجديد": { color: "text-cc-green", bg: "bg-green-dim" },
   "جاري المتابعة": { color: "text-amber", bg: "bg-amber-dim" },
   "انتظار الدفع": { color: "text-cc-purple", bg: "bg-purple-dim" },
   "مكتمل": { color: "text-cc-green", bg: "bg-green-dim" },
@@ -271,8 +272,8 @@ export default function RenewalBoostPage() {
     const total = monthRenewals.length;
     const completed = monthRenewals.filter((r) => r.status === "مكتمل").length;
     const cancelled = monthRenewals.filter((r) => r.status === "ملغي بسبب").length;
-    const scheduled = monthRenewals.filter((r) => r.status === "مجدول").length;
-    const activeFollowUp = monthRenewals.filter((r) => r.status !== "مجدول" && r.status !== "مكتمل" && r.status !== "ملغي بسبب").length;
+    const scheduled = monthRenewals.filter((r) => r.status === "مجدول" || r.status === "مجدول تجديد").length;
+    const activeFollowUp = monthRenewals.filter((r) => r.status !== "مجدول" && r.status !== "مجدول تجديد" && r.status !== "مكتمل" && r.status !== "ملغي بسبب").length;
 
     const renewalRate = total > 0 ? (completed / total) * 100 : 0;
     const churnRate = total > 0 ? (cancelled / total) * 100 : 0;
@@ -315,7 +316,7 @@ export default function RenewalBoostPage() {
     const risky = monthRenewals.filter((r) => {
       if (r.status === "مكتمل" || r.status === "ملغي بسبب") return false;
       const days = getDaysRemaining(r.renewal_date);
-      if (r.status === "مجدول" && days <= 7) return true;
+      if ((r.status === "مجدول" || r.status === "مجدول تجديد") && days <= 7) return true;
       if (["مافي تجاوب", "الرقم غلط", "متردد"].includes(r.status)) return true;
       if (!r.assigned_rep) return true;
       return false;

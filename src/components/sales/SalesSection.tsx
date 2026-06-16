@@ -170,7 +170,7 @@ async function autoCreateRenewalFromDeal(
       plan_name: plan,
       plan_price: dealValue,
       renewal_date: target,
-      status: "مجدول",
+      status: "مجدول تجديد",
       assigned_rep: assignedRep || undefined,
       sales_type: salesType,
       notes: `تجديد تلقائي من صفقة ${salesType === "office" ? "مكتب" : "دعم"} مكتملة — ${author}`,
