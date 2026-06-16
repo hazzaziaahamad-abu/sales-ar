@@ -31,6 +31,18 @@ const INACTIVE_RENEWAL_STATUSES = ["مكتمل", "ملغي بسبب"];
 
 const DAY_NAMES_AR = ["أحد", "إثنين", "ثلاثاء", "أربعاء", "خميس", "جمعة", "سبت"];
 
+// توقيت السعودية UTC+3
+function getSaudiHour(date?: Date): number {
+  const d = date || new Date();
+  const utcH = d.getUTCHours();
+  return (utcH + 3) % 24;
+}
+
+function getSaudiDate(date?: Date): Date {
+  const d = date || new Date();
+  return new Date(d.getTime() + 3 * 60 * 60 * 1000);
+}
+
 type DeptType = "support" | "support_sales" | "office_sales" | "renewals";
 
 function getDepartment(role: string | undefined): DeptType {
@@ -42,45 +54,47 @@ function getDepartment(role: string | undefined): DeptType {
 }
 
 function isInShift(dept: DeptType, shiftType: "morning" | "evening" | undefined, now: Date): boolean {
-  if (dept === "renewals") return true; // مفتوح دائماً
+  if (dept === "renewals") return true;
 
-  const hour = now.getHours();
+  const hour = getSaudiHour(now);
 
   if (dept === "support" || dept === "support_sales") {
     if (shiftType === "evening") {
-      // 17:00 - 01:00
       return hour >= 17 || hour < 1;
     }
-    // صباحي: 9:00 - 17:00
     return hour >= 9 && hour < 17;
   }
 
-  // مبيعات مكتب: 9:00 - 17:00
   return hour >= 9 && hour < 17;
 }
 
 function getShiftStartToday(dept: DeptType, shiftType: "morning" | "evening" | undefined): Date {
   const now = new Date();
-  const start = new Date(now);
-  start.setMinutes(0, 0, 0);
+  const saudiHour = getSaudiHour(now);
 
   if (dept === "renewals") {
-    start.setHours(0);
+    // بداية اليوم بتوقيت السعودية = UTC midnight - 3h = أمس 21:00 UTC
+    const start = new Date(now);
+    start.setUTCHours(0 - 3, 0, 0, 0); // 21:00 UTC = 00:00 Saudi
+    if (start.getTime() > now.getTime()) start.setUTCDate(start.getUTCDate() - 1);
     return start;
   }
 
   if ((dept === "support" || dept === "support_sales") && shiftType === "evening") {
-    const hour = now.getHours();
-    if (hour < 1) {
-      // بعد منتصف الليل — الشفت بدأ أمس الساعة 17
-      start.setDate(start.getDate() - 1);
+    // مسائي: 17:00 سعودي = 14:00 UTC
+    const start = new Date(now);
+    start.setUTCHours(17 - 3, 0, 0, 0); // 14:00 UTC
+    if (saudiHour < 1) {
+      // بعد منتصف الليل — الشفت بدأ أمس
+      start.setUTCDate(start.getUTCDate() - 1);
     }
-    start.setHours(17);
     return start;
   }
 
-  // صباحي أو مكتب
-  start.setHours(9);
+  // صباحي أو مكتب: 9:00 سعودي = 6:00 UTC
+  const start = new Date(now);
+  start.setUTCHours(9 - 3, 0, 0, 0);
+  if (start.getTime() > now.getTime()) start.setUTCDate(start.getUTCDate() - 1);
   return start;
 }
 
@@ -94,19 +108,13 @@ function getShiftLabel(dept: DeptType, shiftType: "morning" | "evening" | undefi
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function isToday(dateStr: string): boolean {
-  const d = new Date(dateStr);
-  const now = new Date();
+  const d = getSaudiDate(new Date(dateStr));
+  const now = getSaudiDate();
   return (
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate()
+    d.getUTCFullYear() === now.getUTCFullYear() &&
+    d.getUTCMonth() === now.getUTCMonth() &&
+    d.getUTCDate() === now.getUTCDate()
   );
-}
-
-function startOfToday(): Date {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
 }
 
 function minutesSince(dateStr: string): number {
@@ -134,12 +142,12 @@ function formatElapsedShort(minutes: number): string {
 }
 
 function todayDateAr(): string {
-  const now = new Date();
+  const now = getSaudiDate();
   const months = [
     "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
     "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
   ];
-  return `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
+  return `${now.getUTCDate()} ${months[now.getUTCMonth()]} ${now.getUTCFullYear()}`;
 }
 
 type GapStatus = "ok" | "warn" | "bad";
