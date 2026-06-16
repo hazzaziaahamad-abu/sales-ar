@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import type { Deal, Marketer, Package, Employee, EmployeeTask } from "@/types";
+import { triggerSaleCelebration } from "@/components/layout/sale-celebration";
 import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createFollowUpNote, fetchRecentFollowUpNotes, fetchPackages, fetchQuoteCommitments, addQuoteCommitment, removeQuoteCommitment, fetchEmployees, fetchEmployeeTasks, createEmployeeTask, createRenewal, fetchRenewals } from "@/lib/supabase/db";
 import { checkDealsForFollowUp, buildFollowUpTask, type FollowUpAction } from "@/lib/auto-followup";
 import { StarEmployeeCard, Leaderboard } from "@/components/star-employee";
@@ -828,8 +829,17 @@ export function SalesSection({ salesType }: SalesPageProps) {
           }
 
           /* Auto-create renewal when deal transitions to "مكتملة" */
-          if (oldDeal.stage !== "مكتملة" && form.stage === "مكتملة" && form.plan) {
-            autoCreateRenewalFromDeal(editingId, form.client_name, form.client_phone, form.plan, form.deal_value, form.assigned_rep_name, salesType, author);
+          if (oldDeal.stage !== "مكتملة" && form.stage === "مكتملة") {
+            triggerSaleCelebration({
+              id: `deal-${editingId}`,
+              repName: form.assigned_rep_name || author,
+              clientName: form.client_name,
+              value: form.deal_value,
+              type: salesType === "support" ? "support" : "office",
+            });
+            if (form.plan) {
+              autoCreateRenewalFromDeal(editingId, form.client_name, form.client_phone, form.plan, form.deal_value, form.assigned_rep_name, salesType, author);
+            }
           }
         }
       } else {
@@ -854,9 +864,18 @@ export function SalesSection({ salesType }: SalesPageProps) {
         });
         setDeals((prev) => [created, ...prev]);
 
-        /* Auto-create renewal if the new deal is created directly as completed */
-        if (form.stage === "مكتملة" && form.plan) {
-          autoCreateRenewalFromDeal(created.id, form.client_name, form.client_phone, form.plan, form.deal_value, form.assigned_rep_name, salesType, authUser?.name || "النظام");
+        /* Celebrate + auto-create renewal if created as completed */
+        if (form.stage === "مكتملة") {
+          triggerSaleCelebration({
+            id: `deal-${created.id}`,
+            repName: form.assigned_rep_name || authUser?.name || "أحد الفريق",
+            clientName: form.client_name,
+            value: form.deal_value,
+            type: salesType === "support" ? "support" : "office",
+          });
+          if (form.plan) {
+            autoCreateRenewalFromDeal(created.id, form.client_name, form.client_phone, form.plan, form.deal_value, form.assigned_rep_name, salesType, authUser?.name || "النظام");
+          }
         }
       }
       setModalOpen(false);

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import type { Renewal, Employee } from "@/types";
+import { triggerSaleCelebration } from "@/components/layout/sale-celebration";
 import {
   fetchRenewals,
   createRenewal,
@@ -661,12 +662,30 @@ export default function RenewalsPage() {
           if (changes.length > 0) {
             createFollowUpNote("renewal", editingId, `📝 تحديث تلقائي:\n${changes.join("\n")}`, author).catch(console.error);
           }
+          if (oldRenewal.status !== "مكتمل" && form.status === "مكتمل") {
+            triggerSaleCelebration({
+              id: `renewal-${editingId}`,
+              repName: form.assigned_rep || author,
+              clientName: form.customer_name,
+              value: form.plan_price,
+              type: "renewal",
+            });
+          }
         }
       } else {
         const created = await createRenewal(payload as Omit<Renewal, "id" | "org_id" | "created_at" | "updated_at">);
         setRenewals((prev) => [...prev, created].sort(
           (a, b) => new Date(a.renewal_date).getTime() - new Date(b.renewal_date).getTime()
         ));
+        if (form.status === "مكتمل") {
+          triggerSaleCelebration({
+            id: `renewal-${created.id}`,
+            repName: form.assigned_rep || authUser?.name || "أحد الفريق",
+            clientName: form.customer_name,
+            value: form.plan_price,
+            type: "renewal",
+          });
+        }
       }
       setModalOpen(false);
     } catch (err) {

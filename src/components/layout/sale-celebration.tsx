@@ -19,6 +19,13 @@ const TYPE_LABELS: Record<string, string> = {
 
 const CONFETTI_COLORS = ["#FFD700", "#FF6B6B", "#4ECDC4", "#45B7D1", "#96E6A1", "#DDA0DD", "#F0E68C", "#87CEEB"];
 
+// Global trigger function — can be called from anywhere
+let _triggerCelebration: ((e: CelebrationEvent) => void) | null = null;
+
+export function triggerSaleCelebration(e: CelebrationEvent) {
+  _triggerCelebration?.(e);
+}
+
 function ConfettiPiece({ index }: { index: number }) {
   const color = CONFETTI_COLORS[index % CONFETTI_COLORS.length];
   const left = Math.random() * 100;
@@ -109,6 +116,11 @@ export function SaleCelebration() {
       setTimeout(() => setEvent(null), 500);
     }, 5000);
   }, []);
+
+  useEffect(() => {
+    _triggerCelebration = showCelebration;
+    return () => { _triggerCelebration = null; };
+  }, [showCelebration]);
 
   useEffect(() => {
     const supabase = createClient();
