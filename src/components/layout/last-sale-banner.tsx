@@ -119,14 +119,15 @@ export function LastSaleBanner() {
           if (d.stage !== "مكتملة") continue;
           const dealType: SaleType = d.sales_type === "support" ? "support" : "office";
           if (!requested.includes(dealType)) continue;
-          const t = new Date(d.close_date || d.updated_at || d.created_at).getTime();
+          const saleDate = d.close_date || d.created_at;
+          const t = new Date(saleDate).getTime();
           if (t > (latestTimeByType[dealType] ?? 0)) {
             latestTimeByType[dealType] = t;
             latestByType[dealType] = {
               clientName: d.client_name,
               value: d.deal_value,
               type: dealType,
-              date: d.close_date || d.updated_at || d.created_at,
+              date: saleDate,
             };
           }
         }
@@ -134,14 +135,15 @@ export function LastSaleBanner() {
         if (requested.includes("renewal")) {
           for (const r of renewals) {
             if (r.status !== "مكتمل") continue;
-            const t = new Date(r.updated_at || r.created_at).getTime();
+            const saleDate = r.payment_date || r.created_at;
+            const t = new Date(saleDate).getTime();
             if (t > (latestTimeByType.renewal ?? 0)) {
               latestTimeByType.renewal = t;
               latestByType.renewal = {
                 clientName: r.customer_name,
                 value: r.plan_price,
                 type: "renewal",
-                date: r.updated_at || r.created_at,
+                date: saleDate,
               };
             }
           }
