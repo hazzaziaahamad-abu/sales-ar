@@ -17,12 +17,79 @@ const THRESHOLDS = {
   sales: { warn: 60, bad: 180 }, // مبيعات / تجديدات
 } as const;
 
+// ─── Shift config ──────────────────────────────────────────────────────────
+// الدعم + مبيعات الدعم: شفتين (صباحي 9-17 / مسائي 17-1)
+// مبيعات المكتب: شفت واحد (9-17)
+// التجديدات: مفتوح (بدون شفت)
 const SUPPORT_ROLES = ["دعم", "دعم فني", "support"];
+const SUPPORT_SALES_ROLES = ["مبيعات الدعم", "مبيعات دعم", "support sales"];
+const OFFICE_SALES_ROLES = ["مبيعات", "مبيعات المكتب", "sales"];
+const RENEWAL_ROLES = ["تجديدات", "تجديد", "renewals"];
 const INACTIVE_DEAL_STAGES = ["مكتملة", "مرفوض مع سبب", "كنسل التجربة", "استهداف خاطئ"];
 const ACTIVE_TICKET_STATUSES = ["مفتوح", "قيد الحل"];
 const INACTIVE_RENEWAL_STATUSES = ["مكتمل", "ملغي بسبب"];
 
 const DAY_NAMES_AR = ["أحد", "إثنين", "ثلاثاء", "أربعاء", "خميس", "جمعة", "سبت"];
+
+type DeptType = "support" | "support_sales" | "office_sales" | "renewals";
+
+function getDepartment(role: string | undefined): DeptType {
+  const r = (role || "").toLowerCase().trim();
+  if (SUPPORT_ROLES.some((s) => r === s.toLowerCase())) return "support";
+  if (SUPPORT_SALES_ROLES.some((s) => r === s.toLowerCase())) return "support_sales";
+  if (RENEWAL_ROLES.some((s) => r === s.toLowerCase())) return "renewals";
+  return "office_sales";
+}
+
+function isInShift(dept: DeptType, shiftType: "morning" | "evening" | undefined, now: Date): boolean {
+  if (dept === "renewals") return true; // مفتوح دائماً
+
+  const hour = now.getHours();
+
+  if (dept === "support" || dept === "support_sales") {
+    if (shiftType === "evening") {
+      // 17:00 - 01:00
+      return hour >= 17 || hour < 1;
+    }
+    // صباحي: 9:00 - 17:00
+    return hour >= 9 && hour < 17;
+  }
+
+  // مبيعات مكتب: 9:00 - 17:00
+  return hour >= 9 && hour < 17;
+}
+
+function getShiftStartToday(dept: DeptType, shiftType: "morning" | "evening" | undefined): Date {
+  const now = new Date();
+  const start = new Date(now);
+  start.setMinutes(0, 0, 0);
+
+  if (dept === "renewals") {
+    start.setHours(0);
+    return start;
+  }
+
+  if ((dept === "support" || dept === "support_sales") && shiftType === "evening") {
+    const hour = now.getHours();
+    if (hour < 1) {
+      // بعد منتصف الليل — الشفت بدأ أمس الساعة 17
+      start.setDate(start.getDate() - 1);
+    }
+    start.setHours(17);
+    return start;
+  }
+
+  // صباحي أو مكتب
+  start.setHours(9);
+  return start;
+}
+
+function getShiftLabel(dept: DeptType, shiftType: "morning" | "evening" | undefined): string {
+  if (dept === "renewals") return "تجديدات";
+  if (dept === "support") return shiftType === "evening" ? "دعم — مسائي" : "دعم — صباحي";
+  if (dept === "support_sales") return shiftType === "evening" ? "مبيعات الدعم — مسائي" : "مبيعات الدعم — صباحي";
+  return "مبيعات المكتب";
+}
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -77,10 +144,26 @@ function todayDateAr(): string {
 
 type GapStatus = "ok" | "warn" | "bad";
 
+// ─── Employee shift mapping ────────────────────────────────────────────────
+// الموظفين وشفتاتهم — إذا الموظف مو في القائمة، يتحدد من دوره
+const EMPLOYEE_SHIFTS: Record<string, "morning" | "evening"> = {
+  "روان": "morning",
+  "علي": "evening",
+};
+
+function getEmployeeShift(name: string): "morning" | "evening" | undefined {
+  const trimmed = name.trim();
+  for (const [key, shift] of Object.entries(EMPLOYEE_SHIFTS)) {
+    if (trimmed.includes(key)) return shift;
+  }
+  return "morning"; // الافتراضي صباحي
+}
+
 interface EmployeeGap {
   name: string;
   role: string;
-  department: "support" | "sales";
+  department: DeptType;
+  deptLabel: string;
   lastRegistration: string | null;
   gapMinutes: number;
   status: GapStatus;
@@ -88,6 +171,7 @@ interface EmployeeGap {
   pendingTickets: number;
   pendingRenewals: number;
   totalPending: number;
+  onShift: boolean;
 }
 
 interface TimelineItem {
@@ -108,16 +192,22 @@ function computeEmployeeGaps(
   tickets: Ticket[],
   renewals: Renewal[]
 ): EmployeeGap[] {
-  const now = Date.now();
+  const nowDate = new Date();
+  const now = nowDate.getTime();
 
   return employees
     .filter((e) => e.status === "نشط" || e.status === "active")
     .map((emp) => {
-      const isSupport = SUPPORT_ROLES.some(
-        (r) => emp.role?.toLowerCase() === r.toLowerCase()
-      );
-      const department: "support" | "sales" = isSupport ? "support" : "sales";
-      const threshold = isSupport ? THRESHOLDS.support : THRESHOLDS.sales;
+      const department = getDepartment(emp.role);
+      const shiftType = getEmployeeShift(emp.name);
+      const onShift = isInShift(department, shiftType, nowDate);
+      const usesSupportThreshold = department === "support" || department === "support_sales";
+      const threshold = usesSupportThreshold ? THRESHOLDS.support : THRESHOLDS.sales;
+      const deptLabel = getShiftLabel(department, shiftType);
+
+      // Shift start time — only count items within current shift
+      const shiftStart = getShiftStartToday(department, shiftType);
+      const shiftStartMs = shiftStart.getTime();
 
       // Find items belonging to this employee
       const empDeals = deals.filter(
@@ -130,12 +220,12 @@ function computeEmployeeGaps(
         (r) => r.assigned_rep?.trim() === emp.name.trim()
       );
 
-      // Last registration = most recent created_at across all items
+      // Last registration = most recent created_at WITHIN current shift
       const allDates = [
         ...empDeals.map((d) => d.created_at),
         ...empTickets.map((t) => t.created_at),
         ...empRenewals.map((r) => r.created_at),
-      ].filter(Boolean);
+      ].filter((d) => d && new Date(d).getTime() >= shiftStartMs);
 
       const lastRegistration =
         allDates.length > 0
@@ -144,30 +234,38 @@ function computeEmployeeGaps(
             )[0]
           : null;
 
+      // Gap = time since last registration, but capped to shift duration
       const gapMinutes = lastRegistration
         ? (now - new Date(lastRegistration).getTime()) / 60_000
-        : Infinity;
+        : onShift
+          ? (now - shiftStartMs) / 60_000
+          : 0;
 
-      // Status
+      // Status — only flag if on shift
       let status: GapStatus = "ok";
-      if (gapMinutes >= threshold.bad) status = "bad";
-      else if (gapMinutes >= threshold.warn) status = "warn";
+      if (onShift) {
+        if (gapMinutes >= threshold.bad) status = "bad";
+        else if (gapMinutes >= threshold.warn) status = "warn";
+      }
 
-      // Pending = active items whose updated_at is older than warn threshold
+      // Pending = active items whose updated_at is older than warn threshold (within shift)
       const warnMs = threshold.warn * 60_000;
       const pendingDeals = empDeals.filter(
         (d) =>
           !INACTIVE_DEAL_STAGES.includes(d.stage) &&
+          new Date(d.created_at).getTime() >= shiftStartMs &&
           now - new Date(d.updated_at).getTime() > warnMs
       ).length;
       const pendingTickets = empTickets.filter(
         (t) =>
           ACTIVE_TICKET_STATUSES.includes(t.status) &&
+          new Date(t.created_at).getTime() >= shiftStartMs &&
           now - new Date(t.updated_at).getTime() > warnMs
       ).length;
       const pendingRenewals = empRenewals.filter(
         (r) =>
           !INACTIVE_RENEWAL_STATUSES.includes(r.status) &&
+          new Date(r.created_at).getTime() >= shiftStartMs &&
           now - new Date(r.updated_at).getTime() > warnMs
       ).length;
 
@@ -175,6 +273,7 @@ function computeEmployeeGaps(
         name: emp.name,
         role: emp.role || "",
         department,
+        deptLabel,
         lastRegistration,
         gapMinutes,
         status,
@@ -182,9 +281,12 @@ function computeEmployeeGaps(
         pendingTickets,
         pendingRenewals,
         totalPending: pendingDeals + pendingTickets + pendingRenewals,
+        onShift,
       };
     })
     .sort((a, b) => {
+      // الموظفين في شفتهم أولاً
+      if (a.onShift !== b.onShift) return a.onShift ? -1 : 1;
       const order: Record<GapStatus, number> = { bad: 0, warn: 1, ok: 2 };
       if (order[a.status] !== order[b.status])
         return order[a.status] - order[b.status];
@@ -218,19 +320,12 @@ const STATUS_CONFIG: Record<
   },
 };
 
-const DEPT_CONFIG: Record<string, { label: string; bg: string; text: string }> =
-  {
-    support: {
-      label: "دعم",
-      bg: "bg-cc-purple/10",
-      text: "text-cc-purple",
-    },
-    sales: {
-      label: "مبيعات",
-      bg: "bg-cc-blue/10",
-      text: "text-cc-blue",
-    },
-  };
+const DEPT_COLORS: Record<DeptType, { bg: string; text: string }> = {
+  support: { bg: "bg-cc-purple/10", text: "text-cc-purple" },
+  support_sales: { bg: "bg-orange-400/10", text: "text-orange-400" },
+  office_sales: { bg: "bg-cc-blue/10", text: "text-cc-blue" },
+  renewals: { bg: "bg-sky-400/10", text: "text-sky-400" },
+};
 
 // ═════════════════════════════════════════════════════════════════════════════
 // MAIN PAGE
@@ -320,10 +415,11 @@ function ManagerView({
     [employees, deals, tickets, renewals]
   );
 
-  const badCount = gaps.filter((g) => g.status === "bad").length;
-  const warnCount = gaps.filter((g) => g.status === "warn").length;
-  const okCount = gaps.filter((g) => g.status === "ok").length;
-  const totalPending = gaps.reduce((s, g) => s + g.totalPending, 0);
+  const onShiftGaps = gaps.filter((g) => g.onShift);
+  const badCount = onShiftGaps.filter((g) => g.status === "bad").length;
+  const warnCount = onShiftGaps.filter((g) => g.status === "warn").length;
+  const okCount = onShiftGaps.filter((g) => g.status === "ok").length;
+  const totalPending = onShiftGaps.reduce((s, g) => s + g.totalPending, 0);
 
   return (
     <div className="space-y-6">
@@ -412,11 +508,11 @@ function SummaryCard({
 
 function EmployeeCard({ gap }: { gap: EmployeeGap }) {
   const sc = STATUS_CONFIG[gap.status];
-  const dc = DEPT_CONFIG[gap.department];
+  const dc = DEPT_COLORS[gap.department];
   const initials = gap.name.trim().slice(0, 2);
 
   return (
-    <div className="glass-surface rounded-[14px] p-4 flex items-center gap-4 flex-wrap sm:flex-nowrap">
+    <div className={`glass-surface rounded-[14px] p-4 flex items-center gap-4 flex-wrap sm:flex-nowrap ${!gap.onShift ? "opacity-50" : ""}`}>
       {/* Avatar */}
       <div
         className={`w-11 h-11 rounded-xl ${sc.bg} flex items-center justify-center shrink-0`}
@@ -433,14 +529,19 @@ function EmployeeCard({ gap }: { gap: EmployeeGap }) {
           <span
             className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${dc.bg} ${dc.text}`}
           >
-            {dc.label}
+            {gap.deptLabel}
           </span>
+          {!gap.onShift && (
+            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-white/[0.06] text-muted-foreground">
+              خارج الشفت
+            </span>
+          )}
         </div>
         <p className="mt-0.5 text-xs text-muted-foreground">
           آخر تسجيل:{" "}
           {gap.lastRegistration
             ? `منذ ${formatElapsed(gap.gapMinutes)}`
-            : "لا يوجد تسجيل"}
+            : gap.onShift ? "لا يوجد تسجيل في هذا الشفت" : "—"}
         </p>
       </div>
 
@@ -497,12 +598,14 @@ function EmployeeView({
 }) {
   const name = userName.trim();
 
-  // Determine department from employees table
+  // Determine department & shift from employees table
   const emp = employees.find((e) => e.name.trim() === name);
-  const isSupport = emp
-    ? SUPPORT_ROLES.some((r) => emp.role?.toLowerCase() === r.toLowerCase())
-    : false;
-  const threshold = isSupport ? THRESHOLDS.support : THRESHOLDS.sales;
+  const department = getDepartment(emp?.role);
+  const shiftType = getEmployeeShift(name);
+  const usesSupportThreshold = department === "support" || department === "support_sales";
+  const threshold = usesSupportThreshold ? THRESHOLDS.support : THRESHOLDS.sales;
+  const shiftStart = getShiftStartToday(department, shiftType);
+  const shiftStartMs = shiftStart.getTime();
 
   // My items
   const myDeals = deals.filter((d) => d.assigned_rep_name?.trim() === name);
@@ -511,28 +614,28 @@ function EmployeeView({
   );
   const myRenewals = renewals.filter((r) => r.assigned_rep?.trim() === name);
 
-  // Today items
-  const todayDeals = myDeals.filter((d) => isToday(d.created_at));
-  const todayTickets = myTickets.filter((t) => isToday(t.created_at));
-  const todayRenewals = myRenewals.filter((r) => isToday(r.created_at));
+  // Items within current shift
+  const shiftDeals = myDeals.filter((d) => new Date(d.created_at).getTime() >= shiftStartMs);
+  const shiftTickets = myTickets.filter((t) => new Date(t.created_at).getTime() >= shiftStartMs);
+  const shiftRenewals = myRenewals.filter((r) => new Date(r.created_at).getTime() >= shiftStartMs);
 
   const registeredToday =
-    todayDeals.length + todayTickets.length + todayRenewals.length;
+    shiftDeals.length + shiftTickets.length + shiftRenewals.length;
 
-  // Pending now
+  // Pending now (within shift)
   const now = Date.now();
   const warnMs = threshold.warn * 60_000;
-  const pendingDeals = myDeals.filter(
+  const pendingDeals = shiftDeals.filter(
     (d) =>
       !INACTIVE_DEAL_STAGES.includes(d.stage) &&
       now - new Date(d.updated_at).getTime() > warnMs
   ).length;
-  const pendingTickets = myTickets.filter(
+  const pendingTickets = shiftTickets.filter(
     (t) =>
       ACTIVE_TICKET_STATUSES.includes(t.status) &&
       now - new Date(t.updated_at).getTime() > warnMs
   ).length;
-  const pendingRenewals = myRenewals.filter(
+  const pendingRenewals = shiftRenewals.filter(
     (r) =>
       !INACTIVE_RENEWAL_STATUSES.includes(r.status) &&
       now - new Date(r.updated_at).getTime() > warnMs
@@ -545,11 +648,11 @@ function EmployeeView({
       ? Math.round((registeredToday / (registeredToday + pendingNow)) * 100)
       : 100;
 
-  // Last registration
+  // Last registration (within shift)
   const allDates = [
-    ...myDeals.map((d) => d.created_at),
-    ...myTickets.map((t) => t.created_at),
-    ...myRenewals.map((r) => r.created_at),
+    ...shiftDeals.map((d) => d.created_at),
+    ...shiftTickets.map((t) => t.created_at),
+    ...shiftRenewals.map((r) => r.created_at),
   ].filter(Boolean);
   const lastReg =
     allDates.length > 0
@@ -576,11 +679,11 @@ function EmployeeView({
     headlineColor = "text-amber";
   }
 
-  // Average registration time (for today items only)
+  // Average registration time (for shift items)
   const todayTimeline = buildTimeline(
-    todayDeals,
-    todayTickets,
-    todayRenewals,
+    shiftDeals,
+    shiftTickets,
+    shiftRenewals,
     threshold
   );
   const doneItems = todayTimeline.filter((t) => !t.isPending);
