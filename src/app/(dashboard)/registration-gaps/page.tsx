@@ -180,6 +180,7 @@ interface EmployeeGap {
   pendingRenewals: number;
   totalPending: number;
   onShift: boolean;
+  extraShiftCount: number;
 }
 
 interface TimelineItem {
@@ -277,6 +278,21 @@ function computeEmployeeGaps(
           now - new Date(r.updated_at).getTime() > warnMs
       ).length;
 
+      // عدد التسجيلات خارج الشفت اليوم (نقطة إضافية)
+      const todayStartMs = getShiftStartToday("renewals", undefined).getTime(); // بداية اليوم سعودي
+      const allTodayDates = [
+        ...empDeals.filter((d) => new Date(d.created_at).getTime() >= todayStartMs).map((d) => d.created_at),
+        ...empTickets.filter((t) => new Date(t.created_at).getTime() >= todayStartMs).map((t) => t.created_at),
+        ...empRenewals.filter((r) => new Date(r.created_at).getTime() >= todayStartMs).map((r) => r.created_at),
+      ];
+      const extraShiftCount = department === "renewals" ? 0 : allTodayDates.filter((dateStr) => {
+        const h = getSaudiHour(new Date(dateStr));
+        if ((department === "support" || department === "support_sales") && shiftType === "evening") {
+          return !(h >= 17 || h < 1); // خارج المسائي
+        }
+        return !(h >= 9 && h < 17); // خارج الصباحي
+      }).length;
+
       return {
         name: emp.name,
         role: emp.role || "",
@@ -290,6 +306,7 @@ function computeEmployeeGaps(
         pendingRenewals,
         totalPending: pendingDeals + pendingTickets + pendingRenewals,
         onShift,
+        extraShiftCount,
       };
     })
     .sort((a, b) => {
@@ -544,6 +561,11 @@ function EmployeeCard({ gap }: { gap: EmployeeGap }) {
               خارج الشفت
             </span>
           )}
+          {gap.extraShiftCount > 0 && (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber/10 text-amber">
+              ⭐ {gap.extraShiftCount} خارج الدوام
+            </span>
+          )}
         </div>
         <p className="mt-0.5 text-xs text-muted-foreground">
           آخر تسجيل:{" "}
@@ -629,6 +651,21 @@ function EmployeeView({
 
   const registeredToday =
     shiftDeals.length + shiftTickets.length + shiftRenewals.length;
+
+  // تسجيلات خارج الشفت اليوم
+  const todayStartMs = getShiftStartToday("renewals", undefined).getTime();
+  const allTodayItems = [
+    ...myDeals.filter((d) => new Date(d.created_at).getTime() >= todayStartMs).map((d) => d.created_at),
+    ...myTickets.filter((t) => new Date(t.created_at).getTime() >= todayStartMs).map((t) => t.created_at),
+    ...myRenewals.filter((r) => new Date(r.created_at).getTime() >= todayStartMs).map((r) => r.created_at),
+  ];
+  const extraShiftCount = department === "renewals" ? 0 : allTodayItems.filter((dateStr) => {
+    const h = getSaudiHour(new Date(dateStr));
+    if ((department === "support" || department === "support_sales") && shiftType === "evening") {
+      return !(h >= 17 || h < 1);
+    }
+    return !(h >= 9 && h < 17);
+  }).length;
 
   // Pending now (within shift)
   const now = Date.now();
@@ -784,13 +821,23 @@ function EmployeeView({
         </div>
       </div>
 
+      {/* Extra shift bonus */}
+      {extraShiftCount > 0 && (
+        <div className="glass-surface rounded-[14px] p-4 text-center border border-amber/20">
+          <p className="text-lg font-bold text-amber">⭐ جهد إضافي</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            سجّلت <span className="font-bold text-amber">{extraShiftCount}</span> عنصر خارج وقت دوامك — ممتاز!
+          </p>
+        </div>
+      )}
+
       {/* Quick stats */}
       <div className="grid grid-cols-3 gap-3">
         <div className="glass-surface rounded-[14px] p-4 text-center">
           <p className="text-2xl font-black font-mono text-cc-green">
             {registeredToday}
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">مسجّل اليوم</p>
+          <p className="mt-1 text-xs text-muted-foreground">مسجّل في الشفت</p>
         </div>
         <div className="glass-surface rounded-[14px] p-4 text-center">
           <p className="text-2xl font-black font-mono text-rose-400">
