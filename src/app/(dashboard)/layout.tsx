@@ -9,7 +9,7 @@ import { NotificationPanel } from "@/components/layout/notification-panel";
 import { AIChatFAB } from "@/components/ai/ai-chat-fab";
 import { AIAlertsBanner } from "@/components/ai/ai-alerts-banner";
 import { LastSaleBanner } from "@/components/layout/last-sale-banner";
-import { SaleCelebration } from "@/components/layout/sale-celebration";
+import { SaleCelebration, triggerSaleCelebration } from "@/components/layout/sale-celebration";
 import { WelcomePopup } from "@/components/layout/welcome-popup";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { OrgProvider } from "@/lib/org-context";
@@ -285,6 +285,19 @@ export default function DashboardLayout({
       <MentionNotifLoader onLoad={addNotifications} />
       <PageTracker />
       <SaleCelebration />
+      {/* TEST BUTTON — REMOVE AFTER TESTING */}
+      <button
+        onClick={() => triggerSaleCelebration({
+          id: `test-${Date.now()}`,
+          repName: "حمد",
+          clientName: "عميل تجريبي",
+          value: 5000,
+          type: "office",
+        })}
+        className="fixed bottom-4 left-4 z-[9998] bg-yellow-500 text-black font-bold px-4 py-2 rounded-full shadow-lg"
+      >
+        🔔 تجربة الجرس
+      </button>
       <WelcomePopup />
       <div className="min-h-screen bg-background panel-grid">
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
