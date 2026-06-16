@@ -363,7 +363,23 @@ export default function RenewalsPage() {
   useEffect(() => {
     setLoading(true);
     Promise.all([fetchRenewals(), fetchEmployees()])
-      .then(([renewalsData, employeesData]) => {
+      .then(async ([renewalsData, employeesData]) => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const toActivate = renewalsData.filter((r) => {
+          if (r.status !== "مجدول تجديد") return false;
+          const days = Math.ceil((new Date(r.renewal_date).getTime() - today.getTime()) / 86400000);
+          return days <= 7;
+        });
+        if (toActivate.length > 0) {
+          await Promise.all(
+            toActivate.map((r) => updateRenewal(r.id, { status: "مجدول" }))
+          );
+          const activatedIds = new Set(toActivate.map((r) => r.id));
+          renewalsData = renewalsData.map((r) =>
+            activatedIds.has(r.id) ? { ...r, status: "مجدول" } : r
+          );
+        }
         setRenewals(renewalsData);
         setEmployees(employeesData);
       })
