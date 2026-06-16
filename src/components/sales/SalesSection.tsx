@@ -795,6 +795,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
 
       if (editingId) {
         const oldDeal = deals.find((d) => d.id === editingId);
+        const isNewlyCompleted = oldDeal?.stage !== "مكتملة" && form.stage === "مكتملة";
         const updated = await updateDeal(editingId, {
           client_name: form.client_name,
           client_phone: form.client_phone,
@@ -809,6 +810,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
           notes: form.notes || undefined,
           last_contact: form.last_contact || undefined,
           callback_date: form.stage === "اعادة الاتصال في وقت اخر" && form.callback_date ? new Date(form.callback_date).toISOString() : undefined,
+          ...(isNewlyCompleted && !oldDeal?.close_date ? { close_date: new Date().toISOString().slice(0, 10) } : {}),
           month,
           year,
         });
@@ -857,6 +859,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
           notes: form.notes || undefined,
           last_contact: form.last_contact || undefined,
           callback_date: form.stage === "اعادة الاتصال في وقت اخر" && form.callback_date ? new Date(form.callback_date).toISOString() : undefined,
+          ...(form.stage === "مكتملة" ? { close_date: new Date().toISOString().slice(0, 10) } : {}),
           cycle_days: 0,
           month,
           year,

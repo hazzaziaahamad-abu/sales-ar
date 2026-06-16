@@ -648,13 +648,14 @@ export default function RenewalsPage() {
     if (!form.customer_name.trim() || !form.plan_name.trim() || !form.renewal_date) return;
     setSaving(true);
     try {
+      const isCompleting = form.status === "مكتمل";
       const payload = {
         customer_name: form.customer_name,
         customer_phone: form.customer_phone || undefined,
         plan_name: form.plan_name,
         plan_price: form.plan_price,
         renewal_date: form.renewal_date,
-        payment_date: form.payment_date || undefined,
+        payment_date: form.payment_date || (isCompleting ? new Date().toISOString().slice(0, 10) : undefined),
         status: form.status,
         cancel_reason: form.status === "ملغي بسبب" ? form.cancel_reason || undefined : undefined,
         assigned_rep: form.assigned_rep || undefined,
