@@ -206,5 +206,6 @@ export const NAV_ITEMS = [
   { label: "الشراكات", href: "/partnerships", icon: "Handshake" },
   { label: "المسوقين", href: "/marketers", icon: "Megaphone" },
   { label: "الفريق", href: "/team", icon: "Users" },
+  { label: "فجوات التسجيل", href: "/registration-gaps", icon: "ClipboardCheck" },
   { label: "المالية", href: "/finance", icon: "Banknote" },
 ] as const;
