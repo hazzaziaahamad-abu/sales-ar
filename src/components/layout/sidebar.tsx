@@ -70,7 +70,7 @@ export const NAV_ITEMS = [
   { label: "المسوقين", href: "/marketers", slug: "marketers", icon: Megaphone, color: "pink", group: "الفريق والتطوير" },
   { label: "الفريق", href: "/team", slug: "team", icon: Users, color: "blue", group: "الفريق والتطوير" },
   { label: "أكاديمية التعلم", href: "/learning-academy", slug: "learning-academy", icon: GraduationCap, color: "emerald", group: "الفريق والتطوير" },
-  { label: "فجوات التسجيل", href: "/registration-gaps", slug: "registration-gaps", icon: ClipboardCheck, color: "rose", group: "تقرير الأداء" },
+  { label: "تقرير الأداء", href: "/registration-gaps", slug: "registration-gaps", icon: BarChart2, color: "rose", group: "تقرير الأداء" },
   { label: "الباقات", href: "/packages", slug: "packages", icon: Package, color: "violet", group: "النظام" },
   { label: "الأكاديمية", href: "/academy", slug: "academy", icon: GraduationCap, color: "amber", group: "النظام" },
   { label: "المالية", href: "/finance", slug: "finance", icon: Banknote, color: "lime", group: "النظام" },
