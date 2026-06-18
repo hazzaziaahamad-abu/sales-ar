@@ -1,5 +1,8 @@
 import { streamText, generateText, convertToModelMessages, tool, stepCountIs } from "ai";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import {
+  createGoogleGenerativeAI,
+  type GoogleLanguageModelOptions,
+} from "@ai-sdk/google";
 import { buildKnowledgeContext } from "@/lib/ai/knowledge";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -12,6 +15,14 @@ import { z } from "zod";
 const google = createGoogleGenerativeAI({
   apiKey: process.env.GEMINI_API_KEY!,
 });
+
+const AGENT_MODEL = process.env.AGENT_GEMINI_MODEL || "gemini-2.5-flash";
+const AGENT_THINKING_BUDGET = Number(process.env.AGENT_THINKING_BUDGET || 512);
+const FAST_GOOGLE_OPTIONS = {
+  thinkingConfig: {
+    thinkingBudget: AGENT_THINKING_BUDGET,
+  },
+} satisfies GoogleLanguageModelOptions;
 
 const AGENT_SYSTEM_PROMPT = `أنت "المساعد الذكي" — مساعد إدارة أعمال ذكي لشركة RESTAVO، شركة أتمتة مطاعم رائدة في السعودية.
 
@@ -58,6 +69,7 @@ const AGENT_SYSTEM_PROMPT = `أنت "المساعد الذكي" — مساعد �
 
 ## أداة queryDatabase:
 عندما يسألك المستخدم عن عميل معين أو صفقة أو تذكرة أو أي بيانات محددة، استخدم أداة queryDatabase للحصول على البيانات الدقيقة.
+السياق المرفق ملخص إجمالي فقط؛ استخدم الأداة أيضاً عند طلب قائمة أو تفاصيل أو أحدث سجلات.
 
 ### الجداول المتاحة:
 - **deals**: الصفقات (client_name, client_phone, deal_value, source, stage, probability, assigned_rep_name, cycle_days, deal_date, close_date, loss_reason, notes, month, year)
@@ -113,12 +125,15 @@ const AGENT_SYSTEM_PROMPT = `أنت "المساعد الذكي" — مساعد �
 \`\`\``;
 
 export async function POST(req: Request) {
+  const requestStartedAt = performance.now();
+
   try {
     const { messages, orgId } = await req.json();
     const ORG_ID = orgId || "00000000-0000-0000-0000-000000000001";
 
-
+    const knowledgeStartedAt = performance.now();
     const knowledgeContext = await buildKnowledgeContext(ORG_ID);
+    const knowledgeDurationMs = Math.round(performance.now() - knowledgeStartedAt);
     const modelMessages = await convertToModelMessages(messages);
 
     const supabase = await createServerSupabaseClient();
@@ -143,10 +158,34 @@ export async function POST(req: Request) {
     });
 
     const result = streamText({
-      model: google("gemini-3-flash-preview"),
+      model: google(AGENT_MODEL),
+      providerOptions: {
+        google: FAST_GOOGLE_OPTIONS,
+      },
       system: `${AGENT_SYSTEM_PROMPT}\n\n---\n\n## بيانات الشركة الحالية:\n${knowledgeContext}`,
       messages: modelMessages,
       stopWhen: stepCountIs(8),
+      abortSignal: AbortSignal.timeout(45_000),
+      onFinish: ({ usage, finishReason }) => {
+        console.info("[agent] response completed", {
+          orgId: ORG_ID,
+          model: AGENT_MODEL,
+          thinkingBudget: AGENT_THINKING_BUDGET,
+          durationMs: Math.round(performance.now() - requestStartedAt),
+          knowledgeDurationMs,
+          finishReason,
+          usage,
+        });
+      },
+      onError: ({ error }) => {
+        console.error("[agent] stream failed", {
+          orgId: ORG_ID,
+          model: AGENT_MODEL,
+          thinkingBudget: AGENT_THINKING_BUDGET,
+          durationMs: Math.round(performance.now() - requestStartedAt),
+          error,
+        });
+      },
       tools: {
         webSearch: tool({
           description: "Search the web for current information. Use this for market trends, competitor info, industry news, restaurant tech updates, or any information not available in the company database.",
@@ -156,7 +195,10 @@ export async function POST(req: Request) {
           execute: async ({ query }) => {
             try {
               const searchResult = await generateText({
-                model: google("gemini-3-flash-preview"),
+                model: google(AGENT_MODEL),
+                providerOptions: {
+                  google: FAST_GOOGLE_OPTIONS,
+                },
                 prompt: query,
                 tools: {
                   googleSearch: google.tools.googleSearch({}),
@@ -375,7 +417,13 @@ export async function POST(req: Request) {
       },
     });
 
-    return result.toUIMessageStreamResponse();
+    return result.toUIMessageStreamResponse({
+      headers: {
+        "Server-Timing": `knowledge;dur=${knowledgeDurationMs}`,
+        "X-Agent-Model": AGENT_MODEL,
+        "X-Agent-Thinking-Budget": String(AGENT_THINKING_BUDGET),
+      },
+    });
   } catch (error) {
     console.error("Agent error:", error);
     return new Response(JSON.stringify({ error: "فشل في الاتصال بالمساعد الذكي" }), {

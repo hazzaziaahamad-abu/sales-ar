@@ -2,6 +2,9 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Renewal, Review } from "@/types";
 
 const DEFAULT_ORG = "00000000-0000-0000-0000-000000000001";
+const KNOWLEDGE_CACHE_TTL_MS = 60_000;
+
+const knowledgeCache = new Map<string, { value: string; expiresAt: number }>();
 
 /**
  * Builds a knowledge context string from REAL Supabase data.
@@ -9,10 +12,18 @@ const DEFAULT_ORG = "00000000-0000-0000-0000-000000000001";
  * questions accurately with real numbers.
  */
 export async function buildKnowledgeContext(orgId?: string): Promise<string> {
-  const supabase = await createServerSupabaseClient();
   const ORG_ID = orgId || DEFAULT_ORG;
+  const cached = knowledgeCache.get(ORG_ID);
 
-  // Fetch all data in parallel
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value;
+  }
+
+  const startedAt = performance.now();
+  const supabase = await createServerSupabaseClient();
+
+  // Fetch only columns needed for aggregate context. Detailed records are
+  // retrieved on demand through the agent's queryDatabase tool.
   const [
     { data: deals },
     { data: tickets },
@@ -23,24 +34,44 @@ export async function buildKnowledgeContext(orgId?: string): Promise<string> {
     { data: renewals },
     { data: reviews },
   ] = await Promise.all([
-    supabase.from("deals").select("*").eq("org_id", ORG_ID).order("created_at", { ascending: false }),
-    supabase.from("tickets").select("*").eq("org_id", ORG_ID).order("created_at", { ascending: false }),
-    supabase.from("employees").select("*").eq("org_id", ORG_ID),
-    supabase.from("projects").select("*").eq("org_id", ORG_ID),
-    supabase.from("partnerships").select("*").eq("org_id", ORG_ID),
-    supabase.from("kpi_snapshots").select("*").eq("org_id", ORG_ID).order("year").order("month"),
-    supabase.from("renewals").select("*").eq("org_id", ORG_ID).order("renewal_date", { ascending: true }),
-    supabase.from("reviews").select("*").eq("org_id", ORG_ID).order("created_at", { ascending: false }),
+    supabase
+      .from("deals")
+      .select("client_name,deal_value,source,stage,probability,assigned_rep_name,cycle_days,month,year")
+      .eq("org_id", ORG_ID),
+    supabase
+      .from("tickets")
+      .select("priority,status,assigned_agent_name,response_time_minutes")
+      .eq("org_id", ORG_ID),
+    supabase.from("employees").select("name,role,status").eq("org_id", ORG_ID),
+    supabase
+      .from("projects")
+      .select("name,team,progress,remaining_tasks,status_tag")
+      .eq("org_id", ORG_ID),
+    supabase
+      .from("partnerships")
+      .select("name,type,status,value,manager_name")
+      .eq("org_id", ORG_ID),
+    supabase
+      .from("kpi_snapshots")
+      .select("month,year,total_revenue,total_deals,closed_deals,close_rate,target_revenue")
+      .eq("org_id", ORG_ID)
+      .order("year")
+      .order("month"),
+    supabase
+      .from("renewals")
+      .select("plan_price,status,renewal_date")
+      .eq("org_id", ORG_ID),
+    supabase.from("reviews").select("stars,type").eq("org_id", ORG_ID),
   ]);
 
-  const allDeals = (deals ?? []) as Deal[];
-  const allTickets = (tickets ?? []) as Ticket[];
-  const allEmployees = (employees ?? []) as Employee[];
-  const allProjects = (projects ?? []) as Project[];
-  const allPartnerships = (partnerships ?? []) as Partnership[];
-  const allKpi = (kpiSnapshots ?? []) as KPISnapshot[];
-  const allRenewals = (renewals ?? []) as Renewal[];
-  const allReviews = (reviews ?? []) as Review[];
+  const allDeals = (deals ?? []) as unknown as Deal[];
+  const allTickets = (tickets ?? []) as unknown as Ticket[];
+  const allEmployees = (employees ?? []) as unknown as Employee[];
+  const allProjects = (projects ?? []) as unknown as Project[];
+  const allPartnerships = (partnerships ?? []) as unknown as Partnership[];
+  const allKpi = (kpiSnapshots ?? []) as unknown as KPISnapshot[];
+  const allRenewals = (renewals ?? []) as unknown as Renewal[];
+  const allReviews = (reviews ?? []) as unknown as Review[];
 
   const sections: string[] = [];
 
@@ -91,12 +122,7 @@ ${totalTarget > 0 ? `- إجمالي الأهداف: $${totalTarget >= 1000000 ? 
 - متوسط قيمة الصفقة: $${(avgDealValue / 1000).toFixed(0)}K
 - متوسط دورة البيع: ${avgCycle.toFixed(0)} يوم
 - توزيع المراحل: ${Object.entries(stageDist).map(([s, c]) => `${s} (${c})`).join("، ")}
-${Object.keys(sourceDist).length > 0 ? `- توزيع المصادر: ${Object.entries(sourceDist).map(([s, c]) => `${s} (${c})`).join("، ")}` : ""}
-
-### تفاصيل الصفقات:
-| العميل | القيمة | المرحلة | الاحتمالية | المسؤول | دورة البيع |
-|--------|--------|---------|-----------|---------|-----------|
-${allDeals.slice(0, 30).map((d) => `| ${d.client_name} | $${(d.deal_value / 1000).toFixed(0)}K | ${d.stage} | ${d.probability}% | ${d.assigned_rep_name || "—"} | ${d.cycle_days} يوم |`).join("\n")}${allDeals.length > 30 ? `\n... و${allDeals.length - 30} صفقة أخرى` : ""}`);
+${Object.keys(sourceDist).length > 0 ? `- توزيع المصادر: ${Object.entries(sourceDist).map(([s, c]) => `${s} (${c})`).join("، ")}` : ""}`);
 
     // Per-rep breakdown
     const repDeals = allDeals.reduce((acc, d) => {
@@ -127,10 +153,7 @@ ${Object.entries(repDeals).map(([name, stats]) => `- ${name}: ${stats.deals} ص�
 - إجمالي التذاكر: ${allTickets.length}
 - مفتوحة: ${openTickets.length} | قيد الحل: ${inProgress.length} | محلولة: ${resolvedTickets.length}
 - عاجلة: ${urgentTickets.length}
-- معدل الحل: ${((resolvedTickets.length / allTickets.length) * 100).toFixed(0)}%
-
-### تفاصيل التذاكر:
-${allTickets.slice(0, 20).map((t) => `| #${t.ticket_number || "—"} | ${t.client_name} | ${t.issue} | ${t.priority} | ${t.status} | ${t.assigned_agent_name || "—"} |`).join("\n")}${allTickets.length > 20 ? `\n... و${allTickets.length - 20} تذكرة أخرى` : ""}`);
+- معدل الحل: ${((resolvedTickets.length / allTickets.length) * 100).toFixed(0)}%`);
   } else {
     sections.push(`## الدعم الفني\nلا توجد تذاكر دعم في النظام بعد.`);
   }
@@ -201,12 +224,7 @@ ${allPartnerships.map((p) => `- ${p.name}: ${p.type || "—"} | ${p.status || "�
 
     sections.push(`## التجديدات (${allRenewals.length} تجديد)
 - نشطة: ${activeRenewals.length} | منتهية: ${expiredRenewals.length} | ملغية: ${cancelledRenewals.length}
-- القيمة الإجمالية: $${totalValue >= 1000000 ? (totalValue / 1000000).toFixed(1) + "M" : (totalValue / 1000).toFixed(0) + "K"}
-
-### تفاصيل التجديدات:
-| العميل | الخطة | السعر | الحالة | تاريخ التجديد |
-|--------|-------|-------|--------|--------------|
-${allRenewals.slice(0, 20).map((r) => `| ${r.customer_name} | ${r.plan_name || "—"} | $${r.plan_price || 0} | ${r.status} | ${r.renewal_date || "—"} |`).join("\n")}${allRenewals.length > 20 ? `\n... و${allRenewals.length - 20} تجديد آخر` : ""}`);
+- القيمة الإجمالية: $${totalValue >= 1000000 ? (totalValue / 1000000).toFixed(1) + "M" : (totalValue / 1000).toFixed(0) + "K"}`);
   } else {
     sections.push(`## التجديدات\nلا توجد تجديدات مسجلة في النظام بعد.`);
   }
@@ -222,12 +240,7 @@ ${allRenewals.slice(0, 20).map((r) => `| ${r.customer_name} | ${r.plan_name || "
 
     sections.push(`## تقييمات العملاء (${allReviews.length} تقييم)
 - متوسط التقييم: ${avgRating.toFixed(1)} / 5
-- توزيع التقييمات: ${Object.entries(typeDist).map(([t, c]) => `${t} (${c})`).join("، ")}
-
-### تفاصيل التقييمات:
-| العميل | التقييم | النوع | التعليق | التاريخ |
-|--------|---------|-------|---------|--------|
-${allReviews.slice(0, 20).map((r) => `| ${r.customer_name} | ${"⭐".repeat(r.stars || 0)} | ${r.type || "—"} | ${r.comment ? r.comment.slice(0, 50) : "—"} | ${r.review_date || "—"} |`).join("\n")}${allReviews.length > 20 ? `\n... و${allReviews.length - 20} تقييم آخر` : ""}`);
+- توزيع التقييمات: ${Object.entries(typeDist).map(([t, c]) => `${t} (${c})`).join("، ")}`);
   } else {
     sections.push(`## تقييمات العملاء\nلا توجد تقييمات مسجلة في النظام بعد.`);
   }
@@ -241,5 +254,27 @@ ${allReviews.slice(0, 20).map((r) => `| ${r.customer_name} | ${"⭐".repeat(r.st
 إذا سأل المستخدم عن تحليل أو أرقام، أخبره أنه يجب رفع البيانات أولاً.`);
   }
 
-  return sections.join("\n\n");
+  sections.push(`## تعليمات دقة البيانات
+- هذا السياق ملخص إجمالي سريع.
+- لأي أسماء عملاء، أرقام جوال، صفقات أو تذاكر محددة، استخدم أداة queryDatabase بدل التخمين.`);
+
+  const context = sections.join("\n\n");
+  knowledgeCache.set(ORG_ID, {
+    value: context,
+    expiresAt: Date.now() + KNOWLEDGE_CACHE_TTL_MS,
+  });
+
+  console.info("[agent] knowledge context built", {
+    orgId: ORG_ID,
+    durationMs: Math.round(performance.now() - startedAt),
+    contextChars: context.length,
+    counts: {
+      deals: allDeals.length,
+      tickets: allTickets.length,
+      renewals: allRenewals.length,
+      reviews: allReviews.length,
+    },
+  });
+
+  return context;
 }

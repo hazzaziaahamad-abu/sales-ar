@@ -91,7 +91,7 @@ const SUGGESTED_PROMPTS = [
 
 export default function AgentPage() {
   const { orgId } = useOrg();
-  const { messages, sendMessage, status, setMessages, addToolApprovalResponse } = useChat({
+  const { messages, sendMessage, status, error, setMessages, addToolApprovalResponse } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/agent",
       body: { orgId },
@@ -582,6 +582,12 @@ export default function AgentPage() {
                     <span className="w-1.5 h-1.5 bg-cyan rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
                     <span className="w-1.5 h-1.5 bg-cyan rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
                   </div>
+                </div>
+              )}
+
+              {error && (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                  تعذر إكمال الرد. حاول مرة ثانية، وإذا استمرت المشكلة تواصل مع مسؤول النظام.
                 </div>
               )}
             </div>
