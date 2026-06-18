@@ -208,7 +208,7 @@ export default function AgentPage() {
   };
 
   return (
-    <div className="flex flex-col gap-3" style={{ height: "calc(100vh - 7rem)" }}>
+    <div className="flex flex-col gap-3" style={{ height: "calc(100vh - 5rem)" }}>
       {/* Tab bar */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "chat" | "tasks")}>
         <TabsList variant="line">
@@ -227,8 +227,8 @@ export default function AgentPage() {
         <ScheduledTasksTab orgId={orgId} />
       ) : (
       <div className="flex gap-4 relative flex-1 min-h-0">
-      {/* Conversations Sidebar */}
-      <div className="w-[240px] flex-shrink-0 cc-card rounded-xl flex flex-col overflow-hidden">
+      {/* Conversations Sidebar — hidden on mobile */}
+      <div className="hidden md:flex w-[240px] flex-shrink-0 cc-card rounded-xl flex-col overflow-hidden">
         <div className="p-3 border-b border-border">
           <Button
             onClick={handleNewChat}
@@ -277,31 +277,30 @@ export default function AgentPage() {
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col cc-card rounded-xl overflow-hidden min-h-0">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-border">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan to-cc-purple flex items-center justify-center">
-              <Bot className="w-5 h-5 text-white" />
+        <div className="flex items-center justify-between px-3 sm:px-5 py-3 border-b border-border">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-cyan to-cc-purple flex items-center justify-center">
+              <Bot className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-foreground">المساعد الذكي</h3>
-              <p className="text-[12px] text-muted-foreground">مستشار أعمال — مدعوم بـ Gemini AI</p>
+              <h3 className="text-xs sm:text-sm font-bold text-foreground">المساعد الذكي</h3>
+              <p className="text-[11px] sm:text-[12px] text-muted-foreground hidden sm:block">مستشار أعمال — مدعوم بـ Gemini AI</p>
             </div>
           </div>
-          {messages.length > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleNewChat}
-              className="text-muted-foreground text-xs gap-1.5"
-            >
-              <RotateCcw className="w-3 h-3" />
-              محادثة جديدة
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleNewChat}
+            className="text-muted-foreground text-xs gap-1.5"
+          >
+            <RotateCcw className="w-3 h-3" />
+            <span className="hidden sm:inline">محادثة جديدة</span>
+            <span className="sm:hidden">جديدة</span>
+          </Button>
         </div>
 
         {/* Messages */}
-        <div className="flex-1 min-h-0 overflow-y-auto px-5" ref={scrollRef}>
+        <div className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-5" ref={scrollRef}>
           {messages.length === 0 ? (
             /* Empty State — Suggested Prompts */
             <div className="flex flex-col items-center justify-center h-full py-12">
@@ -313,7 +312,7 @@ export default function AgentPage() {
                 أقدر أساعدك في تحليل بيانات الشركة، متابعة الأداء، وتقديم توصيات عملية. اختر موضوع أو اكتب سؤالك.
               </p>
 
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 w-full max-w-2xl">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 w-full max-w-2xl">
                 {SUGGESTED_PROMPTS.map((item, i) => {
                   const Icon = item.icon;
                   return (
@@ -595,21 +594,21 @@ export default function AgentPage() {
         </div>
 
         {/* Input Area — always visible */}
-        <div className="flex-shrink-0 p-4 border-t border-border bg-card">
-          <div className="flex items-end gap-3">
+        <div className="flex-shrink-0 p-2.5 sm:p-4 border-t border-border bg-card">
+          <div className="flex items-end gap-2 sm:gap-3">
             <div className="flex-1 relative">
               <textarea
                 ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="اسأل عن المبيعات، الفريق، الدعم، المالية..."
+                placeholder="اسأل عن المبيعات، الفريق، الدعم..."
                 rows={1}
-                className="w-full resize-none bg-muted/50 rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground border border-border focus:border-cyan/50 focus:outline-none focus:ring-1 focus:ring-cyan/25 transition-colors"
-                style={{ minHeight: "48px", maxHeight: "120px" }}
+                className="w-full resize-none bg-muted/50 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-sm text-foreground placeholder:text-muted-foreground border border-border focus:border-cyan/50 focus:outline-none focus:ring-1 focus:ring-cyan/25 transition-colors"
+                style={{ minHeight: "44px", maxHeight: "120px" }}
                 onInput={(e) => {
                   const target = e.target as HTMLTextAreaElement;
-                  target.style.height = "48px";
+                  target.style.height = "44px";
                   target.style.height = Math.min(target.scrollHeight, 120) + "px";
                 }}
               />
@@ -618,12 +617,12 @@ export default function AgentPage() {
               type="button"
               onClick={() => submitMessage(input)}
               disabled={!input.trim() || isLoading}
-              className="h-12 w-12 rounded-xl bg-gradient-to-br from-cyan to-cyan/80 hover:from-cyan/90 hover:to-cyan/70 text-background disabled:opacity-30"
+              className="h-11 w-11 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-cyan to-cyan/80 hover:from-cyan/90 hover:to-cyan/70 text-background disabled:opacity-30"
             >
               <Send className="w-4 h-4" />
             </Button>
           </div>
-          <p className="text-[12px] text-muted-foreground text-center mt-2">
+          <p className="text-[11px] sm:text-[12px] text-muted-foreground text-center mt-1.5 sm:mt-2 hidden sm:block">
             المساعد الذكي مدعوم بـ Gemini AI — الإجابات مبنية على بيانات الشركة الفعلية
           </p>
         </div>
