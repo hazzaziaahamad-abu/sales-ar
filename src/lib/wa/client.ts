@@ -2,46 +2,73 @@
  * OpenWA gateway client (server-side only).
  *
  * Wraps the OpenWA REST API (https://github.com/rmyndharis/OpenWA).
- * Auth is via the `X-API-Key` header. The session we operate on is configured
- * through WA_SESSION_ID — which may be either the session UUID or its
- * human-readable name; `resolveSessionId` handles both.
+ * Auth is via the `X-API-Key` header.
+ *
+ * MULTI-TENANT MODEL: one WhatsApp session per organization. Each org's
+ * session is named deterministically (`dash-org-<orgId>`) so it can be
+ * resolved/created on demand without a database. We NEVER touch sessions we
+ * didn't create (e.g. the legacy `rawasm` session used by the old project) —
+ * all lookups go through the `dash-org-` naming convention.
  */
 
 const WA_API_URL = process.env.WA_API_URL;
 const WA_API_KEY = process.env.WA_API_KEY;
-const WA_SESSION = process.env.WA_SESSION_ID;
 const WA_WEBHOOK_URL = process.env.WA_PUBLIC_WEBHOOK_URL;
 const WA_WEBHOOK_SECRET = process.env.WA_WEBHOOK_SECRET;
 
-export type WaStatus =
-  | "INITIALIZING"
-  | "SCAN_QR"
-  | "CONNECTING"
-  | "CONNECTED"
-  | "DISCONNECTED"
-  | "FAILED";
+/** Raw status values reported by the gateway. */
+export type WaRawStatus =
+  | "created"
+  | "initializing"
+  | "qr_ready"
+  | "authenticating"
+  | "ready"
+  | "disconnected"
+  | "failed";
 
 export interface WaSession {
   id: string;
   name: string;
-  status: WaStatus;
-  phoneNumber?: string | null;
+  status: WaRawStatus | string;
+  phone?: string | null;
+  pushName?: string | null;
+  connectedAt?: string | null;
+  lastActive?: string | null;
   createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface WaQr {
-  code?: string;
-  /** data:image/png;base64,... */
-  image?: string;
+  qrCode?: string; // data:image/png;base64,...
+  status?: string;
 }
 
+const SESSION_PREFIX = "dash-org-";
+
 export function isWaConfigured(): boolean {
-  return Boolean(WA_API_URL && WA_API_KEY && WA_SESSION);
+  return Boolean(WA_API_URL && WA_API_KEY);
+}
+
+/** Deterministic gateway session name for an organization. */
+export function sessionNameForOrg(orgId: string): string {
+  const safe = String(orgId).toLowerCase().replace(/[^a-z0-9-]/g, "");
+  return `${SESSION_PREFIX}${safe}`.slice(0, 50);
+}
+
+/** Extract the org id from a `dash-org-<orgId>` session name, or null. */
+export function orgIdFromSessionName(name: string | undefined | null): string | null {
+  if (!name || !name.startsWith(SESSION_PREFIX)) return null;
+  return name.slice(SESSION_PREFIX.length) || null;
+}
+
+/** True for any status meaning the number is paired & online. */
+export function isConnectedStatus(status: string | undefined | null): boolean {
+  const s = String(status ?? "").toLowerCase();
+  return s === "ready" || s === "authenticated";
 }
 
 function baseUrl(): string {
   if (!WA_API_URL) throw new Error("WA_API_URL is not set");
-  // Gateway exposes the REST API under /api
   return WA_API_URL.replace(/\/+$/, "") + "/api";
 }
 
@@ -54,7 +81,6 @@ async function waFetch(path: string, init?: RequestInit): Promise<Response> {
       "Content-Type": "application/json",
       ...(init?.headers || {}),
     },
-    // The gateway state changes frequently — never cache.
     cache: "no-store",
   });
 }
@@ -67,69 +93,94 @@ export async function listSessions(): Promise<WaSession[]> {
   return Array.isArray(data) ? data : data?.sessions ?? [];
 }
 
-/**
- * Resolve the configured WA_SESSION_ID to the gateway's canonical session id.
- * WA_SESSION_ID may be the UUID or the name; we look it up either way and fall
- * back to using the raw value directly if the session list is unavailable.
- */
-let cachedSessionId: string | null = null;
-export async function resolveSessionId(): Promise<string> {
-  if (!WA_SESSION) throw new Error("WA_SESSION_ID is not set");
-  if (cachedSessionId) return cachedSessionId;
-  try {
-    const sessions = await listSessions();
-    const match = sessions.find(
-      (s) => s.id === WA_SESSION || s.name === WA_SESSION
-    );
-    cachedSessionId = match?.id ?? WA_SESSION;
-  } catch {
-    cachedSessionId = WA_SESSION;
-  }
-  return cachedSessionId;
-}
-
-/** Get the current session record (status, phone number, etc). */
-export async function getSession(): Promise<WaSession | null> {
-  const id = await resolveSessionId();
+/** Get a session by its gateway id. */
+export async function getSessionById(id: string): Promise<WaSession | null> {
   const res = await waFetch(`/sessions/${id}`);
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`OpenWA getSession failed: ${res.status}`);
   return res.json();
 }
 
-/**
- * Make sure the session exists and is started so a QR can be generated.
- * Creates it if missing, then starts it. Safe to call repeatedly.
- */
-export async function ensureSessionStarted(): Promise<WaSession | null> {
-  let session = await getSession();
-  if (!session) {
-    // Create with the configured value as the name.
-    const createRes = await waFetch("/sessions", {
-      method: "POST",
-      body: JSON.stringify({ name: WA_SESSION }),
-    });
-    if (createRes.ok) {
-      session = await createRes.json();
-      cachedSessionId = session?.id ?? cachedSessionId;
-    }
+/** Find the session belonging to an org (by naming convention), or null. */
+export async function resolveOrgSession(orgId: string): Promise<WaSession | null> {
+  const name = sessionNameForOrg(orgId);
+  const sessions = await listSessions();
+  return sessions.find((s) => s.name === name) ?? null;
+}
+
+/** Create a new session for an org. */
+async function createOrgSession(orgId: string): Promise<WaSession> {
+  const res = await waFetch("/sessions", {
+    method: "POST",
+    body: JSON.stringify({ name: sessionNameForOrg(orgId) }),
+  });
+  if (res.status === 409) {
+    // Race: someone created it — just resolve.
+    const existing = await resolveOrgSession(orgId);
+    if (existing) return existing;
   }
-  const id = cachedSessionId ?? (await resolveSessionId());
-  // Starting an already-started session is a no-op on the gateway.
+  if (!res.ok) throw new Error(`OpenWA createSession failed: ${res.status}`);
+  return res.json();
+}
+
+/** Start a session (begins WhatsApp connection / QR generation). */
+async function startSession(id: string): Promise<void> {
+  // 400 = already started; treat as success.
   await waFetch(`/sessions/${id}/start`, { method: "POST" }).catch(() => {});
-  return getSession();
+}
+
+/** Stop a session (disconnects WhatsApp but keeps the session record). */
+export async function stopOrgSession(orgId: string): Promise<boolean> {
+  const session = await resolveOrgSession(orgId);
+  if (!session) return false;
+  const res = await waFetch(`/sessions/${session.id}/stop`, { method: "POST" });
+  return res.ok;
 }
 
 /**
- * Register our inbound webhook with the gateway so it forwards incoming
- * messages + status changes to us. Idempotent-ish: safe to call on connect.
- * Skipped if the webhook URL still points at localhost (not reachable by the
- * remote gateway).
+ * Delete an org's session entirely. Use this to "switch numbers": after
+ * deletion, the next connect() creates a fresh session and shows a new QR.
  */
-export async function registerWebhook(): Promise<boolean> {
+export async function deleteOrgSession(orgId: string): Promise<boolean> {
+  const session = await resolveOrgSession(orgId);
+  if (!session) return true;
+  const res = await waFetch(`/sessions/${session.id}`, { method: "DELETE" });
+  return res.ok || res.status === 404;
+}
+
+/**
+ * Ensure an org has a started session, register our webhook, and return it.
+ * Creates the session if it doesn't exist. Never affects other sessions.
+ */
+export async function ensureOrgSession(orgId: string): Promise<WaSession | null> {
+  let session = await resolveOrgSession(orgId);
+  if (!session) {
+    session = await createOrgSession(orgId);
+  }
+  if (session?.id) {
+    await startSession(session.id);
+    await registerWebhook(session.id).catch(() => {});
+    session = (await getSessionById(session.id)) ?? session;
+  }
+  return session;
+}
+
+/** Get the QR code for an org's session, or null if none/connected. */
+export async function getOrgQr(orgId: string): Promise<WaQr | null> {
+  const session = await resolveOrgSession(orgId);
+  if (!session) return null;
+  if (isConnectedStatus(session.status)) return null;
+  const res = await waFetch(`/sessions/${session.id}/qr`);
+  // 400 = not ready yet or already authenticated.
+  if (res.status === 400 || res.status === 404 || res.status === 409) return null;
+  if (!res.ok) throw new Error(`OpenWA getQr failed: ${res.status}`);
+  return res.json();
+}
+
+/** Register our inbound webhook with the gateway for a session. */
+export async function registerWebhook(sessionId: string): Promise<boolean> {
   if (!WA_WEBHOOK_URL || WA_WEBHOOK_URL.includes("localhost")) return false;
-  const id = await resolveSessionId();
-  const res = await waFetch(`/sessions/${id}/webhooks`, {
+  const res = await waFetch(`/sessions/${sessionId}/webhooks`, {
     method: "POST",
     body: JSON.stringify({
       url: WA_WEBHOOK_URL,
@@ -140,20 +191,19 @@ export async function registerWebhook(): Promise<boolean> {
   return Boolean(res?.ok);
 }
 
-/** Fetch the QR code for scanning. */
-export async function getQr(): Promise<WaQr | null> {
-  const id = await resolveSessionId();
-  const res = await waFetch(`/sessions/${id}/qr`);
-  if (res.status === 404 || res.status === 409) return null;
-  if (!res.ok) throw new Error(`OpenWA getQr failed: ${res.status}`);
-  return res.json();
-}
-
-/** Send a plain text message. `to` may be a bare phone number or a chatId. */
-export async function sendText(to: string, text: string): Promise<unknown> {
-  const id = await resolveSessionId();
+/** Send a plain text message from an org's session. */
+export async function sendTextFromOrg(
+  orgId: string,
+  to: string,
+  text: string
+): Promise<unknown> {
+  const session = await resolveOrgSession(orgId);
+  if (!session) throw new Error("No WhatsApp session for this organization");
+  if (!isConnectedStatus(session.status)) {
+    throw new Error("WhatsApp number is not connected");
+  }
   const chatId = to.includes("@") ? to : `${to.replace(/[^\d]/g, "")}@c.us`;
-  const res = await waFetch(`/sessions/${id}/messages/send-text`, {
+  const res = await waFetch(`/sessions/${session.id}/messages/send-text`, {
     method: "POST",
     body: JSON.stringify({ chatId, text }),
   });

@@ -1,10 +1,13 @@
-import { NextResponse } from "next/server";
-import { getSession, isWaConfigured } from "@/lib/wa/client";
+import { NextRequest, NextResponse } from "next/server";
+import { resolveOrgSession, isWaConfigured } from "@/lib/wa/client";
 import { requireUser } from "../_auth";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const user = await requireUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const orgId = req.nextUrl.searchParams.get("orgId");
+  if (!orgId) return NextResponse.json({ error: "orgId is required" }, { status: 400 });
 
   if (!isWaConfigured()) {
     return NextResponse.json(
@@ -14,13 +17,14 @@ export async function GET() {
   }
 
   try {
-    const session = await getSession();
+    const session = await resolveOrgSession(orgId);
     if (!session) {
-      return NextResponse.json({ status: "DISCONNECTED", session: null });
+      return NextResponse.json({ status: "disconnected", session: null });
     }
     return NextResponse.json({
       status: session.status,
-      phoneNumber: session.phoneNumber ?? null,
+      phone: session.phone ?? null,
+      pushName: session.pushName ?? null,
       session,
     });
   } catch (err) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
+import { getSessionById, orgIdFromSessionName } from "@/lib/wa/client";
 
 /**
  * Inbound webhook from the OpenWA gateway.
@@ -46,11 +47,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
+  // Resolve which organization this event belongs to (best-effort) so the
+  // event can be routed/persisted per-tenant. The gateway session name encodes
+  // the org id (`dash-org-<orgId>`).
+  let orgId: string | null = null;
+  if (payload.sessionId) {
+    try {
+      const session = await getSessionById(payload.sessionId);
+      orgId = orgIdFromSessionName(session?.name);
+    } catch {
+      // gateway unreachable — fall through, still ack
+    }
+  }
+
   switch (payload.event) {
     case "message.received": {
       const m = payload.data ?? {};
-      // TODO: persist to a `wa_messages` table / forward to the UI.
+      // TODO: persist to a `wa_messages` table for an in-app inbox.
       console.log("[wa] message.received", {
+        orgId,
         from: m.from,
         body: m.body,
         type: m.type,
@@ -58,11 +73,11 @@ export async function POST(req: NextRequest) {
       break;
     }
     case "session.status": {
-      console.log("[wa] session.status", payload.data?.status);
+      console.log("[wa] session.status", { orgId, status: payload.data?.status });
       break;
     }
     default:
-      console.log("[wa] unhandled event", payload.event);
+      console.log("[wa] unhandled event", { orgId, event: payload.event });
   }
 
   // Always ack quickly so the gateway doesn't retry.

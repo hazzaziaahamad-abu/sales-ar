@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ColorBadge } from "@/components/ui/color-badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/lib/auth-context";
 import {
   MessageCircle,
   RefreshCw,
@@ -21,6 +22,7 @@ import {
   QrCode,
   CheckCircle2,
   AlertTriangle,
+  Power,
 } from "lucide-react";
 
 type WaStatus =
@@ -47,25 +49,31 @@ const STATUS_META: Record<
 
 const FALLBACK_META = { label: "غير معروف", color: "amber" as const };
 
-// The gateway may report statuses in different casing or with aliases
-// (e.g. whatsapp-web.js states). Normalize to our known set.
+// OpenWA statuses: created | initializing | qr_ready | authenticating |
+// ready | disconnected | failed. Normalize to our display set.
 function normalizeStatus(raw: unknown): WaStatus {
   const s = String(raw ?? "").toUpperCase().replace(/[\s-]+/g, "_");
   if (s in STATUS_META) return s as WaStatus;
   if (["READY", "AUTHENTICATED", "OPEN", "WORKING"].includes(s)) return "CONNECTED";
-  if (["QRCODE", "QR", "SCAN_QR_CODE", "PAIRING"].includes(s)) return "SCAN_QR";
-  if (["STARTING", "OPENING", "TIMEOUT"].includes(s)) return "CONNECTING";
+  if (["QR_READY", "QRCODE", "QR", "SCAN_QR_CODE", "PAIRING"].includes(s)) return "SCAN_QR";
+  if (["AUTHENTICATING", "STARTING", "OPENING", "TIMEOUT"].includes(s)) return "CONNECTING";
+  if (["CREATED"].includes(s)) return "INITIALIZING";
   if (["STOPPED", "LOGGED_OUT", "CLOSED", "CONFLICT"].includes(s)) return "DISCONNECTED";
   if (["ERROR", "UNLAUNCHED"].includes(s)) return "FAILED";
   return "DISCONNECTED";
 }
 
 export default function WhatsAppPage() {
+  const { activeOrgId, orgs } = useAuth();
+  const orgName = orgs.find((o) => o.id === activeOrgId)?.nameAr ?? "";
+
   const [status, setStatus] = useState<WaStatus>("LOADING");
   const [phone, setPhone] = useState<string | null>(null);
+  const [pushName, setPushName] = useState<string | null>(null);
   const [qr, setQr] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // --- test sender state ---
@@ -75,8 +83,9 @@ export default function WhatsAppPage() {
   const [sendMsg, setSendMsg] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
+    if (!activeOrgId) return;
     try {
-      const res = await fetch("/api/wa/status");
+      const res = await fetch(`/api/wa/status?orgId=${encodeURIComponent(activeOrgId)}`);
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || "تعذّر الاتصال بالبوابة");
@@ -84,14 +93,16 @@ export default function WhatsAppPage() {
         return;
       }
       setError(null);
-      setStatus(normalizeStatus(data.status));
-      setPhone(data.phoneNumber ?? null);
+      const norm = normalizeStatus(data.status);
+      setStatus(norm);
+      setPhone(data.phone ?? null);
+      setPushName(data.pushName ?? null);
 
       // If not connected, fetch a fresh QR to display.
-      if (data.status !== "CONNECTED") {
-        const qrRes = await fetch("/api/wa/qr");
+      if (norm !== "CONNECTED") {
+        const qrRes = await fetch(`/api/wa/qr?orgId=${encodeURIComponent(activeOrgId)}`);
         const qrData = await qrRes.json();
-        setQr(qrData?.qr?.image ?? null);
+        setQr(qrData?.qr?.qrCode ?? null);
       } else {
         setQr(null);
       }
@@ -99,10 +110,14 @@ export default function WhatsAppPage() {
       setError("تعذّر الوصول إلى الخادم");
       setStatus("FAILED");
     }
-  }, []);
+  }, [activeOrgId]);
 
-  // Initial load + polling.
+  // Initial load + polling. Re-runs when the active org changes.
   useEffect(() => {
+    setStatus("LOADING");
+    setQr(null);
+    setPhone(null);
+    setPushName(null);
     refresh();
     pollRef.current = setInterval(refresh, 4000);
     return () => {
@@ -111,16 +126,21 @@ export default function WhatsAppPage() {
   }, [refresh]);
 
   const handleConnect = async () => {
+    if (!activeOrgId) return;
     setConnecting(true);
     setError(null);
     try {
-      const res = await fetch("/api/wa/connect", { method: "POST" });
+      const res = await fetch("/api/wa/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orgId: activeOrgId }),
+      });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || "تعذّر بدء الجلسة");
       } else {
         setStatus(normalizeStatus(data.status));
-        setQr(data?.qr?.image ?? null);
+        setQr(data?.qr?.qrCode ?? null);
       }
     } catch {
       setError("تعذّر بدء الجلسة");
@@ -129,15 +149,43 @@ export default function WhatsAppPage() {
     }
   };
 
+  const handleDisconnect = async () => {
+    if (!activeOrgId) return;
+    if (!confirm("سيتم فصل الرقم الحالي حتى تتمكن من ربط رقم آخر. متابعة؟")) return;
+    setDisconnecting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/wa/disconnect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orgId: activeOrgId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "تعذّر فصل الرقم");
+      } else {
+        setStatus("DISCONNECTED");
+        setPhone(null);
+        setPushName(null);
+        setQr(null);
+      }
+    } catch {
+      setError("تعذّر فصل الرقم");
+    } finally {
+      setDisconnecting(false);
+    }
+  };
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!activeOrgId) return;
     setSending(true);
     setSendMsg(null);
     try {
       const res = await fetch("/api/wa/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to, text }),
+        body: JSON.stringify({ orgId: activeOrgId, to, text }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -167,7 +215,7 @@ export default function WhatsAppPage() {
           <div>
             <h1 className="text-xl font-extrabold text-foreground">واتساب</h1>
             <p className="text-xs text-muted-foreground">
-              ربط رقم واتساب لإرسال واستقبال الرسائل
+              ربط رقم واتساب لـ{orgName ? ` ${orgName}` : "المنظمة"} — رقم مستقل لكل منظمة
             </p>
           </div>
         </div>
@@ -211,6 +259,9 @@ export default function WhatsAppPage() {
                 </div>
                 <div>
                   <p className="font-semibold text-foreground">الرقم متصل</p>
+                  {pushName && (
+                    <p className="mt-0.5 text-sm text-foreground">{pushName}</p>
+                  )}
                   {phone && (
                     <p
                       className="mt-1 flex items-center justify-center gap-1.5 text-sm text-muted-foreground"
@@ -221,6 +272,15 @@ export default function WhatsAppPage() {
                     </p>
                   )}
                 </div>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleDisconnect}
+                  disabled={disconnecting}
+                >
+                  <Power className="h-3.5 w-3.5" />
+                  {disconnecting ? "جارٍ الفصل..." : "فصل / ربط رقم آخر"}
+                </Button>
               </div>
             ) : qr ? (
               <div className="flex flex-col items-center gap-4 py-4">
@@ -242,7 +302,7 @@ export default function WhatsAppPage() {
                 <p className="text-sm text-muted-foreground">
                   لا يوجد رمز حاليًا. اضغط «بدء الاتصال» لإنشاء رمز جديد.
                 </p>
-                <Button onClick={handleConnect} disabled={connecting}>
+                <Button onClick={handleConnect} disabled={connecting || !activeOrgId}>
                   <RefreshCw
                     className={connecting ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"}
                   />

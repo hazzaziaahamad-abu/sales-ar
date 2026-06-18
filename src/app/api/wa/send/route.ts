@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sendText, isWaConfigured } from "@/lib/wa/client";
+import { sendTextFromOrg, isWaConfigured } from "@/lib/wa/client";
 import { requireUser } from "../_auth";
 
 export async function POST(req: NextRequest) {
@@ -13,16 +13,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { to, text } = await req.json().catch(() => ({}));
-  if (!to || !text) {
+  const { orgId, to, text } = await req.json().catch(() => ({}));
+  if (!orgId || !to || !text) {
     return NextResponse.json(
-      { error: "Both 'to' (phone number) and 'text' are required" },
+      { error: "orgId, to (phone number) and text are required" },
       { status: 400 }
     );
   }
 
   try {
-    const result = await sendText(String(to), String(text));
+    const result = await sendTextFromOrg(String(orgId), String(to), String(text));
     return NextResponse.json({ ok: true, result });
   } catch (err) {
     return NextResponse.json(
