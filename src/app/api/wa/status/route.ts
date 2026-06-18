@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { resolveOrgSession, isWaConfigured } from "@/lib/wa/client";
+import { getOrgSnapshot, isWaConfigured } from "@/lib/wa/client";
 import { requireUser } from "../_auth";
 
 export async function GET(req: NextRequest) {
@@ -17,20 +17,21 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const session = await resolveOrgSession(orgId);
+    const { session, qr } = await getOrgSnapshot(orgId);
     if (!session) {
-      return NextResponse.json({ status: "disconnected", session: null });
+      return NextResponse.json({ status: "disconnected", session: null, qr: null });
     }
     return NextResponse.json({
       status: session.status,
       phone: session.phone ?? null,
       pushName: session.pushName ?? null,
+      qr,
       session,
     });
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Gateway error" },
-      { status: 502 }
-    );
+    const msg = err instanceof Error ? err.message : "Gateway error";
+    // Surface rate-limiting distinctly so the client can back off.
+    const status = msg.includes("429") ? 429 : 502;
+    return NextResponse.json({ error: msg }, { status });
   }
 }

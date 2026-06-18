@@ -85,12 +85,38 @@ async function waFetch(path: string, init?: RequestInit): Promise<Response> {
   });
 }
 
-/** List all sessions on the gateway. */
-export async function listSessions(): Promise<WaSession[]> {
-  const res = await waFetch("/sessions");
-  if (!res.ok) throw new Error(`OpenWA listSessions failed: ${res.status}`);
-  const data = await res.json();
-  return Array.isArray(data) ? data : data?.sessions ?? [];
+// The gateway rate-limits requests, so we cache the session list briefly and
+// de-duplicate concurrent calls. Multiple resolveOrgSession() calls within one
+// request (or within a poll window) then cost a single upstream fetch.
+let _sessionsCache: { at: number; data: WaSession[] } | null = null;
+let _sessionsInflight: Promise<WaSession[]> | null = null;
+const SESSIONS_TTL_MS = 3000;
+
+/** List all sessions on the gateway (short-lived cache + in-flight dedup). */
+export async function listSessions(force = false): Promise<WaSession[]> {
+  if (!force && _sessionsCache && Date.now() - _sessionsCache.at < SESSIONS_TTL_MS) {
+    return _sessionsCache.data;
+  }
+  if (!force && _sessionsInflight) return _sessionsInflight;
+
+  _sessionsInflight = (async () => {
+    const res = await waFetch("/sessions");
+    if (!res.ok) throw new Error(`OpenWA listSessions failed: ${res.status}`);
+    const data = await res.json();
+    const list: WaSession[] = Array.isArray(data) ? data : data?.sessions ?? [];
+    _sessionsCache = { at: Date.now(), data: list };
+    return list;
+  })();
+  try {
+    return await _sessionsInflight;
+  } finally {
+    _sessionsInflight = null;
+  }
+}
+
+/** Invalidate the session cache (after create/delete/start). */
+function invalidateSessionsCache() {
+  _sessionsCache = null;
 }
 
 /** Get a session by its gateway id. */
@@ -120,6 +146,7 @@ async function createOrgSession(orgId: string): Promise<WaSession> {
     if (existing) return existing;
   }
   if (!res.ok) throw new Error(`OpenWA createSession failed: ${res.status}`);
+  invalidateSessionsCache();
   return res.json();
 }
 
@@ -127,6 +154,7 @@ async function createOrgSession(orgId: string): Promise<WaSession> {
 async function startSession(id: string): Promise<void> {
   // 400 = already started; treat as success.
   await waFetch(`/sessions/${id}/start`, { method: "POST" }).catch(() => {});
+  invalidateSessionsCache();
 }
 
 /** Stop a session (disconnects WhatsApp but keeps the session record). */
@@ -145,6 +173,7 @@ export async function deleteOrgSession(orgId: string): Promise<boolean> {
   const session = await resolveOrgSession(orgId);
   if (!session) return true;
   const res = await waFetch(`/sessions/${session.id}`, { method: "DELETE" });
+  invalidateSessionsCache();
   return res.ok || res.status === 404;
 }
 
@@ -165,16 +194,37 @@ export async function ensureOrgSession(orgId: string): Promise<WaSession | null>
   return session;
 }
 
-/** Get the QR code for an org's session, or null if none/connected. */
-export async function getOrgQr(orgId: string): Promise<WaQr | null> {
-  const session = await resolveOrgSession(orgId);
-  if (!session) return null;
+/** Fetch the QR for a known session, or null if not available. */
+async function fetchQr(session: WaSession): Promise<WaQr | null> {
   if (isConnectedStatus(session.status)) return null;
   const res = await waFetch(`/sessions/${session.id}/qr`);
   // 400 = not ready yet or already authenticated.
   if (res.status === 400 || res.status === 404 || res.status === 409) return null;
   if (!res.ok) throw new Error(`OpenWA getQr failed: ${res.status}`);
   return res.json();
+}
+
+/** Get the QR code for an org's session, or null if none/connected. */
+export async function getOrgQr(orgId: string): Promise<WaQr | null> {
+  const session = await resolveOrgSession(orgId);
+  if (!session) return null;
+  return fetchQr(session);
+}
+
+/**
+ * Single-call snapshot for the UI: the org's session plus its QR (when not
+ * connected). Uses the cached session list, so polling this costs at most one
+ * `/sessions` fetch (cached) + one `/qr` fetch per window.
+ */
+export async function getOrgSnapshot(
+  orgId: string
+): Promise<{ session: WaSession | null; qr: WaQr | null }> {
+  const session = await resolveOrgSession(orgId);
+  if (!session) return { session: null, qr: null };
+  const qr = isConnectedStatus(session.status)
+    ? null
+    : await fetchQr(session).catch(() => null);
+  return { session, qr };
 }
 
 /** Register our inbound webhook with the gateway for a session. */

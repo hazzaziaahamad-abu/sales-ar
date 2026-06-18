@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -74,7 +74,6 @@ export default function WhatsAppPage() {
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // --- test sender state ---
   const [to, setTo] = useState("");
@@ -82,46 +81,54 @@ export default function WhatsAppPage() {
   const [sending, setSending] = useState(false);
   const [sendMsg, setSendMsg] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
-    if (!activeOrgId) return;
+  // Polls status (which now includes the QR). Returns the recommended delay
+  // before the next poll so we can back off on rate-limits and slow down once
+  // connected. The gateway rate-limits, so we never hammer it.
+  const refresh = useCallback(async (): Promise<number> => {
+    if (!activeOrgId) return 8000;
     try {
       const res = await fetch(`/api/wa/status?orgId=${encodeURIComponent(activeOrgId)}`);
+      // Rate-limited: keep the current UI and wait longer.
+      if (res.status === 429) return 15000;
+
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || "تعذّر الاتصال بالبوابة");
         setStatus("FAILED");
-        return;
+        return 12000;
       }
       setError(null);
       const norm = normalizeStatus(data.status);
       setStatus(norm);
       setPhone(data.phone ?? null);
       setPushName(data.pushName ?? null);
+      setQr(norm === "CONNECTED" ? null : data.qr?.qrCode ?? null);
 
-      // If not connected, fetch a fresh QR to display.
-      if (norm !== "CONNECTED") {
-        const qrRes = await fetch(`/api/wa/qr?orgId=${encodeURIComponent(activeOrgId)}`);
-        const qrData = await qrRes.json();
-        setQr(qrData?.qr?.qrCode ?? null);
-      } else {
-        setQr(null);
-      }
+      // Poll often while waiting for a scan; slowly once connected.
+      return norm === "CONNECTED" ? 15000 : 5000;
     } catch {
       setError("تعذّر الوصول إلى الخادم");
       setStatus("FAILED");
+      return 12000;
     }
   }, [activeOrgId]);
 
-  // Initial load + polling. Re-runs when the active org changes.
+  // Self-scheduling poll loop. Re-runs when the active org changes.
   useEffect(() => {
     setStatus("LOADING");
     setQr(null);
     setPhone(null);
     setPushName(null);
-    refresh();
-    pollRef.current = setInterval(refresh, 4000);
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = async () => {
+      const delay = await refresh();
+      if (!cancelled) timer = setTimeout(tick, delay);
+    };
+    tick();
     return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
+      cancelled = true;
+      clearTimeout(timer);
     };
   }, [refresh]);
 
