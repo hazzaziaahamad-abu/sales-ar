@@ -98,10 +98,10 @@ export default function ScheduledTasksTab({ orgId }: { orgId: string }) {
   };
 
   return (
-    <div className="flex-1 flex gap-4 min-h-0">
+    <div className="flex-1 flex flex-col md:flex-row gap-4 min-h-0">
       {/* Tasks list */}
       <div className="flex-1 cc-card rounded-xl flex flex-col overflow-hidden min-h-0">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-border">
+        <div className="flex items-center justify-between px-3 sm:px-5 py-3 border-b border-border">
           <div className="flex items-center gap-2">
             <CalendarClock className="w-4 h-4 text-cyan" />
             <h3 className="text-sm font-bold text-foreground">المهام المجدولة</h3>
@@ -113,7 +113,7 @@ export default function ScheduledTasksTab({ orgId }: { orgId: string }) {
           </Button>
         </div>
 
-        <ScrollArea className="flex-1 p-4">
+        <ScrollArea className="flex-1 p-3 sm:p-4">
           {loading ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground gap-2 text-sm">
               <Loader2 className="w-4 h-4 animate-spin" /> جاري التحميل...
@@ -129,11 +129,11 @@ export default function ScheduledTasksTab({ orgId }: { orgId: string }) {
           ) : (
             <div className="space-y-3">
               {tasks.map((task) => (
-                <div key={task.id} className="rounded-xl border border-border bg-card/50 p-4">
-                  <div className="flex items-start justify-between gap-3">
+                <div key={task.id} className="rounded-xl border border-border bg-card/50 p-3 sm:p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="text-sm font-bold text-foreground truncate">{task.title}</h4>
+                        <h4 className="text-sm font-bold text-foreground">{task.title}</h4>
                         <span className={cn("text-[11px] px-2 py-0.5 rounded-full border", STATUS_BADGE[task.status])}>
                           {STATUS_LABEL[task.status] ?? task.status}
                         </span>
@@ -144,7 +144,7 @@ export default function ScheduledTasksTab({ orgId }: { orgId: string }) {
                         )}
                       </div>
                       <p className="text-[12px] text-muted-foreground mt-1">{describeSchedule(task)}</p>
-                      <div className="flex items-center gap-4 mt-2 text-[11px] text-muted-foreground/80">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 mt-2 text-[11px] text-muted-foreground/80">
                         <span>التشغيل القادم: {fmtDate(task.next_run_at)}</span>
                         <span>آخر تشغيل: {fmtDate(task.last_run_at)}</span>
                         <span>عدد مرات التشغيل: {task.run_count}</span>
@@ -191,8 +191,8 @@ export default function ScheduledTasksTab({ orgId }: { orgId: string }) {
       </div>
 
       {/* Run history */}
-      <div className="w-[300px] flex-shrink-0 cc-card rounded-xl flex flex-col overflow-hidden min-h-0">
-        <div className="px-5 py-3 border-b border-border">
+      <div className="md:w-[300px] flex-shrink-0 cc-card rounded-xl flex flex-col overflow-hidden min-h-0 max-h-[300px] md:max-h-none">
+        <div className="px-3 sm:px-5 py-3 border-b border-border">
           <h3 className="text-sm font-bold text-foreground">سجل التشغيل</h3>
         </div>
         <ScrollArea className="flex-1 p-3">
