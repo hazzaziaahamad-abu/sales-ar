@@ -74,6 +74,7 @@ export default function WhatsAppPage() {
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [rateLimitedSec, setRateLimitedSec] = useState<number | null>(null);
 
   // --- test sender state ---
   const [to, setTo] = useState("");
@@ -88,10 +89,19 @@ export default function WhatsAppPage() {
     if (!activeOrgId) return 8000;
     try {
       const res = await fetch(`/api/wa/status?orgId=${encodeURIComponent(activeOrgId)}`);
-      // Rate-limited: keep the current UI and wait longer.
-      if (res.status === 429) return 15000;
+      const data = await res.json().catch(() => ({}));
 
-      const data = await res.json();
+      // Rate-limited: show a clear "busy" state (not an endless skeleton) and
+      // back off. Re-checks periodically since the gateway windows reset.
+      if (res.status === 429) {
+        const retry = Number(data?.retryAfterSec) || 60;
+        setRateLimitedSec(retry);
+        setError(null);
+        setStatus((prev) => (prev === "LOADING" ? "DISCONNECTED" : prev));
+        return Math.min(Math.max(retry, 20), 60) * 1000;
+      }
+      setRateLimitedSec(null);
+
       if (!res.ok) {
         setError(data.error || "تعذّر الاتصال بالبوابة");
         setStatus("FAILED");
@@ -104,8 +114,11 @@ export default function WhatsAppPage() {
       setPushName(data.pushName ?? null);
       setQr(norm === "CONNECTED" ? null : data.qr?.qrCode ?? null);
 
-      // Poll often while waiting for a scan; slowly once connected.
-      return norm === "CONNECTED" ? 15000 : 5000;
+      // Poll fast ONLY while actively pairing (QR on screen). Otherwise poll
+      // slowly — the gateway's long-window rate limit is strict, and idle
+      // status rarely changes (webhooks cover status changes in production).
+      if (norm === "SCAN_QR" || norm === "CONNECTING") return 6000;
+      return 30000; // connected or idle
     } catch {
       setError("تعذّر الوصول إلى الخادم");
       setStatus("FAILED");
@@ -242,6 +255,19 @@ export default function WhatsAppPage() {
         </div>
       )}
 
+      {rateLimitedSec !== null && (
+        <div className="flex items-center gap-2 rounded-xl border border-amber/20 bg-amber-dim px-4 py-3 text-sm text-amber">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>
+            البوابة مزدحمة مؤقتًا (تم تجاوز حد الطلبات). سيُعاد المحاولة تلقائيًا
+            {rateLimitedSec >= 120
+              ? ` خلال حوالي ${Math.ceil(rateLimitedSec / 60)} دقيقة`
+              : ` خلال ${rateLimitedSec} ثانية`}
+            .
+          </span>
+        </div>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Connection / QR card */}
         <Card>
@@ -299,6 +325,15 @@ export default function WhatsAppPage() {
                 />
                 <p className="text-xs text-muted-foreground">
                   يتم تحديث الرمز تلقائيًا — امسحه بسرعة
+                </p>
+              </div>
+            ) : rateLimitedSec !== null ? (
+              <div className="flex flex-col items-center gap-3 py-10 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-dim ring-1 ring-amber/20">
+                  <RefreshCw className="h-7 w-7 animate-spin text-amber" />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  البوابة مزدحمة مؤقتًا — جارٍ إعادة المحاولة تلقائيًا...
                 </p>
               </div>
             ) : (

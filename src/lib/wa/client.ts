@@ -92,19 +92,64 @@ let _sessionsCache: { at: number; data: WaSession[] } | null = null;
 let _sessionsInflight: Promise<WaSession[]> | null = null;
 const SESSIONS_TTL_MS = 3000;
 
-/** List all sessions on the gateway (short-lived cache + in-flight dedup). */
+// When the gateway returns 429, we stop hitting it until this timestamp and
+// serve stale cache instead — so we never make the throttle worse.
+let _cooldownUntil = 0;
+let _lastRetryAfterSec = 0;
+
+/** Error thrown when the gateway is rate-limited and we have no cached data. */
+export class WaRateLimitError extends Error {
+  retryAfterSec: number;
+  constructor(retryAfterSec: number) {
+    super(`OpenWA rate-limited; retry after ${retryAfterSec}s`);
+    this.name = "WaRateLimitError";
+    this.retryAfterSec = retryAfterSec;
+  }
+}
+
+export function waCooldownRemainingSec(): number {
+  return Math.max(0, Math.ceil((_cooldownUntil - Date.now()) / 1000));
+}
+
+/** Parse the largest retry-after-* hint from a 429 response. */
+function parseRetryAfter(res: Response): number {
+  const keys = ["retry-after", "retry-after-long", "retry-after-medium", "retry-after-short"];
+  let max = 0;
+  for (const k of keys) {
+    const n = Number(res.headers.get(k));
+    if (Number.isFinite(n)) max = Math.max(max, n);
+  }
+  return max || 30;
+}
+
+/** List all sessions on the gateway (cache + in-flight dedup + 429 backoff). */
 export async function listSessions(force = false): Promise<WaSession[]> {
   if (!force && _sessionsCache && Date.now() - _sessionsCache.at < SESSIONS_TTL_MS) {
     return _sessionsCache.data;
   }
   if (!force && _sessionsInflight) return _sessionsInflight;
 
+  // In cooldown: never hit the gateway. Serve stale cache, or signal the limit.
+  if (Date.now() < _cooldownUntil) {
+    if (_sessionsCache) return _sessionsCache.data;
+    throw new WaRateLimitError(waCooldownRemainingSec() || _lastRetryAfterSec);
+  }
+
   _sessionsInflight = (async () => {
     const res = await waFetch("/sessions");
+    if (res.status === 429) {
+      _lastRetryAfterSec = parseRetryAfter(res);
+      // Re-check periodically (other windows reset) rather than waiting the
+      // full long-window penalty, capped so we don't hammer.
+      _cooldownUntil = Date.now() + Math.min(_lastRetryAfterSec, 60) * 1000;
+      if (_sessionsCache) return _sessionsCache.data;
+      throw new WaRateLimitError(_lastRetryAfterSec);
+    }
     if (!res.ok) throw new Error(`OpenWA listSessions failed: ${res.status}`);
     const data = await res.json();
     const list: WaSession[] = Array.isArray(data) ? data : data?.sessions ?? [];
     _sessionsCache = { at: Date.now(), data: list };
+    _cooldownUntil = 0;
     return list;
   })();
   try {

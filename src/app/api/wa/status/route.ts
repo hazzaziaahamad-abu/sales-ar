@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getOrgSnapshot, isWaConfigured } from "@/lib/wa/client";
+import { getOrgSnapshot, isWaConfigured, WaRateLimitError } from "@/lib/wa/client";
 import { requireUser } from "../_auth";
 
 export async function GET(req: NextRequest) {
@@ -29,8 +29,13 @@ export async function GET(req: NextRequest) {
       session,
     });
   } catch (err) {
+    if (err instanceof WaRateLimitError) {
+      return NextResponse.json(
+        { error: "rate_limited", retryAfterSec: err.retryAfterSec },
+        { status: 429 }
+      );
+    }
     const msg = err instanceof Error ? err.message : "Gateway error";
-    // Surface rate-limiting distinctly so the client can back off.
     const status = msg.includes("429") ? 429 : 502;
     return NextResponse.json({ error: msg }, { status });
   }
