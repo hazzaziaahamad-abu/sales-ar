@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createMiddlewareClient } from "@/lib/supabase/middleware";
 
-// /api/wa/webhook is called server-to-server by the OpenWA gateway and is
-// authenticated by its HMAC signature, not by a Supabase session.
-const PUBLIC_PATHS = ["/login", "/auth/callback", "/gift", "/submit", "/api/wa/webhook"];
+// These paths are called server-to-server and carry their own auth, so they
+// must bypass the Supabase-session gate:
+//   /api/wa/webhook        — OpenWA gateway, HMAC-signed
+//   /api/cron/*            — Supabase pg_cron, guarded by CRON_SECRET
+//   /api/render/task-card  — public image, payload HMAC-signed in the token
+const PUBLIC_PATHS = [
+  "/login",
+  "/auth/callback",
+  "/gift",
+  "/submit",
+  "/api/wa/webhook",
+  "/api/cron/",
+  "/api/render/task-card",
+];
 
 export async function middleware(request: NextRequest) {
   const { supabase, response } = createMiddlewareClient(request);

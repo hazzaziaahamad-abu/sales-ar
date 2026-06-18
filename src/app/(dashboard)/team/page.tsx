@@ -607,12 +607,15 @@ export default function TeamPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label>الجوال</Label>
+              <Label>الجوال (واتساب)</Label>
               <Input
                 value={formPhone}
                 onChange={(e) => setFormPhone(e.target.value)}
-                placeholder="05xxxxxxxx"
+                placeholder="05xxxxxxxx أو 9665xxxxxxxx"
               />
+              <p className="text-[11px] text-muted-foreground">
+                يُستخدم لإرسال رسائل واتساب والمهام المجدولة. يُقبل التنسيق المحلي (05…) أو الدولي (9665…).
+              </p>
             </div>
 
             <div className="space-y-1.5">

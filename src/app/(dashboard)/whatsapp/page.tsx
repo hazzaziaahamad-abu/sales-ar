@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -74,7 +74,7 @@ export default function WhatsAppPage() {
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [rateLimitedSec, setRateLimitedSec] = useState<number | null>(null);
 
   // --- test sender state ---
   const [to, setTo] = useState("");
@@ -82,46 +82,66 @@ export default function WhatsAppPage() {
   const [sending, setSending] = useState(false);
   const [sendMsg, setSendMsg] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
-    if (!activeOrgId) return;
+  // Polls status (which now includes the QR). Returns the recommended delay
+  // before the next poll so we can back off on rate-limits and slow down once
+  // connected. The gateway rate-limits, so we never hammer it.
+  const refresh = useCallback(async (): Promise<number> => {
+    if (!activeOrgId) return 8000;
     try {
       const res = await fetch(`/api/wa/status?orgId=${encodeURIComponent(activeOrgId)}`);
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+
+      // Rate-limited: show a clear "busy" state (not an endless skeleton) and
+      // back off. Re-checks periodically since the gateway windows reset.
+      if (res.status === 429) {
+        const retry = Number(data?.retryAfterSec) || 60;
+        setRateLimitedSec(retry);
+        setError(null);
+        setStatus((prev) => (prev === "LOADING" ? "DISCONNECTED" : prev));
+        return Math.min(Math.max(retry, 20), 60) * 1000;
+      }
+      setRateLimitedSec(null);
+
       if (!res.ok) {
         setError(data.error || "تعذّر الاتصال بالبوابة");
         setStatus("FAILED");
-        return;
+        return 12000;
       }
       setError(null);
       const norm = normalizeStatus(data.status);
       setStatus(norm);
       setPhone(data.phone ?? null);
       setPushName(data.pushName ?? null);
+      setQr(norm === "CONNECTED" ? null : data.qr?.qrCode ?? null);
 
-      // If not connected, fetch a fresh QR to display.
-      if (norm !== "CONNECTED") {
-        const qrRes = await fetch(`/api/wa/qr?orgId=${encodeURIComponent(activeOrgId)}`);
-        const qrData = await qrRes.json();
-        setQr(qrData?.qr?.qrCode ?? null);
-      } else {
-        setQr(null);
-      }
+      // Poll fast ONLY while actively pairing (QR on screen). Otherwise poll
+      // slowly — the gateway's long-window rate limit is strict, and idle
+      // status rarely changes (webhooks cover status changes in production).
+      if (norm === "SCAN_QR" || norm === "CONNECTING") return 6000;
+      return 30000; // connected or idle
     } catch {
       setError("تعذّر الوصول إلى الخادم");
       setStatus("FAILED");
+      return 12000;
     }
   }, [activeOrgId]);
 
-  // Initial load + polling. Re-runs when the active org changes.
+  // Self-scheduling poll loop. Re-runs when the active org changes.
   useEffect(() => {
     setStatus("LOADING");
     setQr(null);
     setPhone(null);
     setPushName(null);
-    refresh();
-    pollRef.current = setInterval(refresh, 4000);
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = async () => {
+      const delay = await refresh();
+      if (!cancelled) timer = setTimeout(tick, delay);
+    };
+    tick();
     return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
+      cancelled = true;
+      clearTimeout(timer);
     };
   }, [refresh]);
 
@@ -235,6 +255,19 @@ export default function WhatsAppPage() {
         </div>
       )}
 
+      {rateLimitedSec !== null && (
+        <div className="flex items-center gap-2 rounded-xl border border-amber/20 bg-amber-dim px-4 py-3 text-sm text-amber">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>
+            البوابة مزدحمة مؤقتًا (تم تجاوز حد الطلبات). سيُعاد المحاولة تلقائيًا
+            {rateLimitedSec >= 120
+              ? ` خلال حوالي ${Math.ceil(rateLimitedSec / 60)} دقيقة`
+              : ` خلال ${rateLimitedSec} ثانية`}
+            .
+          </span>
+        </div>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Connection / QR card */}
         <Card>
@@ -292,6 +325,15 @@ export default function WhatsAppPage() {
                 />
                 <p className="text-xs text-muted-foreground">
                   يتم تحديث الرمز تلقائيًا — امسحه بسرعة
+                </p>
+              </div>
+            ) : rateLimitedSec !== null ? (
+              <div className="flex flex-col items-center gap-3 py-10 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-dim ring-1 ring-amber/20">
+                  <RefreshCw className="h-7 w-7 animate-spin text-amber" />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  البوابة مزدحمة مؤقتًا — جارٍ إعادة المحاولة تلقائيًا...
                 </p>
               </div>
             ) : (

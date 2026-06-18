@@ -85,12 +85,83 @@ async function waFetch(path: string, init?: RequestInit): Promise<Response> {
   });
 }
 
-/** List all sessions on the gateway. */
-export async function listSessions(): Promise<WaSession[]> {
-  const res = await waFetch("/sessions");
-  if (!res.ok) throw new Error(`OpenWA listSessions failed: ${res.status}`);
-  const data = await res.json();
-  return Array.isArray(data) ? data : data?.sessions ?? [];
+// The gateway rate-limits requests, so we cache the session list briefly and
+// de-duplicate concurrent calls. Multiple resolveOrgSession() calls within one
+// request (or within a poll window) then cost a single upstream fetch.
+let _sessionsCache: { at: number; data: WaSession[] } | null = null;
+let _sessionsInflight: Promise<WaSession[]> | null = null;
+const SESSIONS_TTL_MS = 3000;
+
+// When the gateway returns 429, we stop hitting it until this timestamp and
+// serve stale cache instead — so we never make the throttle worse.
+let _cooldownUntil = 0;
+let _lastRetryAfterSec = 0;
+
+/** Error thrown when the gateway is rate-limited and we have no cached data. */
+export class WaRateLimitError extends Error {
+  retryAfterSec: number;
+  constructor(retryAfterSec: number) {
+    super(`OpenWA rate-limited; retry after ${retryAfterSec}s`);
+    this.name = "WaRateLimitError";
+    this.retryAfterSec = retryAfterSec;
+  }
+}
+
+export function waCooldownRemainingSec(): number {
+  return Math.max(0, Math.ceil((_cooldownUntil - Date.now()) / 1000));
+}
+
+/** Parse the largest retry-after-* hint from a 429 response. */
+function parseRetryAfter(res: Response): number {
+  const keys = ["retry-after", "retry-after-long", "retry-after-medium", "retry-after-short"];
+  let max = 0;
+  for (const k of keys) {
+    const n = Number(res.headers.get(k));
+    if (Number.isFinite(n)) max = Math.max(max, n);
+  }
+  return max || 30;
+}
+
+/** List all sessions on the gateway (cache + in-flight dedup + 429 backoff). */
+export async function listSessions(force = false): Promise<WaSession[]> {
+  if (!force && _sessionsCache && Date.now() - _sessionsCache.at < SESSIONS_TTL_MS) {
+    return _sessionsCache.data;
+  }
+  if (!force && _sessionsInflight) return _sessionsInflight;
+
+  // In cooldown: never hit the gateway. Serve stale cache, or signal the limit.
+  if (Date.now() < _cooldownUntil) {
+    if (_sessionsCache) return _sessionsCache.data;
+    throw new WaRateLimitError(waCooldownRemainingSec() || _lastRetryAfterSec);
+  }
+
+  _sessionsInflight = (async () => {
+    const res = await waFetch("/sessions");
+    if (res.status === 429) {
+      _lastRetryAfterSec = parseRetryAfter(res);
+      // Re-check periodically (other windows reset) rather than waiting the
+      // full long-window penalty, capped so we don't hammer.
+      _cooldownUntil = Date.now() + Math.min(_lastRetryAfterSec, 60) * 1000;
+      if (_sessionsCache) return _sessionsCache.data;
+      throw new WaRateLimitError(_lastRetryAfterSec);
+    }
+    if (!res.ok) throw new Error(`OpenWA listSessions failed: ${res.status}`);
+    const data = await res.json();
+    const list: WaSession[] = Array.isArray(data) ? data : data?.sessions ?? [];
+    _sessionsCache = { at: Date.now(), data: list };
+    _cooldownUntil = 0;
+    return list;
+  })();
+  try {
+    return await _sessionsInflight;
+  } finally {
+    _sessionsInflight = null;
+  }
+}
+
+/** Invalidate the session cache (after create/delete/start). */
+function invalidateSessionsCache() {
+  _sessionsCache = null;
 }
 
 /** Get a session by its gateway id. */
@@ -120,6 +191,7 @@ async function createOrgSession(orgId: string): Promise<WaSession> {
     if (existing) return existing;
   }
   if (!res.ok) throw new Error(`OpenWA createSession failed: ${res.status}`);
+  invalidateSessionsCache();
   return res.json();
 }
 
@@ -127,6 +199,7 @@ async function createOrgSession(orgId: string): Promise<WaSession> {
 async function startSession(id: string): Promise<void> {
   // 400 = already started; treat as success.
   await waFetch(`/sessions/${id}/start`, { method: "POST" }).catch(() => {});
+  invalidateSessionsCache();
 }
 
 /** Stop a session (disconnects WhatsApp but keeps the session record). */
@@ -145,6 +218,7 @@ export async function deleteOrgSession(orgId: string): Promise<boolean> {
   const session = await resolveOrgSession(orgId);
   if (!session) return true;
   const res = await waFetch(`/sessions/${session.id}`, { method: "DELETE" });
+  invalidateSessionsCache();
   return res.ok || res.status === 404;
 }
 
@@ -165,16 +239,37 @@ export async function ensureOrgSession(orgId: string): Promise<WaSession | null>
   return session;
 }
 
-/** Get the QR code for an org's session, or null if none/connected. */
-export async function getOrgQr(orgId: string): Promise<WaQr | null> {
-  const session = await resolveOrgSession(orgId);
-  if (!session) return null;
+/** Fetch the QR for a known session, or null if not available. */
+async function fetchQr(session: WaSession): Promise<WaQr | null> {
   if (isConnectedStatus(session.status)) return null;
   const res = await waFetch(`/sessions/${session.id}/qr`);
   // 400 = not ready yet or already authenticated.
   if (res.status === 400 || res.status === 404 || res.status === 409) return null;
   if (!res.ok) throw new Error(`OpenWA getQr failed: ${res.status}`);
   return res.json();
+}
+
+/** Get the QR code for an org's session, or null if none/connected. */
+export async function getOrgQr(orgId: string): Promise<WaQr | null> {
+  const session = await resolveOrgSession(orgId);
+  if (!session) return null;
+  return fetchQr(session);
+}
+
+/**
+ * Single-call snapshot for the UI: the org's session plus its QR (when not
+ * connected). Uses the cached session list, so polling this costs at most one
+ * `/sessions` fetch (cached) + one `/qr` fetch per window.
+ */
+export async function getOrgSnapshot(
+  orgId: string
+): Promise<{ session: WaSession | null; qr: WaQr | null }> {
+  const session = await resolveOrgSession(orgId);
+  if (!session) return { session: null, qr: null };
+  const qr = isConnectedStatus(session.status)
+    ? null
+    : await fetchQr(session).catch(() => null);
+  return { session, qr };
 }
 
 /** Register our inbound webhook with the gateway for a session. */
@@ -191,6 +286,30 @@ export async function registerWebhook(sessionId: string): Promise<boolean> {
   return Boolean(res?.ok);
 }
 
+/**
+ * Normalize a phone number to international digits for WhatsApp.
+ * Saudi-default (the app's primary market) but preserves already-international
+ * numbers untouched:
+ *   05XXXXXXXX / 5XXXXXXXX  → 9665XXXXXXXX   (KSA local → international)
+ *   +966… / 00966… / 966…   → 966…           (already KSA international)
+ *   201157337829, etc.      → kept as-is      (already has a country code)
+ */
+export function normalizePhone(raw: string): string {
+  let d = String(raw ?? "").replace(/[^\d]/g, "");
+  if (!d) return "";
+  if (d.startsWith("00")) d = d.slice(2); // intl access prefix
+  if (d.startsWith("966")) return d; // already KSA international
+  if (d.length === 10 && d.startsWith("05")) return "966" + d.slice(1); // 05XXXXXXXX
+  if (d.length === 9 && d.startsWith("5")) return "966" + d; // 5XXXXXXXX
+  return d; // assume it already carries a country code
+}
+
+/** Build a WhatsApp chat id from a phone number (or pass through an existing id). */
+function toChatId(to: string): string {
+  if (to.includes("@")) return to;
+  return `${normalizePhone(to)}@c.us`;
+}
+
 /** Send a plain text message from an org's session. */
 export async function sendTextFromOrg(
   orgId: string,
@@ -202,7 +321,7 @@ export async function sendTextFromOrg(
   if (!isConnectedStatus(session.status)) {
     throw new Error("WhatsApp number is not connected");
   }
-  const chatId = to.includes("@") ? to : `${to.replace(/[^\d]/g, "")}@c.us`;
+  const chatId = toChatId(to);
   const res = await waFetch(`/sessions/${session.id}/messages/send-text`, {
     method: "POST",
     body: JSON.stringify({ chatId, text }),
@@ -212,4 +331,36 @@ export async function sendTextFromOrg(
     throw new Error(`OpenWA sendText failed: ${res.status} ${body}`);
   }
   return res.json();
+}
+
+/**
+ * Send an image (by public URL) with an optional caption from an org's session.
+ *
+ * The gateway's media endpoint isn't guaranteed, so if `send-image` is missing
+ * we fall back to a plain-text message containing the caption + the image URL —
+ * the recipient still gets the link, which is the core requirement.
+ */
+export async function sendImageFromOrg(
+  orgId: string,
+  to: string,
+  imageUrl: string,
+  caption = ""
+): Promise<unknown> {
+  const session = await resolveOrgSession(orgId);
+  if (!session) throw new Error("No WhatsApp session for this organization");
+  if (!isConnectedStatus(session.status)) {
+    throw new Error("WhatsApp number is not connected");
+  }
+  const chatId = toChatId(to);
+
+  const res = await waFetch(`/sessions/${session.id}/messages/send-image`, {
+    method: "POST",
+    body: JSON.stringify({ chatId, url: imageUrl, image: imageUrl, caption }),
+  }).catch(() => null);
+
+  if (res && res.ok) return res.json();
+
+  // Fallback: gateway doesn't support image media — send caption + link as text.
+  const text = caption ? `${caption}\n${imageUrl}` : imageUrl;
+  return sendTextFromOrg(orgId, to, text);
 }

@@ -2,6 +2,11 @@ import { streamText, generateText, convertToModelMessages, tool, stepCountIs } f
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { buildKnowledgeContext } from "@/lib/ai/knowledge";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import { resolveOrgSession, isConnectedStatus, sendTextFromOrg } from "@/lib/wa/client";
+import { computeNextRun, describeSchedule } from "@/lib/tasks/schedule";
+import { runTaskAndRecord } from "@/lib/tasks/executor";
+import type { ScheduledTask } from "@/types";
 import { z } from "zod";
 
 const google = createGoogleGenerativeAI({
@@ -26,6 +31,30 @@ const AGENT_SYSTEM_PROMPT = `أنت "المساعد الذكي" — مساعد �
 8. **المالية**: تحليل الإيرادات، المصاريف، هامش الربح، Burn Rate
 9. **استعلام قاعدة البيانات**: يمكنك استخدام أداة queryDatabase للاستعلام عن أي جدول في قاعدة البيانات مباشرة
 10. **البحث في الويب**: يمكنك استخدام أداة webSearch للبحث في الإنترنت عن معلومات حديثة مثل أخبار السوق، المنافسين، الاتجاهات، أو أي معلومة غير موجودة في بيانات الشركة
+11. **إرسال رسائل واتساب**: يمكنك استخدام أداة sendWhatsApp لإرسال رسالة واتساب لعميل من رقم واتساب الشركة المتصل
+12. **المهام المجدولة**: يمكنك استخدام أداة scheduleTask لإنشاء مهمة تتكرر تلقائياً (يومياً/أسبوعياً/شهرياً) أو تعمل مرة واحدة، لتذكير أو مراسلة الفريق عبر واتساب. وأدوات listScheduledTasks و updateScheduledTask و deleteScheduledTask و runTaskNow لإدارتها
+
+## تأكيد العمليات الحساسة (مهم):
+أدوات الإرسال والجدولة محمية بنظام موافقة في الواجهة — عند استدعائك لها يظهر للمستخدم كرت فيه زر "أوافق" و"رفض". لذلك **لا تطلب التأكيد بنص** ولا تكتب "هل أرسلها؟"؛ فقط استدعِ الأداة مباشرة بالقيم الصحيحة، والواجهة تتكفّل بأخذ الموافقة. بعد تنفيذ الأداة، لخّص النتيجة (نجاح/فشل) للمستخدم.
+
+## أداة sendWhatsApp:
+تتيح لك إرسال رسالة نصية عبر واتساب لعميل (مثل متابعة صفقة، تذكير بتجديد، رد على تذكرة دعم).
+- احصل على رقم العميل من قاعدة البيانات (deals.client_phone أو renewals.customer_phone أو tickets.client_phone) — لا تختلق أرقاماً
+- الرقم بصيغة دولية بأرقام فقط (مثال: 9665XXXXXXXX)
+- اكتب رسالة مهنية مهذبة بالعربية ما لم يُطلب غير ذلك
+- إذا كان رقم واتساب الشركة غير متصل، اطلب من المستخدم ربطه من صفحة "واتساب"
+
+## أداة scheduleTask:
+المهمة = **لمن** (الجمهور) + **ماذا** (نص الرسالة وصورة/رابط اختياري) + **متى** (الجدولة).
+- action_type:
+  - "notify_underperformers": يحدد الجمهور تلقائياً = الموظفون الذين نتيجتهم أقل من الحد (threshold، الافتراضي 70) للفترة الحالية، ويرسل لكل واحد ملخص أرقامه
+  - "custom_message": جمهور محدد (موظفون بالـ id، أو أرقام، أو كل الفريق) برسالة ثابتة
+- audience.kind: "underperformers" | "employees" | "phones" | "all_team"
+- لاستهداف موظفين بالاسم: اجعل kind="employees" ومرّر أسماءهم في employee_names (مثل ["روان","أمينة"]) — يحوّلها النظام إلى أرقامهم تلقائياً من قاعدة البيانات. لا تحتاج تبحث عن الـ id بنفسك. (شرط أن يكون رقم جوال الموظف مُسجّلاً في صفحة الفريق)
+- message.template يدعم متغيرات: {name} {score} {threshold} {gap} {revenue} {deals} {close_rate}
+- message.include_image=true لإرفاق كرت صورة بالأرقام (مناسب لـ notify_underperformers)
+- frequency: "once" | "daily" | "weekly" | "monthly" مع at_hour/at_minute (بتوقيت السعودية)، و weekday (0=الأحد..6=السبت) للأسبوعي، و day_of_month للشهري، و run_at (ISO) لمرة واحدة
+- مثال: "كل أحد الساعة 9 صباحاً ذكّر الموظفين تحت الهدف" → notify_underperformers، weekly، weekday=0، at_hour=9
 
 ## أداة queryDatabase:
 عندما يسألك المستخدم عن عميل معين أو صفقة أو تذكرة أو أي بيانات محددة، استخدم أداة queryDatabase للحصول على البيانات الدقيقة.
@@ -117,7 +146,7 @@ export async function POST(req: Request) {
       model: google("gemini-3-flash-preview"),
       system: `${AGENT_SYSTEM_PROMPT}\n\n---\n\n## بيانات الشركة الحالية:\n${knowledgeContext}`,
       messages: modelMessages,
-      stopWhen: stepCountIs(5),
+      stopWhen: stepCountIs(8),
       tools: {
         webSearch: tool({
           description: "Search the web for current information. Use this for market trends, competitor info, industry news, restaurant tech updates, or any information not available in the company database.",
@@ -180,6 +209,166 @@ export async function POST(req: Request) {
               data: data ?? [],
               count: (data as unknown[])?.length ?? 0,
               table,
+            };
+          },
+        }),
+        sendWhatsApp: tool({
+          description: "Send a WhatsApp text message to a client from the organization's connected WhatsApp number. Use phone numbers fetched from the database (e.g. deals.client_phone), never invented ones. The UI shows the user an approval card before sending — do NOT ask for confirmation in text.",
+          needsApproval: true,
+          inputSchema: z.object({
+            to: z.string().describe("Recipient phone number in international format, digits only (e.g. 9665XXXXXXXX). No spaces or symbols."),
+            message: z.string().describe("The message text to send. Should be a professional, polite Arabic message unless the user requested otherwise."),
+          }),
+          execute: async ({ to, message }) => {
+            const phone = to.replace(/[^\d]/g, "");
+            if (phone.length < 8) {
+              return { success: false as const, error: "رقم الهاتف غير صالح", to };
+            }
+            try {
+              const session = await resolveOrgSession(ORG_ID);
+              if (!session) {
+                return { success: false as const, error: "لا يوجد رقم واتساب مربوط لهذه الشركة. اربط رقماً من صفحة واتساب أولاً.", to: phone };
+              }
+              if (!isConnectedStatus(session.status)) {
+                return { success: false as const, error: "رقم واتساب الشركة غير متصل حالياً. تحقق من صفحة واتساب.", to: phone };
+              }
+              await sendTextFromOrg(ORG_ID, phone, message);
+              return { success: true as const, to: phone, message };
+            } catch (err) {
+              return {
+                success: false as const,
+                error: err instanceof Error ? err.message : "فشل إرسال الرسالة",
+                to: phone,
+              };
+            }
+          },
+        }),
+        scheduleTask: tool({
+          description: "Create a scheduled/routine task that messages the team over WhatsApp on a schedule (once/daily/weekly/monthly). The UI shows an approval card before saving — do NOT ask for confirmation in text. Resolve employee ids/phones from the database first when needed.",
+          needsApproval: true,
+          inputSchema: z.object({
+            title: z.string().describe("Short Arabic title for the task"),
+            description: z.string().optional().describe("Optional longer description"),
+            action_type: z.enum(["notify_underperformers", "custom_message"]),
+            audience: z.object({
+              kind: z.enum(["underperformers", "employees", "phones", "all_team"]),
+              employee_names: z.array(z.string()).optional().describe("employee names (kind=employees) — resolved to phones automatically; prefer this when the user names people"),
+              employee_ids: z.array(z.string()).optional().describe("employee UUIDs (kind=employees) — only if you already have exact ids"),
+              phones: z.array(z.string()).optional().describe("raw phone numbers (kind=phones)"),
+              threshold: z.number().optional().describe("underperformer score cutoff, default 70"),
+            }),
+            message: z.object({
+              template: z.string().describe("Message text; supports {name} {score} {threshold} {gap} {revenue} {deals} {close_rate}"),
+              include_image: z.boolean().optional().describe("attach a generated numbers card"),
+              image_template: z.enum(["performance", "announcement", "reminder"]).optional(),
+              link: z.string().optional().describe("optional link appended to the message"),
+            }),
+            frequency: z.enum(["once", "daily", "weekly", "monthly"]),
+            at_hour: z.number().min(0).max(23).default(9),
+            at_minute: z.number().min(0).max(59).default(0),
+            weekday: z.number().min(0).max(6).optional().describe("0=Sunday..6=Saturday (weekly)"),
+            day_of_month: z.number().min(1).max(31).optional().describe("(monthly)"),
+            run_at: z.string().optional().describe("ISO datetime (once)"),
+            timezone: z.string().default("Asia/Riyadh"),
+          }),
+          execute: async (input) => {
+            try {
+              const row: Partial<ScheduledTask> = {
+                org_id: ORG_ID,
+                title: input.title,
+                description: input.description ?? null,
+                action_type: input.action_type,
+                action_config: { audience: input.audience, message: input.message, channel: "whatsapp" },
+                status: "active",
+                frequency: input.frequency,
+                at_hour: input.at_hour,
+                at_minute: input.at_minute,
+                weekday: input.weekday ?? null,
+                day_of_month: input.day_of_month ?? null,
+                run_at: input.run_at ?? null,
+                timezone: input.timezone,
+              };
+              const next = computeNextRun(row as ScheduledTask, new Date());
+              row.next_run_at = next ? next.toISOString() : null;
+
+              const { data, error } = await supabaseAdmin
+                .from("scheduled_tasks").insert(row).select("*").single();
+              if (error) return { success: false as const, error: error.message };
+              return {
+                success: true as const,
+                task_id: data.id,
+                title: data.title,
+                schedule: describeSchedule(data as ScheduledTask),
+                next_run_at: data.next_run_at,
+              };
+            } catch (err) {
+              return { success: false as const, error: err instanceof Error ? err.message : "فشل إنشاء المهمة" };
+            }
+          },
+        }),
+        listScheduledTasks: tool({
+          description: "List the organization's scheduled tasks with their schedule and status.",
+          inputSchema: z.object({}),
+          execute: async () => {
+            const { data, error } = await supabaseAdmin
+              .from("scheduled_tasks").select("*").eq("org_id", ORG_ID)
+              .order("created_at", { ascending: false });
+            if (error) return { success: false as const, error: error.message, tasks: [] };
+            const tasks = (data ?? []).map((t) => ({
+              id: t.id, title: t.title, status: t.status, action_type: t.action_type,
+              schedule: describeSchedule(t as ScheduledTask), next_run_at: t.next_run_at, run_count: t.run_count,
+            }));
+            return { success: true as const, count: tasks.length, tasks };
+          },
+        }),
+        updateScheduledTask: tool({
+          description: "Pause or resume a scheduled task. The UI shows an approval card.",
+          needsApproval: true,
+          inputSchema: z.object({
+            task_id: z.string(),
+            status: z.enum(["active", "paused"]),
+          }),
+          execute: async ({ task_id, status }) => {
+            const { data: existing } = await supabaseAdmin
+              .from("scheduled_tasks").select("*").eq("id", task_id).eq("org_id", ORG_ID).single();
+            if (!existing) return { success: false as const, error: "المهمة غير موجودة" };
+            const next = status === "active"
+              ? computeNextRun(existing as ScheduledTask, new Date())
+              : null;
+            const { error } = await supabaseAdmin
+              .from("scheduled_tasks")
+              .update({ status, next_run_at: next ? next.toISOString() : existing.next_run_at })
+              .eq("id", task_id).eq("org_id", ORG_ID);
+            if (error) return { success: false as const, error: error.message };
+            return { success: true as const, task_id, status };
+          },
+        }),
+        deleteScheduledTask: tool({
+          description: "Delete a scheduled task permanently. The UI shows an approval card.",
+          needsApproval: true,
+          inputSchema: z.object({ task_id: z.string() }),
+          execute: async ({ task_id }) => {
+            const { error } = await supabaseAdmin
+              .from("scheduled_tasks").delete().eq("id", task_id).eq("org_id", ORG_ID);
+            if (error) return { success: false as const, error: error.message };
+            return { success: true as const, task_id };
+          },
+        }),
+        runTaskNow: tool({
+          description: "Execute a scheduled task immediately (for testing or one-off send). The UI shows an approval card.",
+          needsApproval: true,
+          inputSchema: z.object({ task_id: z.string() }),
+          execute: async ({ task_id }) => {
+            const { data: task } = await supabaseAdmin
+              .from("scheduled_tasks").select("*").eq("id", task_id).eq("org_id", ORG_ID).single();
+            if (!task) return { success: false as const, error: "المهمة غير موجودة" };
+            const r = await runTaskAndRecord(task as ScheduledTask);
+            return {
+              success: r.status !== "failed",
+              status: r.status,
+              recipients_total: r.recipientsTotal,
+              recipients_sent: r.recipientsSent,
+              summary: r.summary,
             };
           },
         }),

@@ -1,7 +1,12 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, isToolUIPart, getToolName } from "ai";
+import {
+  DefaultChatTransport,
+  isToolUIPart,
+  getToolName,
+  lastAssistantMessageIsCompleteWithApprovalResponses,
+} from "ai";
 import { useRef, useEffect, useState } from "react";
 import {
   Bot,
@@ -20,11 +25,18 @@ import {
   Trash2,
   Globe,
   Database,
+  MessageCircle,
+  CalendarClock,
+  CheckCircle2,
+  XCircle,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { useOrg } from "@/lib/org-context";
+import ScheduledTasksTab from "./_components/ScheduledTasksTab";
 
 interface Conversation {
   id: string;
@@ -79,13 +91,16 @@ const SUGGESTED_PROMPTS = [
 
 export default function AgentPage() {
   const { orgId } = useOrg();
-  const { messages, sendMessage, status, setMessages } = useChat({
+  const { messages, sendMessage, status, setMessages, addToolApprovalResponse } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/agent",
       body: { orgId },
     }),
+    // After the user accepts/rejects an approval card, resume the run automatically.
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
   });
 
+  const [activeTab, setActiveTab] = useState<"chat" | "tasks">("chat");
   const isLoading = status === "streaming" || status === "submitted";
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -193,7 +208,25 @@ export default function AgentPage() {
   };
 
   return (
-    <div className="flex gap-4 relative" style={{ height: "calc(100vh - 7rem)" }}>
+    <div className="flex flex-col gap-3" style={{ height: "calc(100vh - 7rem)" }}>
+      {/* Tab bar */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "chat" | "tasks")}>
+        <TabsList variant="line">
+          <TabsTrigger value="chat">
+            <Bot className="w-3.5 h-3.5" />
+            المحادثة
+          </TabsTrigger>
+          <TabsTrigger value="tasks">
+            <CalendarClock className="w-3.5 h-3.5" />
+            المهام المجدولة
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      {activeTab === "tasks" ? (
+        <ScheduledTasksTab orgId={orgId} />
+      ) : (
+      <div className="flex gap-4 relative flex-1 min-h-0">
       {/* Conversations Sidebar */}
       <div className="w-[240px] flex-shrink-0 cc-card rounded-xl flex flex-col overflow-hidden">
         <div className="p-3 border-b border-border">
@@ -350,6 +383,31 @@ export default function AgentPage() {
                               const name = getToolName(part);
                               const isDone = part.state === "output-available" || part.state === "output-error";
 
+                              // Human-in-the-loop approval card (Accept / Reject)
+                              if (part.state === "approval-requested") {
+                                return (
+                                  <ApprovalCard
+                                    key={i}
+                                    toolName={name}
+                                    input={part.input as Record<string, unknown>}
+                                    onDecision={(approved) =>
+                                      addToolApprovalResponse({ id: part.approval.id, approved })
+                                    }
+                                  />
+                                );
+                              }
+                              if (part.state === "approval-responded") {
+                                return (
+                                  <div key={i} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/40 border border-border text-[12px] text-muted-foreground">
+                                    {part.approval.approved ? (
+                                      <><CheckCircle2 className="w-3 h-3 text-cc-green" /> تمت الموافقة — جاري التنفيذ</>
+                                    ) : (
+                                      <><XCircle className="w-3 h-3 text-red-500" /> تم الرفض</>
+                                    )}
+                                  </div>
+                                );
+                              }
+
                               if (name === "webSearch" && !isDone) {
                                 return (
                                   <div key={i} className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-cyan/5 border border-cyan/15 animate-pulse">
@@ -396,6 +454,72 @@ export default function AgentPage() {
                                   <div key={i} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cc-purple/5 border border-cc-purple/10 text-[13px] text-cc-purple/70">
                                     <Database className="w-3 h-3" />
                                     تم الاستعلام من قاعدة البيانات
+                                  </div>
+                                );
+                              }
+
+                              if (name === "sendWhatsApp" && !isDone) {
+                                return (
+                                  <div key={i} className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/15 animate-pulse">
+                                    <MessageCircle className="w-4 h-4 text-emerald-500 animate-pulse" />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-xs font-medium text-emerald-500">جاري إرسال رسالة واتساب...</p>
+                                      <div className="flex gap-2 mt-1.5">
+                                        <div className="h-2 w-24 bg-emerald-500/10 rounded-full" />
+                                        <div className="h-2 w-16 bg-emerald-500/10 rounded-full" />
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              }
+
+                              if (name === "sendWhatsApp" && isDone) {
+                                const out = part.state === "output-available"
+                                  ? (part.output as { success?: boolean } | undefined)
+                                  : undefined;
+                                const ok = out?.success === true;
+                                return (
+                                  <div
+                                    key={i}
+                                    className={cn(
+                                      "flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px]",
+                                      ok
+                                        ? "bg-emerald-500/5 border border-emerald-500/10 text-emerald-600"
+                                        : "bg-red-500/5 border border-red-500/10 text-red-500"
+                                    )}
+                                  >
+                                    <MessageCircle className="w-3 h-3" />
+                                    {ok ? "تم إرسال رسالة الواتساب" : "تعذّر إرسال رسالة الواتساب"}
+                                  </div>
+                                );
+                              }
+
+                              // Scheduling tools — compact done badge
+                              if (
+                                ["scheduleTask", "updateScheduledTask", "deleteScheduledTask", "runTaskNow"].includes(name) &&
+                                isDone
+                              ) {
+                                const out = part.state === "output-available"
+                                  ? (part.output as { success?: boolean; summary?: string } | undefined)
+                                  : undefined;
+                                const ok = out?.success === true;
+                                const label =
+                                  name === "scheduleTask" ? "المهمة المجدولة"
+                                  : name === "deleteScheduledTask" ? "حذف المهمة"
+                                  : name === "runTaskNow" ? "تشغيل المهمة"
+                                  : "تحديث المهمة";
+                                return (
+                                  <div
+                                    key={i}
+                                    className={cn(
+                                      "flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px]",
+                                      ok
+                                        ? "bg-cyan/5 border border-cyan/15 text-cyan/80"
+                                        : "bg-red-500/5 border border-red-500/10 text-red-500"
+                                    )}
+                                  >
+                                    <CalendarClock className="w-3 h-3" />
+                                    {ok ? `تم: ${label}` : `تعذّر: ${label}`}
                                   </div>
                                 );
                               }
@@ -498,6 +622,112 @@ export default function AgentPage() {
           </p>
         </div>
       </div>
+      </div>
+      )}
+    </div>
+  );
+}
+
+/** Approval card for human-in-the-loop tool calls (Accept / Reject) */
+function ApprovalCard({
+  toolName,
+  input,
+  onDecision,
+}: {
+  toolName: string;
+  input: Record<string, unknown>;
+  onDecision: (approved: boolean) => void;
+}) {
+  const [decided, setDecided] = useState<null | boolean>(null);
+  const decide = (approved: boolean) => {
+    setDecided(approved);
+    onDecision(approved);
+  };
+
+  const str = (v: unknown) => (v == null ? "" : String(v));
+  const audience = (input.audience as Record<string, unknown>) || {};
+  const message = (input.message as Record<string, unknown>) || {};
+
+  let title = "تأكيد العملية";
+  let rows: { label: string; value: string }[] = [];
+
+  if (toolName === "sendWhatsApp") {
+    title = "تأكيد إرسال رسالة واتساب";
+    rows = [
+      { label: "إلى", value: str(input.to) },
+      { label: "الرسالة", value: str(input.message) },
+    ];
+  } else if (toolName === "scheduleTask") {
+    title = "تأكيد إنشاء مهمة مجدولة";
+    const audienceLabel: Record<string, string> = {
+      underperformers: "الموظفون تحت الهدف",
+      employees: "موظفون محددون",
+      phones: "أرقام محددة",
+      all_team: "كل الفريق",
+    };
+    const freqLabel: Record<string, string> = {
+      once: "مرة واحدة", daily: "يومياً", weekly: "أسبوعياً", monthly: "شهرياً",
+    };
+    rows = [
+      { label: "العنوان", value: str(input.title) },
+      { label: "الجمهور", value: audienceLabel[str(audience.kind)] ?? str(audience.kind) },
+      { label: "التكرار", value: freqLabel[str(input.frequency)] ?? str(input.frequency) },
+      { label: "الرسالة", value: str(message.template) },
+    ];
+  } else if (toolName === "runTaskNow") {
+    title = "تأكيد تشغيل المهمة الآن";
+    rows = [{ label: "المهمة", value: str(input.task_id) }];
+  } else if (toolName === "deleteScheduledTask") {
+    title = "تأكيد حذف المهمة";
+    rows = [{ label: "المهمة", value: str(input.task_id) }];
+  } else if (toolName === "updateScheduledTask") {
+    title = "تأكيد تعديل المهمة";
+    rows = [
+      { label: "المهمة", value: str(input.task_id) },
+      { label: "الحالة", value: str(input.status) === "active" ? "تشغيل" : "إيقاف" },
+    ];
+  }
+
+  return (
+    <div className="rounded-xl border border-cyan/25 bg-cyan/[0.04] p-4 shadow-[0_0_20px_rgba(0,212,255,0.06)]">
+      <div className="flex items-center gap-2 mb-3">
+        <ShieldCheck className="w-4 h-4 text-cyan" />
+        <span className="text-sm font-bold text-foreground">{title}</span>
+      </div>
+      <div className="space-y-2 mb-3">
+        {rows.map((r, i) => (
+          <div key={i} className="flex gap-2 text-[13px]">
+            <span className="text-muted-foreground min-w-[64px] flex-shrink-0">{r.label}:</span>
+            <span className="text-foreground/90 whitespace-pre-wrap break-words">{r.value}</span>
+          </div>
+        ))}
+      </div>
+      {decided === null ? (
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            onClick={() => decide(true)}
+            className="gap-1.5 bg-cc-green hover:bg-cc-green/90 text-white"
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            أوافق
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => decide(false)}
+            className="gap-1.5 border-red-500/30 text-red-500 hover:bg-red-500/10"
+          >
+            <XCircle className="w-3.5 h-3.5" />
+            رفض
+          </Button>
+        </div>
+      ) : (
+        <div className={cn("flex items-center gap-1.5 text-[12px]", decided ? "text-cc-green" : "text-red-500")}>
+          {decided ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+          {decided ? "تمت الموافقة" : "تم الرفض"}
+        </div>
+      )}
     </div>
   );
 }
