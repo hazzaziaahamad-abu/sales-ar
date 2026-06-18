@@ -780,7 +780,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
       notes: deal.notes || "",
       last_contact: deal.last_contact || deal.deal_date || todayLocal(),
       callback_date: deal.callback_date ? deal.callback_date.slice(0, 16) : "",
-      close_date: deal.close_date || "",
+      close_date: deal.close_date ? deal.close_date.slice(0, 10) : "",
     });
     setModalOpen(true);
   }
@@ -812,7 +812,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
           notes: form.notes || undefined,
           last_contact: form.last_contact || undefined,
           callback_date: form.stage === "اعادة الاتصال في وقت اخر" && form.callback_date ? new Date(form.callback_date).toISOString() : undefined,
-          close_date: form.close_date || (isNewlyCompleted ? new Date().toISOString().slice(0, 10) : oldDeal?.close_date || undefined),
+          close_date: form.close_date || (isNewlyCompleted ? new Date().toISOString() : oldDeal?.close_date || undefined),
           month,
           year,
         });
@@ -861,7 +861,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
           notes: form.notes || undefined,
           last_contact: form.last_contact || undefined,
           callback_date: form.stage === "اعادة الاتصال في وقت اخر" && form.callback_date ? new Date(form.callback_date).toISOString() : undefined,
-          close_date: form.close_date || (form.stage === "مكتملة" ? new Date().toISOString().slice(0, 10) : undefined),
+          close_date: form.close_date || (form.stage === "مكتملة" ? new Date().toISOString() : undefined),
           cycle_days: 0,
           month,
           year,
