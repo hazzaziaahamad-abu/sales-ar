@@ -131,16 +131,32 @@ export default function TeamPage() {
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([fetchEmployees(), fetchDeals(), fetchTickets(), fetchAllLearningProgress()])
-      .then(([e, d, t, lp]) => {
-        setEmployees(e);
-        setDeals(d);
-        setTickets(t);
-        const map: Record<string, string[]> = {};
-        lp.forEach((p) => { map[p.user_id] = p.completed_lessons; });
-        setLearningMap(map);
+    // Resilient load: a failure in one of the auxiliary fetches (e.g. a missing
+    // optional table) must NOT blank out the whole team list.
+    Promise.allSettled([
+      fetchEmployees(),
+      fetchDeals(),
+      fetchTickets(),
+      fetchAllLearningProgress(),
+    ])
+      .then(([eR, dR, tR, lpR]) => {
+        if (eR.status === "fulfilled") setEmployees(eR.value);
+        else console.error("fetchEmployees failed:", eR.reason);
+
+        if (dR.status === "fulfilled") setDeals(dR.value);
+        else console.error("fetchDeals failed:", dR.reason);
+
+        if (tR.status === "fulfilled") setTickets(tR.value);
+        else console.error("fetchTickets failed:", tR.reason);
+
+        if (lpR.status === "fulfilled") {
+          const map: Record<string, string[]> = {};
+          lpR.value.forEach((p) => { map[p.user_id] = p.completed_lessons; });
+          setLearningMap(map);
+        } else {
+          console.error("fetchAllLearningProgress failed:", lpR.reason);
+        }
       })
-      .catch(console.error)
       .finally(() => setLoading(false));
   }, [orgId]);
 
