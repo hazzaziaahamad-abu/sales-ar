@@ -175,15 +175,16 @@ export default function WeeklyMeetingView() {
     async function loadStats() {
       setLoadingStats(true);
       try {
+        // Each fetch is fail-safe so one failing query can't blank the meeting.
         const [ret, ref, emps, deals, lp] = await Promise.all([
-          fetchWeeklyRetentionStats(),
-          fetchWeeklyReferralStats(),
-          fetchEmployees(),
-          fetchDeals(),
-          fetchAllLearningProgress(),
+          fetchWeeklyRetentionStats().catch((e) => { console.error("retentionStats", e); return null; }),
+          fetchWeeklyReferralStats().catch((e) => { console.error("referralStats", e); return null; }),
+          fetchEmployees().catch((e) => { console.error("employees", e); return []; }),
+          fetchDeals().catch((e) => { console.error("deals", e); return []; }),
+          fetchAllLearningProgress().catch((e) => { console.error("learningProgress", e); return []; }),
         ]);
-        setRetentionStats(ret);
-        setReferralStats(ref);
+        if (ret) setRetentionStats(ret);
+        if (ref) setReferralStats(ref);
         const aMap: Record<string, string[]> = {};
         lp.forEach((p) => { aMap[p.user_id] = p.completed_lessons; });
         setAcademyMap(aMap);
