@@ -693,3 +693,76 @@ export interface ActivityLog {
   details?: string;
   created_at: string;
 }
+
+// ---------------------------------------------------------------------------
+// Scheduled / routine tasks (AI agent)
+// ---------------------------------------------------------------------------
+
+export type ScheduledTaskActionType = "notify_underperformers" | "custom_message";
+export type ScheduledTaskStatus = "active" | "paused" | "completed";
+export type ScheduledTaskFrequency = "once" | "daily" | "weekly" | "monthly";
+
+/** WHO the task reaches. */
+export interface TaskAudience {
+  kind: "underperformers" | "employees" | "phones" | "all_team";
+  employee_ids?: string[];
+  phones?: string[];
+  /** overall_score below this counts as underperforming (default 70). */
+  threshold?: number;
+  /** "current_month" or an explicit period. */
+  period?: "current_month" | { month: number; year: number };
+}
+
+/** WHAT the task sends. `template` supports {name} {revenue} {target} {gap} {score}. */
+export interface TaskMessage {
+  template: string;
+  include_image?: boolean;
+  image_template?: "performance" | "announcement" | "reminder";
+  link?: string;
+}
+
+export interface TaskActionConfig {
+  audience: TaskAudience;
+  message: TaskMessage;
+  channel?: "whatsapp";
+}
+
+export interface ScheduledTask {
+  id: string;
+  org_id: string;
+  title: string;
+  description?: string | null;
+  action_type: ScheduledTaskActionType;
+  action_config: TaskActionConfig;
+  status: ScheduledTaskStatus;
+  frequency: ScheduledTaskFrequency;
+  at_hour: number;
+  at_minute: number;
+  weekday?: number | null;
+  day_of_month?: number | null;
+  run_at?: string | null;
+  timezone: string;
+  next_run_at?: string | null;
+  last_run_at?: string | null;
+  run_count: number;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ScheduledTaskRun {
+  id: string;
+  task_id: string;
+  org_id: string;
+  status: "running" | "success" | "partial" | "failed";
+  started_at: string;
+  finished_at?: string | null;
+  recipients_total: number;
+  recipients_sent: number;
+  summary?: string | null;
+  details?: {
+    recipients?: { name?: string; phone: string; ok: boolean; error?: string }[];
+    error?: string;
+  } | null;
+  created_at: string;
+}

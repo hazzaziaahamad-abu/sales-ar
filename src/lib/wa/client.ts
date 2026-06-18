@@ -308,3 +308,35 @@ export async function sendTextFromOrg(
   }
   return res.json();
 }
+
+/**
+ * Send an image (by public URL) with an optional caption from an org's session.
+ *
+ * The gateway's media endpoint isn't guaranteed, so if `send-image` is missing
+ * we fall back to a plain-text message containing the caption + the image URL —
+ * the recipient still gets the link, which is the core requirement.
+ */
+export async function sendImageFromOrg(
+  orgId: string,
+  to: string,
+  imageUrl: string,
+  caption = ""
+): Promise<unknown> {
+  const session = await resolveOrgSession(orgId);
+  if (!session) throw new Error("No WhatsApp session for this organization");
+  if (!isConnectedStatus(session.status)) {
+    throw new Error("WhatsApp number is not connected");
+  }
+  const chatId = to.includes("@") ? to : `${to.replace(/[^\d]/g, "")}@c.us`;
+
+  const res = await waFetch(`/sessions/${session.id}/messages/send-image`, {
+    method: "POST",
+    body: JSON.stringify({ chatId, url: imageUrl, image: imageUrl, caption }),
+  }).catch(() => null);
+
+  if (res && res.ok) return res.json();
+
+  // Fallback: gateway doesn't support image media — send caption + link as text.
+  const text = caption ? `${caption}\n${imageUrl}` : imageUrl;
+  return sendTextFromOrg(orgId, to, text);
+}
