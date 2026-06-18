@@ -124,6 +124,7 @@ const EMPTY_FORM = {
   notes: "",
   last_contact: todayLocal(),
   callback_date: "",
+  close_date: "",
 };
 
 export interface SalesPageProps {
@@ -779,6 +780,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
       notes: deal.notes || "",
       last_contact: deal.last_contact || deal.deal_date || todayLocal(),
       callback_date: deal.callback_date ? deal.callback_date.slice(0, 16) : "",
+      close_date: deal.close_date || "",
     });
     setModalOpen(true);
   }
@@ -810,7 +812,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
           notes: form.notes || undefined,
           last_contact: form.last_contact || undefined,
           callback_date: form.stage === "اعادة الاتصال في وقت اخر" && form.callback_date ? new Date(form.callback_date).toISOString() : undefined,
-          ...(isNewlyCompleted && !oldDeal?.close_date ? { close_date: new Date().toISOString().slice(0, 10) } : {}),
+          close_date: form.close_date || (isNewlyCompleted ? new Date().toISOString().slice(0, 10) : oldDeal?.close_date || undefined),
           month,
           year,
         });
@@ -859,7 +861,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
           notes: form.notes || undefined,
           last_contact: form.last_contact || undefined,
           callback_date: form.stage === "اعادة الاتصال في وقت اخر" && form.callback_date ? new Date(form.callback_date).toISOString() : undefined,
-          ...(form.stage === "مكتملة" ? { close_date: new Date().toISOString().slice(0, 10) } : {}),
+          close_date: form.close_date || (form.stage === "مكتملة" ? new Date().toISOString().slice(0, 10) : undefined),
           cycle_days: 0,
           month,
           year,
@@ -1570,6 +1572,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
               <TableHead>احتمالية</TableHead>
               <TableHead>المسؤول</TableHead>
               <TableHead>التاريخ</TableHead>
+              <TableHead>تاريخ الدفع</TableHead>
               <TableHead>آخر تواصل</TableHead>
               <TableHead>أيام بدون تواصل</TableHead>
               <TableHead>ملاحظات</TableHead>
@@ -1685,6 +1688,13 @@ export function SalesSection({ salesType }: SalesPageProps) {
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs">
                     {deal.deal_date ? formatDate(deal.deal_date) : "—"}
+                  </TableCell>
+                  <TableCell className="text-xs">
+                    {deal.close_date ? (
+                      <span className="text-cc-green">{formatDate(deal.close_date)}</span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs">
                     {deal.last_contact ? formatDate(deal.last_contact) : "—"}
@@ -2257,6 +2267,19 @@ export function SalesSection({ salesType }: SalesPageProps) {
                 type="date"
                 value={form.last_contact}
                 onChange={(e) => setForm({ ...form, last_contact: e.target.value })}
+                dir="ltr"
+                className="text-right"
+              />
+            </div>
+
+            {/* Payment/Close date */}
+            <div className="grid gap-1.5">
+              <Label htmlFor="close_date">تاريخ الدفع</Label>
+              <Input
+                id="close_date"
+                type="date"
+                value={form.close_date}
+                onChange={(e) => setForm({ ...form, close_date: e.target.value })}
                 dir="ltr"
                 className="text-right"
               />
