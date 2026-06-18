@@ -286,6 +286,30 @@ export async function registerWebhook(sessionId: string): Promise<boolean> {
   return Boolean(res?.ok);
 }
 
+/**
+ * Normalize a phone number to international digits for WhatsApp.
+ * Saudi-default (the app's primary market) but preserves already-international
+ * numbers untouched:
+ *   05XXXXXXXX / 5XXXXXXXX  → 9665XXXXXXXX   (KSA local → international)
+ *   +966… / 00966… / 966…   → 966…           (already KSA international)
+ *   201157337829, etc.      → kept as-is      (already has a country code)
+ */
+export function normalizePhone(raw: string): string {
+  let d = String(raw ?? "").replace(/[^\d]/g, "");
+  if (!d) return "";
+  if (d.startsWith("00")) d = d.slice(2); // intl access prefix
+  if (d.startsWith("966")) return d; // already KSA international
+  if (d.length === 10 && d.startsWith("05")) return "966" + d.slice(1); // 05XXXXXXXX
+  if (d.length === 9 && d.startsWith("5")) return "966" + d; // 5XXXXXXXX
+  return d; // assume it already carries a country code
+}
+
+/** Build a WhatsApp chat id from a phone number (or pass through an existing id). */
+function toChatId(to: string): string {
+  if (to.includes("@")) return to;
+  return `${normalizePhone(to)}@c.us`;
+}
+
 /** Send a plain text message from an org's session. */
 export async function sendTextFromOrg(
   orgId: string,
@@ -297,7 +321,7 @@ export async function sendTextFromOrg(
   if (!isConnectedStatus(session.status)) {
     throw new Error("WhatsApp number is not connected");
   }
-  const chatId = to.includes("@") ? to : `${to.replace(/[^\d]/g, "")}@c.us`;
+  const chatId = toChatId(to);
   const res = await waFetch(`/sessions/${session.id}/messages/send-text`, {
     method: "POST",
     body: JSON.stringify({ chatId, text }),
@@ -327,7 +351,7 @@ export async function sendImageFromOrg(
   if (!isConnectedStatus(session.status)) {
     throw new Error("WhatsApp number is not connected");
   }
-  const chatId = to.includes("@") ? to : `${to.replace(/[^\d]/g, "")}@c.us`;
+  const chatId = toChatId(to);
 
   const res = await waFetch(`/sessions/${session.id}/messages/send-image`, {
     method: "POST",

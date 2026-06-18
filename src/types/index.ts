@@ -706,6 +706,8 @@ export type ScheduledTaskFrequency = "once" | "daily" | "weekly" | "monthly";
 export interface TaskAudience {
   kind: "underperformers" | "employees" | "phones" | "all_team";
   employee_ids?: string[];
+  /** Employee names (resolved to phones by the executor — case-insensitive). */
+  employee_names?: string[];
   phones?: string[];
   /** overall_score below this counts as underperforming (default 70). */
   threshold?: number;

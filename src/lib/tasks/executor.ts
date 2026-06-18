@@ -142,17 +142,34 @@ async function resolveExplicit(
   }
 
   // employees / all_team
-  let q = supabaseAdmin
-    .from("employees")
-    .select("id, name, phone, status")
-    .eq("org_id", orgId);
-  if (audience.kind === "employees" && audience.employee_ids?.length) {
-    q = q.in("id", audience.employee_ids);
-  }
-  const { data: employees } = await q;
-  for (const emp of employees ?? []) {
-    if (!emp.phone) continue;
-    recipients.push({ name: emp.name ?? "", phone: emp.phone, vars: { name: emp.name ?? "" } });
+  const seen = new Set<string>();
+  const pushEmployees = (rows: { id: string; name: string | null; phone: string | null }[] | null) => {
+    for (const emp of rows ?? []) {
+      if (!emp.phone || seen.has(emp.id)) continue;
+      seen.add(emp.id);
+      recipients.push({ name: emp.name ?? "", phone: emp.phone, vars: { name: emp.name ?? "" } });
+    }
+  };
+
+  const byId = audience.kind === "employees" ? audience.employee_ids ?? [] : [];
+  const byName = audience.kind === "employees" ? audience.employee_names ?? [] : [];
+
+  // Explicit selection by id and/or name; otherwise the whole team.
+  if (audience.kind === "employees" && (byId.length || byName.length)) {
+    if (byId.length) {
+      const { data } = await supabaseAdmin
+        .from("employees").select("id, name, phone").eq("org_id", orgId).in("id", byId);
+      pushEmployees(data);
+    }
+    for (const name of byName) {
+      const { data } = await supabaseAdmin
+        .from("employees").select("id, name, phone").eq("org_id", orgId).ilike("name", `%${name}%`);
+      pushEmployees(data);
+    }
+  } else {
+    const { data } = await supabaseAdmin
+      .from("employees").select("id, name, phone").eq("org_id", orgId);
+    pushEmployees(data);
   }
   return recipients;
 }
