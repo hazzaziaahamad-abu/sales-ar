@@ -45,6 +45,21 @@ const STATUS_META: Record<
   LOADING: { label: "جارٍ التحميل", color: "blue" },
 };
 
+const FALLBACK_META = { label: "غير معروف", color: "amber" as const };
+
+// The gateway may report statuses in different casing or with aliases
+// (e.g. whatsapp-web.js states). Normalize to our known set.
+function normalizeStatus(raw: unknown): WaStatus {
+  const s = String(raw ?? "").toUpperCase().replace(/[\s-]+/g, "_");
+  if (s in STATUS_META) return s as WaStatus;
+  if (["READY", "AUTHENTICATED", "OPEN", "WORKING"].includes(s)) return "CONNECTED";
+  if (["QRCODE", "QR", "SCAN_QR_CODE", "PAIRING"].includes(s)) return "SCAN_QR";
+  if (["STARTING", "OPENING", "TIMEOUT"].includes(s)) return "CONNECTING";
+  if (["STOPPED", "LOGGED_OUT", "CLOSED", "CONFLICT"].includes(s)) return "DISCONNECTED";
+  if (["ERROR", "UNLAUNCHED"].includes(s)) return "FAILED";
+  return "DISCONNECTED";
+}
+
 export default function WhatsAppPage() {
   const [status, setStatus] = useState<WaStatus>("LOADING");
   const [phone, setPhone] = useState<string | null>(null);
@@ -69,7 +84,7 @@ export default function WhatsAppPage() {
         return;
       }
       setError(null);
-      setStatus((data.status as WaStatus) || "DISCONNECTED");
+      setStatus(normalizeStatus(data.status));
       setPhone(data.phoneNumber ?? null);
 
       // If not connected, fetch a fresh QR to display.
@@ -104,7 +119,7 @@ export default function WhatsAppPage() {
       if (!res.ok) {
         setError(data.error || "تعذّر بدء الجلسة");
       } else {
-        setStatus((data.status as WaStatus) || "INITIALIZING");
+        setStatus(normalizeStatus(data.status));
         setQr(data?.qr?.image ?? null);
       }
     } catch {
@@ -138,7 +153,7 @@ export default function WhatsAppPage() {
     }
   };
 
-  const meta = STATUS_META[status];
+  const meta = STATUS_META[status] ?? FALLBACK_META;
   const isConnected = status === "CONNECTED";
 
   return (
