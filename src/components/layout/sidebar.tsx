@@ -41,6 +41,7 @@ import {
   Briefcase,
   BarChart2,
   ClipboardCheck,
+  MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
@@ -83,6 +84,7 @@ export const NAV_ITEMS = [
   { label: "صحة القائد", href: "/leader-health", slug: "leader-health", icon: HeartPulse, color: "amber", group: "النظام" },
   { label: "الخطط التسويقية", href: "/marketing-plans", slug: "marketing-plans", icon: Megaphone, color: "violet", group: "المبيعات والدعم" },
   { label: "تحليلات الزيارات", href: "/analytics", slug: "analytics", icon: BarChart2, color: "cyan", group: "النظام" },
+  { label: "واتساب", href: "/whatsapp", slug: "whatsapp", icon: MessageCircle, color: "emerald", group: "النظام" },
 ];
 
 const NAV_GROUPS = ["عام", "الإدارة التنفيذية", "المبيعات والدعم", "المتابعة", "العملاء", "المهام", "الفريق والتطوير", "تقرير الأداء", "النظام"];
