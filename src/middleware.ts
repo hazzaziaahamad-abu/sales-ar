@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createMiddlewareClient } from "@/lib/supabase/middleware";
 
-const PUBLIC_PATHS = ["/login", "/auth/callback", "/gift", "/submit"];
+// /api/wa/webhook is called server-to-server by the OpenWA gateway and is
+// authenticated by its HMAC signature, not by a Supabase session.
+const PUBLIC_PATHS = ["/login", "/auth/callback", "/gift", "/submit", "/api/wa/webhook"];
 
 export async function middleware(request: NextRequest) {
   const { supabase, response } = createMiddlewareClient(request);
