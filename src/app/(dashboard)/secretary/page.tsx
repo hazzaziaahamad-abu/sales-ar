@@ -14,7 +14,7 @@ import {
 import { fetchDeals, fetchRenewals, fetchEmployees, fetchRecentFollowUpNotes, upsertSalesGuideSetting, fetchSalesGuideSettings, fetchTickets, fetchUserLoginLogs, fetchActivityLogs, type UserLoginLog } from "@/lib/supabase/db";
 import type { ActivityLog } from "@/types";
 import { useAuth } from "@/lib/auth-context";
-import { formatMoneyFull, todayLocal, dateToLocal } from "@/lib/utils/format";
+import { formatMoneyFull, todayLocal, dateToLocal, saudiDateStr } from "@/lib/utils/format";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Deal, Renewal, Employee, Ticket } from "@/types";
@@ -62,8 +62,7 @@ function getGreeting() {
 }
 
 function toLocalDateStr(dateStr: string): string {
-  const d = new Date(dateStr);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return saudiDateStr(new Date(dateStr));
 }
 
 function isToday(dateStr: string): boolean {

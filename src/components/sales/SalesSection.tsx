@@ -13,7 +13,7 @@ import { useTopbarControls } from "@/components/layout/topbar-context";
 import { STAGES, SOURCES, SOURCE_COLORS, PLANS } from "@/lib/utils/constants";
 
 import SalesKPIsView from "@/components/SalesKPIsView";
-import { formatMoney, formatMoneyFull, formatDate, formatPhone, formatPercent, todayLocal, dateToLocal } from "@/lib/utils/format";
+import { formatMoney, formatMoneyFull, formatDate, formatPhone, formatPercent, todayLocal, dateToLocal, dateToTimestamp, saudiTimestamp } from "@/lib/utils/format";
 import { FollowUpLogButton } from "@/components/follow-up-log";
 import { ClientProfilePanel } from "@/components/client-profile-panel";
 import { AchievementSummary } from "@/components/achievement-summary";
@@ -812,7 +812,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
           notes: form.notes || undefined,
           last_contact: form.last_contact || undefined,
           callback_date: form.stage === "اعادة الاتصال في وقت اخر" && form.callback_date ? new Date(form.callback_date).toISOString() : undefined,
-          close_date: form.close_date ? new Date(form.close_date + "T" + new Date().toTimeString().slice(0, 8)).toISOString() : (isNewlyCompleted ? new Date().toISOString() : oldDeal?.close_date || undefined),
+          close_date: form.close_date ? dateToTimestamp(form.close_date) : (isNewlyCompleted ? saudiTimestamp() : oldDeal?.close_date || undefined),
           month,
           year,
         });
@@ -861,7 +861,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
           notes: form.notes || undefined,
           last_contact: form.last_contact || undefined,
           callback_date: form.stage === "اعادة الاتصال في وقت اخر" && form.callback_date ? new Date(form.callback_date).toISOString() : undefined,
-          close_date: form.close_date ? new Date(form.close_date + "T" + new Date().toTimeString().slice(0, 8)).toISOString() : (form.stage === "مكتملة" ? new Date().toISOString() : undefined),
+          close_date: form.close_date ? dateToTimestamp(form.close_date) : (form.stage === "مكتملة" ? saudiTimestamp() : undefined),
           cycle_days: 0,
           month,
           year,

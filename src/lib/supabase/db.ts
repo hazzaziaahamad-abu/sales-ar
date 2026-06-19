@@ -1,5 +1,5 @@
 import { createClient } from "./client";
-import { todayLocal } from "@/lib/utils/format";
+import { todayLocal, saudiDateStr } from "@/lib/utils/format";
 import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, MonthlyBudget, StartupCost, Marketer, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating, FollowUpNote, MentionNotification, PendingDeal, TargetClient, GiftOffer, EmployeeTask, Package, AcademyContent, LearningStage, LearningLesson, LearningQuiz, ActivityLog, TrainingKnowledge, ProductFeature, TrainingSessionLog, MarketingPlan, PlanAxis, PlanIdea } from "@/types";
 
 const DEFAULT_ORG = "00000000-0000-0000-0000-000000000001";
@@ -1021,13 +1021,13 @@ export async function fetchWeeklyRetentionStats(): Promise<{
   const weekStart = new Date(now);
   weekStart.setDate(now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
   weekStart.setHours(0, 0, 0, 0);
-  const weekStartStr = weekStart.toISOString().split("T")[0];
-  const todayStr = now.toISOString().split("T")[0];
+  const weekStartStr = saudiDateStr(weekStart);
+  const todayStr = saudiDateStr(now);
 
   // Next 14 days for expiring
   const expiringEnd = new Date(now);
   expiringEnd.setDate(now.getDate() + 14);
-  const expiringEndStr = expiringEnd.toISOString().split("T")[0];
+  const expiringEndStr = saudiDateStr(expiringEnd);
 
   // Renewals completed this week
   const { data: renewedData } = await supabase
@@ -1069,7 +1069,7 @@ export async function fetchWeeklyRetentionStats(): Promise<{
   const upsell = upsellData?.length || 0;
 
   // Renewal rate: completed / (completed + cancelled) this month
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
+  const monthStart = saudiDateStr(new Date(now.getFullYear(), now.getMonth(), 1));
   const { data: allDueData } = await supabase
     .from("renewals")
     .select("status")
@@ -1097,7 +1097,7 @@ export async function fetchWeeklyReferralStats(): Promise<{
   const weekStart = new Date(now);
   weekStart.setDate(now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
   weekStart.setHours(0, 0, 0, 0);
-  const weekStartStr = weekStart.toISOString().split("T")[0];
+  const weekStartStr = saudiDateStr(weekStart);
 
   // All referrals for org
   const { data: allRefs } = await supabase
@@ -1893,7 +1893,7 @@ export async function generateDailyAutoTasks(
   userId: string,
   userName: string
 ): Promise<EmployeeTask[]> {
-  const today = new Date().toISOString().split("T")[0];
+  const today = saudiDateStr();
   const dayOfWeek = new Date().getDay(); // 0=Sun, 5=Fri, 6=Sat
   // Only generate on workdays (Sun=0 through Thu=4)
   if (dayOfWeek === 5 || dayOfWeek === 6) return [];
@@ -1983,8 +1983,8 @@ export async function fetchWeeklyTaskStats(userId: string): Promise<{ completed:
   start.setDate(now.getDate() - day);
   const end = new Date(start);
   end.setDate(start.getDate() + 6);
-  const startStr = start.toISOString().split("T")[0];
-  const endStr = end.toISOString().split("T")[0];
+  const startStr = saudiDateStr(start);
+  const endStr = saudiDateStr(end);
 
   const { data, error } = await supabase
     .from("employee_tasks")
@@ -2010,7 +2010,7 @@ export async function fetchMyTaskStats(userId: string): Promise<{ total: number;
     .eq("assigned_to", userId);
   if (error) throw error;
   const tasks = data ?? [];
-  const today = new Date().toISOString().split("T")[0];
+  const today = saudiDateStr();
   return {
     total: tasks.length,
     completed: tasks.filter(t => t.status === "completed").length,

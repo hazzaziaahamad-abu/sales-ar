@@ -28,7 +28,7 @@ import {
   getKpiStatus,
   KPI_STATUS_STYLES,
 } from "@/lib/utils/constants";
-import { formatMoneyFull, formatDate, formatPhone, formatPercent, todayLocal } from "@/lib/utils/format";
+import { formatMoneyFull, formatDate, formatPhone, formatPercent, todayLocal, dateToTimestamp, saudiTimestamp } from "@/lib/utils/format";
 import { FollowUpLogButton } from "@/components/follow-up-log";
 import { StatCard } from "@/components/ui/stat-card";
 import { DonutChart } from "@/components/ui/donut-chart";
@@ -655,7 +655,7 @@ export default function RenewalsPage() {
         plan_name: form.plan_name,
         plan_price: form.plan_price,
         renewal_date: form.renewal_date,
-        payment_date: form.payment_date ? new Date(form.payment_date + "T" + new Date().toTimeString().slice(0, 8)).toISOString() : (isCompleting ? new Date().toISOString() : undefined),
+        payment_date: form.payment_date ? dateToTimestamp(form.payment_date) : (isCompleting ? saudiTimestamp() : undefined),
         status: form.status,
         cancel_reason: form.status === "ملغي بسبب" ? form.cancel_reason || undefined : undefined,
         assigned_rep: form.assigned_rep || undefined,

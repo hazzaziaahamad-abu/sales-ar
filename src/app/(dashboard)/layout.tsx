@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { fetchDeals, fetchSalesTargets, fetchSalesActivities, fetchTickets, fetchMentionNotifications, markMentionNotificationsRead, fetchRecentFollowUpNotes } from "@/lib/supabase/db";
 import type { AppNotification } from "@/types";
 import { CCThemeProvider } from "@/lib/theme-context";
+import { saudiDateStr } from "@/lib/utils/format";
 import { PageTracker } from "@/components/layout/page-tracker";
 
 const PAGE_SLUG_MAP: Record<string, string> = {
@@ -214,7 +215,7 @@ async function generateLiveNotifications(): Promise<AppNotification[]> {
 
     // Unmet daily targets
     if (targets.status === "fulfilled" && activities.status === "fulfilled") {
-      const todayStr = new Date().toISOString().split("T")[0];
+      const todayStr = saudiDateStr();
       const todayActivities = activities.value.filter((a) => a.activity_date === todayStr);
 
       const dailyTargets = targets.value.filter((t) => t.period_type === "daily");

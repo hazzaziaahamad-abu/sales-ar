@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser, hasPermission } from "@/lib/permissions";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { saudiDateStr } from "@/lib/utils/format";
 
 export async function GET() {
   const user = await getAuthUser();
@@ -74,5 +75,5 @@ function getWeekStart(): string {
   const day = now.getDay();
   const diff = now.getDate() - day + (day === 0 ? -6 : 1);
   const monday = new Date(now.setDate(diff));
-  return monday.toISOString().split("T")[0];
+  return saudiDateStr(monday);
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { saudiDateStr } from "@/lib/utils/format";
 
 /**
  * صحة القائد — تحدي ٩٠ يوم
@@ -194,8 +195,8 @@ const SLUMP_EXERCISES: SlumpExercise[] = [
 
 type StoodOption = "now" | "lt30" | "30to60" | "gt60" | "forgot";
 
-const todayISO = () => new Date().toISOString().split("T")[0];
-const dateISO = (d: Date) => d.toISOString().split("T")[0];
+const todayISO = () => saudiDateStr();
+const dateISO = (d: Date) => saudiDateStr(d);
 
 function arabicNum(n: number | string | null | undefined): string {
   if (n === null || n === undefined || n === "") return "—";

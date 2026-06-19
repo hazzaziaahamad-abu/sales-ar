@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthUser, hasPermission, isSuperAdmin } from "@/lib/permissions";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { saudiDateStr } from "@/lib/utils/format";
 
 async function getUserName(userId: string): Promise<string | null> {
   const { data } = await supabaseAdmin
@@ -18,7 +19,7 @@ export async function GET() {
   const admin = await isSuperAdmin(user.id);
   const monthStart = new Date();
   monthStart.setDate(1);
-  const monthStartStr = monthStart.toISOString().split("T")[0];
+  const monthStartStr = saudiDateStr(monthStart);
 
   let query = supabaseAdmin.from("deals").select("*");
 

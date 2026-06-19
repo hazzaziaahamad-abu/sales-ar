@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { saudiDateStr } from "@/lib/utils/format";
 import { useAuth } from "@/lib/auth-context";
 import {
   fetchEmployeeTasks,
@@ -266,7 +267,7 @@ export default function TasksPage() {
     setShareMenuId(null);
   };
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = saudiDateStr();
 
   const filtered = tasks.filter(t => {
     if (filterStatus !== "all" && t.status !== filterStatus) return false;

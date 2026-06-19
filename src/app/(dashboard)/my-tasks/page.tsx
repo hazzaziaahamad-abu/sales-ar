@@ -21,7 +21,7 @@ import {
   type DailyTaskTemplate,
 } from "@/lib/supabase/db";
 import { SOURCES, PLANS } from "@/lib/utils/constants";
-import { formatMoney, todayLocal } from "@/lib/utils/format";
+import { formatMoney, todayLocal, saudiDateStr } from "@/lib/utils/format";
 import {
   CheckCircle2,
   Clock,
@@ -426,7 +426,7 @@ export default function MyTasksPage() {
 
   /* Load admin data when switching to admin tabs */
   const loadAdminData = useCallback(async () => {
-    const today = new Date().toISOString().split("T")[0];
+    const today = saudiDateStr();
     const [repsResult, templateResult] = await Promise.allSettled([
       fetchAllRepsDailyStats(today),
       fetchDailyTasksTemplate(),
@@ -443,7 +443,7 @@ export default function MyTasksPage() {
 
   /* ─── Today's task stats for stats bar ─── */
   const todayStats = useMemo(() => {
-    const today = new Date().toISOString().split("T")[0];
+    const today = saudiDateStr();
     const todayTasks = tasks.filter(t => t.due_date === today);
     const completed = todayTasks.filter(t => t.status === "completed").length;
     const total = todayTasks.length;
@@ -543,7 +543,7 @@ export default function MyTasksPage() {
     }
   };
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = saudiDateStr();
 
   const getWeekRange = () => {
     const now = new Date();
@@ -552,14 +552,14 @@ export default function MyTasksPage() {
     start.setDate(now.getDate() - dayOfWeek);
     const end = new Date(start);
     end.setDate(start.getDate() + 6);
-    return { start: start.toISOString().split("T")[0], end: end.toISOString().split("T")[0] };
+    return { start: saudiDateStr(start), end: saudiDateStr(end) };
   };
 
   const getMonthRange = () => {
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth(), 1);
     const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    return { start: start.toISOString().split("T")[0], end: end.toISOString().split("T")[0] };
+    return { start: saudiDateStr(start), end: saudiDateStr(end) };
   };
 
   const filteredTasks = useMemo(() => {
@@ -619,7 +619,7 @@ export default function MyTasksPage() {
     let count = 0;
     const d = new Date();
     while (true) {
-      const dateStr = d.toISOString().split("T")[0];
+      const dateStr = saudiDateStr(d);
       if (completedDates.has(dateStr)) {
         count++;
         d.setDate(d.getDate() - 1);

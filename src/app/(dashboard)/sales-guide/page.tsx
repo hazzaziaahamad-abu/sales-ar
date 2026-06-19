@@ -34,7 +34,7 @@ import {
   PIP_STATUSES,
   PIPELINE_STAGES_GUIDE as DEFAULT_PIPELINE_STAGES,
 } from "@/lib/utils/constants";
-import { formatMoneyFull, formatDate } from "@/lib/utils/format";
+import { formatMoneyFull, formatDate, saudiDateStr } from "@/lib/utils/format";
 import { StatCard } from "@/components/ui/stat-card";
 import { ColorBadge } from "@/components/ui/color-badge";
 import { Button } from "@/components/ui/button";
@@ -124,7 +124,7 @@ const PIP_BADGE: Record<string, { color: "green" | "amber" | "red" | "blue"; lab
 
 /* ─── Empty forms ─── */
 const EMPTY_ACTIVITY = {
-  activity_date: new Date().toISOString().split("T")[0],
+  activity_date: saudiDateStr(),
   activity_type: "" as string,
   result: "" as string,
   employee_name: "",
@@ -134,7 +134,7 @@ const EMPTY_ACTIVITY = {
 
 const EMPTY_PIP = {
   employee_name: "",
-  start_date: new Date().toISOString().split("T")[0],
+  start_date: saudiDateStr(),
   end_date: "",
   reason: "",
   target_percentage: 100,
@@ -298,13 +298,13 @@ export default function SalesGuidePage() {
   }
 
   /* ─── Stats ─── */
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = saudiDateStr();
   const todayActivities = activities.filter((a) => a.activity_date === todayStr);
   const weekActivities = useMemo(() => {
     const now = new Date();
     const startOfWeek = new Date(now);
     startOfWeek.setDate(now.getDate() - now.getDay());
-    const start = startOfWeek.toISOString().split("T")[0];
+    const start = saudiDateStr(startOfWeek);
     return activities.filter((a) => a.activity_date >= start);
   }, [activities]);
 
@@ -313,8 +313,8 @@ export default function SalesGuidePage() {
     const now = new Date();
     const weekStart = new Date(now);
     weekStart.setDate(now.getDate() - weekStart.getDay());
-    const weekStartStr = weekStart.toISOString().split("T")[0];
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
+    const weekStartStr = saudiDateStr(weekStart);
+    const monthStart = saudiDateStr(new Date(now.getFullYear(), now.getMonth(), 1));
 
     // Get week's closed deals
     const weekClosedDeals = deals.filter((d) =>
@@ -886,8 +886,8 @@ export default function SalesGuidePage() {
 
                     // Period-based deal filtering
                     const now = new Date();
-                    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
-                    const weekStart = (() => { const d = new Date(now); d.setDate(d.getDate() - d.getDay()); return d.toISOString().split("T")[0]; })();
+                    const monthStart = saudiDateStr(new Date(now.getFullYear(), now.getMonth(), 1));
+                    const weekStart = (() => { const d = new Date(now); d.setDate(d.getDate() - d.getDay()); return saudiDateStr(d); })();
                     const periodDeals = (period: string) => {
                       if (period === "daily") return deals.filter((d) => (d.deal_date || d.created_at.slice(0, 10)) === todayStr);
                       if (period === "weekly") return deals.filter((d) => (d.deal_date || d.created_at.slice(0, 10)) >= weekStart);

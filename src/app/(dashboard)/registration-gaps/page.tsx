@@ -10,6 +10,7 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import type { Deal, Ticket, Employee, Renewal } from "@/types";
 import { Skeleton } from "@/components/ui/skeleton";
+import { saudiHour, saudiNow, saudiDateStr } from "@/lib/utils/format";
 
 // ─── Thresholds (minutes) ───────────────────────────────────────────────────
 const THRESHOLDS = {
@@ -18,9 +19,6 @@ const THRESHOLDS = {
 } as const;
 
 // ─── Shift config ──────────────────────────────────────────────────────────
-// الدعم + مبيعات الدعم: شفتين (صباحي 9-17 / مسائي 17-1)
-// مبيعات المكتب: شفت واحد (9-17)
-// التجديدات: مفتوح (بدون شفت)
 const SUPPORT_ROLES = ["دعم", "دعم فني", "support"];
 const SUPPORT_SALES_ROLES = ["مبيعات الدعم", "مبيعات دعم", "support sales"];
 const OFFICE_SALES_ROLES = ["مبيعات", "مبيعات المكتب", "sales"];
@@ -31,17 +29,8 @@ const INACTIVE_RENEWAL_STATUSES = ["مكتمل", "ملغي بسبب"];
 
 const DAY_NAMES_AR = ["أحد", "إثنين", "ثلاثاء", "أربعاء", "خميس", "جمعة", "سبت"];
 
-// توقيت السعودية UTC+3
-function getSaudiHour(date?: Date): number {
-  const d = date || new Date();
-  const utcH = d.getUTCHours();
-  return (utcH + 3) % 24;
-}
-
-function getSaudiDate(date?: Date): Date {
-  const d = date || new Date();
-  return new Date(d.getTime() + 3 * 60 * 60 * 1000);
-}
+const getSaudiHour = saudiHour;
+const getSaudiDate = saudiNow;
 
 type DeptType = "support" | "support_sales" | "office_sales" | "renewals";
 

@@ -6,7 +6,7 @@ import { fetchDeals, fetchRenewals, fetchMonthlyExpenses, createExpense, deleteE
 import { useAuth } from "@/lib/auth-context";
 import { useTopbarControls } from "@/components/layout/topbar-context";
 import { MONTHS_AR, SOURCE_COLORS } from "@/lib/utils/constants";
-import { formatMoney, formatMoneyFull } from "@/lib/utils/format";
+import { formatMoney, formatMoneyFull, saudiDateStr } from "@/lib/utils/format";
 import { StatCard } from "@/components/ui/stat-card";
 import { DonutChart } from "@/components/ui/donut-chart";
 import { BarChart } from "@/components/ui/bar-chart";
@@ -117,7 +117,7 @@ export default function FinancePage() {
     if (!expenseForm.category.trim() || !expenseForm.amount) return;
     setSavingExpense(true);
     try {
-      const expDate = expenseForm.expense_date || now.toISOString().split("T")[0];
+      const expDate = expenseForm.expense_date || saudiDateStr(now);
       const d = new Date(expDate);
       const expMonth = d.getMonth() + 1;
       const expYear = d.getFullYear();

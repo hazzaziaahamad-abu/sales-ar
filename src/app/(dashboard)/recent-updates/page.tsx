@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, useMemo } from "react";
 import { fetchRecentUpdates, fetchActivityLogs, fetchTrainingSessionLogs, fetchEmployees, type RecentUpdateItem } from "@/lib/supabase/db";
 import type { ActivityLog, TrainingSessionLog, Employee } from "@/types";
 import { useAuth } from "@/lib/auth-context";
+import { saudiDateStr } from "@/lib/utils/format";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ColorBadge } from "@/components/ui/color-badge";
 import { Button } from "@/components/ui/button";
@@ -85,12 +86,11 @@ type FilterMode = "all" | "today" | "week";
 type TabMode = "updates" | "log" | "academy";
 
 function toLocalDateStr(dateStr: string): string {
-  const d = new Date(dateStr);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return saudiDateStr(new Date(dateStr));
 }
 
 function isToday(dateStr: string): boolean {
-  return toLocalDateStr(dateStr) === toLocalDateStr(new Date().toISOString());
+  return saudiDateStr(new Date(dateStr)) === saudiDateStr();
 }
 
 function isThisWeek(dateStr: string): boolean {

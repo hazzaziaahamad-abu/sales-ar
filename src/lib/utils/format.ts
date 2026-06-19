@@ -18,24 +18,60 @@ export function formatPercent(value: number): string {
 
 export function formatDate(date: string | Date): string {
   const d = new Date(date);
-  return `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}/${d.getFullYear()}`;
+  const s = new Date(d.getTime() + SAUDI_OFFSET_MS);
+  return `${s.getUTCDate().toString().padStart(2, "0")}/${(s.getUTCMonth() + 1).toString().padStart(2, "0")}/${s.getUTCFullYear()}`;
 }
 
-/** Returns a YYYY-MM-DD string for the given Date in **local time** (not UTC).
- *  Use this instead of `.toISOString().slice(0, 10)` whenever you need the
- *  user's calendar date — UTC slicing flips 1 day backward for users in
- *  positive-offset timezones (e.g. Saudi Arabia) during the first hours
- *  of a new day, which corrupts month/year reporting. */
+// ─── Saudi Arabia Timezone (UTC+3) — single source of truth ───
+const SAUDI_OFFSET_MS = 3 * 60 * 60 * 1000;
+
+/** Returns a Date shifted to Saudi time (UTC+3). Use for display & comparisons. */
+export function saudiNow(): Date {
+  return new Date(Date.now() + SAUDI_OFFSET_MS);
+}
+
+/** Current Saudi hour (0-23). */
+export function saudiHour(date?: Date): number {
+  const d = date ?? new Date();
+  return (d.getUTCHours() + 3) % 24;
+}
+
+/** YYYY-MM-DD in Saudi time. */
+export function saudiDateStr(date?: Date): string {
+  const d = date ?? new Date();
+  const s = new Date(d.getTime() + SAUDI_OFFSET_MS);
+  const y = s.getUTCFullYear();
+  const m = String(s.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(s.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Full ISO timestamp anchored to Saudi wall-clock time. Use when storing close_date / payment_date. */
+export function saudiTimestamp(): string {
+  return new Date().toISOString();
+}
+
+/** Converts a date-only string (YYYY-MM-DD) to a full ISO timestamp using current Saudi time-of-day. */
+export function dateToTimestamp(dateStr: string): string {
+  const now = new Date();
+  const h = String((now.getUTCHours() + 3) % 24).padStart(2, "0");
+  const m = String(now.getUTCMinutes()).padStart(2, "0");
+  const s = String(now.getUTCSeconds()).padStart(2, "0");
+  return new Date(`${dateStr}T${h}:${m}:${s}+03:00`).toISOString();
+}
+
+/** Returns a YYYY-MM-DD string in Saudi time. Replaces dateToLocal for Saudi usage. */
 export function dateToLocal(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
+  const s = new Date(date.getTime() + SAUDI_OFFSET_MS);
+  const y = s.getUTCFullYear();
+  const m = String(s.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(s.getUTCDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
 
-/** Today's date as YYYY-MM-DD in **local time**. Shorthand for dateToLocal(new Date()). */
+/** Today's date as YYYY-MM-DD in Saudi time. */
 export function todayLocal(): string {
-  return dateToLocal(new Date());
+  return saudiDateStr();
 }
 
 export function formatPhone(phone: string): string {

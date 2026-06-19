@@ -28,7 +28,7 @@ import {
 import type { Employee, Deal, Ticket } from "@/types";
 import { Users, UserPlus, Pencil, Trash2, TrendingUp, Headphones, Calendar, GraduationCap, Award } from "lucide-react";
 import { getAcademyStats, TOTAL_LESSONS } from "@/components/academy/LearningAcademy";
-import { formatMoney } from "@/lib/utils/format";
+import { formatMoney, saudiDateStr } from "@/lib/utils/format";
 
 /* ---------- helpers ---------- */
 
@@ -164,15 +164,15 @@ export default function TeamPage() {
   const periodRange = (() => {
     if (periodFilter === "all") return null;
     const now = new Date();
-    const today = now.toISOString().split("T")[0];
+    const today = saudiDateStr(now);
     if (periodFilter === "day") return today;
     if (periodFilter === "week") {
       const dayOfWeek = now.getDay();
       const weekStart = new Date(now);
       weekStart.setDate(now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
-      return weekStart.toISOString().split("T")[0];
+      return saudiDateStr(weekStart);
     }
-    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
+    return saudiDateStr(new Date(now.getFullYear(), now.getMonth(), 1));
   })();
 
   /* Filter deals & tickets by period */
