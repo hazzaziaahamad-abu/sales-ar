@@ -655,7 +655,7 @@ export default function RenewalsPage() {
         plan_name: form.plan_name,
         plan_price: form.plan_price,
         renewal_date: form.renewal_date,
-        payment_date: form.payment_date || (isCompleting ? new Date().toISOString() : undefined),
+        payment_date: form.payment_date ? new Date(form.payment_date + "T" + new Date().toTimeString().slice(0, 8)).toISOString() : (isCompleting ? new Date().toISOString() : undefined),
         status: form.status,
         cancel_reason: form.status === "ملغي بسبب" ? form.cancel_reason || undefined : undefined,
         assigned_rep: form.assigned_rep || undefined,
