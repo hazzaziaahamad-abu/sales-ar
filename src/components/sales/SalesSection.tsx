@@ -79,7 +79,6 @@ import {
   AlertTriangle,
   PhoneCall,
   ChevronDown,
-  Search,
 } from "lucide-react";
 
 /* ─── Stage badge color mapping ─── */
@@ -219,24 +218,6 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
-  const [existingClientSearch, setExistingClientSearch] = useState("");
-  const [showExistingClients, setShowExistingClients] = useState(false);
-
-  const uniqueClients = useMemo(() => {
-    const map = new Map<string, { name: string; phone: string; plan: string; value: number }>();
-    for (const d of deals) {
-      const key = d.client_name.trim().toLowerCase();
-      if (!key || map.has(key)) continue;
-      map.set(key, { name: d.client_name, phone: d.client_phone || "", plan: d.plan || "", value: d.deal_value });
-    }
-    return Array.from(map.values());
-  }, [deals]);
-
-  const filteredClients = useMemo(() => {
-    if (!existingClientSearch.trim()) return uniqueClients.slice(0, 10);
-    const q = existingClientSearch.toLowerCase();
-    return uniqueClients.filter((c) => c.name.toLowerCase().includes(q) || c.phone.includes(q)).slice(0, 10);
-  }, [uniqueClients, existingClientSearch]);
 
   /* delete confirmation */
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -780,8 +761,6 @@ export function SalesSection({ salesType }: SalesPageProps) {
   function openAddModal() {
     setEditingId(null);
     setForm(EMPTY_FORM);
-    setExistingClientSearch("");
-    setShowExistingClients(false);
     setModalOpen(true);
   }
 
@@ -2207,51 +2186,6 @@ export function SalesSection({ salesType }: SalesPageProps) {
           </DialogHeader>
 
           <div className="grid gap-4 py-2">
-            {/* Pick existing client */}
-            {!editingId && (
-              <div className="grid gap-1.5">
-                <Label className="flex items-center gap-1.5">
-                  <Search className="w-3.5 h-3.5 text-cyan" />
-                  اختيار عميل سابق
-                </Label>
-                <div className="relative">
-                  <Input
-                    value={existingClientSearch}
-                    onChange={(e) => {
-                      setExistingClientSearch(e.target.value);
-                      setShowExistingClients(true);
-                    }}
-                    onFocus={() => setShowExistingClients(true)}
-                    onBlur={() => setTimeout(() => setShowExistingClients(false), 200)}
-                    placeholder="ابحث باسم العميل أو رقم الجوال..."
-                  />
-                  {showExistingClients && filteredClients.length > 0 && (
-                    <div className="absolute z-50 top-full mt-1 w-full bg-card border border-border rounded-xl shadow-lg max-h-[200px] overflow-y-auto">
-                      {filteredClients.map((c, i) => (
-                        <button
-                          key={i}
-                          type="button"
-                          className="w-full text-right px-3 py-2 text-sm hover:bg-muted/50 transition-colors flex items-center justify-between gap-2 border-b border-border last:border-0"
-                          onClick={() => {
-                            setForm({ ...form, client_name: c.name, client_phone: c.phone, plan: c.plan || form.plan, deal_value: c.value || form.deal_value });
-                            setExistingClientSearch("");
-                            setShowExistingClients(false);
-                          }}
-                        >
-                          <div className="flex flex-col items-start gap-0.5 min-w-0">
-                            <span className="font-bold text-foreground truncate">{c.name}</span>
-                            {c.phone && <span className="text-[11px] text-muted-foreground" dir="ltr">{c.phone}</span>}
-                          </div>
-                          {c.plan && <span className="text-[11px] px-2 py-0.5 rounded-full bg-cyan-dim text-cyan shrink-0">{c.plan}</span>}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <p className="text-[11px] text-muted-foreground">اختياري — ابحث لتعبئة بيانات عميل موجود تلقائياً</p>
-              </div>
-            )}
-
             {/* Client name */}
             <div className="grid gap-1.5">
               <Label htmlFor="client_name">اسم العميل</Label>
