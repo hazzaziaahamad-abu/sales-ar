@@ -26,8 +26,9 @@ export function formatDate(date: string | Date): string {
 const SAUDI_OFFSET_MS = 3 * 60 * 60 * 1000;
 
 /** Returns a Date shifted to Saudi time (UTC+3). Use for display & comparisons. */
-export function saudiNow(): Date {
-  return new Date(Date.now() + SAUDI_OFFSET_MS);
+export function saudiNow(date?: Date): Date {
+  const d = date ?? new Date();
+  return new Date(d.getTime() + SAUDI_OFFSET_MS);
 }
 
 /** Current Saudi hour (0-23). */
