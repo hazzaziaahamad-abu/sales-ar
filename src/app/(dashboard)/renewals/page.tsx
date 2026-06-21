@@ -146,6 +146,7 @@ function getDaysRemainingStyle(days: number) {
 
 export default function RenewalsPage() {
   const { activeOrgId: orgId, user: authUser } = useAuth();
+  const isAdmin = authUser?.isSuperAdmin || authUser?.roleName === "مدير" || authUser?.roleName === "admin";
   const [renewals, setRenewals] = useState<Renewal[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -623,7 +624,7 @@ export default function RenewalsPage() {
   /* ─── Handlers ─── */
   function openAddModal() {
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, assigned_rep: authUser?.name || "" });
     setModalOpen(true);
   }
 
@@ -1845,16 +1846,22 @@ export default function RenewalsPage() {
               </div>
               <div className="grid gap-1.5">
                 <Label>المسؤول</Label>
-                <Select value={form.assigned_rep} onValueChange={(v) => v && setForm({ ...form, assigned_rep: v })}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="اختر المسؤول" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {employees.filter((e) => e.status === "نشط" || e.status === "متاح").map((e) => (
-                      <SelectItem key={e.id} value={e.name}>{e.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {isAdmin ? (
+                  <Select value={form.assigned_rep} onValueChange={(v) => v && setForm({ ...form, assigned_rep: v })}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="اختر المسؤول" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {employees.filter((e) => e.status === "نشط" || e.status === "متاح").map((e) => (
+                        <SelectItem key={e.id} value={e.name}>{e.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="px-3 py-2 rounded-lg border border-border bg-muted/30 text-sm text-foreground">
+                    {form.assigned_rep || "—"}
+                  </div>
+                )}
               </div>
             </div>
 

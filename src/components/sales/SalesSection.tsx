@@ -188,6 +188,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const pageDesc = isOffice ? "متابعة مبيعات المكتب وخط الأنابيب" : "متابعة مبيعات الدعم وخط الأنابيب";
   const clientCodePrefix = isOffice ? "S" : "D";
   const { activeOrgId: orgId, user: authUser } = useAuth();
+  const isAdmin = authUser?.isSuperAdmin || authUser?.roleName === "مدير" || authUser?.roleName === "admin";
   const [deals, setDeals] = useState<Deal[]>([]);
   const [packages, setPackages] = useState<Package[]>([]);
   const [marketers, setMarketers] = useState<Marketer[]>([]);
@@ -760,7 +761,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
   /* ─── Handlers ─── */
   function openAddModal() {
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, assigned_rep_name: authUser?.name || "" });
     setModalOpen(true);
   }
 
@@ -2228,24 +2229,33 @@ export function SalesSection({ salesType }: SalesPageProps) {
 
             {/* Rep + Date row */}
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <div className="grid gap-1.5">
-                <Label htmlFor="assigned_rep_name">المسؤول</Label>
-                <Select
-                  value={form.assigned_rep_name}
-                  onValueChange={(val) => val && setForm({ ...form, assigned_rep_name: val })}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="اختر المسؤول" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {employees.filter((e) => e.status === "نشط" || e.status === "مشغول" || e.status === "متاح").map((e) => (
-                      <SelectItem key={e.id} value={e.name}>
-                        {e.name}{e.role ? ` — ${e.role}` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {isAdmin ? (
+                <div className="grid gap-1.5">
+                  <Label htmlFor="assigned_rep_name">المسؤول</Label>
+                  <Select
+                    value={form.assigned_rep_name}
+                    onValueChange={(val) => val && setForm({ ...form, assigned_rep_name: val })}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="اختر المسؤول" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {employees.filter((e) => e.status === "نشط" || e.status === "مشغول" || e.status === "متاح").map((e) => (
+                        <SelectItem key={e.id} value={e.name}>
+                          {e.name}{e.role ? ` — ${e.role}` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="grid gap-1.5">
+                  <Label>المسؤول</Label>
+                  <div className="px-3 py-2 rounded-lg border border-border bg-muted/30 text-sm text-foreground">
+                    {form.assigned_rep_name || "—"}
+                  </div>
+                </div>
+              )}
               <div className="grid gap-1.5">
                 <Label htmlFor="deal_date">التاريخ</Label>
                 <Input

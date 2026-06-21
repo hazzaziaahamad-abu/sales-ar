@@ -153,6 +153,7 @@ const EMPTY_FORM: TicketForm = {
 /* ------------------------------------------------------------------ */
 export default function SupportPage() {
   const { activeOrgId: orgId, user: authUser } = useAuth();
+  const isAdmin = authUser?.isSuperAdmin || authUser?.roleName === "مدير" || authUser?.roleName === "admin";
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -493,7 +494,8 @@ export default function SupportPage() {
   /* ---------- helpers ---------- */
   function openCreateDialog() {
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    const currentUserName = authUser?.name || authUser?.email || "";
+    setForm({ ...EMPTY_FORM, assigned_agent_name: currentUserName });
     setDialogOpen(true);
   }
 
@@ -1630,26 +1632,35 @@ export default function SupportPage() {
             </div>
 
             {/* الموظف */}
-            <div className="space-y-1.5">
-              <Label>الموظف</Label>
-              <Select
-                value={form.assigned_agent_name}
-                onValueChange={(val) =>
-                  val && updateField("assigned_agent_name", val as string)
-                }
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="اختر الموظف" />
-                </SelectTrigger>
-                <SelectContent>
-                  {employees.map((emp) => (
-                    <SelectItem key={emp.id} value={emp.name}>
-                      {emp.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {isAdmin ? (
+              <div className="space-y-1.5">
+                <Label>الموظف</Label>
+                <Select
+                  value={form.assigned_agent_name}
+                  onValueChange={(val) =>
+                    val && updateField("assigned_agent_name", val as string)
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="اختر الموظف" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {employees.map((emp) => (
+                      <SelectItem key={emp.id} value={emp.name}>
+                        {emp.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="grid gap-1.5">
+                <Label>الموظف</Label>
+                <div className="px-3 py-2 rounded-lg border border-border bg-muted/30 text-sm text-foreground">
+                  {form.assigned_agent_name || "—"}
+                </div>
+              </div>
+            )}
 
             {/* تاريخ الفتح + الساعة */}
             <div className="space-y-1.5">
