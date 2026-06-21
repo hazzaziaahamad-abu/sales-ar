@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import type { Deal, Marketer, Package, Employee, EmployeeTask } from "@/types";
 import { triggerSaleCelebration } from "@/components/layout/sale-celebration";
-import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createFollowUpNote, fetchRecentFollowUpNotes, fetchPackages, fetchQuoteCommitments, addQuoteCommitment, removeQuoteCommitment, fetchEmployees, fetchEmployeeTasks, createEmployeeTask, createRenewal, fetchRenewals } from "@/lib/supabase/db";
+import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createFollowUpNote, fetchRecentFollowUpNotes, fetchPackages, fetchQuoteCommitments, addQuoteCommitment, removeQuoteCommitment, fetchEmployees, fetchEmployeeTasks, createEmployeeTask, createRenewal, fetchRenewals, createDealKpiStages } from "@/lib/supabase/db";
 import { checkDealsForFollowUp, buildFollowUpTask, type FollowUpAction } from "@/lib/auto-followup";
 import { StarEmployeeCard, Leaderboard } from "@/components/star-employee";
 import { AssignTaskModal } from "@/components/tasks/AssignTaskModal";
@@ -13,7 +13,7 @@ import { useTopbarControls } from "@/components/layout/topbar-context";
 import { STAGES, SOURCES, SOURCE_COLORS, PLANS } from "@/lib/utils/constants";
 
 import SalesKPIsView from "@/components/SalesKPIsView";
-import { formatMoney, formatMoneyFull, formatDate, formatPhone, formatPercent, todayLocal, dateToLocal, dateToTimestamp, saudiTimestamp } from "@/lib/utils/format";
+import { formatMoney, formatMoneyFull, formatDate, formatPhone, todayLocal, dateToLocal, dateToTimestamp, saudiTimestamp } from "@/lib/utils/format";
 import { FollowUpLogButton } from "@/components/follow-up-log";
 import { ClientProfilePanel } from "@/components/client-profile-panel";
 import { AchievementSummary } from "@/components/achievement-summary";
@@ -870,6 +870,11 @@ export function SalesSection({ salesType }: SalesPageProps) {
         });
         setDeals((prev) => [created, ...prev]);
 
+        /* Auto-create KPI stages for support deals */
+        if (!isOffice) {
+          createDealKpiStages(created.id).catch(console.error);
+        }
+
         /* Celebrate + auto-create renewal if created as completed */
         if (form.stage === "مكتملة") {
           triggerSaleCelebration({
@@ -1570,7 +1575,6 @@ export function SalesSection({ salesType }: SalesPageProps) {
               <TableHead>الباقة</TableHead>
               <TableHead>المرحلة</TableHead>
               <TableHead>القيمة</TableHead>
-              <TableHead>احتمالية</TableHead>
               <TableHead>المسؤول</TableHead>
               <TableHead>التاريخ</TableHead>
               <TableHead>تاريخ الدفع</TableHead>
@@ -1680,9 +1684,6 @@ export function SalesSection({ salesType }: SalesPageProps) {
                   </TableCell>
                   <TableCell className="font-bold text-cyan text-xs">
                     {formatMoneyFull(deal.deal_value)}
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {formatPercent(deal.probability)}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs">
                     {deal.assigned_rep_name || "—"}
@@ -2171,7 +2172,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
         {/* Tab: KPI مبيعات الدعم — support only */}
         {!isOffice && (
           <TabsContent value="sales-kpi" className="space-y-6">
-            <SalesKPIDashboard />
+            <SalesKPIDashboard deals={deals} />
           </TabsContent>
         )}
       </Tabs>
@@ -2412,28 +2413,6 @@ export function SalesSection({ salesType }: SalesPageProps) {
               />
             </div>
 
-            {/* Probability slider */}
-            <div className="grid gap-1.5">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="probability">احتمالية الإغلاق</Label>
-                <span className="text-xs font-bold text-cyan">{form.probability}%</span>
-              </div>
-              <input
-                id="probability"
-                type="range"
-                min={0}
-                max={100}
-                step={5}
-                value={form.probability}
-                onChange={(e) => setForm({ ...form, probability: Number(e.target.value) })}
-                className="w-full h-1.5 bg-muted rounded-full appearance-none cursor-pointer accent-cyan [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-cyan [&::-webkit-slider-thumb]:cursor-pointer"
-              />
-              <div className="flex justify-between text-[12px] text-muted-foreground">
-                <span>0%</span>
-                <span>50%</span>
-                <span>100%</span>
-              </div>
-            </div>
           </div>
 
           <DialogFooter>
