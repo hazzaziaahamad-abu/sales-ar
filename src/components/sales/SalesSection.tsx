@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import type { Deal, Marketer, Package, Employee, EmployeeTask } from "@/types";
 import { triggerSaleCelebration } from "@/components/layout/sale-celebration";
-import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createFollowUpNote, fetchRecentFollowUpNotes, fetchPackages, fetchQuoteCommitments, addQuoteCommitment, removeQuoteCommitment, fetchEmployees, fetchEmployeeTasks, createEmployeeTask, createRenewal, fetchRenewals } from "@/lib/supabase/db";
+import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createFollowUpNote, fetchRecentFollowUpNotes, fetchPackages, fetchQuoteCommitments, addQuoteCommitment, removeQuoteCommitment, fetchEmployees, fetchEmployeeTasks, createEmployeeTask, createRenewal, fetchRenewals, createDealKpiStages } from "@/lib/supabase/db";
 import { checkDealsForFollowUp, buildFollowUpTask, type FollowUpAction } from "@/lib/auto-followup";
 import { StarEmployeeCard, Leaderboard } from "@/components/star-employee";
 import { AssignTaskModal } from "@/components/tasks/AssignTaskModal";
@@ -863,6 +863,11 @@ export function SalesSection({ salesType }: SalesPageProps) {
           sales_type: salesType,
         });
         setDeals((prev) => [created, ...prev]);
+
+        /* Auto-create KPI stages for support deals */
+        if (!isOffice) {
+          createDealKpiStages(created.id).catch(console.error);
+        }
 
         /* Celebrate + auto-create renewal if created as completed */
         if (form.stage === "مكتملة") {
@@ -2153,7 +2158,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
         {/* Tab: KPI مبيعات الدعم — support only */}
         {!isOffice && (
           <TabsContent value="sales-kpi" className="space-y-6">
-            <SalesKPIDashboard />
+            <SalesKPIDashboard deals={deals} />
           </TabsContent>
         )}
       </Tabs>

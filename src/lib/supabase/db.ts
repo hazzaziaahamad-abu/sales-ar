@@ -1,6 +1,6 @@
 import { createClient } from "./client";
 import { todayLocal } from "@/lib/utils/format";
-import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, MonthlyBudget, StartupCost, Marketer, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating, FollowUpNote, MentionNotification, PendingDeal, TargetClient, GiftOffer, EmployeeTask, Package, AcademyContent, LearningStage, LearningLesson, LearningQuiz, ActivityLog, TrainingKnowledge, ProductFeature, TrainingSessionLog, MarketingPlan, PlanAxis, PlanIdea } from "@/types";
+import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, MonthlyBudget, StartupCost, Marketer, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating, FollowUpNote, MentionNotification, PendingDeal, TargetClient, GiftOffer, EmployeeTask, Package, AcademyContent, LearningStage, LearningLesson, LearningQuiz, ActivityLog, TrainingKnowledge, ProductFeature, TrainingSessionLog, MarketingPlan, PlanAxis, PlanIdea, DealKpiStage } from "@/types";
 
 const DEFAULT_ORG = "00000000-0000-0000-0000-000000000001";
 
@@ -3087,6 +3087,91 @@ export async function upsertLeadStage(leadId: string, stageNumber: number, stage
       stage_number: stageNumber,
       stage_name: stageName,
       stage_weight: stageWeight,
+      assigned_to: assignedTo,
+      assigned_name: assignedName,
+      completed_at: new Date().toISOString(),
+    });
+  }
+}
+
+// ─── DEAL KPI STAGES ────────────────────────────────────────────────────────
+
+const KPI_STAGES = [
+  { num: 1, name: "أول تواصل", weight: 10 },
+  { num: 2, name: "تأهيل وعرض", weight: 15 },
+  { num: 3, name: "اختيار الباقة", weight: 30 },
+  { num: 4, name: "الدفع", weight: 30 },
+  { num: 5, name: "تأكيد التسجيل", weight: 15 },
+];
+
+export { KPI_STAGES };
+
+export async function fetchDealKpiStages(dealId: string): Promise<DealKpiStage[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("deal_kpi_stages")
+    .select("*")
+    .eq("deal_id", dealId)
+    .order("stage_number", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as DealKpiStage[];
+}
+
+export async function fetchAllDealKpiStages(dealIds: string[]): Promise<DealKpiStage[]> {
+  if (dealIds.length === 0) return [];
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("deal_kpi_stages")
+    .select("*")
+    .in("deal_id", dealIds)
+    .order("stage_number", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as DealKpiStage[];
+}
+
+export async function createDealKpiStages(dealId: string): Promise<DealKpiStage[]> {
+  const supabase = createClient();
+  const rows = KPI_STAGES.map((s) => ({
+    deal_id: dealId,
+    stage_number: s.num,
+    stage_name: s.name,
+    stage_weight: s.weight,
+  }));
+  const { data, error } = await supabase
+    .from("deal_kpi_stages")
+    .insert(rows)
+    .select();
+  if (error) throw error;
+  return (data ?? []) as DealKpiStage[];
+}
+
+export async function upsertDealKpiStage(
+  dealId: string,
+  stageNumber: number,
+  assignedTo: string,
+  assignedName: string,
+): Promise<void> {
+  const supabase = createClient();
+  const { data: existing } = await supabase
+    .from("deal_kpi_stages")
+    .select("id")
+    .eq("deal_id", dealId)
+    .eq("stage_number", stageNumber)
+    .maybeSingle();
+
+  if (existing) {
+    await supabase.from("deal_kpi_stages").update({
+      assigned_to: assignedTo,
+      assigned_name: assignedName,
+      completed_at: new Date().toISOString(),
+    }).eq("id", existing.id);
+  } else {
+    const def = KPI_STAGES.find((s) => s.num === stageNumber)!;
+    await supabase.from("deal_kpi_stages").insert({
+      deal_id: dealId,
+      stage_number: stageNumber,
+      stage_name: def.name,
+      stage_weight: def.weight,
       assigned_to: assignedTo,
       assigned_name: assignedName,
       completed_at: new Date().toISOString(),

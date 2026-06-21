@@ -681,6 +681,19 @@ export interface LearningQuiz {
   updated_at: string;
 }
 
+export interface DealKpiStage {
+  id: string;
+  deal_id: string;
+  stage_number: number;
+  stage_name: string;
+  stage_weight: number;
+  assigned_to?: string;
+  assigned_name?: string;
+  completed_at?: string;
+  notes?: string;
+  created_at: string;
+}
+
 export interface ActivityLog {
   id: string;
   org_id: string;

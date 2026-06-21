@@ -1,14 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { fetchSalesLeads, createSalesLead, updateSalesLead, deleteSalesLead, fetchLeadStages, upsertLeadStage, fetchEmployees } from "@/lib/supabase/db";
-import type { SalesLead, SalesLeadStage } from "@/lib/supabase/db";
-import type { Employee } from "@/types";
+import { fetchDeals, fetchAllDealKpiStages, fetchDealKpiStages, upsertDealKpiStage, createDealKpiStages, updateDeal, fetchEmployees, KPI_STAGES } from "@/lib/supabase/db";
+import type { Deal, DealKpiStage, Employee } from "@/types";
 import { aggregateEmployeeCredits } from "@/lib/kpi-calculations";
 import { cn } from "@/lib/utils";
 import {
-  BarChart2, Plus, Trash2, Phone, MessageCircle, Users2, X,
-  Trophy, Target, CreditCard, Star, CheckCircle, ChevronLeft,
+  BarChart2, Phone, MessageCircle, Users2, X,
+  Trophy, Target, CreditCard, Star, CheckCircle,
 } from "lucide-react";
 
 const STAGES = [
@@ -19,36 +18,71 @@ const STAGES = [
   { num: 5, name: "تأكيد التسجيل", weight: 15, critical: true, icon: CheckCircle },
 ];
 
-const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  new: { label: "جديد", color: "bg-blue-500/20 text-blue-400" },
-  in_progress: { label: "قيد المتابعة", color: "bg-amber-500/20 text-amber-400" },
-  won: { label: "مغلق", color: "bg-emerald-500/20 text-emerald-400" },
-  lost: { label: "خسرنا", color: "bg-red-500/20 text-red-400" },
+const STAGE_STATUS_MAP: Record<string, { label: string; color: string }> = {
+  "قيد التواصل": { label: "قيد التواصل", color: "bg-blue-500/20 text-blue-400" },
+  "عميل جديد": { label: "جديد", color: "bg-blue-500/20 text-blue-400" },
+  "تفاوض": { label: "تفاوض", color: "bg-amber-500/20 text-amber-400" },
+  "تجهيز": { label: "تجهيز", color: "bg-cyan-500/20 text-cyan-400" },
+  "انتظار الدفع": { label: "انتظار الدفع", color: "bg-amber-500/20 text-amber-400" },
+  "مكتملة": { label: "مغلق", color: "bg-emerald-500/20 text-emerald-400" },
+  "مرفوض مع سبب": { label: "خسرنا", color: "bg-red-500/20 text-red-400" },
+  "كنسل التجربة": { label: "ملغي", color: "bg-red-500/20 text-red-400" },
 };
 
-export default function SalesKPIDashboard() {
-  const [leads, setLeads] = useState<SalesLead[]>([]);
+interface DealWithStages extends Deal {
+  kpiStages: DealKpiStage[];
+}
+
+export default function SalesKPIDashboard({ deals: externalDeals }: { deals?: Deal[] }) {
+  const [deals, setDeals] = useState<DealWithStages[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"leads" | "kpi">("leads");
-  const [filterStatus, setFilterStatus] = useState("all");
-  const [selectedLead, setSelectedLead] = useState<SalesLead | null>(null);
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [activeTab, setActiveTab] = useState<"deals" | "kpi">("deals");
+  const [filterStage, setFilterStage] = useState("all");
+  const [selectedDeal, setSelectedDeal] = useState<DealWithStages | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [l, e] = await Promise.all([fetchSalesLeads(), fetchEmployees()]);
-    setLeads(l);
-    setEmployees(e);
+    try {
+      const rawDeals = externalDeals ?? await fetchDeals("support");
+      const [allStages, emps] = await Promise.all([
+        fetchAllDealKpiStages(rawDeals.map((d) => d.id)),
+        fetchEmployees(),
+      ]);
+
+      const stageMap = new Map<string, DealKpiStage[]>();
+      allStages.forEach((s) => {
+        const arr = stageMap.get(s.deal_id) || [];
+        arr.push(s);
+        stageMap.set(s.deal_id, arr);
+      });
+
+      const dealsWithStages: DealWithStages[] = rawDeals.map((d) => ({
+        ...d,
+        kpiStages: stageMap.get(d.id) || [],
+      }));
+
+      setDeals(dealsWithStages);
+      setEmployees(emps);
+    } catch (err) {
+      console.error(err);
+    }
     setLoading(false);
-  }, []);
+  }, [externalDeals]);
 
   useEffect(() => { load(); }, [load]);
 
-  const filteredLeads = filterStatus === "all" ? leads : leads.filter((l) => l.status === filterStatus);
-  const kpiData = aggregateEmployeeCredits(leads.map((l) => ({
-    deal_value: l.deal_value || 0,
-    stages: (l.stages || []).map((s) => ({
+  const filteredDeals = filterStage === "all"
+    ? deals
+    : filterStage === "active"
+      ? deals.filter((d) => d.stage !== "مكتملة" && d.stage !== "مرفوض مع سبب" && d.stage !== "كنسل التجربة")
+      : filterStage === "won"
+        ? deals.filter((d) => d.stage === "مكتملة")
+        : deals;
+
+  const kpiData = aggregateEmployeeCredits(deals.map((d) => ({
+    deal_value: d.deal_value || 0,
+    stages: d.kpiStages.map((s) => ({
       stage_number: s.stage_number,
       stage_weight: s.stage_weight,
       assigned_to: s.assigned_to || "",
@@ -67,22 +101,15 @@ export default function SalesKPIDashboard() {
           </div>
           <div>
             <h2 className="text-lg font-bold text-foreground">KPI مبيعات الدعم</h2>
-            <p className="text-xs text-muted-foreground">تتبع مراحل البيع ونسب الكريديت</p>
+            <p className="text-xs text-muted-foreground">تتبع مراحل البيع ونسب الكريديت — مرتبط بالصفقات مباشرة</p>
           </div>
         </div>
-        <button
-          onClick={() => setShowAddForm(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 border border-orange-500/20 font-semibold text-sm transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          عميل جديد
-        </button>
       </div>
 
       {/* Tabs */}
       <div className="flex gap-1 p-1 rounded-xl bg-white/[0.04] w-fit">
         {[
-          { key: "leads" as const, label: "العملاء والمراحل" },
+          { key: "deals" as const, label: "الصفقات والمراحل" },
           { key: "kpi" as const, label: "KPI الموظفين" },
         ].map((tab) => (
           <button
@@ -98,23 +125,21 @@ export default function SalesKPIDashboard() {
         ))}
       </div>
 
-      {activeTab === "leads" && (
+      {activeTab === "deals" && (
         <>
           {/* Status Filter */}
           <div className="flex flex-wrap gap-2">
             {[
-              { key: "all", label: "الكل" },
-              { key: "new", label: "جديد" },
-              { key: "in_progress", label: "قيد المتابعة" },
-              { key: "won", label: "مغلق" },
-              { key: "lost", label: "خسرنا" },
+              { key: "all", label: `الكل (${deals.length})` },
+              { key: "active", label: `نشطة (${deals.filter((d) => d.stage !== "مكتملة" && d.stage !== "مرفوض مع سبب" && d.stage !== "كنسل التجربة").length})` },
+              { key: "won", label: `مغلقة (${deals.filter((d) => d.stage === "مكتملة").length})` },
             ].map((s) => (
               <button
                 key={s.key}
-                onClick={() => setFilterStatus(s.key)}
+                onClick={() => setFilterStage(s.key)}
                 className={cn(
                   "px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border",
-                  filterStatus === s.key
+                  filterStage === s.key
                     ? "bg-orange-500/15 text-orange-400 border-orange-500/30"
                     : "bg-white/[0.04] text-muted-foreground border-transparent hover:text-foreground"
                 )}
@@ -124,20 +149,21 @@ export default function SalesKPIDashboard() {
             ))}
           </div>
 
-          {/* Leads List */}
+          {/* Deals List */}
           {loading ? (
             <div className="space-y-3">
               {[...Array(3)].map((_, i) => <div key={i} className="h-24 rounded-[14px] bg-white/[0.04] animate-pulse" />)}
             </div>
-          ) : filteredLeads.length === 0 ? (
+          ) : filteredDeals.length === 0 ? (
             <div className="text-center py-16 text-muted-foreground">
               <Users2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
-              <p className="font-semibold">لا يوجد عملاء</p>
+              <p className="font-semibold">لا توجد صفقات</p>
+              <p className="text-sm mt-1">أضف مبيعة من زر &ldquo;إضافة مبيع&rdquo; أعلاه وسيتم إنشاء المراحل تلقائياً</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {filteredLeads.map((lead) => (
-                <LeadCard key={lead.id} lead={lead} onClick={() => setSelectedLead(lead)} />
+              {filteredDeals.map((deal) => (
+                <DealKpiCard key={deal.id} deal={deal} onClick={() => setSelectedDeal(deal)} />
               ))}
             </div>
           )}
@@ -146,12 +172,11 @@ export default function SalesKPIDashboard() {
 
       {activeTab === "kpi" && (
         <div className="space-y-6">
-          {/* KPI Cards */}
           {kpiData.length === 0 ? (
             <div className="text-center py-16 text-muted-foreground">
               <Trophy className="w-10 h-10 mx-auto mb-3 opacity-30" />
               <p className="font-semibold">لا توجد بيانات KPI بعد</p>
-              <p className="text-sm mt-1">أضف عملاء وسجّل المراحل لرؤية الإحصائيات</p>
+              <p className="text-sm mt-1">سجّل إنجاز المراحل في الصفقات لرؤية الإحصائيات</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -192,30 +217,23 @@ export default function SalesKPIDashboard() {
         </div>
       )}
 
-      {/* Lead Stage Modal */}
-      {selectedLead && (
-        <LeadStageModal
-          lead={selectedLead}
+      {/* Deal Stage Modal */}
+      {selectedDeal && (
+        <DealStageModal
+          deal={selectedDeal}
           employees={employees}
-          onClose={() => { setSelectedLead(null); load(); }}
-        />
-      )}
-
-      {/* Add Lead Modal */}
-      {showAddForm && (
-        <AddLeadModal
-          onClose={() => { setShowAddForm(false); load(); }}
+          onClose={() => { setSelectedDeal(null); load(); }}
         />
       )}
     </div>
   );
 }
 
-// ─── Lead Card ──────────────────────────────────────────────────────────────
+// ─── Deal KPI Card ────────────────────────────────────────────────────────
 
-function LeadCard({ lead, onClick }: { lead: SalesLead; onClick: () => void }) {
-  const completedStages = (lead.stages || []).filter((s) => s.completed_at).length;
-  const st = STATUS_MAP[lead.status] || STATUS_MAP.new;
+function DealKpiCard({ deal, onClick }: { deal: DealWithStages; onClick: () => void }) {
+  const completedStages = deal.kpiStages.filter((s) => s.completed_at).length;
+  const st = STAGE_STATUS_MAP[deal.stage] || { label: deal.stage, color: "bg-blue-500/20 text-blue-400" };
 
   return (
     <div
@@ -225,19 +243,20 @@ function LeadCard({ lead, onClick }: { lead: SalesLead; onClick: () => void }) {
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-orange-500/15 flex items-center justify-center text-orange-400 text-sm font-bold">
-            {lead.client_name[0]}
+            {deal.client_name[0]}
           </div>
           <div>
-            <span className="font-bold text-foreground text-sm">{lead.client_name}</span>
+            <span className="font-bold text-foreground text-sm">{deal.client_name}</span>
             <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-              {lead.phone && <span>{lead.phone}</span>}
-              {lead.product && <span>• {lead.product}</span>}
+              {deal.client_phone && <span>{deal.client_phone}</span>}
+              {deal.plan && <span>• {deal.plan}</span>}
+              {deal.assigned_rep_name && <span>• {deal.assigned_rep_name}</span>}
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {lead.deal_value > 0 && (
-            <span className="text-sm font-bold text-amber-400">{lead.deal_value.toLocaleString()} ر.س</span>
+          {deal.deal_value > 0 && (
+            <span className="text-sm font-bold text-amber-400">{deal.deal_value.toLocaleString()} ر.س</span>
           )}
           <span className={cn("text-[11px] font-bold px-2 py-0.5 rounded-full", st.color)}>{st.label}</span>
         </div>
@@ -246,7 +265,7 @@ function LeadCard({ lead, onClick }: { lead: SalesLead; onClick: () => void }) {
       {/* Stage Progress */}
       <div className="flex gap-1.5 mb-2">
         {STAGES.map((stage) => {
-          const completed = (lead.stages || []).find((s) => s.stage_number === stage.num && s.completed_at);
+          const completed = deal.kpiStages.find((s) => s.stage_number === stage.num && s.completed_at);
           return (
             <div key={stage.num} className="flex-1">
               <div className={cn("h-1.5 rounded-full", completed ? (stage.critical ? "bg-amber-400" : "bg-orange-500") : "bg-white/[0.08]")} />
@@ -258,7 +277,7 @@ function LeadCard({ lead, onClick }: { lead: SalesLead; onClick: () => void }) {
       <div className="flex items-center justify-between">
         <div className="flex gap-2">
           {STAGES.map((stage) => {
-            const completed = (lead.stages || []).find((s) => s.stage_number === stage.num && s.completed_at);
+            const completed = deal.kpiStages.find((s) => s.stage_number === stage.num && s.completed_at);
             if (!completed) return null;
             return (
               <span key={stage.num} className="text-[10px] text-muted-foreground">
@@ -321,34 +340,41 @@ function EmployeeKPICard({ emp, rank }: { emp: ReturnType<typeof aggregateEmploy
   );
 }
 
-// ─── Lead Stage Modal ───────────────────────────────────────────────────────
+// ─── Deal Stage Modal ───────────────────────────────────────────────────────
 
-function LeadStageModal({ lead, employees, onClose }: { lead: SalesLead; employees: Employee[]; onClose: () => void }) {
-  const [stages, setStages] = useState<SalesLeadStage[]>(lead.stages || []);
+function DealStageModal({ deal, employees, onClose }: { deal: DealWithStages; employees: Employee[]; onClose: () => void }) {
+  const [stages, setStages] = useState<DealKpiStage[]>(deal.kpiStages);
   const [saving, setSaving] = useState(false);
+  const [initializing, setInitializing] = useState(false);
 
   const reload = useCallback(async () => {
-    const s = await fetchLeadStages(lead.id);
+    const s = await fetchDealKpiStages(deal.id);
     setStages(s);
-  }, [lead.id]);
+  }, [deal.id]);
 
-  useEffect(() => { reload(); }, [reload]);
+  useEffect(() => {
+    if (deal.kpiStages.length === 0) {
+      setInitializing(true);
+      createDealKpiStages(deal.id).then((s) => {
+        setStages(s);
+        setInitializing(false);
+      }).catch(() => setInitializing(false));
+    }
+  }, [deal.id, deal.kpiStages.length]);
 
   const getStage = (num: number) => stages.find((s) => s.stage_number === num);
 
   const saveStage = async (stageNum: number, empId: string, empName: string) => {
     setSaving(true);
-    const def = STAGES.find((s) => s.num === stageNum)!;
-    await upsertLeadStage(lead.id, stageNum, def.name, def.weight, empId, empName);
+    await upsertDealKpiStage(deal.id, stageNum, empId, empName);
     await reload();
 
-    const updatedStages = await fetchLeadStages(lead.id);
-    const hasPayment = updatedStages.find((s) => s.stage_number === 5 && s.completed_at);
-    const hasProgress = updatedStages.find((s) => s.completed_at);
-    if (hasPayment) {
-      await updateSalesLead(lead.id, { status: "won" });
-    } else if (hasProgress) {
-      await updateSalesLead(lead.id, { status: "in_progress" });
+    const updatedStages = await fetchDealKpiStages(deal.id);
+    const allCompleted = KPI_STAGES.every((ks) =>
+      updatedStages.find((s) => s.stage_number === ks.num && s.completed_at)
+    );
+    if (allCompleted && deal.stage !== "مكتملة") {
+      await updateDeal(deal.id, { stage: "مكتملة", close_date: new Date().toISOString() });
     }
     setSaving(false);
   };
@@ -358,8 +384,11 @@ function LeadStageModal({ lead, employees, onClose }: { lead: SalesLead; employe
       <div className="w-full max-w-lg rounded-[14px] glass-surface border border-border p-6 m-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h3 className="text-base font-bold text-foreground">{lead.client_name}</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">{lead.phone} • {lead.product}</p>
+            <h3 className="text-base font-bold text-foreground">{deal.client_name}</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {deal.client_phone && `${deal.client_phone} • `}
+              {deal.plan || "—"} • {deal.deal_value.toLocaleString()} ر.س
+            </p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/[0.1] text-muted-foreground">
             <X className="w-4 h-4" />
@@ -368,151 +397,57 @@ function LeadStageModal({ lead, employees, onClose }: { lead: SalesLead; employe
 
         <p className="text-xs font-semibold text-muted-foreground mb-3">تسجيل الموظف المسؤول عن كل مرحلة:</p>
 
-        <div className="space-y-3">
-          {STAGES.map((stage) => {
-            const completed = getStage(stage.num);
-            const Icon = stage.icon;
-            return (
-              <div
-                key={stage.num}
-                className={cn(
-                  "rounded-xl p-3 border",
-                  completed?.completed_at ? "bg-amber-500/5 border-amber-500/15" : "bg-white/[0.03] border-border"
-                )}
-              >
-                <div className="flex items-center justify-between mb-2">
+        {initializing ? (
+          <div className="text-center py-8 text-muted-foreground text-sm">جاري تهيئة المراحل...</div>
+        ) : (
+          <div className="space-y-3">
+            {STAGES.map((stage) => {
+              const completed = getStage(stage.num);
+              const Icon = stage.icon;
+              return (
+                <div
+                  key={stage.num}
+                  className={cn(
+                    "rounded-xl p-3 border",
+                    completed?.completed_at ? "bg-amber-500/5 border-amber-500/15" : "bg-white/[0.03] border-border"
+                  )}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Icon className={cn("w-4 h-4", completed?.completed_at ? "text-amber-400" : "text-muted-foreground")} />
+                      <span className="text-sm font-semibold text-foreground">{stage.name}</span>
+                      {stage.critical && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400">حاسمة</span>
+                      )}
+                    </div>
+                    <span className="text-sm font-bold text-amber-400">{stage.weight}%</span>
+                  </div>
                   <div className="flex items-center gap-2">
-                    <Icon className={cn("w-4 h-4", completed?.completed_at ? "text-amber-400" : "text-muted-foreground")} />
-                    <span className="text-sm font-semibold text-foreground">{stage.name}</span>
-                    {stage.critical && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400">حاسمة</span>
+                    <select
+                      value={completed?.assigned_to || ""}
+                      onChange={(e) => {
+                        const emp = employees.find((em) => em.id === e.target.value);
+                        if (emp) saveStage(stage.num, emp.id, emp.name);
+                      }}
+                      disabled={saving}
+                      className="flex-1 rounded-lg bg-white/[0.06] border border-border px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-orange-500/50 disabled:opacity-50"
+                    >
+                      <option value="">— اختر الموظف —</option>
+                      {employees.map((emp) => (
+                        <option key={emp.id} value={emp.id}>{emp.name}</option>
+                      ))}
+                    </select>
+                    {completed?.completed_at && (
+                      <span className="text-[11px] text-emerald-400 font-semibold whitespace-nowrap">
+                        ✓ {completed.assigned_name?.split(" ")[0]}
+                      </span>
                     )}
                   </div>
-                  <span className="text-sm font-bold text-amber-400">{stage.weight}%</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <select
-                    value={completed?.assigned_to || ""}
-                    onChange={(e) => {
-                      const emp = employees.find((em) => em.id === e.target.value);
-                      if (emp) saveStage(stage.num, emp.id, emp.name);
-                    }}
-                    disabled={saving}
-                    className="flex-1 rounded-lg bg-white/[0.06] border border-border px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-orange-500/50 disabled:opacity-50"
-                  >
-                    <option value="">— اختر الموظف —</option>
-                    {employees.map((emp) => (
-                      <option key={emp.id} value={emp.id}>{emp.name}</option>
-                    ))}
-                  </select>
-                  {completed?.completed_at && (
-                    <span className="text-[11px] text-emerald-400 font-semibold whitespace-nowrap">
-                      ✓ {completed.assigned_name?.split(" ")[0]}
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="flex gap-2 mt-5">
-          <button
-            onClick={async () => { await updateSalesLead(lead.id, { status: "won" }); onClose(); }}
-            className="flex-1 py-2.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-semibold text-sm hover:bg-emerald-500/25 transition-colors"
-          >
-            تم الإغلاق
-          </button>
-          <button
-            onClick={async () => { await updateSalesLead(lead.id, { status: "lost" }); onClose(); }}
-            className="flex-1 py-2.5 rounded-lg bg-red-500/15 border border-red-500/30 text-red-400 font-semibold text-sm hover:bg-red-500/25 transition-colors"
-          >
-            خسرنا العميل
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Add Lead Modal ─────────────────────────────────────────────────────────
-
-function AddLeadModal({ onClose }: { onClose: () => void }) {
-  const [form, setForm] = useState({
-    client_name: "", phone: "", source: "whatsapp", product: "menu", package_name: "", deal_value: "",
-  });
-  const [saving, setSaving] = useState(false);
-
-  const handleSave = async () => {
-    if (!form.client_name.trim()) return;
-    setSaving(true);
-    await createSalesLead({
-      client_name: form.client_name,
-      phone: form.phone,
-      source: form.source,
-      product: form.product,
-      package_name: form.package_name,
-      deal_value: form.deal_value ? parseFloat(form.deal_value) : 0,
-      status: "new",
-    });
-    setSaving(false);
-    onClose();
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-md rounded-[14px] glass-surface border border-border p-6 m-4" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="text-base font-bold text-foreground">عميل جديد</h3>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/[0.1] text-muted-foreground">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="space-y-3">
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground block mb-1">اسم العميل *</label>
-            <input value={form.client_name} onChange={(e) => setForm({ ...form, client_name: e.target.value })} placeholder="مطعم / كافيه ..." className="w-full rounded-lg bg-white/[0.06] border border-border px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-orange-500/50" />
+              );
+            })}
           </div>
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground block mb-1">رقم الجوال</label>
-            <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="05xxxxxxxx" className="w-full rounded-lg bg-white/[0.06] border border-border px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-orange-500/50" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">المصدر</label>
-              <select value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} className="w-full rounded-lg bg-white/[0.06] border border-border px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-orange-500/50">
-                <option value="whatsapp">واتساب</option>
-                <option value="call">مكالمة</option>
-                <option value="referral">إحالة</option>
-                <option value="walk_in">حضور مباشر</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground block mb-1">المنتج</label>
-              <select value={form.product} onChange={(e) => setForm({ ...form, product: e.target.value })} className="w-full rounded-lg bg-white/[0.06] border border-border px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-orange-500/50">
-                <option value="menu">المنيو</option>
-                <option value="cashier">الكاشير</option>
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground block mb-1">الباقة</label>
-            <input value={form.package_name} onChange={(e) => setForm({ ...form, package_name: e.target.value })} placeholder="باقة سنوية / شهرية ..." className="w-full rounded-lg bg-white/[0.06] border border-border px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-orange-500/50" />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground block mb-1">قيمة الصفقة (ر.س)</label>
-            <input type="number" value={form.deal_value} onChange={(e) => setForm({ ...form, deal_value: e.target.value })} placeholder="0" className="w-full rounded-lg bg-white/[0.06] border border-border px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-orange-500/50" />
-          </div>
-        </div>
-
-        <button
-          onClick={handleSave}
-          disabled={saving || !form.client_name.trim()}
-          className="w-full mt-5 py-2.5 rounded-lg bg-orange-500 text-white font-semibold text-sm hover:bg-orange-600 disabled:opacity-50 transition-colors"
-        >
-          {saving ? "جارٍ الحفظ..." : "حفظ العميل"}
-        </button>
+        )}
       </div>
     </div>
   );
