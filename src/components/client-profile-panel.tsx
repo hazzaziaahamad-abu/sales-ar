@@ -7,10 +7,10 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { fetchClientProfile, fetchClientBio, upsertClientBio, type ClientProfileData } from "@/lib/supabase/db";
+import { fetchClientProfile, fetchClientBio, upsertClientBio, fetchDealKpiStages, upsertDealKpiStage, createDealKpiStages, fetchEmployees, KPI_STAGES, updateDeal, type ClientProfileData } from "@/lib/supabase/db";
 import { useAuth } from "@/lib/auth-context";
-import { Search, Phone, User, ShoppingBag, RefreshCw, Headphones, FileText, ChevronDown, ChevronUp, Clock, X, Pencil, Check, StickyNote } from "lucide-react";
-import type { Deal, Renewal, Ticket, FollowUpNote } from "@/types";
+import { Search, Phone, User, ShoppingBag, RefreshCw, Headphones, FileText, ChevronDown, ChevronUp, Clock, X, Pencil, Check, StickyNote, BarChart2 } from "lucide-react";
+import type { Deal, Renewal, Ticket, FollowUpNote, DealKpiStage, Employee } from "@/types";
 
 const STAGE_COLORS: Record<string, string> = {
   "مكتملة": "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
@@ -74,9 +74,96 @@ function SectionToggle({ title, icon, count, children }: { title: string; icon: 
   );
 }
 
-function DealCard({ deal, notes }: { deal: Deal; notes: FollowUpNote[] }) {
+function DealKpiSection({ deal, employees }: { deal: Deal; employees: Employee[] }) {
+  const [stages, setStages] = useState<DealKpiStage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        let s = await fetchDealKpiStages(deal.id);
+        if (s.length === 0) {
+          s = await createDealKpiStages(deal.id);
+        }
+        if (!cancelled) setStages(s);
+      } catch { /* ignore */ }
+      if (!cancelled) setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [deal.id]);
+
+  const saveStage = async (stageNum: number, empId: string, empName: string) => {
+    setSaving(true);
+    try {
+      await upsertDealKpiStage(deal.id, stageNum, empId, empName);
+      const updated = await fetchDealKpiStages(deal.id);
+      setStages(updated);
+      const allDone = KPI_STAGES.every(ks => updated.find(s => s.stage_number === ks.num && s.completed_at));
+      if (allDone && deal.stage !== "مكتملة") {
+        await updateDeal(deal.id, { stage: "مكتملة", close_date: new Date().toISOString() });
+      }
+    } catch { /* ignore */ }
+    setSaving(false);
+  };
+
+  const completedCount = stages.filter(s => s.completed_at).length;
+
+  if (loading) return <div className="text-[11px] text-muted-foreground py-1">جاري تحميل المراحل...</div>;
+
+  return (
+    <div className="space-y-1.5 pt-1 border-t border-border/30">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1">
+          <BarChart2 className="w-3 h-3 text-orange-400" />
+          <span className="text-[11px] font-bold text-foreground">مراحل KPI</span>
+        </div>
+        <span className="text-[11px] text-muted-foreground">{completedCount}/5</span>
+      </div>
+      <div className="flex gap-0.5">
+        {KPI_STAGES.map(ks => {
+          const done = stages.find(s => s.stage_number === ks.num && s.completed_at);
+          return <div key={ks.num} className={`flex-1 h-1 rounded-full ${done ? "bg-orange-400" : "bg-white/10"}`} />;
+        })}
+      </div>
+      <div className="space-y-1">
+        {KPI_STAGES.map(ks => {
+          const stage = stages.find(s => s.stage_number === ks.num);
+          const done = !!stage?.completed_at;
+          return (
+            <div key={ks.num} className={`flex items-center gap-1.5 rounded-md px-1.5 py-1 ${done ? "bg-orange-500/5" : ""}`}>
+              <span className={`text-[11px] font-semibold min-w-[70px] ${done ? "text-orange-400" : "text-muted-foreground"}`}>
+                {done && "✓ "}{ks.name}
+              </span>
+              <span className="text-[10px] text-muted-foreground/60">{ks.weight}%</span>
+              <select
+                value={stage?.assigned_to || ""}
+                onChange={e => {
+                  const emp = employees.find(em => em.id === e.target.value);
+                  if (emp) saveStage(ks.num, emp.id, emp.name);
+                }}
+                disabled={saving}
+                className="flex-1 text-[11px] bg-transparent border border-border/30 rounded px-1 py-0.5 text-foreground focus:outline-none focus:ring-1 focus:ring-orange-500/50 disabled:opacity-50"
+              >
+                <option value="">— موظف —</option>
+                {employees.map(emp => (
+                  <option key={emp.id} value={emp.id}>{emp.name}</option>
+                ))}
+              </select>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function DealCard({ deal, notes, employees }: { deal: Deal; notes: FollowUpNote[]; employees: Employee[] }) {
   const [showNotes, setShowNotes] = useState(false);
+  const [showKpi, setShowKpi] = useState(false);
   const dealNotes = notes.filter(n => n.entity_type === "deal" && n.entity_id === deal.id);
+  const isSupport = deal.sales_type === "support";
   return (
     <div className="rounded-lg border border-border/40 bg-card/50 p-2.5 space-y-1.5">
       <div className="flex items-center justify-between gap-2">
@@ -84,7 +171,7 @@ function DealCard({ deal, notes }: { deal: Deal; notes: FollowUpNote[] }) {
         <span className="text-[12px] text-muted-foreground">{formatDate(deal.created_at)}</span>
       </div>
       <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">{deal.sales_type === "support" ? "دعم" : "مكتب"} · {deal.plan || "—"}</span>
+        <span className="text-xs text-muted-foreground">{isSupport ? "دعم" : "مكتب"} · {deal.plan || "—"}</span>
         <span className="text-xs font-bold text-emerald-400">{formatMoney(deal.deal_value)}</span>
       </div>
       {deal.assigned_rep_name && (
@@ -102,6 +189,12 @@ function DealCard({ deal, notes }: { deal: Deal; notes: FollowUpNote[] }) {
       {deal.notes && (
         <p className="text-[12px] text-muted-foreground/70 line-clamp-2">{deal.notes}</p>
       )}
+      {isSupport && (
+        <button onClick={() => setShowKpi(!showKpi)} className="text-[12px] text-orange-400 hover:underline flex items-center gap-1">
+          <BarChart2 className="w-3 h-3" /> {showKpi ? "إخفاء" : "عرض"} مراحل KPI
+        </button>
+      )}
+      {showKpi && isSupport && <DealKpiSection deal={deal} employees={employees} />}
       {dealNotes.length > 0 && (
         <>
           <button onClick={() => setShowNotes(!showNotes)} className="text-[12px] text-primary hover:underline flex items-center gap-1">
@@ -207,6 +300,11 @@ export function ClientProfilePanel({ open, onClose, initialQuery }: ClientProfil
   const [bioDraft, setBioDraft] = useState("");
   const [bioSaving, setBioSaving] = useState(false);
   const [bioKey, setBioKey] = useState("");
+  const [employees, setEmployees] = useState<Employee[]>([]);
+
+  useEffect(() => {
+    fetchEmployees().then(setEmployees).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (initialQuery && open) {
@@ -457,7 +555,7 @@ export function ClientProfilePanel({ open, onClose, initialQuery }: ClientProfil
                   count={data.deals.length}
                 >
                   {data.deals.map(d => (
-                    <DealCard key={d.id} deal={d} notes={data.notes} />
+                    <DealCard key={d.id} deal={d} notes={data.notes} employees={employees} />
                   ))}
                 </SectionToggle>
               )}
