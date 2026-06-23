@@ -8,8 +8,9 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { fetchClientProfile, fetchClientBio, upsertClientBio, fetchDealKpiStages, upsertDealKpiStage, createDealKpiStages, fetchEmployees, KPI_STAGES, updateDeal, type ClientProfileData } from "@/lib/supabase/db";
+import { getTopContributor } from "@/components/sales/SalesKPIDashboard";
 import { useAuth } from "@/lib/auth-context";
-import { Search, Phone, User, ShoppingBag, RefreshCw, Headphones, FileText, ChevronDown, ChevronUp, Clock, X, Pencil, Check, StickyNote, BarChart2 } from "lucide-react";
+import { Search, Phone, User, ShoppingBag, RefreshCw, Headphones, FileText, ChevronDown, ChevronUp, Clock, X, Pencil, Check, StickyNote, BarChart2, Trophy } from "lucide-react";
 import type { Deal, Renewal, Ticket, FollowUpNote, DealKpiStage, Employee } from "@/types";
 
 const STAGE_COLORS: Record<string, string> = {
@@ -109,6 +110,7 @@ function DealKpiSection({ deal, employees }: { deal: Deal; employees: Employee[]
   };
 
   const completedCount = stages.filter(s => s.completed_at).length;
+  const topContrib = getTopContributor(stages);
 
   if (loading) return <div className="text-[11px] text-muted-foreground py-1">جاري تحميل المراحل...</div>;
 
@@ -121,6 +123,14 @@ function DealKpiSection({ deal, employees }: { deal: Deal; employees: Employee[]
         </div>
         <span className="text-[11px] text-muted-foreground">{completedCount}/5</span>
       </div>
+      {topContrib && (
+        <div className="flex items-center gap-1 px-1.5 py-1 rounded-md bg-amber-500/10 border border-amber-500/20">
+          <Trophy className="w-3 h-3 text-amber-400" />
+          <span className="text-[11px] font-semibold text-amber-400">
+            مسجّلة باسم: {topContrib.name} ({topContrib.totalWeight}%)
+          </span>
+        </div>
+      )}
       <div className="flex gap-0.5">
         {KPI_STAGES.map(ks => {
           const done = stages.find(s => s.stage_number === ks.num && s.completed_at);
