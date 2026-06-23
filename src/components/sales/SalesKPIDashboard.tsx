@@ -34,6 +34,18 @@ export interface DealWithStages extends Deal {
   kpiStages: DealKpiStage[];
 }
 
+export function getTopContributor(stages: DealKpiStage[]): { name: string; totalWeight: number } | null {
+  const completed = stages.filter(s => s.completed_at && s.assigned_name);
+  if (completed.length === 0) return null;
+  const map = new Map<string, number>();
+  completed.forEach(s => {
+    map.set(s.assigned_name!, (map.get(s.assigned_name!) || 0) + s.stage_weight);
+  });
+  let top = { name: "", totalWeight: 0 };
+  map.forEach((w, name) => { if (w > top.totalWeight) top = { name, totalWeight: w }; });
+  return top.name ? top : null;
+}
+
 function getDateRange(period: string): Date | null {
   const now = new Date();
   const todayStr = saudiDateStr();
@@ -331,6 +343,7 @@ export default function SalesKPIDashboard({ deals: externalDeals }: { deals?: De
 function DealKpiCard({ deal, onClick }: { deal: DealWithStages; onClick: () => void }) {
   const completedStages = deal.kpiStages.filter((s) => s.completed_at).length;
   const st = STAGE_STATUS_MAP[deal.stage] || { label: deal.stage, color: "bg-blue-500/20 text-blue-400" };
+  const topContrib = getTopContributor(deal.kpiStages);
 
   return (
     <div
@@ -372,7 +385,13 @@ function DealKpiCard({ deal, onClick }: { deal: DealWithStages; onClick: () => v
       </div>
 
       <div className="flex items-center justify-between">
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          {topContrib && (
+            <span className="text-[11px] font-semibold text-amber-400 flex items-center gap-1">
+              <Trophy className="w-3 h-3" />
+              {topContrib.name.split(" ")[0]} ({topContrib.totalWeight}%)
+            </span>
+          )}
           {STAGES.map((stage) => {
             const completed = deal.kpiStages.find((s) => s.stage_number === stage.num && s.completed_at);
             if (!completed) return null;
@@ -491,6 +510,16 @@ function DealStageModal({ deal, employees, onClose }: { deal: DealWithStages; em
             <X className="w-4 h-4" />
           </button>
         </div>
+
+        {(() => {
+          const top = getTopContributor(stages);
+          return top ? (
+            <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20">
+              <Trophy className="w-4 h-4 text-amber-400" />
+              <span className="text-sm font-bold text-amber-400">مسجّلة باسم: {top.name} ({top.totalWeight}%)</span>
+            </div>
+          ) : null;
+        })()}
 
         <p className="text-xs font-semibold text-muted-foreground mb-3">تسجيل الموظف المسؤول عن كل مرحلة:</p>
 
