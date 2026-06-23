@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { fetchDeals, fetchAllDealKpiStages, fetchDealKpiStages, upsertDealKpiStage, createDealKpiStages, updateDeal, fetchEmployees, KPI_STAGES } from "@/lib/supabase/db";
 import type { Deal, DealKpiStage, Employee } from "@/types";
 import { aggregateEmployeeCredits } from "@/lib/kpi-calculations";
+import { saudiDateStr } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import {
-  BarChart2, Phone, MessageCircle, Users2, X,
-  Trophy, Target, CreditCard, Star, CheckCircle,
+  BarChart2, Phone, MessageCircle, Users2, X, Search,
+  Trophy, Target, CreditCard, Star, CheckCircle, Calendar,
 } from "lucide-react";
 
 const STAGES = [
@@ -29,8 +30,31 @@ const STAGE_STATUS_MAP: Record<string, { label: string; color: string }> = {
   "كنسل التجربة": { label: "ملغي", color: "bg-red-500/20 text-red-400" },
 };
 
-interface DealWithStages extends Deal {
+export interface DealWithStages extends Deal {
   kpiStages: DealKpiStage[];
+}
+
+function getDateRange(period: string): Date | null {
+  const now = new Date();
+  const todayStr = saudiDateStr();
+  if (period === "all") return null;
+  if (period === "today") return new Date(todayStr + "T00:00:00+03:00");
+  if (period === "yesterday") {
+    const d = new Date(todayStr + "T00:00:00+03:00");
+    d.setDate(d.getDate() - 1);
+    return d;
+  }
+  if (period === "week") {
+    const d = new Date(todayStr + "T00:00:00+03:00");
+    d.setDate(d.getDate() - 7);
+    return d;
+  }
+  if (period === "month") {
+    const d = new Date(todayStr + "T00:00:00+03:00");
+    d.setDate(d.getDate() - 30);
+    return d;
+  }
+  return null;
 }
 
 export default function SalesKPIDashboard({ deals: externalDeals }: { deals?: Deal[] }) {
@@ -39,6 +63,8 @@ export default function SalesKPIDashboard({ deals: externalDeals }: { deals?: De
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"deals" | "kpi">("deals");
   const [filterStage, setFilterStage] = useState("all");
+  const [timePeriod, setTimePeriod] = useState("all");
+  const [phoneSearch, setPhoneSearch] = useState("");
   const [selectedDeal, setSelectedDeal] = useState<DealWithStages | null>(null);
 
   const load = useCallback(async () => {
@@ -72,15 +98,45 @@ export default function SalesKPIDashboard({ deals: externalDeals }: { deals?: De
 
   useEffect(() => { load(); }, [load]);
 
-  const filteredDeals = filterStage === "all"
-    ? deals
-    : filterStage === "active"
-      ? deals.filter((d) => d.stage !== "مكتملة" && d.stage !== "مرفوض مع سبب" && d.stage !== "كنسل التجربة")
-      : filterStage === "won"
-        ? deals.filter((d) => d.stage === "مكتملة")
-        : deals;
+  const filteredDeals = useMemo(() => {
+    let result = deals;
 
-  const kpiData = aggregateEmployeeCredits(deals.map((d) => ({
+    // Time filter
+    const cutoff = getDateRange(timePeriod);
+    if (cutoff) {
+      if (timePeriod === "yesterday") {
+        const nextDay = new Date(cutoff);
+        nextDay.setDate(nextDay.getDate() + 1);
+        result = result.filter((d) => {
+          const dt = new Date(d.deal_date || d.created_at);
+          return dt >= cutoff && dt < nextDay;
+        });
+      } else {
+        result = result.filter((d) => new Date(d.deal_date || d.created_at) >= cutoff);
+      }
+    }
+
+    // Stage filter
+    if (filterStage === "active") {
+      result = result.filter((d) => d.stage !== "مكتملة" && d.stage !== "مرفوض مع سبب" && d.stage !== "كنسل التجربة");
+    } else if (filterStage === "won") {
+      result = result.filter((d) => d.stage === "مكتملة");
+    }
+
+    // Phone search
+    if (phoneSearch.trim()) {
+      const q = phoneSearch.replace(/\s+/g, "").replace(/\D/g, "");
+      result = result.filter((d) => {
+        const phone = (d.client_phone || "").replace(/\s+/g, "").replace(/\D/g, "");
+        const name = d.client_name.toLowerCase();
+        return phone.includes(q) || name.includes(phoneSearch.trim().toLowerCase());
+      });
+    }
+
+    return result;
+  }, [deals, timePeriod, filterStage, phoneSearch]);
+
+  const kpiData = aggregateEmployeeCredits(filteredDeals.map((d) => ({
     deal_value: d.deal_value || 0,
     stages: d.kpiStages.map((s) => ({
       stage_number: s.stage_number,
@@ -125,14 +181,53 @@ export default function SalesKPIDashboard({ deals: externalDeals }: { deals?: De
         ))}
       </div>
 
+      {/* Time Period Filter + Search */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
+          {[
+            { key: "all", label: "الكل" },
+            { key: "today", label: "اليوم" },
+            { key: "yesterday", label: "أمس" },
+            { key: "week", label: "الأسبوع" },
+            { key: "month", label: "الشهر" },
+          ].map((p) => (
+            <button
+              key={p.key}
+              onClick={() => setTimePeriod(p.key)}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border",
+                timePeriod === p.key
+                  ? "bg-orange-500/15 text-orange-400 border-orange-500/30"
+                  : "bg-white/[0.04] text-muted-foreground border-transparent hover:text-foreground"
+              )}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="relative max-w-xs">
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+          <input
+            type="text"
+            value={phoneSearch}
+            onChange={(e) => setPhoneSearch(e.target.value)}
+            placeholder="ابحث برقم الجوال أو اسم العميل..."
+            className="w-full pr-9 pl-3 py-2 text-sm rounded-lg bg-white/[0.06] border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-orange-500/50"
+            dir="rtl"
+          />
+        </div>
+      </div>
+
       {activeTab === "deals" && (
         <>
           {/* Status Filter */}
           <div className="flex flex-wrap gap-2">
             {[
-              { key: "all", label: `الكل (${deals.length})` },
-              { key: "active", label: `نشطة (${deals.filter((d) => d.stage !== "مكتملة" && d.stage !== "مرفوض مع سبب" && d.stage !== "كنسل التجربة").length})` },
-              { key: "won", label: `مغلقة (${deals.filter((d) => d.stage === "مكتملة").length})` },
+              { key: "all", label: `الكل (${filteredDeals.length})` },
+              { key: "active", label: `نشطة (${filteredDeals.filter((d) => d.stage !== "مكتملة" && d.stage !== "مرفوض مع سبب" && d.stage !== "كنسل التجربة").length})` },
+              { key: "won", label: `مغلقة (${filteredDeals.filter((d) => d.stage === "مكتملة").length})` },
             ].map((s) => (
               <button
                 key={s.key}
@@ -158,7 +253,9 @@ export default function SalesKPIDashboard({ deals: externalDeals }: { deals?: De
             <div className="text-center py-16 text-muted-foreground">
               <Users2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
               <p className="font-semibold">لا توجد صفقات</p>
-              <p className="text-sm mt-1">أضف مبيعة من زر &ldquo;إضافة مبيع&rdquo; أعلاه وسيتم إنشاء المراحل تلقائياً</p>
+              <p className="text-sm mt-1">
+                {phoneSearch ? "لا توجد نتائج للبحث" : timePeriod !== "all" ? "لا توجد صفقات في هذه الفترة" : "أضف مبيعة من زر \"إضافة مبيع\" أعلاه"}
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
