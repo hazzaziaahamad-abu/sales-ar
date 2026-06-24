@@ -119,7 +119,11 @@ function MentionAlertBanner({ mentions, onDismiss }: { mentions: MentionNotifica
         {mentions.slice(0, 8).map((m) => (
           <button
             key={m.id}
-            onClick={() => router.push(SECTION_PATH[m.entity_type] || "/sales")}
+            onClick={() => {
+              const base = SECTION_PATH[m.entity_type] || "/sales";
+              const hasProfile = m.entity_type === "deal" || m.entity_type === "renewal";
+              router.push(hasProfile ? `${base}?profile=${encodeURIComponent(m.entity_name)}` : base);
+            }}
             className="w-full text-right px-4 py-2.5 flex items-center gap-3 hover:bg-white/[0.04] transition-colors"
           >
             <div className="w-7 h-7 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 text-xs font-bold shrink-0">

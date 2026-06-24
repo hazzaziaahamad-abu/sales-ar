@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import type { Renewal, Employee } from "@/types";
 import { triggerSaleCelebration } from "@/components/layout/sale-celebration";
 import {
@@ -190,6 +191,15 @@ export default function RenewalsPage() {
   const [assignRenewal, setAssignRenewal] = useState<Renewal | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileQuery, setProfileQuery] = useState("");
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const p = searchParams.get("profile");
+    if (p) {
+      setProfileQuery(p);
+      setProfileOpen(true);
+    }
+  }, [searchParams]);
 
   /* Achievement summary period */
   type SummaryPeriod = "today" | "week" | "month" | "quarter" | "custom";

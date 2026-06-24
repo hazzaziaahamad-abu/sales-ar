@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import type { Deal, Marketer, Package, Employee, EmployeeTask } from "@/types";
 import { triggerSaleCelebration } from "@/components/layout/sale-celebration";
 import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createFollowUpNote, fetchRecentFollowUpNotes, fetchPackages, fetchQuoteCommitments, addQuoteCommitment, removeQuoteCommitment, fetchEmployees, fetchEmployeeTasks, createEmployeeTask, createRenewal, fetchRenewals, createDealKpiStages } from "@/lib/supabase/db";
@@ -228,6 +229,15 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const [assignDeal, setAssignDeal] = useState<Deal | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileQuery, setProfileQuery] = useState("");
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const p = searchParams.get("profile");
+    if (p) {
+      setProfileQuery(p);
+      setProfileOpen(true);
+    }
+  }, [searchParams]);
 
   /* auto follow-up engine */
   const [followUpActions, setFollowUpActions] = useState<FollowUpAction[]>([]);
