@@ -1279,122 +1279,6 @@ export default function RenewalsPage() {
         </div>
       )}
 
-      {/* ─── Renewal Alerts Banner ─── */}
-      {!loading && (() => {
-        const now = new Date();
-        now.setHours(0, 0, 0, 0);
-        const activeStatuses = new Set(["مجدول", "مجدول تجديد", "جاري المتابعة", "انتظار الدفع", "مؤجل مؤقتاً", "تواصل وقت آخر", "متردد"]);
-        const activeRenewals = (repFilter ? renewals.filter(r => r.assigned_rep === repFilter) : renewals)
-          .filter(r => activeStatuses.has(r.status));
-
-        const overdue = activeRenewals
-          .filter(r => {
-            const d = getDaysRemaining(r.renewal_date);
-            return d < 0;
-          })
-          .sort((a, b) => getDaysRemaining(a.renewal_date) - getDaysRemaining(b.renewal_date));
-
-        const urgent = activeRenewals
-          .filter(r => {
-            const d = getDaysRemaining(r.renewal_date);
-            return d >= 0 && d <= 7;
-          })
-          .sort((a, b) => getDaysRemaining(a.renewal_date) - getDaysRemaining(b.renewal_date));
-
-        const stale = activeRenewals
-          .filter(r => {
-            const daysSinceUpdate = Math.floor((Date.now() - new Date(r.updated_at).getTime()) / 86400000);
-            return daysSinceUpdate >= 5 && getDaysRemaining(r.renewal_date) > 7;
-          })
-          .sort((a, b) => new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime());
-
-        const totalAlerts = overdue.length + urgent.length + stale.length;
-        if (totalAlerts === 0) return null;
-
-        const alerts = [
-          ...overdue.map(r => ({ renewal: r, type: "overdue" as const, days: getDaysRemaining(r.renewal_date) })),
-          ...urgent.map(r => ({ renewal: r, type: "urgent" as const, days: getDaysRemaining(r.renewal_date) })),
-          ...stale.map(r => ({ renewal: r, type: "stale" as const, days: Math.floor((Date.now() - new Date(r.updated_at).getTime()) / 86400000) })),
-        ];
-
-        return (
-          <div className="cc-card rounded-[14px] border border-cc-red/20 bg-gradient-to-l from-cc-red/[0.04] via-amber/[0.03] to-transparent overflow-hidden">
-            <div className="p-4 flex items-center justify-between border-b border-border/30">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-cc-red/10 flex items-center justify-center relative">
-                  <Bell className="w-4 h-4 text-cc-red" />
-                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-cc-red text-white text-[11px] font-bold flex items-center justify-center">
-                    {totalAlerts}
-                  </span>
-                </div>
-                <div className="text-right">
-                  <h3 className="text-sm font-bold text-foreground">تنبيهات التجديدات</h3>
-                  <p className="text-[12px] text-muted-foreground">
-                    {overdue.length > 0 && <span className="text-cc-red font-semibold">{overdue.length} متأخر</span>}
-                    {overdue.length > 0 && urgent.length > 0 && " · "}
-                    {urgent.length > 0 && <span className="text-amber font-semibold">{urgent.length} خلال أسبوع</span>}
-                    {(overdue.length > 0 || urgent.length > 0) && stale.length > 0 && " · "}
-                    {stale.length > 0 && <span className="text-cc-blue font-semibold">{stale.length} بدون متابعة</span>}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="divide-y divide-border/20 max-h-[280px] overflow-y-auto">
-              {alerts.slice(0, 12).map((alert) => (
-                <div key={alert.renewal.id} className="px-4 py-2.5 flex items-center gap-3 hover:bg-muted/30 transition-colors">
-                  <div className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center border ${
-                    alert.type === "overdue" ? "bg-cc-red/10 border-cc-red/30" :
-                    alert.type === "urgent" ? "bg-amber/10 border-amber/30" :
-                    "bg-cc-blue/10 border-cc-blue/30"
-                  }`}>
-                    {alert.type === "overdue" ? (
-                      <AlertTriangle className="w-3.5 h-3.5 text-cc-red" />
-                    ) : alert.type === "urgent" ? (
-                      <Clock className="w-3.5 h-3.5 text-amber" />
-                    ) : (
-                      <RefreshCw className="w-3.5 h-3.5 text-cc-blue" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-foreground truncate">
-                      {alert.type === "overdue"
-                        ? `🚨 ${alert.renewal.customer_name} — متأخر ${Math.abs(alert.days)} يوم!`
-                        : alert.type === "urgent"
-                        ? `⏰ ${alert.renewal.customer_name} — يجدد خلال ${alert.days} ${alert.days === 0 ? "(اليوم!)" : "يوم"}`
-                        : `📋 ${alert.renewal.customer_name} — بدون متابعة منذ ${alert.days} يوم`}
-                    </p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className={`text-[12px] px-1.5 py-0.5 rounded-full border font-semibold ${
-                        alert.type === "overdue" ? "bg-cc-red/10 border-cc-red/30 text-cc-red" :
-                        alert.type === "urgent" ? "bg-amber/10 border-amber/30 text-amber" :
-                        "bg-cc-blue/10 border-cc-blue/30 text-cc-blue"
-                      }`}>
-                        {alert.type === "overdue" ? "متأخر" : alert.type === "urgent" ? "عاجل" : "راكد"}
-                      </span>
-                      <span className="text-[12px] text-muted-foreground">{alert.renewal.plan_name} · {formatMoneyFull(alert.renewal.plan_price)}</span>
-                      {alert.renewal.assigned_rep && (
-                        <span className="text-[12px] text-muted-foreground">• {alert.renewal.assigned_rep}</span>
-                      )}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => openEditModal(alert.renewal)}
-                    className="text-[12px] px-2.5 py-1.5 rounded-lg bg-cyan/10 text-cyan border border-cyan/30 hover:bg-cyan/20 transition-colors font-medium shrink-0"
-                  >
-                    متابعة
-                  </button>
-                </div>
-              ))}
-            </div>
-            {totalAlerts > 12 && (
-              <div className="px-4 py-2 text-center border-t border-border/30">
-                <span className="text-[12px] text-muted-foreground">و {totalAlerts - 12} تنبيه آخر...</span>
-              </div>
-            )}
-          </div>
-        );
-      })()}
-
       {/* ─── 4 KPI Cards ─── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {loading ? (
@@ -2323,6 +2207,116 @@ export default function RenewalsPage() {
           defaultTitle={`متابعة تجديد ${assignRenewal.customer_name} — ${assignRenewal.plan_name}`}
         />
       )}
+      {/* ─── Renewal Alerts Banner ─── */}
+      {!loading && (() => {
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+        const activeStatuses = new Set(["مجدول", "مجدول تجديد", "جاري المتابعة", "انتظار الدفع", "مؤجل مؤقتاً", "تواصل وقت آخر", "متردد"]);
+        const activeRenewals = (repFilter ? renewals.filter(r => r.assigned_rep === repFilter) : renewals)
+          .filter(r => activeStatuses.has(r.status));
+
+        const overdue = activeRenewals
+          .filter(r => getDaysRemaining(r.renewal_date) < 0)
+          .sort((a, b) => getDaysRemaining(a.renewal_date) - getDaysRemaining(b.renewal_date));
+
+        const urgent = activeRenewals
+          .filter(r => { const d = getDaysRemaining(r.renewal_date); return d >= 0 && d <= 7; })
+          .sort((a, b) => getDaysRemaining(a.renewal_date) - getDaysRemaining(b.renewal_date));
+
+        const stale = activeRenewals
+          .filter(r => {
+            const daysSinceUpdate = Math.floor((Date.now() - new Date(r.updated_at).getTime()) / 86400000);
+            return daysSinceUpdate >= 5 && getDaysRemaining(r.renewal_date) > 7;
+          })
+          .sort((a, b) => new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime());
+
+        const totalAlerts = overdue.length + urgent.length + stale.length;
+        if (totalAlerts === 0) return null;
+
+        const alerts = [
+          ...overdue.map(r => ({ renewal: r, type: "overdue" as const, days: getDaysRemaining(r.renewal_date) })),
+          ...urgent.map(r => ({ renewal: r, type: "urgent" as const, days: getDaysRemaining(r.renewal_date) })),
+          ...stale.map(r => ({ renewal: r, type: "stale" as const, days: Math.floor((Date.now() - new Date(r.updated_at).getTime()) / 86400000) })),
+        ];
+
+        return (
+          <div className="cc-card rounded-[14px] border border-cc-red/20 bg-gradient-to-l from-cc-red/[0.04] via-amber/[0.03] to-transparent overflow-hidden">
+            <div className="p-4 flex items-center justify-between border-b border-border/30">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-cc-red/10 flex items-center justify-center relative">
+                  <Bell className="w-4 h-4 text-cc-red" />
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-cc-red text-white text-[11px] font-bold flex items-center justify-center">
+                    {totalAlerts}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <h3 className="text-sm font-bold text-foreground">تنبيهات التجديدات</h3>
+                  <p className="text-[12px] text-muted-foreground">
+                    {overdue.length > 0 && <span className="text-cc-red font-semibold">{overdue.length} متأخر</span>}
+                    {overdue.length > 0 && urgent.length > 0 && " · "}
+                    {urgent.length > 0 && <span className="text-amber font-semibold">{urgent.length} خلال أسبوع</span>}
+                    {(overdue.length > 0 || urgent.length > 0) && stale.length > 0 && " · "}
+                    {stale.length > 0 && <span className="text-cc-blue font-semibold">{stale.length} بدون متابعة</span>}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="divide-y divide-border/20 max-h-[280px] overflow-y-auto">
+              {alerts.slice(0, 12).map((alert) => (
+                <div key={alert.renewal.id} className="px-4 py-2.5 flex items-center gap-3 hover:bg-muted/30 transition-colors">
+                  <div className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center border ${
+                    alert.type === "overdue" ? "bg-cc-red/10 border-cc-red/30" :
+                    alert.type === "urgent" ? "bg-amber/10 border-amber/30" :
+                    "bg-cc-blue/10 border-cc-blue/30"
+                  }`}>
+                    {alert.type === "overdue" ? (
+                      <AlertTriangle className="w-3.5 h-3.5 text-cc-red" />
+                    ) : alert.type === "urgent" ? (
+                      <Clock className="w-3.5 h-3.5 text-amber" />
+                    ) : (
+                      <RefreshCw className="w-3.5 h-3.5 text-cc-blue" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-foreground truncate">
+                      {alert.type === "overdue"
+                        ? `🚨 ${alert.renewal.customer_name} — متأخر ${Math.abs(alert.days)} يوم!`
+                        : alert.type === "urgent"
+                        ? `⏰ ${alert.renewal.customer_name} — يجدد خلال ${alert.days} ${alert.days === 0 ? "(اليوم!)" : "يوم"}`
+                        : `📋 ${alert.renewal.customer_name} — بدون متابعة منذ ${alert.days} يوم`}
+                    </p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className={`text-[12px] px-1.5 py-0.5 rounded-full border font-semibold ${
+                        alert.type === "overdue" ? "bg-cc-red/10 border-cc-red/30 text-cc-red" :
+                        alert.type === "urgent" ? "bg-amber/10 border-amber/30 text-amber" :
+                        "bg-cc-blue/10 border-cc-blue/30 text-cc-blue"
+                      }`}>
+                        {alert.type === "overdue" ? "متأخر" : alert.type === "urgent" ? "عاجل" : "راكد"}
+                      </span>
+                      <span className="text-[12px] text-muted-foreground">{alert.renewal.plan_name} · {formatMoneyFull(alert.renewal.plan_price)}</span>
+                      {alert.renewal.assigned_rep && (
+                        <span className="text-[12px] text-muted-foreground">• {alert.renewal.assigned_rep}</span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => openEditModal(alert.renewal)}
+                    className="text-[12px] px-2.5 py-1.5 rounded-lg bg-cyan/10 text-cyan border border-cyan/30 hover:bg-cyan/20 transition-colors font-medium shrink-0"
+                  >
+                    متابعة
+                  </button>
+                </div>
+              ))}
+            </div>
+            {totalAlerts > 12 && (
+              <div className="px-4 py-2 text-center border-t border-border/30">
+                <span className="text-[12px] text-muted-foreground">و {totalAlerts - 12} تنبيه آخر...</span>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       <ClientProfilePanel
         open={profileOpen}
         onClose={() => setProfileOpen(false)}
