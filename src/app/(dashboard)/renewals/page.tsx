@@ -20,7 +20,7 @@ import {
 import { AssignTaskModal } from "@/components/tasks/AssignTaskModal";
 import { ClientProfilePanel } from "@/components/client-profile-panel";
 import { useAuth } from "@/lib/auth-context";
-import { useTopbarControls } from "@/components/layout/topbar-context";
+
 import {
   RENEWAL_STATUSES,
   RENEWAL_STATUS_COLORS,
@@ -327,26 +327,26 @@ export default function RenewalsPage() {
     }
   }
 
+  /* inline month filter — defaults to current month */
+  const [monthFilter, setMonthFilter] = useState<number>(new Date().getMonth());
+
   /* sales type tabs: all / office / support */
   const [salesTypeTab, setSalesTypeTab] = useState<"all" | "office" | "support">("all");
   const typedRenewals = salesTypeTab === "all"
     ? renewals
     : renewals.filter((r) => (r.sales_type || "support") === salesTypeTab);
 
-  /* month filter — by month only (ignoring year) based on renewal_date */
-  const { activeMonthIndex, filterCutoff } = useTopbarControls();
-  const allMonthRenewals = filterCutoff
-    ? typedRenewals.filter((r) => new Date(r.renewal_date) >= filterCutoff)
-    : activeMonthIndex
-      ? typedRenewals.filter((r) => {
-          const rd = new Date(r.renewal_date);
-          return rd.getMonth() + 1 === activeMonthIndex.month;
-        })
-      : typedRenewals;
+  /* month filter — by inline month selector based on renewal_date */
+  const monthFilteredRenewals = monthFilter === -1
+    ? typedRenewals
+    : typedRenewals.filter((r) => {
+        const rd = new Date(r.renewal_date);
+        return rd.getMonth() === monthFilter;
+      });
 
   // Separate closed-forever from active renewals
-  const closedForeverRenewals = allMonthRenewals.filter(isClosedForever);
-  const monthRenewals = allMonthRenewals.filter((r) => !isClosedForever(r));
+  const closedForeverRenewals = monthFilteredRenewals.filter(isClosedForever);
+  const monthRenewals = monthFilteredRenewals.filter((r) => !isClosedForever(r));
 
   /* card filter */
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
@@ -742,7 +742,7 @@ export default function RenewalsPage() {
   const totalPages = Math.max(1, Math.ceil(filteredRenewals.length / PAGE_SIZE));
   const paginatedRenewals = filteredRenewals.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  useEffect(() => { setCurrentPage(1); }, [statusFilter, clientSearch, salesTypeTab, summaryFilter]);
+  useEffect(() => { setCurrentPage(1); }, [statusFilter, clientSearch, salesTypeTab, summaryFilter, monthFilter]);
 
   /* ─── Excel template download ─── */
   const [uploadStatus, setUploadStatus] = useState<"idle" | "importing" | "done" | "error">("idle");
@@ -1599,7 +1599,34 @@ export default function RenewalsPage() {
 
       {/* ─── Renewals Table ─── */}
       <div id="renewals-table" className="cc-card rounded-[14px] overflow-x-auto scroll-mt-4">
-        <div className="p-4 pb-0 flex items-center gap-3">
+        {/* Month filter */}
+        <div className="p-4 pb-2 flex items-center gap-1.5 flex-wrap">
+          <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
+          <button
+            onClick={() => setMonthFilter(-1)}
+            className={`px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-colors border ${
+              monthFilter === -1
+                ? "bg-cyan/15 text-cyan border-cyan/30"
+                : "text-muted-foreground border-transparent hover:text-foreground hover:bg-white/[0.06]"
+            }`}
+          >
+            الكل
+          </button>
+          {MONTHS_AR.map((m, i) => (
+            <button
+              key={i}
+              onClick={() => setMonthFilter(i)}
+              className={`px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-colors border ${
+                monthFilter === i
+                  ? "bg-cyan/15 text-cyan border-cyan/30"
+                  : "text-muted-foreground border-transparent hover:text-foreground hover:bg-white/[0.06]"
+              }`}
+            >
+              {m.slice(0, 3)}
+            </button>
+          ))}
+        </div>
+        <div className="px-4 pb-0 flex items-center gap-3">
           <Input
             value={clientSearch}
             onChange={(e) => setClientSearch(e.target.value)}
