@@ -429,7 +429,7 @@ export default function RenewalsPage() {
   }, [orgId, myName, todayStr, hasCommitted]);
 
   /* ─── Computed analytics ─── */
-  const analyticsBase = repFilter ? monthRenewals.filter(r => r.assigned_rep === repFilter) : monthRenewals;
+  const analyticsBase = repFilter ? monthFilteredRenewals.filter(r => r.assigned_rep === repFilter) : monthFilteredRenewals;
   const analytics = useMemo(() => {
     const total = analyticsBase.length;
     const renewed = analyticsBase.filter((r) => r.status === "مكتمل").length;
@@ -1522,9 +1522,9 @@ export default function RenewalsPage() {
         </div>
         {/* Month completion summary */}
         {monthFilter !== -1 && (() => {
-          const total = monthRenewals.length;
-          const completed = monthRenewals.filter(r => r.status === "مكتمل").length;
-          const cancelled = monthRenewals.filter(r => r.status === "ملغي بسبب").length;
+          const total = monthFilteredRenewals.length;
+          const completed = monthFilteredRenewals.filter(r => r.status === "مكتمل").length;
+          const cancelled = monthFilteredRenewals.filter(r => r.status === "ملغي بسبب").length;
           const pending = total - completed - cancelled;
           const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
           return (
