@@ -48,8 +48,10 @@ function MentionNotifLoader({ onLoad, onMentions }: { onLoad: (n: AppNotificatio
   const loadMentions = useCallback(() => {
     if (!user?.name) return;
     fetchMentionNotifications(user.name).then((mentions) => {
-      const unread = mentions.filter((m) => !m.is_read);
-      onMentions(unread);
+      const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+      const recent = mentions.filter((m) => new Date(m.created_at).getTime() > oneDayAgo);
+      onMentions(recent);
+      const unread = recent.filter((m) => !m.is_read);
       const notifs: AppNotification[] = unread.map((m) => ({
         id: `mention-${m.id}`,
         type: "crud_action" as const,
@@ -75,11 +77,13 @@ function MentionNotifLoader({ onLoad, onMentions }: { onLoad: (n: AppNotificatio
   return null;
 }
 
-function MentionAlertBanner({ mentions, onDismiss }: { mentions: MentionNotification[]; onDismiss: () => void }) {
+function MentionAlertBanner({ mentions, onRefresh }: { mentions: MentionNotification[]; onRefresh: () => void }) {
   const router = useRouter();
-  const [dismissed, setDismissed] = useState(false);
+  const [markedIds, setMarkedIds] = useState<Set<string>>(new Set());
 
-  if (mentions.length === 0 || dismissed) return null;
+  if (mentions.length === 0) return null;
+
+  const unreadCount = mentions.filter((m) => !m.is_read && !markedIds.has(m.id)).length;
 
   const SECTION_PATH: Record<string, string> = {
     deal: "/sales",
@@ -93,64 +97,78 @@ function MentionAlertBanner({ mentions, onDismiss }: { mentions: MentionNotifica
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-amber-500/15 flex items-center justify-center relative shrink-0">
             <span className="text-lg">@</span>
-            <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-amber-500 text-white text-[11px] font-bold flex items-center justify-center animate-pulse">
+            <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-amber-500 text-white text-[11px] font-bold flex items-center justify-center">
               {mentions.length}
             </span>
           </div>
           <div>
-            <p className="text-sm font-bold text-foreground">عندك {mentions.length} منشن جديد</p>
+            <p className="text-sm font-bold text-foreground">
+              منشنات آخر 24 ساعة ({mentions.length})
+              {unreadCount > 0 && <span className="text-amber-400 mr-2">— {unreadCount} جديد</span>}
+            </p>
             <p className="text-[12px] text-muted-foreground">موظفين أشاروا إليك في سجل المتابعة</p>
           </div>
         </div>
-        <button
-          onClick={() => {
-            markMentionNotificationsRead(mentions.map(m => m.id)).catch(console.error);
-            setDismissed(true);
-            onDismiss();
-          }}
-          className="text-[12px] px-3 py-1.5 rounded-lg border border-amber-500/30 text-amber-400 hover:bg-amber-500/10 transition-colors shrink-0"
-        >
-          تم القراءة ✓
-        </button>
-      </div>
-      <div className="divide-y divide-border/20 max-h-[200px] overflow-y-auto">
-        {mentions.slice(0, 8).map((m) => (
+        {unreadCount > 0 && (
           <button
-            key={m.id}
             onClick={() => {
-              const base = SECTION_PATH[m.entity_type] || "/sales";
-              const hasProfile = m.entity_type === "deal" || m.entity_type === "renewal";
-              router.push(hasProfile ? `${base}?profile=${encodeURIComponent(m.entity_name)}` : base);
+              const unreadIds = mentions.filter((m) => !m.is_read && !markedIds.has(m.id)).map((m) => m.id);
+              markMentionNotificationsRead(unreadIds).catch(console.error);
+              setMarkedIds((prev) => { const next = new Set(prev); unreadIds.forEach((id) => next.add(id)); return next; });
+              onRefresh();
             }}
-            className="w-full text-right px-4 py-2.5 flex items-center gap-3 hover:bg-white/[0.04] transition-colors"
+            className="text-[12px] px-3 py-1.5 rounded-lg border border-amber-500/30 text-amber-400 hover:bg-amber-500/10 transition-colors shrink-0"
           >
-            <div className="w-7 h-7 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 text-xs font-bold shrink-0">
-              {m.author_name.charAt(0)}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-foreground truncate">
-                <span className="font-bold text-amber-400">{m.author_name}</span>
-                {" أشار إليك في "}
-                <span className="font-semibold">{m.entity_name}</span>
-              </p>
-              <p className="text-[11px] text-muted-foreground truncate mt-0.5">{m.note_text.slice(0, 80)}</p>
-            </div>
-            <span className="text-[11px] text-muted-foreground/60 shrink-0">
-              {(() => {
-                const diff = Date.now() - new Date(m.created_at).getTime();
-                const mins = Math.floor(diff / 60000);
-                if (mins < 60) return `${mins}د`;
-                const hrs = Math.floor(mins / 60);
-                if (hrs < 24) return `${hrs}س`;
-                return `${Math.floor(hrs / 24)}ي`;
-              })()}
-            </span>
+            تم القراءة ✓
           </button>
-        ))}
+        )}
       </div>
-      {mentions.length > 8 && (
+      <div className="divide-y divide-border/20 max-h-[240px] overflow-y-auto">
+        {mentions.slice(0, 12).map((m) => {
+          const isNew = !m.is_read && !markedIds.has(m.id);
+          return (
+            <button
+              key={m.id}
+              onClick={() => {
+                const base = SECTION_PATH[m.entity_type] || "/sales";
+                const hasProfile = m.entity_type === "deal" || m.entity_type === "renewal";
+                router.push(hasProfile ? `${base}?profile=${encodeURIComponent(m.entity_name)}` : base);
+              }}
+              className={`w-full text-right px-4 py-2.5 flex items-center gap-3 hover:bg-white/[0.04] transition-colors ${isNew ? "" : "opacity-50"}`}
+            >
+              <div className={`w-7 h-7 rounded-full border flex items-center justify-center text-xs font-bold shrink-0 ${isNew ? "bg-amber-500/10 border-amber-500/20 text-amber-400" : "bg-muted/10 border-border/30 text-muted-foreground"}`}>
+                {m.author_name.charAt(0)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-foreground truncate">
+                  <span className={`font-bold ${isNew ? "text-amber-400" : "text-muted-foreground"}`}>{m.author_name}</span>
+                  {" أشار إليك في "}
+                  <span className="font-semibold">{m.entity_name}</span>
+                </p>
+                <p className="text-[11px] text-muted-foreground truncate mt-0.5">{m.note_text.slice(0, 80)}</p>
+              </div>
+              <div className="flex flex-col items-end gap-1 shrink-0">
+                {isNew && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-bold animate-pulse">جديد</span>
+                )}
+                <span className="text-[11px] text-muted-foreground/60">
+                  {(() => {
+                    const diff = Date.now() - new Date(m.created_at).getTime();
+                    const mins = Math.floor(diff / 60000);
+                    if (mins < 60) return `${mins}د`;
+                    const hrs = Math.floor(mins / 60);
+                    if (hrs < 24) return `${hrs}س`;
+                    return `${Math.floor(hrs / 24)}ي`;
+                  })()}
+                </span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      {mentions.length > 12 && (
         <div className="px-4 py-2 text-center border-t border-border/20">
-          <span className="text-[12px] text-muted-foreground">و {mentions.length - 8} منشن آخر...</span>
+          <span className="text-[12px] text-muted-foreground">و {mentions.length - 12} منشن آخر...</span>
         </div>
       )}
     </div>
@@ -348,7 +366,7 @@ export default function DashboardLayout({
   const [notifOpen, setNotifOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [unreadMentions, setUnreadMentions] = useState<MentionNotification[]>([]);
+  const [recentMentions, setRecentMentions] = useState<MentionNotification[]>([]);
 
   // Load live notifications from DB
   useEffect(() => {
@@ -377,7 +395,7 @@ export default function DashboardLayout({
     <OrgProvider>
     <AuthProvider>
     <TopbarProvider>
-      <MentionNotifLoader onLoad={addNotifications} onMentions={setUnreadMentions} />
+      <MentionNotifLoader onLoad={addNotifications} onMentions={setRecentMentions} />
       <PageTracker />
       <SaleCelebration />
       <WelcomePopup />
@@ -393,7 +411,7 @@ export default function DashboardLayout({
           />
           <main className="px-4 sm:px-6 pb-8 pt-5">
             <AuthGate>
-              <MentionAlertBanner mentions={unreadMentions} onDismiss={() => setUnreadMentions([])} />
+              <MentionAlertBanner mentions={recentMentions} onRefresh={() => {}} />
               <LastSaleBanner />
               <AIAlertsBanner />
               {children}
