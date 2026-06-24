@@ -14,6 +14,8 @@ import {
   addQuoteCommitment,
   removeQuoteCommitment,
   fetchEmployees,
+  insertManyRenewals,
+  saveUploadRecord,
 } from "@/lib/supabase/db";
 import { AssignTaskModal } from "@/components/tasks/AssignTaskModal";
 import { ClientProfilePanel } from "@/components/client-profile-panel";
@@ -75,6 +77,8 @@ import {
   Target,
   SquareCheck,
   Download,
+  Upload,
+  FileSpreadsheet,
   Share2,
   UserPlus,
   Award,
@@ -730,6 +734,155 @@ export default function RenewalsPage() {
     setDeleteId(null);
   }
 
+  /* ─── Excel template download ─── */
+  const [uploadStatus, setUploadStatus] = useState<"idle" | "importing" | "done" | "error">("idle");
+  const [uploadResult, setUploadResult] = useState<{ imported: number; skipped: number } | null>(null);
+
+  const downloadRenewalsTemplate = useCallback(async () => {
+    const XLSX = await import("xlsx");
+    const wb = XLSX.utils.book_new();
+    const headers = ["اسم العميل", "رقم التواصل", "الباقة", "تاريخ الانتهاء", "الحالة", "المسؤول", "ملاحظات"];
+    const statuses = RENEWAL_STATUSES;
+    const plans = PLANS;
+    const empNames = employees.filter(e => e.status !== "إجازة").map(e => e.name);
+    const sample = [
+      ["مثال: محمد أحمد", "05xxxxxxxx", plans[0] || "الاساسية", todayLocal(), statuses[0] || "مجدول", empNames[0] || "", ""],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...sample]);
+    ws["!cols"] = headers.map(() => ({ wch: 20 }));
+    XLSX.utils.book_append_sheet(wb, ws, "التجديدات");
+
+    // Reference sheet for statuses + plans
+    const refHeaders = ["الحالات المتاحة", "الباقات المتاحة", "الموظفين"];
+    const maxLen = Math.max(statuses.length, plans.length, empNames.length);
+    const refRows = Array.from({ length: maxLen }, (_, i) => [
+      statuses[i] || "", plans[i] || "", empNames[i] || "",
+    ]);
+    const refWs = XLSX.utils.aoa_to_sheet([refHeaders, ...refRows]);
+    refWs["!cols"] = refHeaders.map(() => ({ wch: 22 }));
+    XLSX.utils.book_append_sheet(wb, refWs, "مرجع القيم");
+
+    const buffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `قالب-التجديدات-${todayLocal()}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [employees]);
+
+  const handleRenewalsUpload = useCallback(async (file: File) => {
+    if (!file.name.match(/\.(xlsx|xls|csv)$/i)) return;
+    setUploadStatus("importing");
+    setUploadResult(null);
+    try {
+      const XLSX = await import("xlsx");
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array", cellDates: false });
+      const ws = workbook.Sheets[workbook.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" }) as unknown[][];
+
+      const headerRowIdx = json.length > 1 && (json[1] as unknown[]).filter(c => c !== "").length >= 3 ? 1 : 0;
+      const headers = (json[headerRowIdx] as unknown[]).map(h => String(h).trim().toLowerCase());
+      const rows = json.slice(headerRowIdx + 1).filter(r => (r as unknown[]).some(c => c !== "" && c != null));
+
+      const colPatterns: Record<string, string[]> = {
+        customer_name: ["اسم العميل", "العميل", "الاسم", "اسم"],
+        customer_phone: ["رقم التواصل", "جوال", "الجوال", "رقم الجوال", "هاتف", "phone"],
+        plan_name: ["الباقة", "الخطة", "اسم الخطة", "plan"],
+        renewal_date: ["تاريخ الانتهاء", "تاريخ التجديد", "موعد التجديد", "تاريخ"],
+        status: ["الحالة", "حالة", "status"],
+        assigned_rep: ["المسؤول", "مندوب", "موظف"],
+        notes: ["ملاحظات", "notes"],
+      };
+
+      const colMap: Record<string, number> = {};
+      for (const [field, keywords] of Object.entries(colPatterns)) {
+        for (let i = 0; i < headers.length; i++) {
+          if (keywords.some(k => headers[i].includes(k.toLowerCase()))) {
+            colMap[field] = i;
+            break;
+          }
+        }
+      }
+
+      const cell = (row: unknown[], f: string) => {
+        const idx = colMap[f];
+        if (idx === undefined || idx < 0 || row[idx] == null || row[idx] === "") return "";
+        return String(row[idx]).trim();
+      };
+
+      const toDate = (val: unknown): string | undefined => {
+        if (!val && val !== 0) return undefined;
+        if (typeof val === "number") {
+          const d = new Date(Math.round((val - 25569) * 86400 * 1000));
+          if (!isNaN(d.getTime())) return d.toISOString().split("T")[0];
+        }
+        const s = String(val).trim();
+        if (!s) return undefined;
+        const d = new Date(s);
+        return isNaN(d.getTime()) ? undefined : d.toISOString().split("T")[0];
+      };
+
+      const existingKeys = new Set(renewals.map(r =>
+        (r.customer_name || "").toLowerCase() + "|" + (r.customer_phone || "").replace(/\s/g, "") + "|" + (r.renewal_date || "")
+      ));
+
+      const batch: Omit<Renewal, "id" | "org_id" | "created_at" | "updated_at">[] = [];
+      let skipped = 0;
+
+      for (const rawRow of rows) {
+        const row = rawRow as unknown[];
+        const name = cell(row, "customer_name");
+        if (!name) continue;
+
+        const phone = cell(row, "customer_phone") || undefined;
+        const renewalDate = toDate(colMap.renewal_date !== undefined ? row[colMap.renewal_date] : undefined) ?? todayLocal();
+
+        const key = name.toLowerCase() + "|" + (phone || "").replace(/\s/g, "") + "|" + renewalDate;
+        if (existingKeys.has(key)) { skipped++; continue; }
+        existingKeys.add(key);
+
+        const price = colMap.plan_name !== undefined ? row[colMap.plan_name] : undefined;
+        batch.push({
+          customer_name: name,
+          customer_phone: phone,
+          plan_name: cell(row, "plan_name") || "الاساسية",
+          plan_price: 0,
+          renewal_date: renewalDate,
+          status: cell(row, "status") || "مجدول",
+          assigned_rep: cell(row, "assigned_rep") || undefined,
+          notes: cell(row, "notes") || undefined,
+        });
+      }
+
+      let imported = 0;
+      if (batch.length > 0) {
+        imported = await insertManyRenewals(batch);
+      }
+
+      await saveUploadRecord({
+        filename: file.name,
+        sheets_count: 1,
+        deals_imported: 0,
+        tickets_imported: 0,
+        renewals_imported: imported,
+        status: "done",
+      }).catch(() => {});
+
+      const [r] = await Promise.all([fetchRenewals()]);
+      setRenewals(r);
+      setUploadResult({ imported, skipped });
+      setUploadStatus("done");
+      setTimeout(() => setUploadStatus("idle"), 5000);
+    } catch (err) {
+      console.error("Renewals upload error:", err);
+      setUploadStatus("error");
+      setTimeout(() => setUploadStatus("idle"), 4000);
+    }
+  }, [renewals]);
+
   return (
     <div className="space-y-6">
       {/* ─── Page Header ─── */}
@@ -817,11 +970,50 @@ export default function RenewalsPage() {
             })()}
           </div>
         </div>
-        <Button onClick={openAddModal} className="gap-1.5">
-          <Plus className="w-4 h-4" />
-          إضافة تجديد
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={downloadRenewalsTemplate} className="gap-1.5 border-cyan/30 text-cyan hover:bg-cyan/10">
+            <Download className="w-3.5 h-3.5" />
+            قالب Excel
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+            onClick={() => document.getElementById("renewals-upload")?.click()}
+            disabled={uploadStatus === "importing"}
+          >
+            <Upload className="w-3.5 h-3.5" />
+            {uploadStatus === "importing" ? "جاري الرفع..." : "رفع Excel"}
+          </Button>
+          <input
+            id="renewals-upload"
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleRenewalsUpload(f); e.target.value = ""; }}
+          />
+          <Button onClick={openAddModal} className="gap-1.5">
+            <Plus className="w-4 h-4" />
+            إضافة تجديد
+          </Button>
+        </div>
       </div>
+
+      {/* Upload result banner */}
+      {uploadStatus === "done" && uploadResult && (
+        <div className="flex items-center gap-3 bg-green-dim border border-cc-green/30 rounded-[14px] p-3 text-sm">
+          <FileSpreadsheet className="w-5 h-5 text-cc-green shrink-0" />
+          <span className="text-cc-green font-semibold">
+            تم رفع {uploadResult.imported} تجديد بنجاح
+            {uploadResult.skipped > 0 && ` (${uploadResult.skipped} مكرر تم تخطيه)`}
+          </span>
+        </div>
+      )}
+      {uploadStatus === "error" && (
+        <div className="flex items-center gap-3 bg-red-dim border border-cc-red/30 rounded-[14px] p-3 text-sm text-cc-red">
+          خطأ في رفع الملف — تأكد من صيغة الملف
+        </div>
+      )}
 
       {/* ─── Sales Type Tabs ─── */}
       <div className="flex items-center gap-1.5 bg-white/[0.04] rounded-xl p-1 border border-white/[0.06] w-fit">
