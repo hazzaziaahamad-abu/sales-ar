@@ -92,6 +92,8 @@ import {
   Archive,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 /* ─── Permanently closed cancel reasons — excluded from main list ─── */
@@ -735,6 +737,14 @@ export default function RenewalsPage() {
     setDeleteOpen(false);
     setDeleteId(null);
   }
+
+  /* ─── Pagination ─── */
+  const PAGE_SIZE = 25;
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(filteredRenewals.length / PAGE_SIZE));
+  const paginatedRenewals = filteredRenewals.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  useEffect(() => { setCurrentPage(1); }, [statusFilter, clientSearch, salesTypeTab, summaryFilter]);
 
   /* ─── Excel template download ─── */
   const [uploadStatus, setUploadStatus] = useState<"idle" | "importing" | "done" | "error">("idle");
@@ -1639,7 +1649,7 @@ export default function RenewalsPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredRenewals.map((renewal) => {
+              paginatedRenewals.map((renewal) => {
                 const days = getDaysRemaining(renewal.renewal_date);
                 const daysStyle = getDaysRemainingStyle(days);
                 const badge = STATUS_BADGE[renewal.status] || STATUS_BADGE["مجدول"];
@@ -1785,6 +1795,59 @@ export default function RenewalsPage() {
           </TableBody>
         </Table>
       </div>
+
+      {/* ─── Pagination ─── */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-1">
+          <span className="text-xs text-muted-foreground">
+            عرض {((currentPage - 1) * PAGE_SIZE) + 1}–{Math.min(currentPage * PAGE_SIZE, filteredRenewals.length)} من {filteredRenewals.length}
+          </span>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              className="text-muted-foreground"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2)
+              .reduce<(number | "...")[]>((acc, p, i, arr) => {
+                if (i > 0 && p - (arr[i - 1]) > 1) acc.push("...");
+                acc.push(p);
+                return acc;
+              }, [])
+              .map((p, i) =>
+                p === "..." ? (
+                  <span key={`dot-${i}`} className="text-xs text-muted-foreground px-1">...</span>
+                ) : (
+                  <button
+                    key={p}
+                    onClick={() => setCurrentPage(p)}
+                    className={`min-w-[28px] h-7 rounded-lg text-xs font-semibold transition-colors ${
+                      currentPage === p
+                        ? "bg-cyan/15 text-cyan border border-cyan/30"
+                        : "text-muted-foreground hover:text-foreground hover:bg-white/[0.06]"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                )
+              )}
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              className="text-muted-foreground"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* ─── Charts Row ─── */}
       {!loading && analytics.total > 0 && (
