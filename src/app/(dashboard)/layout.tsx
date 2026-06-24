@@ -15,7 +15,7 @@ import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { OrgProvider } from "@/lib/org-context";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchDeals, fetchSalesTargets, fetchSalesActivities, fetchTickets, fetchMentionNotifications, markMentionNotificationsRead, fetchRecentFollowUpNotes } from "@/lib/supabase/db";
-import type { AppNotification } from "@/types";
+import type { AppNotification, MentionNotification } from "@/types";
 import { CCThemeProvider } from "@/lib/theme-context";
 import { PageTracker } from "@/components/layout/page-tracker";
 
@@ -41,26 +41,104 @@ const PAGE_SLUG_MAP: Record<string, string> = {
   "/marketing-plans": "marketing-plans",
 };
 
-function MentionNotifLoader({ onLoad }: { onLoad: (n: AppNotification[]) => void }) {
+function MentionNotifLoader({ onLoad, onMentions }: { onLoad: (n: AppNotification[]) => void; onMentions: (m: MentionNotification[]) => void }) {
   const { user } = useAuth();
   useEffect(() => {
     if (!user?.name) return;
     fetchMentionNotifications(user.name).then((mentions) => {
-      const notifs: AppNotification[] = mentions
-        .filter((m) => !m.is_read)
-        .map((m) => ({
-          id: `mention-${m.id}`,
-          type: "crud_action" as const,
-          icon: "💬",
-          message: `${m.author_name} أشار إليك في متابعة "${m.entity_name}": ${m.note_text.slice(0, 60)}...`,
-          section: m.entity_type === "deal" ? "sales" : m.entity_type === "ticket" ? "support" : "renewals",
-          timestamp: m.created_at,
-          isRead: false,
-        }));
+      const unread = mentions.filter((m) => !m.is_read);
+      onMentions(unread);
+      const notifs: AppNotification[] = unread.map((m) => ({
+        id: `mention-${m.id}`,
+        type: "crud_action" as const,
+        icon: "💬",
+        message: `${m.author_name} أشار إليك في متابعة "${m.entity_name}": ${m.note_text.slice(0, 60)}...`,
+        section: m.entity_type === "deal" ? "sales" : m.entity_type === "ticket" ? "support" : "renewals",
+        timestamp: m.created_at,
+        isRead: false,
+      }));
       if (notifs.length > 0) onLoad(notifs);
     }).catch(console.error);
-  }, [user?.name, onLoad]);
+  }, [user?.name, onLoad, onMentions]);
   return null;
+}
+
+function MentionAlertBanner({ mentions, onDismiss }: { mentions: MentionNotification[]; onDismiss: () => void }) {
+  const router = useRouter();
+  const [dismissed, setDismissed] = useState(false);
+
+  if (mentions.length === 0 || dismissed) return null;
+
+  const SECTION_PATH: Record<string, string> = {
+    deal: "/sales",
+    ticket: "/support",
+    renewal: "/renewals",
+  };
+
+  return (
+    <div className="mb-4 rounded-[14px] border border-amber-500/30 bg-gradient-to-l from-amber-500/[0.08] to-amber-500/[0.02] overflow-hidden animate-in slide-in-from-top-2 duration-300">
+      <div className="px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-amber-500/15 flex items-center justify-center relative shrink-0">
+            <span className="text-lg">@</span>
+            <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-amber-500 text-white text-[11px] font-bold flex items-center justify-center animate-pulse">
+              {mentions.length}
+            </span>
+          </div>
+          <div>
+            <p className="text-sm font-bold text-foreground">عندك {mentions.length} منشن جديد</p>
+            <p className="text-[12px] text-muted-foreground">موظفين أشاروا إليك في سجل المتابعة</p>
+          </div>
+        </div>
+        <button
+          onClick={() => {
+            markMentionNotificationsRead(mentions.map(m => m.id)).catch(console.error);
+            setDismissed(true);
+            onDismiss();
+          }}
+          className="text-[12px] px-3 py-1.5 rounded-lg border border-amber-500/30 text-amber-400 hover:bg-amber-500/10 transition-colors shrink-0"
+        >
+          تم القراءة ✓
+        </button>
+      </div>
+      <div className="divide-y divide-border/20 max-h-[200px] overflow-y-auto">
+        {mentions.slice(0, 8).map((m) => (
+          <button
+            key={m.id}
+            onClick={() => router.push(SECTION_PATH[m.entity_type] || "/sales")}
+            className="w-full text-right px-4 py-2.5 flex items-center gap-3 hover:bg-white/[0.04] transition-colors"
+          >
+            <div className="w-7 h-7 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 text-xs font-bold shrink-0">
+              {m.author_name.charAt(0)}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-foreground truncate">
+                <span className="font-bold text-amber-400">{m.author_name}</span>
+                {" أشار إليك في "}
+                <span className="font-semibold">{m.entity_name}</span>
+              </p>
+              <p className="text-[11px] text-muted-foreground truncate mt-0.5">{m.note_text.slice(0, 80)}</p>
+            </div>
+            <span className="text-[11px] text-muted-foreground/60 shrink-0">
+              {(() => {
+                const diff = Date.now() - new Date(m.created_at).getTime();
+                const mins = Math.floor(diff / 60000);
+                if (mins < 60) return `${mins}د`;
+                const hrs = Math.floor(mins / 60);
+                if (hrs < 24) return `${hrs}س`;
+                return `${Math.floor(hrs / 24)}ي`;
+              })()}
+            </span>
+          </button>
+        ))}
+      </div>
+      {mentions.length > 8 && (
+        <div className="px-4 py-2 text-center border-t border-border/20">
+          <span className="text-[12px] text-muted-foreground">و {mentions.length - 8} منشن آخر...</span>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function AuthGate({ children }: { children: React.ReactNode }) {
@@ -254,6 +332,7 @@ export default function DashboardLayout({
   const [notifOpen, setNotifOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [unreadMentions, setUnreadMentions] = useState<MentionNotification[]>([]);
 
   // Load live notifications from DB
   useEffect(() => {
@@ -282,7 +361,7 @@ export default function DashboardLayout({
     <OrgProvider>
     <AuthProvider>
     <TopbarProvider>
-      <MentionNotifLoader onLoad={addNotifications} />
+      <MentionNotifLoader onLoad={addNotifications} onMentions={setUnreadMentions} />
       <PageTracker />
       <SaleCelebration />
       <WelcomePopup />
@@ -298,6 +377,7 @@ export default function DashboardLayout({
           />
           <main className="px-4 sm:px-6 pb-8 pt-5">
             <AuthGate>
+              <MentionAlertBanner mentions={unreadMentions} onDismiss={() => setUnreadMentions([])} />
               <LastSaleBanner />
               <AIAlertsBanner />
               {children}
