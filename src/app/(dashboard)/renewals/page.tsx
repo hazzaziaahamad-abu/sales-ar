@@ -364,9 +364,10 @@ export default function RenewalsPage() {
   const [repFilter, setRepFilter] = useState<string | null>(null);
   const [showClosed, setShowClosed] = useState(false);
   const PENDING_STATUSES = new Set(["مجدول", "مجدول تجديد", "جاري المتابعة", "انتظار الدفع"]);
+  const listBase = statusFilter === "ملغي بسبب" ? monthFilteredRenewals : monthRenewals;
   const repFilteredRenewals = repFilter
-    ? monthRenewals.filter((r) => r.assigned_rep === repFilter)
-    : monthRenewals;
+    ? listBase.filter((r) => r.assigned_rep === repFilter)
+    : listBase;
   const statusFilteredRenewals = statusFilter
     ? statusFilter === "pending"
       ? repFilteredRenewals.filter((r) => PENDING_STATUSES.has(r.status))
