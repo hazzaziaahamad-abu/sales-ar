@@ -43,7 +43,9 @@ const PAGE_SLUG_MAP: Record<string, string> = {
 
 function MentionNotifLoader({ onLoad, onMentions }: { onLoad: (n: AppNotification[]) => void; onMentions: (m: MentionNotification[]) => void }) {
   const { user } = useAuth();
-  useEffect(() => {
+  const pathname = usePathname();
+
+  const loadMentions = useCallback(() => {
     if (!user?.name) return;
     fetchMentionNotifications(user.name).then((mentions) => {
       const unread = mentions.filter((m) => !m.is_read);
@@ -60,6 +62,16 @@ function MentionNotifLoader({ onLoad, onMentions }: { onLoad: (n: AppNotificatio
       if (notifs.length > 0) onLoad(notifs);
     }).catch(console.error);
   }, [user?.name, onLoad, onMentions]);
+
+  // Check on page load, on every navigation, and every 60s while tab is visible
+  useEffect(() => { loadMentions(); }, [loadMentions, pathname]);
+  useEffect(() => {
+    const onFocus = () => loadMentions();
+    window.addEventListener("focus", onFocus);
+    const interval = setInterval(() => { if (!document.hidden) loadMentions(); }, 60000);
+    return () => { window.removeEventListener("focus", onFocus); clearInterval(interval); };
+  }, [loadMentions]);
+
   return null;
 }
 
