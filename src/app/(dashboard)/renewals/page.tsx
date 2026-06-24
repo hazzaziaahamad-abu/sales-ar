@@ -1626,6 +1626,50 @@ export default function RenewalsPage() {
             </button>
           ))}
         </div>
+        {/* Month completion summary */}
+        {monthFilter !== -1 && (() => {
+          const total = monthRenewals.length;
+          const completed = monthRenewals.filter(r => r.status === "مكتمل").length;
+          const cancelled = monthRenewals.filter(r => r.status === "ملغي بسبب").length;
+          const pending = total - completed - cancelled;
+          const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+          return (
+            <div className="px-4 pb-2">
+              <div className="flex items-center gap-4 rounded-xl bg-white/[0.03] border border-border/50 px-4 py-2.5">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-foreground">
+                        إنجاز {MONTHS_AR[monthFilter]}
+                      </span>
+                      <span className={`text-[11px] font-medium ${pct >= 80 ? "text-cc-green" : pct >= 50 ? "text-amber" : "text-muted-foreground"}`}>
+                        {pct === 100 ? "ممتاز! تم إنجاز الكل" : pct >= 80 ? "أحسنتم! قاربتم على الإنجاز" : pct >= 50 ? "في المسار الصحيح، واصلوا!" : pct >= 25 ? "بداية جيدة، كملوا!" : total > 0 ? "يلا نبدأ! الشهر بانتظاركم" : ""}
+                      </span>
+                    </div>
+                    <span className={`text-sm font-extrabold ${pct >= 80 ? "text-cc-green" : pct >= 50 ? "text-amber" : "text-cc-red"}`}>
+                      {pct}%
+                    </span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-white/[0.08] overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${pct >= 80 ? "bg-cc-green" : pct >= 50 ? "bg-amber" : "bg-cc-red"}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 text-[12px] shrink-0">
+                  <span className="text-cc-green font-semibold">{completed} مكتمل</span>
+                  <span className="text-muted-foreground">|</span>
+                  <span className="text-amber font-semibold">{pending} معلّق</span>
+                  <span className="text-muted-foreground">|</span>
+                  <span className="text-cc-red font-semibold">{cancelled} ملغي</span>
+                  <span className="text-muted-foreground">|</span>
+                  <span className="text-foreground font-bold">{total} إجمالي</span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
         <div className="px-4 pb-0 flex items-center gap-3">
           <Input
             value={clientSearch}
