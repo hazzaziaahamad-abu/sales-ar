@@ -337,8 +337,9 @@ export default function RenewalsPage() {
     }
   }
 
-  /* inline month filter — defaults to current month */
+  /* inline month/year filter — defaults to current month & year */
   const [monthFilter, setMonthFilter] = useState<number>(new Date().getMonth());
+  const [yearFilter, setYearFilter] = useState<number>(new Date().getFullYear());
 
   /* sales type tabs: all / office / support */
   const [salesTypeTab, setSalesTypeTab] = useState<"all" | "office" | "support">("all");
@@ -346,10 +347,18 @@ export default function RenewalsPage() {
     ? renewals
     : renewals.filter((r) => (r.sales_type || "support") === salesTypeTab);
 
-  /* month filter — by inline month selector based on renewal_date */
+  /* available years from data */
+  const availableYears = useMemo(() => {
+    const years = new Set(renewals.map((r) => new Date(r.renewal_date).getFullYear()));
+    years.add(new Date().getFullYear());
+    return Array.from(years).sort();
+  }, [renewals]);
+
+  /* year + month filter */
+  const yearFilteredRenewals = typedRenewals.filter((r) => new Date(r.renewal_date).getFullYear() === yearFilter);
   const monthFilteredRenewals = monthFilter === -1
-    ? typedRenewals
-    : typedRenewals.filter((r) => {
+    ? yearFilteredRenewals
+    : yearFilteredRenewals.filter((r) => {
         const rd = new Date(r.renewal_date);
         return rd.getMonth() === monthFilter;
       });
@@ -1494,8 +1503,26 @@ export default function RenewalsPage() {
 
       {/* ─── Renewals Table ─── */}
       <div id="renewals-table" className="cc-card rounded-[14px] overflow-x-auto scroll-mt-4">
-        {/* Month filter */}
-        <div className="p-4 pb-2 flex items-center gap-1.5 flex-wrap">
+        {/* Year + Month filter */}
+        {availableYears.length > 1 && (
+          <div className="px-4 pt-4 pb-1 flex items-center gap-1.5 flex-wrap">
+            <CalendarDays className="w-4 h-4 text-muted-foreground shrink-0" />
+            {availableYears.map((y) => (
+              <button
+                key={y}
+                onClick={() => setYearFilter(y)}
+                className={`px-3 py-1 rounded-lg text-[12px] font-semibold transition-colors border ${
+                  yearFilter === y
+                    ? "bg-amber/15 text-amber border-amber/30"
+                    : "text-muted-foreground border-transparent hover:text-foreground hover:bg-white/[0.06]"
+                }`}
+              >
+                {y}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className={`px-4 ${availableYears.length > 1 ? "pt-1" : "pt-4"} pb-2 flex items-center gap-1.5 flex-wrap`}>
           <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
           <button
             onClick={() => setMonthFilter(-1)}
