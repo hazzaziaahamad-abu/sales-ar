@@ -225,6 +225,9 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
+  /* team performance period filter */
+  const [teamPerfFilter, setTeamPerfFilter] = useState<"اليوم" | "الأسبوع" | "الشهر" | "الكل">("الشهر");
+
   /* assign task modal */
   const [assignDeal, setAssignDeal] = useState<Deal | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -637,9 +640,26 @@ export function SalesSection({ salesType }: SalesPageProps) {
     return plan.trim();
   };
 
+  const teamPerfDeals = (() => {
+    const now = new Date();
+    if (teamPerfFilter === "اليوم") {
+      const start = new Date(now); start.setHours(0, 0, 0, 0);
+      return repFilteredDeals.filter((d) => new Date(d.deal_date || d.created_at) >= start);
+    }
+    if (teamPerfFilter === "الأسبوع") {
+      const start = new Date(now); start.setDate(start.getDate() - 6); start.setHours(0, 0, 0, 0);
+      return repFilteredDeals.filter((d) => new Date(d.deal_date || d.created_at) >= start);
+    }
+    if (teamPerfFilter === "الشهر") {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      return repFilteredDeals.filter((d) => new Date(d.deal_date || d.created_at) >= start);
+    }
+    return repFilteredDeals;
+  })();
+
   const repPerformance = (() => {
     const repMap: Record<string, { deals: number; closed: number; value: number; cycleDays: number; plans: Record<string, number>; fullPrice: number; discounted: number; discountTotal: number }> = {};
-    repFilteredDeals.forEach((d) => {
+    teamPerfDeals.forEach((d) => {
       const rep = d.assigned_rep_name || "غير محدد";
       if (!repMap[rep]) repMap[rep] = { deals: 0, closed: 0, value: 0, cycleDays: 0, plans: {}, fullPrice: 0, discounted: 0, discountTotal: 0 };
       repMap[rep].deals++;
@@ -1827,11 +1847,29 @@ export function SalesSection({ salesType }: SalesPageProps) {
       </div>
 
       {/* ─── Sales Team Performance ─── */}
-      {!loading && repPerformance.length > 0 && (
+      {!loading && (
         <div className="cc-card rounded-2xl overflow-hidden">
-          <div className="p-5 pb-0">
+          <div className="p-5 pb-3 flex items-center justify-between gap-3 flex-wrap">
             <h3 className="text-sm font-bold text-foreground">أداء فريق المبيعات</h3>
+            <div className="flex items-center gap-1">
+              {(["اليوم", "الأسبوع", "الشهر", "الكل"] as const).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setTeamPerfFilter(f)}
+                  className={`px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-colors border ${
+                    teamPerfFilter === f
+                      ? "bg-cyan/15 text-cyan border-cyan/30"
+                      : "text-muted-foreground border-transparent hover:text-foreground hover:bg-white/[0.06]"
+                  }`}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
           </div>
+          {repPerformance.length === 0 ? (
+            <p className="text-center text-xs text-muted-foreground py-8">لا يوجد بيانات للفترة المحددة</p>
+          ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
@@ -1934,6 +1972,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
               </tbody>
             </table>
           </div>
+          )}
         </div>
       )}
 
