@@ -226,7 +226,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   /* team performance period filter */
-  const [teamPerfFilter, setTeamPerfFilter] = useState<"اليوم" | "الأسبوع" | "الشهر" | "الكل">("الشهر");
+  const [teamPerfFilter, setTeamPerfFilter] = useState<"اليوم" | "الأسبوع" | "الشهر" | "الشهر الماضي" | "الكل">("الشهر");
 
   /* assign task modal */
   const [assignDeal, setAssignDeal] = useState<Deal | null>(null);
@@ -653,6 +653,11 @@ export function SalesSection({ salesType }: SalesPageProps) {
     if (teamPerfFilter === "الشهر") {
       const start = new Date(now.getFullYear(), now.getMonth(), 1);
       return repFilteredDeals.filter((d) => new Date(d.deal_date || d.created_at) >= start);
+    }
+    if (teamPerfFilter === "الشهر الماضي") {
+      const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const end = new Date(now.getFullYear(), now.getMonth(), 1);
+      return repFilteredDeals.filter((d) => { const dt = new Date(d.deal_date || d.created_at); return dt >= start && dt < end; });
     }
     return repFilteredDeals;
   })();
@@ -1852,7 +1857,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
           <div className="p-5 pb-3 flex items-center justify-between gap-3 flex-wrap">
             <h3 className="text-sm font-bold text-foreground">أداء فريق المبيعات</h3>
             <div className="flex items-center gap-1">
-              {(["اليوم", "الأسبوع", "الشهر", "الكل"] as const).map((f) => (
+              {(["اليوم", "الأسبوع", "الشهر", "الشهر الماضي", "الكل"] as const).map((f) => (
                 <button
                   key={f}
                   onClick={() => setTeamPerfFilter(f)}
