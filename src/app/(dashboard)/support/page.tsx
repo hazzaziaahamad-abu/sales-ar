@@ -1273,6 +1273,7 @@ export default function SupportPage() {
                       >
                         <Pencil className="w-3.5 h-3.5" />
                       </Button>
+                      {(authUser?.isSuperAdmin || authUser?.roleName === "مدير" || authUser?.roleName === "admin") && (
                       <Button
                         variant="destructive"
                         size="icon-xs"
@@ -1281,6 +1282,7 @@ export default function SupportPage() {
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
