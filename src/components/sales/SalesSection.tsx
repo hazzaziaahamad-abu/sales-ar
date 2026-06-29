@@ -1589,9 +1589,15 @@ export function SalesSection({ salesType }: SalesPageProps) {
             placeholder="ابحث باسم العميل أو رقم الجوال..."
             className="max-w-xs"
           />
-          <button onClick={selectAllVisible} className="text-[12px] px-2.5 py-1.5 rounded-lg border border-cyan/30 text-cyan hover:bg-cyan/10 transition-colors whitespace-nowrap" title="تحديد الكل كهدف يومي">
-            <SquareCheck className="w-3 h-3 inline-block ml-1" />تحديد الكل
-          </button>
+          {filteredDeals.length > 0 && filteredDeals.every((d) => dailyTargetIds.has(d.id)) ? (
+            <button onClick={deselectAll} className="text-[12px] px-2.5 py-1.5 rounded-lg border border-cc-red/30 text-cc-red hover:bg-cc-red/10 transition-colors whitespace-nowrap">
+              <SquareCheck className="w-3 h-3 inline-block ml-1" />إلغاء تحديد الكل
+            </button>
+          ) : (
+            <button onClick={selectAllVisible} className="text-[12px] px-2.5 py-1.5 rounded-lg border border-cyan/30 text-cyan hover:bg-cyan/10 transition-colors whitespace-nowrap">
+              <SquareCheck className="w-3 h-3 inline-block ml-1" />تحديد الكل
+            </button>
+          )}
         </div>
         <Table>
           <TableHeader>
