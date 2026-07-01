@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { fetchDeals, fetchAllDealKpiStages, fetchDealKpiStages, upsertDealKpiStage, createDealKpiStages, updateDeal, fetchEmployees, KPI_STAGES } from "@/lib/supabase/db";
 import type { Deal, DealKpiStage, Employee } from "@/types";
 import { aggregateEmployeeCredits } from "@/lib/kpi-calculations";
-import { saudiDateStr } from "@/lib/utils/format";
+import { todayLocal as saudiDateStr } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import {
   BarChart2, Phone, MessageCircle, Users2, X, Search,

@@ -228,12 +228,6 @@ export function SalesSection({ salesType }: SalesPageProps) {
 
   /* rep deals drill-down modal */
   const [repDrillDown, setRepDrillDown] = useState<{ repName: string; mode: "all" | "closed" } | null>(null);
-  const repDrillDownDeals = repDrillDown
-    ? teamPerfDeals.filter((d) =>
-        d.assigned_rep_name === repDrillDown.repName &&
-        (repDrillDown.mode === "all" || d.stage === "مكتملة")
-      )
-    : [];
 
   /* assign task modal */
   const [assignDeal, setAssignDeal] = useState<Deal | null>(null);
@@ -668,6 +662,13 @@ export function SalesSection({ salesType }: SalesPageProps) {
     }
     return repFilteredDeals;
   })();
+
+  const repDrillDownDeals = repDrillDown
+    ? teamPerfDeals.filter((d) =>
+        d.assigned_rep_name === repDrillDown.repName &&
+        (repDrillDown.mode === "all" || d.stage === "مكتملة")
+      )
+    : [];
 
   const repPerformance = (() => {
     const repMap: Record<string, { deals: number; closed: number; value: number; cycleDays: number; plans: Record<string, number>; fullPrice: number; discounted: number; discountTotal: number }> = {};
