@@ -228,6 +228,15 @@ export function SalesSection({ salesType }: SalesPageProps) {
   /* team performance period filter */
   const [teamPerfFilter, setTeamPerfFilter] = useState<"اليوم" | "الأسبوع" | "الشهر" | "الشهر الماضي" | "الكل">("الشهر");
 
+  /* rep deals drill-down modal */
+  const [repDrillDown, setRepDrillDown] = useState<{ repName: string; mode: "all" | "closed" } | null>(null);
+  const repDrillDownDeals = repDrillDown
+    ? teamPerfDeals.filter((d) =>
+        d.assigned_rep_name === repDrillDown.repName &&
+        (repDrillDown.mode === "all" || d.stage === "مكتملة")
+      )
+    : [];
+
   /* assign task modal */
   const [assignDeal, setAssignDeal] = useState<Deal | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -1924,8 +1933,16 @@ export function SalesSection({ salesType }: SalesPageProps) {
                           <span className="font-medium text-foreground text-sm">{rep.name}</span>
                         </div>
                       </td>
-                      <td className="py-3.5 px-4 text-center text-muted-foreground">{rep.deals}</td>
-                      <td className="py-3.5 px-4 text-center text-muted-foreground">{rep.closed}</td>
+                      <td className="py-3.5 px-4 text-center">
+                        <button onClick={() => setRepDrillDown({ repName: rep.name, mode: "all" })} className="text-muted-foreground hover:text-cyan hover:underline transition-colors font-medium">
+                          {rep.deals}
+                        </button>
+                      </td>
+                      <td className="py-3.5 px-4 text-center">
+                        <button onClick={() => rep.closed > 0 && setRepDrillDown({ repName: rep.name, mode: "closed" })} className={`transition-colors font-medium ${rep.closed > 0 ? "text-cc-green hover:text-cc-green/80 hover:underline" : "text-muted-foreground/40 cursor-default"}`}>
+                          {rep.closed}
+                        </button>
+                      </td>
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex flex-wrap gap-1 justify-end">
                           {Object.entries(rep.plans).map(([plan, count]) => (
@@ -2523,6 +2540,41 @@ export function SalesSection({ salesType }: SalesPageProps) {
         onClose={() => setProfileOpen(false)}
         initialQuery={profileQuery}
       />
+
+      {/* Rep drill-down modal */}
+      <Dialog open={!!repDrillDown} onOpenChange={(o) => { if (!o) setRepDrillDown(null); }}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-right">
+              {repDrillDown?.mode === "closed" ? "الصفقات المُغلقة" : "كل الصفقات"} — {repDrillDown?.repName}
+              <span className="text-sm font-normal text-muted-foreground mr-2">({repDrillDownDeals.length})</span>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 mt-2">
+            {repDrillDownDeals.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8 text-sm">لا توجد صفقات</p>
+            ) : (
+              repDrillDownDeals.map((d) => (
+                <div key={d.id} className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl bg-white/[0.03] border border-border/40 hover:bg-white/[0.05] transition-colors">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium shrink-0 ${
+                      d.stage === "مكتملة" ? "bg-green-500/15 text-cc-green" :
+                      d.stage === "مرفوض مع سبب" ? "bg-red-500/15 text-cc-red" :
+                      "bg-amber/15 text-amber"
+                    }`}>{d.stage}</span>
+                    <span className="text-sm font-medium text-foreground truncate">{d.client_name}</span>
+                    {d.plan && <span className="text-[11px] text-muted-foreground shrink-0">{d.plan}</span>}
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0 text-right">
+                    <span className="text-sm font-bold text-amber">{formatMoney(d.deal_value)}</span>
+                    <span className="text-[11px] text-muted-foreground">{formatDate(d.deal_date || d.created_at)}</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
