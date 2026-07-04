@@ -42,6 +42,7 @@ import {
   BarChart2,
   ClipboardCheck,
   MessageCircle,
+  ShieldAlert,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
@@ -50,6 +51,7 @@ import { countPendingDeals } from "@/lib/supabase/db";
 export const NAV_ITEMS = [
   { label: "نظرة عامة", href: "/dashboard", slug: "dashboard", icon: LayoutDashboard, color: "cyan", group: "عام" },
   { label: "لوحة المدير", href: "/manager", slug: "manager", icon: Briefcase, color: "violet", group: "عام" },
+  { label: "انضباط الإغلاق", href: "/discipline", slug: "discipline", icon: ShieldAlert, color: "amber", group: "عام" },
   { label: "التحديثات الأخيرة", href: "/recent-updates", slug: "recent-updates", icon: History, color: "cyan", group: "عام" },
   { label: "السكرتير التنفيذي", href: "/secretary", slug: "secretary", icon: BrainCircuit, color: "violet", group: "الإدارة التنفيذية" },
   { label: "قائمة الطلبات", href: "/requests", slug: "requests", icon: Inbox, color: "violet", group: "الإدارة التنفيذية" },
