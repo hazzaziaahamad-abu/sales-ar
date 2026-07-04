@@ -16,6 +16,7 @@ import { STAGES, SOURCES, SOURCE_COLORS, PLANS } from "@/lib/utils/constants";
 import SalesKPIsView from "@/components/SalesKPIsView";
 import { formatMoney, formatMoneyFull, formatDate, formatPhone, todayLocal, dateToLocal, dateToTimestamp, saudiTimestamp } from "@/lib/utils/format";
 import { FollowUpLogButton } from "@/components/follow-up-log";
+import { WatchlistPinButton } from "@/components/watchlist-pin-button";
 import { ClientProfilePanel } from "@/components/client-profile-panel";
 import { AchievementSummary } from "@/components/achievement-summary";
 import SalesKPIDashboard from "@/components/sales/SalesKPIDashboard";
@@ -1771,6 +1772,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
                     <div className="flex items-center justify-center gap-1">
                       <div className="relative">
                         <FollowUpLogButton entityType="deal" entityId={deal.id} entityName={deal.client_name} />
+                        <WatchlistPinButton entityType="deal" entityId={deal.id} entityName={deal.client_name} section="/sales" />
                         {deal.stage !== "مكتملة" && deal.stage !== "مرفوض مع سبب" && (() => {
                           const daysSince = Math.floor((Date.now() - new Date(deal.updated_at).getTime()) / 86400000);
                           if (daysSince < 3) return null;

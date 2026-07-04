@@ -15,6 +15,7 @@ import type { Ticket, Employee, ActivityLog } from "@/types";
 
 import { AchievementSummary } from "@/components/achievement-summary";
 import { FollowUpLogButton } from "@/components/follow-up-log";
+import { WatchlistPinButton } from "@/components/watchlist-pin-button";
 import { StatCard } from "@/components/ui/stat-card";
 import { ColorBadge } from "@/components/ui/color-badge";
 import { Button } from "@/components/ui/button";
@@ -1260,6 +1261,7 @@ export default function SupportPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center gap-1">
+                      <WatchlistPinButton entityType="ticket" entityId={ticket.id} entityName={ticket.client_name} section="/support" />
                       <FollowUpLogButton
                         entityType="ticket"
                         entityId={ticket.id}

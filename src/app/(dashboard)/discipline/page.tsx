@@ -1,11 +1,13 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { createClient } from "@/lib/supabase/client";
-import { getOrgId } from "@/lib/supabase/db";
+import { getOrgId, fetchWatchlist, resolveWatchlistItem } from "@/lib/supabase/db";
+import type { WatchlistItem } from "@/lib/supabase/db";
 import { todayLocal } from "@/lib/utils/format";
-import { Flame, Users, BookOpen, Calendar, FileText, Loader2, Lock } from "lucide-react";
+import { Flame, Users, BookOpen, Calendar, FileText, Loader2, Lock, Telescope, ExternalLink, CheckCircle2 } from "lucide-react";
 
 // ─── Static Data ─────────────────────────────────────────────────────────────
 
@@ -136,6 +138,9 @@ export default function DisciplinePage() {
 
   const [reasonsOpen, setReasonsOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
+
+  const router = useRouter();
 
   // ── Load data ──
   const loadAll = useCallback(async () => {
@@ -144,6 +149,9 @@ export default function DisciplinePage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       setUserId(user.id);
+
+      // Load watchlist
+      fetchWatchlist().then(setWatchlist).catch(() => {});
 
       // Load active employees
       const { data: empData } = await supabase
@@ -411,6 +419,73 @@ export default function DisciplinePage() {
             </p>
           </div>
         </header>
+
+        {/* Watchlist Radar */}
+        {watchlist.length > 0 && (
+          <Section icon={<Telescope className="w-4 h-4" />} title={`رادار الانضباط (${watchlist.length})`}>
+            <p className="text-xs mb-3" style={{ color: "#AFA0C9" }}>
+              الصفقات والتجديدات والتذاكر التي أضفتها للمتابعة المباشرة.
+            </p>
+            <div className="space-y-2">
+              {watchlist.map((item) => {
+                const sectionLabel: Record<string, string> = {
+                  "/sales": "مبيعات المكتب",
+                  "/support-sales": "مبيعات الدعم",
+                  "/renewals": "تجديدات",
+                  "/support": "دعم",
+                };
+                const typeColor: Record<string, string> = {
+                  deal: "#8B5CF6",
+                  renewal: "#06B6D4",
+                  ticket: "#F97316",
+                };
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between gap-3 rounded-xl px-3 py-2.5"
+                    style={{ background: "#241B3D", border: "1px solid #352A57" }}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span
+                        className="text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0"
+                        style={{ background: `${typeColor[item.entity_type]}22`, color: typeColor[item.entity_type] }}
+                      >
+                        {sectionLabel[item.section] || item.section}
+                      </span>
+                      <span className="text-sm font-medium truncate" style={{ color: "#F3EEF9" }}>
+                        {item.entity_name}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        onClick={() => {
+                          const hasProfile = item.entity_type === "deal" || item.entity_type === "renewal";
+                          router.push(hasProfile ? `${item.section}?profile=${encodeURIComponent(item.entity_name)}` : item.section);
+                        }}
+                        className="p-1.5 rounded-lg transition-colors"
+                        style={{ color: "#8B5CF6" }}
+                        title="افتح الصفقة"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={async () => {
+                          await resolveWatchlistItem(item.entity_id);
+                          setWatchlist((prev) => prev.filter((w) => w.id !== item.id));
+                        }}
+                        className="p-1.5 rounded-lg transition-colors"
+                        style={{ color: "#AFA0C9" }}
+                        title="تم — أزل من الرادار"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Section>
+        )}
 
         {/* Founder Tasks */}
         <Section icon={<span className="text-base">🗝️</span>} title="مهامك اليوم (المؤسس)">

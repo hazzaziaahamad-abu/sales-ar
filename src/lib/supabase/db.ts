@@ -3249,3 +3249,81 @@ export async function fetchUpcomingReminders(): Promise<Reminder[]> {
   if (error) return [];
   return (data ?? []) as Reminder[];
 }
+
+// ─── MANAGER WATCHLIST ────────────────────────────────────────────────────────
+
+export interface WatchlistItem {
+  id: string;
+  user_id: string;
+  entity_type: string;
+  entity_id: string;
+  entity_name: string;
+  section: string;
+  note: string | null;
+  resolved: boolean;
+  created_at: string;
+}
+
+export async function addToWatchlist(item: {
+  entity_type: string;
+  entity_id: string;
+  entity_name: string;
+  section: string;
+  note?: string;
+}): Promise<void> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+  await supabase.from("manager_watchlist").upsert(
+    { ...item, user_id: user.id, resolved: false },
+    { onConflict: "user_id,entity_id" }
+  );
+}
+
+export async function removeFromWatchlist(entityId: string): Promise<void> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from("manager_watchlist")
+    .delete()
+    .eq("user_id", user.id)
+    .eq("entity_id", entityId);
+}
+
+export async function fetchWatchlist(): Promise<WatchlistItem[]> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data, error } = await supabase
+    .from("manager_watchlist")
+    .select("*")
+    .eq("user_id", user.id)
+    .eq("resolved", false)
+    .order("created_at", { ascending: false });
+  if (error) return [];
+  return (data ?? []) as WatchlistItem[];
+}
+
+export async function resolveWatchlistItem(entityId: string): Promise<void> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from("manager_watchlist")
+    .update({ resolved: true })
+    .eq("user_id", user.id)
+    .eq("entity_id", entityId);
+}
+
+export async function isInWatchlist(entityId: string): Promise<boolean> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+  const { data } = await supabase
+    .from("manager_watchlist")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("entity_id", entityId)
+    .eq("resolved", false)
+    .maybeSingle();
+  return !!data;
+}

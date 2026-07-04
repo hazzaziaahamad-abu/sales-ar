@@ -33,6 +33,7 @@ import {
 } from "@/lib/utils/constants";
 import { formatMoneyFull, formatDate, formatPhone, formatPercent, todayLocal, dateToTimestamp, saudiTimestamp } from "@/lib/utils/format";
 import { FollowUpLogButton } from "@/components/follow-up-log";
+import { WatchlistPinButton } from "@/components/watchlist-pin-button";
 import { StatCard } from "@/components/ui/stat-card";
 import { DonutChart } from "@/components/ui/donut-chart";
 import { LineChart } from "@/components/ui/line-chart";
@@ -1740,6 +1741,7 @@ export default function RenewalsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-center gap-1">
+                        <WatchlistPinButton entityType="renewal" entityId={renewal.id} entityName={renewal.customer_name} section="/renewals" />
                         <div className="relative">
                           <FollowUpLogButton entityType="renewal" entityId={renewal.id} entityName={renewal.customer_name} />
                           {renewal.status !== "مكتمل" && renewal.status !== "ملغي بسبب" && (() => {
@@ -2005,6 +2007,7 @@ export default function RenewalsPage() {
                         <TableCell className="text-muted-foreground text-xs">{renewal.assigned_rep || "—"}</TableCell>
                         <TableCell>
                           <div className="flex items-center justify-center gap-1">
+                            <WatchlistPinButton entityType="renewal" entityId={renewal.id} entityName={renewal.customer_name} section="/renewals" />
                             <FollowUpLogButton entityType="renewal" entityId={renewal.id} entityName={renewal.customer_name} />
                             <Button variant="ghost" size="icon-xs" onClick={() => openEditModal(renewal)} title="تعديل">
                               <Pencil className="w-3.5 h-3.5" />
