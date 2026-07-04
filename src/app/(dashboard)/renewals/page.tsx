@@ -826,7 +826,10 @@ export default function RenewalsPage() {
       const ws = workbook.Sheets[workbook.SheetNames[0]];
       const json = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" }) as unknown[][];
 
-      const headerRowIdx = json.length > 1 && (json[1] as unknown[]).filter(c => c !== "").length >= 3 ? 1 : 0;
+      const HEADER_KEYWORDS = ["اسم", "عميل", "جوال", "هاتف", "phone", "تاريخ", "باقة", "خطة", "حالة", "مسؤول", "name", "plan", "status"];
+      const isHeaderRow = (row: unknown[]) =>
+        row.some(c => HEADER_KEYWORDS.some(k => String(c).trim().toLowerCase().includes(k)));
+      const headerRowIdx = isHeaderRow(json[0] as unknown[]) ? 0 : isHeaderRow(json[1] as unknown[]) ? 1 : 0;
       const headers = (json[headerRowIdx] as unknown[]).map(h => String(h).trim().toLowerCase());
       const rows = json.slice(headerRowIdx + 1).filter(r => (r as unknown[]).some(c => c !== "" && c != null));
 
@@ -853,7 +856,12 @@ export default function RenewalsPage() {
       const cell = (row: unknown[], f: string) => {
         const idx = colMap[f];
         if (idx === undefined || idx < 0 || row[idx] == null || row[idx] === "") return "";
-        return String(row[idx]).trim();
+        const raw = row[idx];
+        // Phone numbers stored as floats lose the leading zero — convert to int string
+        if (f === "customer_phone" && typeof raw === "number") {
+          return String(Math.round(raw));
+        }
+        return String(raw).trim();
       };
 
       const toDate = (val: unknown): string | undefined => {
