@@ -3178,3 +3178,74 @@ export async function upsertDealKpiStage(
     });
   }
 }
+
+// ─── REMINDERS ───────────────────────────────────────────────────────────────
+
+export interface Reminder {
+  id: string;
+  user_id: string;
+  user_name: string | null;
+  entity_type: string;
+  entity_id: string;
+  entity_name: string;
+  note_text: string | null;
+  remind_at: string;
+  dismissed: boolean;
+  created_at: string;
+}
+
+export async function createReminder(r: {
+  entity_type: string;
+  entity_id: string;
+  entity_name: string;
+  note_text?: string;
+  remind_at: string;
+  user_name: string;
+}): Promise<Reminder> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+  const { data, error } = await supabase
+    .from("reminders")
+    .insert({ ...r, user_id: user.id })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Reminder;
+}
+
+export async function fetchDueReminders(): Promise<Reminder[]> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("reminders")
+    .select("*")
+    .eq("user_id", user.id)
+    .eq("dismissed", false)
+    .lte("remind_at", now)
+    .order("remind_at", { ascending: true });
+  if (error) return [];
+  return (data ?? []) as Reminder[];
+}
+
+export async function dismissReminder(id: string): Promise<void> {
+  const supabase = createClient();
+  await supabase.from("reminders").update({ dismissed: true }).eq("id", id);
+}
+
+export async function fetchUpcomingReminders(): Promise<Reminder[]> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data, error } = await supabase
+    .from("reminders")
+    .select("*")
+    .eq("user_id", user.id)
+    .eq("dismissed", false)
+    .order("remind_at", { ascending: true })
+    .limit(20);
+  if (error) return [];
+  return (data ?? []) as Reminder[];
+}

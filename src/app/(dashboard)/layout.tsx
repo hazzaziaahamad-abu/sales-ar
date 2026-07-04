@@ -14,7 +14,8 @@ import { WelcomePopup } from "@/components/layout/welcome-popup";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { OrgProvider } from "@/lib/org-context";
 import { Skeleton } from "@/components/ui/skeleton";
-import { fetchDeals, fetchSalesTargets, fetchSalesActivities, fetchTickets, fetchMentionNotifications, markMentionNotificationsRead, fetchRecentFollowUpNotes } from "@/lib/supabase/db";
+import { fetchDeals, fetchSalesTargets, fetchSalesActivities, fetchTickets, fetchMentionNotifications, markMentionNotificationsRead, fetchRecentFollowUpNotes, fetchDueReminders, dismissReminder } from "@/lib/supabase/db";
+import type { Reminder } from "@/lib/supabase/db";
 import type { AppNotification, MentionNotification } from "@/types";
 import { CCThemeProvider } from "@/lib/theme-context";
 import { saudiDateStr } from "@/lib/utils/format";
@@ -359,6 +360,38 @@ async function generateLiveNotifications(): Promise<AppNotification[]> {
   return notifications;
 }
 
+function RemindersBanner({ reminders, onDismiss }: { reminders: Reminder[]; onDismiss: (id: string) => void }) {
+  if (reminders.length === 0) return null;
+  return (
+    <div className="mb-4 space-y-2">
+      {reminders.map((rem) => (
+        <div
+          key={rem.id}
+          className="flex items-center gap-3 px-4 py-3 rounded-[14px] border border-cc-purple/40 bg-gradient-to-l from-cc-purple/[0.10] to-cc-purple/[0.03] animate-in slide-in-from-top-2 duration-300"
+        >
+          <div className="w-8 h-8 rounded-xl bg-cc-purple/20 flex items-center justify-center shrink-0">
+            <span className="text-base">🔔</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-foreground">
+              تذكير: <span className="text-cc-purple">{rem.entity_name}</span>
+            </p>
+            {rem.note_text && (
+              <p className="text-xs text-muted-foreground truncate mt-0.5">{rem.note_text}</p>
+            )}
+          </div>
+          <button
+            onClick={() => onDismiss(rem.id)}
+            className="px-3 py-1.5 rounded-lg text-xs border border-cc-purple/30 text-cc-purple hover:bg-cc-purple/10 transition-colors shrink-0"
+          >
+            تم ✓
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function DashboardLayout({
   children,
 }: {
@@ -370,6 +403,7 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [recentMentions, setRecentMentions] = useState<MentionNotification[]>([]);
+  const [dueReminders, setDueReminders] = useState<Reminder[]>([]);
 
   // Load live notifications from DB
   useEffect(() => {
@@ -378,6 +412,16 @@ export default function DashboardLayout({
         setNotifications(live);
       }
     });
+  }, []);
+
+  // Poll for due reminders every 60s
+  useEffect(() => {
+    const check = () => {
+      fetchDueReminders().then((r) => setDueReminders(r)).catch(() => {});
+    };
+    check();
+    const interval = setInterval(check, 60000);
+    return () => clearInterval(interval);
   }, []);
 
   // Expose addNotifications for child components
@@ -415,6 +459,10 @@ export default function DashboardLayout({
           <main className="px-4 sm:px-6 pb-8 pt-5">
             <AuthGate>
               <MentionAlertBanner mentions={recentMentions} onRefresh={() => {}} />
+              <RemindersBanner reminders={dueReminders} onDismiss={(id) => {
+                dismissReminder(id).catch(() => {});
+                setDueReminders((prev) => prev.filter((r) => r.id !== id));
+              }} />
               <LastSaleBanner />
               <AIAlertsBanner />
               {children}
