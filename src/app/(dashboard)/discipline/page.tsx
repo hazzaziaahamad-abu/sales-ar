@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { createClient } from "@/lib/supabase/client";
+import { getOrgId } from "@/lib/supabase/db";
 import { todayLocal } from "@/lib/utils/format";
 import { Flame, Users, BookOpen, Calendar, FileText, Loader2, Lock } from "lucide-react";
 
@@ -71,7 +72,8 @@ const METRIC_KEYS = [
 interface Employee {
   id: string;
   name: string;
-  role: string;
+  role?: string;
+  status: string;
 }
 
 interface RepState {
@@ -143,14 +145,14 @@ export default function DisciplinePage() {
       if (!user) return;
       setUserId(user.id);
 
-      // Load employees (sales roles)
+      // Load active employees
       const { data: empData } = await supabase
         .from("employees")
-        .select("id, name, role")
+        .select("id, name, role, status")
+        .eq("org_id", getOrgId())
+        .in("status", ["نشط", "مشغول"])
         .order("name");
-      const emps: Employee[] = (empData || []).filter((e) =>
-        e.role?.includes("مبيعات") || e.role?.includes("مندوب")
-      );
+      const emps: Employee[] = (empData || []) as Employee[];
       setEmployees(emps);
 
       // Load founder tasks
@@ -468,7 +470,7 @@ export default function DisciplinePage() {
                         <p className="font-bold text-sm" style={{ fontFamily: "Cairo, sans-serif", color: "#F0D580" }}>
                           {emp.name}
                         </p>
-                        <p className="text-xs" style={{ color: "#AFA0C9" }}>{emp.role}</p>
+                        {emp.role && <p className="text-xs" style={{ color: "#AFA0C9" }}>{emp.role}</p>}
                       </div>
                       <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "#352A57", color: repDoneCount === REP_TASKS.length ? "#D4AF37" : "#AFA0C9" }}>
                         {repDoneCount}/{REP_TASKS.length}
@@ -665,7 +667,8 @@ function TaskRow({
   text: string;
   done: boolean;
   disabled?: boolean;
-  onToggle: () => void | Promise<void>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onToggle: () => any;
   small?: boolean;
 }) {
   return (
