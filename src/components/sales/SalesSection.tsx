@@ -1142,87 +1142,6 @@ export function SalesSection({ salesType }: SalesPageProps) {
         </div>
       </div>
 
-      {/* ─── Auto Follow-up Reminders ─── */}
-      {!loading && visibleFollowUps.length > 0 && (
-        <div className="cc-card rounded-[14px] border border-cc-red/20 bg-gradient-to-l from-cc-red/[0.04] via-amber/[0.03] to-transparent overflow-hidden">
-          <div className="p-4 flex items-center justify-between border-b border-border/30">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-cc-red/10 flex items-center justify-center relative">
-                <Bell className="w-4 h-4 text-cc-red" />
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-cc-red text-white text-[11px] font-bold flex items-center justify-center">
-                  {visibleFollowUps.length}
-                </span>
-              </div>
-              <div className="text-right">
-                <h3 className="text-sm font-bold text-foreground">تنبيهات المتابعة التلقائية</h3>
-                <p className="text-[12px] text-muted-foreground">
-                  {visibleFollowUps.filter((a) => a.rule.priority === "urgent").length > 0
-                    ? `${visibleFollowUps.filter((a) => a.rule.priority === "urgent").length} تصعيد عاجل — `
-                    : ""}
-                  {visibleFollowUps.length} عميل يحتاج متابعة
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="divide-y divide-border/20 max-h-[320px] overflow-y-auto">
-            {visibleFollowUps.slice(0, 10).map((action) => {
-              const priorityStyles: Record<string, { bg: string; text: string; label: string }> = {
-                urgent: { bg: "bg-cc-red/10 border-cc-red/30", text: "text-cc-red", label: "عاجل" },
-                high: { bg: "bg-amber/10 border-amber/30", text: "text-amber", label: "مرتفع" },
-                medium: { bg: "bg-cc-blue/10 border-cc-blue/30", text: "text-cc-blue", label: "متوسط" },
-                low: { bg: "bg-muted/50 border-border", text: "text-muted-foreground", label: "منخفض" },
-              };
-              const ps = priorityStyles[action.rule.priority] || priorityStyles.medium;
-              return (
-                <div key={action.deal.id} className="px-4 py-3 flex items-center gap-3 hover:bg-muted/30 transition-colors">
-                  <div className={`shrink-0 w-7 h-7 rounded-full ${ps.bg} border flex items-center justify-center`}>
-                    {action.rule.priority === "urgent" ? (
-                      <AlertTriangle className={`w-3.5 h-3.5 ${ps.text}`} />
-                    ) : action.rule.taskType === "call" ? (
-                      <PhoneCall className={`w-3.5 h-3.5 ${ps.text}`} />
-                    ) : (
-                      <Bell className={`w-3.5 h-3.5 ${ps.text}`} />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-foreground truncate">{action.taskTitle}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className={`text-[12px] px-1.5 py-0.5 rounded-full border ${ps.bg} ${ps.text} font-semibold`}>
-                        {ps.label}
-                      </span>
-                      <span className="text-[12px] text-muted-foreground">{action.rule.label}</span>
-                      {action.deal.assigned_rep_name && (
-                        <span className="text-[12px] text-muted-foreground">• {action.deal.assigned_rep_name}</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      onClick={() => handleCreateFollowUpTask(action)}
-                      disabled={creatingFollowUpTask === action.deal.id}
-                      className="text-[12px] px-2.5 py-1.5 rounded-lg bg-cc-green/10 text-cc-green border border-cc-green/30 hover:bg-cc-green/20 transition-colors disabled:opacity-50 font-medium"
-                    >
-                      {creatingFollowUpTask === action.deal.id ? "جاري..." : "إنشاء مهمة"}
-                    </button>
-                    <button
-                      onClick={() => dismissFollowUp(action.deal.id)}
-                      className="text-[12px] px-2 py-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-                    >
-                      تخطي
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          {visibleFollowUps.length > 10 && (
-            <div className="px-4 py-2 text-center border-t border-border/30">
-              <span className="text-[12px] text-muted-foreground">و {visibleFollowUps.length - 10} تنبيه آخر...</span>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* ─── Stage Summary Cards ─── */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
         {loading
@@ -2543,6 +2462,87 @@ export function SalesSection({ salesType }: SalesPageProps) {
         onClose={() => setProfileOpen(false)}
         initialQuery={profileQuery}
       />
+
+      {/* ─── Auto Follow-up Reminders (bottom) ─── */}
+      {!loading && visibleFollowUps.length > 0 && (
+        <div className="cc-card rounded-[14px] border border-cc-red/20 bg-gradient-to-l from-cc-red/[0.04] via-amber/[0.03] to-transparent overflow-hidden">
+          <div className="p-4 flex items-center justify-between border-b border-border/30">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-cc-red/10 flex items-center justify-center relative">
+                <Bell className="w-4 h-4 text-cc-red" />
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-cc-red text-white text-[11px] font-bold flex items-center justify-center">
+                  {visibleFollowUps.length}
+                </span>
+              </div>
+              <div className="text-right">
+                <h3 className="text-sm font-bold text-foreground">تنبيهات المتابعة التلقائية</h3>
+                <p className="text-[12px] text-muted-foreground">
+                  {visibleFollowUps.filter((a) => a.rule.priority === "urgent").length > 0
+                    ? `${visibleFollowUps.filter((a) => a.rule.priority === "urgent").length} تصعيد عاجل — `
+                    : ""}
+                  {visibleFollowUps.length} عميل يحتاج متابعة
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="divide-y divide-border/20 max-h-[320px] overflow-y-auto">
+            {visibleFollowUps.slice(0, 10).map((action) => {
+              const priorityStyles: Record<string, { bg: string; text: string; label: string }> = {
+                urgent: { bg: "bg-cc-red/10 border-cc-red/30", text: "text-cc-red", label: "عاجل" },
+                high: { bg: "bg-amber/10 border-amber/30", text: "text-amber", label: "مرتفع" },
+                medium: { bg: "bg-cc-blue/10 border-cc-blue/30", text: "text-cc-blue", label: "متوسط" },
+                low: { bg: "bg-muted/50 border-border", text: "text-muted-foreground", label: "منخفض" },
+              };
+              const ps = priorityStyles[action.rule.priority] || priorityStyles.medium;
+              return (
+                <div key={action.deal.id} className="px-4 py-3 flex items-center gap-3 hover:bg-muted/30 transition-colors">
+                  <div className={`shrink-0 w-7 h-7 rounded-full ${ps.bg} border flex items-center justify-center`}>
+                    {action.rule.priority === "urgent" ? (
+                      <AlertTriangle className={`w-3.5 h-3.5 ${ps.text}`} />
+                    ) : action.rule.taskType === "call" ? (
+                      <PhoneCall className={`w-3.5 h-3.5 ${ps.text}`} />
+                    ) : (
+                      <Bell className={`w-3.5 h-3.5 ${ps.text}`} />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-foreground truncate">{action.taskTitle}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className={`text-[12px] px-1.5 py-0.5 rounded-full border ${ps.bg} ${ps.text} font-semibold`}>
+                        {ps.label}
+                      </span>
+                      <span className="text-[12px] text-muted-foreground">{action.rule.label}</span>
+                      {action.deal.assigned_rep_name && (
+                        <span className="text-[12px] text-muted-foreground">• {action.deal.assigned_rep_name}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={() => handleCreateFollowUpTask(action)}
+                      disabled={creatingFollowUpTask === action.deal.id}
+                      className="text-[12px] px-2.5 py-1.5 rounded-lg bg-cc-green/10 text-cc-green border border-cc-green/30 hover:bg-cc-green/20 transition-colors disabled:opacity-50 font-medium"
+                    >
+                      {creatingFollowUpTask === action.deal.id ? "جاري..." : "إنشاء مهمة"}
+                    </button>
+                    <button
+                      onClick={() => dismissFollowUp(action.deal.id)}
+                      className="text-[12px] px-2 py-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                    >
+                      تخطي
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {visibleFollowUps.length > 10 && (
+            <div className="px-4 py-2 text-center border-t border-border/30">
+              <span className="text-[12px] text-muted-foreground">و {visibleFollowUps.length - 10} تنبيه آخر...</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Rep drill-down modal */}
       <Dialog open={!!repDrillDown} onOpenChange={(o) => { if (!o) setRepDrillDown(null); }}>
