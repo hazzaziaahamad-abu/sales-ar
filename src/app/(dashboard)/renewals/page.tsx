@@ -31,7 +31,7 @@ import {
   getKpiStatus,
   KPI_STATUS_STYLES,
 } from "@/lib/utils/constants";
-import { formatMoneyFull, formatDate, formatPhone, formatPercent, todayLocal, dateToTimestamp, saudiTimestamp } from "@/lib/utils/format";
+import { formatMoneyFull, formatDate, formatPhone, formatPercent, todayLocal, dateToTimestamp, saudiTimestamp, tableDateBounds } from "@/lib/utils/format";
 import { FollowUpLogButton } from "@/components/follow-up-log";
 import { WatchlistPinButton } from "@/components/watchlist-pin-button";
 import { StatCard } from "@/components/ui/stat-card";
@@ -374,6 +374,9 @@ export default function RenewalsPage() {
   const [clientSearch, setClientSearch] = useState("");
   const [repFilter, setRepFilter] = useState<string | null>(null);
   const [showClosed, setShowClosed] = useState(false);
+  const [tableDateFilter, setTableDateFilter] = useState<string | null>(null);
+  const [tableCustomFrom, setTableCustomFrom] = useState("");
+  const [tableCustomTo, setTableCustomTo] = useState("");
   const PENDING_STATUSES = new Set(["مجدول", "مجدول تجديد", "جاري المتابعة", "انتظار الدفع"]);
   const listBase = statusFilter === "ملغي بسبب" ? monthFilteredRenewals : monthRenewals;
   const repFilteredRenewals = repFilter
@@ -384,9 +387,16 @@ export default function RenewalsPage() {
       ? repFilteredRenewals.filter((r) => PENDING_STATUSES.has(r.status))
       : repFilteredRenewals.filter((r) => r.status === statusFilter)
     : repFilteredRenewals;
-  const filteredRenewals_base = clientSearch
-    ? statusFilteredRenewals.filter((r) => r.customer_name.toLowerCase().includes(clientSearch.toLowerCase()) || (r.client_code && r.client_code.toLowerCase().includes(clientSearch.toLowerCase())))
+  const _renewalDateBounds = tableDateBounds(tableDateFilter || "", tableCustomFrom, tableCustomTo);
+  const dateFilteredRenewals = _renewalDateBounds
+    ? statusFilteredRenewals.filter(r => {
+        const s = (r.renewal_date || "").slice(0, 10);
+        return s >= _renewalDateBounds[0] && s <= _renewalDateBounds[1];
+      })
     : statusFilteredRenewals;
+  const filteredRenewals_base = clientSearch
+    ? dateFilteredRenewals.filter((r) => r.customer_name.toLowerCase().includes(clientSearch.toLowerCase()) || (r.client_code && r.client_code.toLowerCase().includes(clientSearch.toLowerCase())))
+    : dateFilteredRenewals;
 
   useEffect(() => {
     setLoading(true);
@@ -765,7 +775,7 @@ export default function RenewalsPage() {
   const totalPages = Math.max(1, Math.ceil(filteredRenewals.length / PAGE_SIZE));
   const paginatedRenewals = filteredRenewals.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  useEffect(() => { setCurrentPage(1); }, [statusFilter, clientSearch, salesTypeTab, summaryFilter, monthFilter]);
+  useEffect(() => { setCurrentPage(1); }, [statusFilter, clientSearch, salesTypeTab, summaryFilter, monthFilter, tableDateFilter, tableCustomFrom, tableCustomTo]);
 
   /* ─── Excel template download ─── */
   const [uploadStatus, setUploadStatus] = useState<"idle" | "importing" | "done" | "error">("idle");
@@ -1595,7 +1605,33 @@ export default function RenewalsPage() {
             </div>
           );
         })()}
-        <div className="px-4 pb-0 flex items-center gap-3">
+        {/* Date filter */}
+        <div className="px-4 pt-3 pb-0 flex items-center gap-1.5 flex-wrap">
+          <span className="text-xs text-muted-foreground shrink-0">الفترة:</span>
+          {(["اليوم", "أمس", "الأسبوع", "الشهر", "الشهر الماضي", "مخصص"] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setTableDateFilter(tableDateFilter === f ? null : f)}
+              className={`px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-colors border ${
+                tableDateFilter === f
+                  ? "bg-cyan/15 text-cyan border-cyan/30"
+                  : "text-muted-foreground border-transparent hover:text-foreground hover:bg-white/[0.06]"
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+          {tableDateFilter === "مخصص" && (
+            <div className="flex items-center gap-1.5">
+              <input type="date" value={tableCustomFrom} onChange={e => setTableCustomFrom(e.target.value)}
+                className="text-[12px] bg-card border border-border rounded-lg px-2 py-1 text-foreground" />
+              <span className="text-xs text-muted-foreground">—</span>
+              <input type="date" value={tableCustomTo} onChange={e => setTableCustomTo(e.target.value)}
+                className="text-[12px] bg-card border border-border rounded-lg px-2 py-1 text-foreground" />
+            </div>
+          )}
+        </div>
+        <div className="px-4 pb-0 flex items-center gap-3 mt-3">
           <Input
             value={clientSearch}
             onChange={(e) => setClientSearch(e.target.value)}

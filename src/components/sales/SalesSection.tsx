@@ -14,7 +14,7 @@ import { useTopbarControls } from "@/components/layout/topbar-context";
 import { STAGES, SOURCES, SOURCE_COLORS, PLANS } from "@/lib/utils/constants";
 
 import SalesKPIsView from "@/components/SalesKPIsView";
-import { formatMoney, formatMoneyFull, formatDate, formatPhone, todayLocal, dateToLocal, dateToTimestamp, saudiTimestamp } from "@/lib/utils/format";
+import { formatMoney, formatMoneyFull, formatDate, formatPhone, todayLocal, dateToLocal, dateToTimestamp, saudiTimestamp, tableDateBounds } from "@/lib/utils/format";
 import { FollowUpLogButton } from "@/components/follow-up-log";
 import { WatchlistPinButton } from "@/components/watchlist-pin-button";
 import { ClientProfilePanel } from "@/components/client-profile-panel";
@@ -501,6 +501,11 @@ export function SalesSection({ salesType }: SalesPageProps) {
   /* achievement summary filter */
   const [achieveFilter, setAchieveFilter] = useState<string | null>(null);
   const [achieveFilterIds, setAchieveFilterIds] = useState<Set<string>>(new Set());
+
+  /* table date filter */
+  const [tableDateFilter, setTableDateFilter] = useState<string | null>(null);
+  const [tableCustomFrom, setTableCustomFrom] = useState("");
+  const [tableCustomTo, setTableCustomTo] = useState("");
   const { activeMonthIndex, filterCutoff } = useTopbarControls();
 
   /* time/month-filtered deals (used for all analytics + table) */
@@ -535,14 +540,21 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const baseFilteredDeals = achieveFilter
     ? repOnlyDeals.filter(d => achieveFilterIds.has(d.id))
     : stageFilter ? repFilteredDeals.filter((d) => d.stage === stageFilter) : repFilteredDeals;
-  const filteredDeals = clientSearch
-    ? baseFilteredDeals.filter((d) => d.client_name.toLowerCase().includes(clientSearch.toLowerCase()) || (d.client_code && d.client_code.toLowerCase().includes(clientSearch.toLowerCase())) || (d.client_phone && d.client_phone.includes(clientSearch)))
+  const _dateBounds = tableDateBounds(tableDateFilter || "", tableCustomFrom, tableCustomTo);
+  const dateFilteredDeals = _dateBounds
+    ? baseFilteredDeals.filter(d => {
+        const s = (d.deal_date || d.created_at || "").slice(0, 10);
+        return s >= _dateBounds[0] && s <= _dateBounds[1];
+      })
     : baseFilteredDeals;
+  const filteredDeals = clientSearch
+    ? dateFilteredDeals.filter((d) => d.client_name.toLowerCase().includes(clientSearch.toLowerCase()) || (d.client_code && d.client_code.toLowerCase().includes(clientSearch.toLowerCase())) || (d.client_phone && d.client_phone.includes(clientSearch)))
+    : dateFilteredDeals;
 
   const totalPages = Math.max(1, Math.ceil(filteredDeals.length / DEALS_PER_PAGE));
   const paginatedDeals = filteredDeals.slice((currentPage - 1) * DEALS_PER_PAGE, currentPage * DEALS_PER_PAGE);
 
-  useEffect(() => { setCurrentPage(1); }, [clientSearch, stageFilter, achieveFilter, repFilter]);
+  useEffect(() => { setCurrentPage(1); }, [clientSearch, stageFilter, achieveFilter, repFilter, tableDateFilter, tableCustomFrom, tableCustomTo]);
 
   useEffect(() => {
     setLoading(true);
@@ -1182,6 +1194,32 @@ export function SalesSection({ salesType }: SalesPageProps) {
         </button>
         {dealsTableOpen && (
         <div id="sales-table-body" className="overflow-x-auto border-t border-border">
+        {/* Date filter */}
+        <div className="px-4 pt-3 pb-0 flex items-center gap-1.5 flex-wrap">
+          <span className="text-xs text-muted-foreground shrink-0">الفترة:</span>
+          {(["اليوم", "أمس", "الأسبوع", "الشهر", "الشهر الماضي", "مخصص"] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setTableDateFilter(tableDateFilter === f ? null : f)}
+              className={`px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-colors border ${
+                tableDateFilter === f
+                  ? "bg-cyan/15 text-cyan border-cyan/30"
+                  : "text-muted-foreground border-transparent hover:text-foreground hover:bg-white/[0.06]"
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+          {tableDateFilter === "مخصص" && (
+            <div className="flex items-center gap-1.5">
+              <input type="date" value={tableCustomFrom} onChange={e => setTableCustomFrom(e.target.value)}
+                className="text-[12px] bg-card border border-border rounded-lg px-2 py-1 text-foreground" />
+              <span className="text-xs text-muted-foreground">—</span>
+              <input type="date" value={tableCustomTo} onChange={e => setTableCustomTo(e.target.value)}
+                className="text-[12px] bg-card border border-border rounded-lg px-2 py-1 text-foreground" />
+            </div>
+          )}
+        </div>
         <div className="p-4 pb-0 flex items-center gap-3">
           <Input
             value={clientSearch}

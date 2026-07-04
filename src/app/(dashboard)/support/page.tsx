@@ -10,7 +10,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useTopbarControls } from "@/components/layout/topbar-context";
 import { PRIORITIES, TICKET_STATUSES, TICKET_CATEGORIES, PROBLEM_CATEGORIES, SERVICE_CATEGORIES, REQUEST_TYPES } from "@/lib/utils/constants";
 import { PRIORITY_COLORS, TICKET_STATUS_COLORS } from "@/lib/utils/constants";
-import { formatDate, formatPhone, todayLocal } from "@/lib/utils/format";
+import { formatDate, formatPhone, todayLocal, tableDateBounds } from "@/lib/utils/format";
 import type { Ticket, Employee, ActivityLog } from "@/types";
 
 import { AchievementSummary } from "@/components/achievement-summary";
@@ -186,6 +186,10 @@ export default function SupportPage() {
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   // Employee filter
   const [agentFilter, setAgentFilter] = useState<string | null>(null);
+  // Table date filter
+  const [tableDateFilter, setTableDateFilter] = useState<string | null>(null);
+  const [tableCustomFrom, setTableCustomFrom] = useState("");
+  const [tableCustomTo, setTableCustomTo] = useState("");
 
   // Activity log
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
@@ -277,14 +281,21 @@ export default function SupportPage() {
         ? categoryFilteredTickets.filter((t) => t.priority === "عاجل")
         : categoryFilteredTickets.filter((t) => t.status === cardFilter)
       : categoryFilteredTickets;
+  const _ticketDateBounds = tableDateBounds(tableDateFilter || "", tableCustomFrom, tableCustomTo);
+  const dateFilteredTickets = _ticketDateBounds
+    ? baseFilteredTickets.filter(t => {
+        const s = (t.open_date || t.created_at || "").slice(0, 10);
+        return s >= _ticketDateBounds[0] && s <= _ticketDateBounds[1];
+      })
+    : baseFilteredTickets;
   const filteredTickets = clientSearch
-    ? baseFilteredTickets.filter((t) => {
+    ? dateFilteredTickets.filter((t) => {
         const q = clientSearch.toLowerCase().trim();
         const nameMatch = t.client_name.toLowerCase().includes(q);
         const phoneMatch = t.client_phone ? t.client_phone.replace(/\s+/g, "").includes(q.replace(/\s+/g, "")) : false;
         return nameMatch || phoneMatch;
       })
-    : baseFilteredTickets;
+    : dateFilteredTickets;
 
   useEffect(() => {
     setLoading(true);
@@ -1150,6 +1161,32 @@ export default function SupportPage() {
               placeholder="ابحث باسم العميل أو رقم الجوال..."
               className="pr-9"
             />
+          </div>
+          {/* Date filter */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs text-muted-foreground shrink-0">الفترة:</span>
+            {(["اليوم", "أمس", "الأسبوع", "الشهر", "الشهر الماضي", "مخصص"] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setTableDateFilter(tableDateFilter === f ? null : f)}
+                className={`px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-colors border ${
+                  tableDateFilter === f
+                    ? "bg-cyan/15 text-cyan border-cyan/30"
+                    : "text-muted-foreground border-transparent hover:text-foreground hover:bg-white/[0.06]"
+                }`}
+              >
+                {f}
+              </button>
+            ))}
+            {tableDateFilter === "مخصص" && (
+              <div className="flex items-center gap-1.5">
+                <input type="date" value={tableCustomFrom} onChange={e => setTableCustomFrom(e.target.value)}
+                  className="text-[12px] bg-card border border-border rounded-lg px-2 py-1 text-foreground" />
+                <span className="text-xs text-muted-foreground">—</span>
+                <input type="date" value={tableCustomTo} onChange={e => setTableCustomTo(e.target.value)}
+                  className="text-[12px] bg-card border border-border rounded-lg px-2 py-1 text-foreground" />
+              </div>
+            )}
           </div>
         </div>
         <Table>
