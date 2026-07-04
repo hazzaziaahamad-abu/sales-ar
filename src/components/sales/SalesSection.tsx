@@ -1165,6 +1165,293 @@ export function SalesSection({ salesType }: SalesPageProps) {
             })}
       </div>
 
+      {/* ─── Deals Table ─── */}
+      <div id="sales-table" className="cc-card rounded-2xl overflow-hidden">
+        <button
+          type="button"
+          onClick={toggleDealsTable}
+          aria-expanded={dealsTableOpen}
+          aria-controls="sales-table-body"
+          className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-white/[0.03] transition-colors text-right"
+        >
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-bold text-foreground">قائمة الصفقات</h3>
+            <span className="text-[12px] text-muted-foreground">({filteredDeals.length})</span>
+          </div>
+          <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${dealsTableOpen ? "" : "-rotate-90"}`} />
+        </button>
+        {dealsTableOpen && (
+        <div id="sales-table-body" className="overflow-x-auto border-t border-border">
+        <div className="p-4 pb-0 flex items-center gap-3">
+          <Input
+            value={clientSearch}
+            onChange={(e) => setClientSearch(e.target.value)}
+            placeholder="ابحث باسم العميل أو رقم الجوال..."
+            className="max-w-xs"
+          />
+          {filteredDeals.length > 0 && filteredDeals.every((d) => dailyTargetIds.has(d.id)) ? (
+            <button onClick={deselectAll} className="text-[12px] px-2.5 py-1.5 rounded-lg border border-cc-red/30 text-cc-red hover:bg-cc-red/10 transition-colors whitespace-nowrap">
+              <SquareCheck className="w-3 h-3 inline-block ml-1" />إلغاء تحديد الكل
+            </button>
+          ) : (
+            <button onClick={selectAllVisible} className="text-[12px] px-2.5 py-1.5 rounded-lg border border-cyan/30 text-cyan hover:bg-cyan/10 transition-colors whitespace-nowrap">
+              <SquareCheck className="w-3 h-3 inline-block ml-1" />تحديد الكل
+            </button>
+          )}
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-10 text-center">هدف</TableHead>
+              <TableHead className="w-20">الكود</TableHead>
+              <TableHead>العميل</TableHead>
+              <TableHead>رقم الجوال</TableHead>
+              <TableHead>المصدر</TableHead>
+              <TableHead>الباقة</TableHead>
+              <TableHead>المرحلة</TableHead>
+              <TableHead>القيمة</TableHead>
+              <TableHead>المسؤول</TableHead>
+              <TableHead>التاريخ</TableHead>
+              <TableHead>تاريخ الدفع</TableHead>
+              <TableHead>آخر تواصل</TableHead>
+              <TableHead>أيام بدون تواصل</TableHead>
+              <TableHead>ملاحظات</TableHead>
+              <TableHead className="text-center">إجراءات</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              Array.from({ length: 6 }).map((_, index) => (
+                <TableRow key={index}>
+                  <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                  <TableCell><Skeleton className="h-6 w-16 rounded-full" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                  <TableCell>
+                    <div className="flex items-center justify-center gap-1">
+                      <Skeleton className="h-7 w-7 rounded-md" />
+                      <Skeleton className="h-7 w-7 rounded-md" />
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : filteredDeals.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={15} className="text-center text-muted-foreground py-8">
+                  {stageFilter ? `لا توجد مبيعات في مرحلة "${stageFilter}"` : "لا توجد مبيعات"}
+                </TableCell>
+              </TableRow>
+            ) : (
+              paginatedDeals.map((deal) => {
+                const isTarget = dailyTargetIds.has(deal.id);
+                const isTargetDone = isTarget && deal.stage === "مكتملة";
+                return (
+                <TableRow key={deal.id} className={isTarget ? (isTargetDone ? "bg-cc-green/[0.04]" : "bg-cyan/[0.04]") : ""}>
+                  <TableCell className="text-center">
+                    <button
+                      onClick={() => toggleDailyTarget(deal.id)}
+                      className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                        isTargetDone ? "border-cc-green bg-cc-green text-white"
+                        : isTarget ? "border-cyan bg-cyan/20 text-cyan"
+                        : "border-muted-foreground/30 hover:border-cyan/50"
+                      }`}
+                    >
+                      {isTarget && (
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </button>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-xs font-mono">
+                    {deal.client_code || "—"}
+                  </TableCell>
+                  <TableCell className="font-medium text-foreground">
+                    <button
+                      onClick={() => { setProfileQuery(deal.client_phone || deal.client_name); setProfileOpen(true); }}
+                      className="hover:text-primary hover:underline transition-colors text-right"
+                    >
+                      {deal.client_name}
+                    </button>
+                    {isTarget && !isTargetDone && (
+                      <span className="mr-1.5 inline-block text-[11px] px-1.5 py-0.5 rounded bg-cyan/10 text-cyan font-medium">هدف اليوم</span>
+                    )}
+                    {isTargetDone && (
+                      <span className="mr-1.5 inline-block text-[11px] px-1.5 py-0.5 rounded bg-cc-green/15 text-cc-green font-medium">تم الإنجاز</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-xs" dir="ltr">
+                    <button
+                      onClick={() => { if (deal.client_phone) { setProfileQuery(deal.client_phone); setProfileOpen(true); } }}
+                      className={deal.client_phone ? "hover:text-primary hover:underline transition-colors" : ""}
+                    >
+                      {deal.client_phone ? formatPhone(deal.client_phone) : "—"}
+                    </button>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-xs">
+                    {deal.source || "—"}
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-xs text-muted-foreground">{deal.plan || "—"}</span>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col gap-1">
+                      <ColorBadge
+                        text={deal.stage}
+                        color={STAGE_BADGE_COLOR[deal.stage] || "blue"}
+                      />
+                      {deal.stage === "اعادة الاتصال في وقت اخر" && deal.callback_date && (
+                        <span className={`text-[12px] px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 w-fit ${
+                          new Date(deal.callback_date).getTime() < Date.now()
+                            ? "bg-red-500/15 text-red-400"
+                            : new Date(deal.callback_date).getTime() - Date.now() < 3600000
+                            ? "bg-amber-500/15 text-amber-400"
+                            : "bg-sky-500/15 text-sky-400"
+                        }`}>
+                          📅 {new Date(deal.callback_date).toLocaleDateString("ar-SA")} — {new Date(deal.callback_date).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-bold text-cyan text-xs">
+                    {formatMoneyFull(deal.deal_value)}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-xs">
+                    {deal.assigned_rep_name || "—"}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-xs">
+                    {deal.deal_date ? formatDate(deal.deal_date) : "—"}
+                  </TableCell>
+                  <TableCell className="text-xs">
+                    {deal.close_date ? (
+                      <span className="text-cc-green">{formatDate(deal.close_date)}</span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-xs">
+                    {deal.last_contact ? formatDate(deal.last_contact) : "—"}
+                  </TableCell>
+                  <TableCell className="text-xs">
+                    {(() => {
+                      const ref = deal.last_contact || deal.deal_date;
+                      if (!ref) return "—";
+                      const days = Math.floor((Date.now() - new Date(ref).getTime()) / 86400000);
+                      return (
+                        <span className={days > 7 ? "text-cc-red font-medium" : days > 3 ? "text-amber" : "text-cc-green"}>
+                          {days} يوم
+                        </span>
+                      );
+                    })()}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-xs max-w-[120px] truncate" title={deal.notes || ""}>
+                    {deal.notes || "—"}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center justify-center gap-1">
+                      <div className="relative">
+                        <FollowUpLogButton entityType="deal" entityId={deal.id} entityName={deal.client_name} />
+                        <WatchlistPinButton entityType="deal" entityId={deal.id} entityName={deal.client_name} section="/sales" />
+                        {deal.stage !== "مكتملة" && deal.stage !== "مرفوض مع سبب" && (() => {
+                          const daysSince = Math.floor((Date.now() - new Date(deal.updated_at).getTime()) / 86400000);
+                          if (daysSince < 3) return null;
+                          return (
+                            <span className={`absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[11px] font-bold px-1 ${
+                              daysSince >= 7 ? "bg-red-500 text-white" : "bg-amber-500 text-white"
+                            }`} title={`${daysSince} يوم بدون تحديث`}>
+                              {daysSince}
+                            </span>
+                          );
+                        })()}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        onClick={() => setAssignDeal(deal)}
+                        title="تعيين لموظف"
+                        className="text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10"
+                      >
+                        <UserPlus className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        onClick={() => openEditModal(deal)}
+                        title="تعديل"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="icon-xs"
+                        onClick={() => confirmDelete(deal.id)}
+                        title="حذف"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ); })
+            )}
+          </TableBody>
+        </Table>
+        {/* Pagination */}
+        {filteredDeals.length > DEALS_PER_PAGE && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+            <span className="text-xs text-muted-foreground">
+              عرض {((currentPage - 1) * DEALS_PER_PAGE) + 1}–{Math.min(currentPage * DEALS_PER_PAGE, filteredDeals.length)} من {filteredDeals.length}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium border border-border hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                السابق
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                .reduce<(number | string)[]>((acc, p, i, arr) => {
+                  if (i > 0 && (arr[i - 1] as number) < p - 1) acc.push("...");
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, i) =>
+                  typeof p === "string" ? (
+                    <span key={`dot-${i}`} className="px-1.5 text-xs text-muted-foreground">…</span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => setCurrentPage(p)}
+                      className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${
+                        currentPage === p
+                          ? "bg-cyan/15 text-cyan border border-cyan/30"
+                          : "border border-border hover:bg-white/[0.06] text-muted-foreground"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  )
+                )}
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium border border-border hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                التالي
+              </button>
+            </div>
+          </div>
+        )}
+        </div>
+        )}
+      </div>
+
       {/* ─── Financial Summary Row ─── */}
       {!loading && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1500,293 +1787,6 @@ export function SalesSection({ salesType }: SalesPageProps) {
           </div>
         );
       })()}
-
-      {/* ─── Deals Table ─── */}
-      <div id="sales-table" className="cc-card rounded-2xl overflow-hidden">
-        <button
-          type="button"
-          onClick={toggleDealsTable}
-          aria-expanded={dealsTableOpen}
-          aria-controls="sales-table-body"
-          className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-white/[0.03] transition-colors text-right"
-        >
-          <div className="flex items-center gap-2">
-            <h3 className="text-sm font-bold text-foreground">قائمة الصفقات</h3>
-            <span className="text-[12px] text-muted-foreground">({filteredDeals.length})</span>
-          </div>
-          <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${dealsTableOpen ? "" : "-rotate-90"}`} />
-        </button>
-        {dealsTableOpen && (
-        <div id="sales-table-body" className="overflow-x-auto border-t border-border">
-        <div className="p-4 pb-0 flex items-center gap-3">
-          <Input
-            value={clientSearch}
-            onChange={(e) => setClientSearch(e.target.value)}
-            placeholder="ابحث باسم العميل أو رقم الجوال..."
-            className="max-w-xs"
-          />
-          {filteredDeals.length > 0 && filteredDeals.every((d) => dailyTargetIds.has(d.id)) ? (
-            <button onClick={deselectAll} className="text-[12px] px-2.5 py-1.5 rounded-lg border border-cc-red/30 text-cc-red hover:bg-cc-red/10 transition-colors whitespace-nowrap">
-              <SquareCheck className="w-3 h-3 inline-block ml-1" />إلغاء تحديد الكل
-            </button>
-          ) : (
-            <button onClick={selectAllVisible} className="text-[12px] px-2.5 py-1.5 rounded-lg border border-cyan/30 text-cyan hover:bg-cyan/10 transition-colors whitespace-nowrap">
-              <SquareCheck className="w-3 h-3 inline-block ml-1" />تحديد الكل
-            </button>
-          )}
-        </div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-10 text-center">هدف</TableHead>
-              <TableHead className="w-20">الكود</TableHead>
-              <TableHead>العميل</TableHead>
-              <TableHead>رقم الجوال</TableHead>
-              <TableHead>المصدر</TableHead>
-              <TableHead>الباقة</TableHead>
-              <TableHead>المرحلة</TableHead>
-              <TableHead>القيمة</TableHead>
-              <TableHead>المسؤول</TableHead>
-              <TableHead>التاريخ</TableHead>
-              <TableHead>تاريخ الدفع</TableHead>
-              <TableHead>آخر تواصل</TableHead>
-              <TableHead>أيام بدون تواصل</TableHead>
-              <TableHead>ملاحظات</TableHead>
-              <TableHead className="text-center">إجراءات</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              Array.from({ length: 6 }).map((_, index) => (
-                <TableRow key={index}>
-                  <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                  <TableCell><Skeleton className="h-6 w-16 rounded-full" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-center gap-1">
-                      <Skeleton className="h-7 w-7 rounded-md" />
-                      <Skeleton className="h-7 w-7 rounded-md" />
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : filteredDeals.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={15} className="text-center text-muted-foreground py-8">
-                  {stageFilter ? `لا توجد مبيعات في مرحلة "${stageFilter}"` : "لا توجد مبيعات"}
-                </TableCell>
-              </TableRow>
-            ) : (
-              paginatedDeals.map((deal) => {
-                const isTarget = dailyTargetIds.has(deal.id);
-                const isTargetDone = isTarget && deal.stage === "مكتملة";
-                return (
-                <TableRow key={deal.id} className={isTarget ? (isTargetDone ? "bg-cc-green/[0.04]" : "bg-cyan/[0.04]") : ""}>
-                  <TableCell className="text-center">
-                    <button
-                      onClick={() => toggleDailyTarget(deal.id)}
-                      className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                        isTargetDone ? "border-cc-green bg-cc-green text-white"
-                        : isTarget ? "border-cyan bg-cyan/20 text-cyan"
-                        : "border-muted-foreground/30 hover:border-cyan/50"
-                      }`}
-                    >
-                      {isTarget && (
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </button>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs font-mono">
-                    {deal.client_code || "—"}
-                  </TableCell>
-                  <TableCell className="font-medium text-foreground">
-                    <button
-                      onClick={() => { setProfileQuery(deal.client_phone || deal.client_name); setProfileOpen(true); }}
-                      className="hover:text-primary hover:underline transition-colors text-right"
-                    >
-                      {deal.client_name}
-                    </button>
-                    {isTarget && !isTargetDone && (
-                      <span className="mr-1.5 inline-block text-[11px] px-1.5 py-0.5 rounded bg-cyan/10 text-cyan font-medium">هدف اليوم</span>
-                    )}
-                    {isTargetDone && (
-                      <span className="mr-1.5 inline-block text-[11px] px-1.5 py-0.5 rounded bg-cc-green/15 text-cc-green font-medium">تم الإنجاز</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs" dir="ltr">
-                    <button
-                      onClick={() => { if (deal.client_phone) { setProfileQuery(deal.client_phone); setProfileOpen(true); } }}
-                      className={deal.client_phone ? "hover:text-primary hover:underline transition-colors" : ""}
-                    >
-                      {deal.client_phone ? formatPhone(deal.client_phone) : "—"}
-                    </button>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">
-                    {deal.source || "—"}
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-xs text-muted-foreground">{deal.plan || "—"}</span>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col gap-1">
-                      <ColorBadge
-                        text={deal.stage}
-                        color={STAGE_BADGE_COLOR[deal.stage] || "blue"}
-                      />
-                      {deal.stage === "اعادة الاتصال في وقت اخر" && deal.callback_date && (
-                        <span className={`text-[12px] px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 w-fit ${
-                          new Date(deal.callback_date).getTime() < Date.now()
-                            ? "bg-red-500/15 text-red-400"
-                            : new Date(deal.callback_date).getTime() - Date.now() < 3600000
-                            ? "bg-amber-500/15 text-amber-400"
-                            : "bg-sky-500/15 text-sky-400"
-                        }`}>
-                          📅 {new Date(deal.callback_date).toLocaleDateString("ar-SA")} — {new Date(deal.callback_date).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}
-                        </span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-bold text-cyan text-xs">
-                    {formatMoneyFull(deal.deal_value)}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">
-                    {deal.assigned_rep_name || "—"}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">
-                    {deal.deal_date ? formatDate(deal.deal_date) : "—"}
-                  </TableCell>
-                  <TableCell className="text-xs">
-                    {deal.close_date ? (
-                      <span className="text-cc-green">{formatDate(deal.close_date)}</span>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">
-                    {deal.last_contact ? formatDate(deal.last_contact) : "—"}
-                  </TableCell>
-                  <TableCell className="text-xs">
-                    {(() => {
-                      const ref = deal.last_contact || deal.deal_date;
-                      if (!ref) return "—";
-                      const days = Math.floor((Date.now() - new Date(ref).getTime()) / 86400000);
-                      return (
-                        <span className={days > 7 ? "text-cc-red font-medium" : days > 3 ? "text-amber" : "text-cc-green"}>
-                          {days} يوم
-                        </span>
-                      );
-                    })()}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs max-w-[120px] truncate" title={deal.notes || ""}>
-                    {deal.notes || "—"}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-center gap-1">
-                      <div className="relative">
-                        <FollowUpLogButton entityType="deal" entityId={deal.id} entityName={deal.client_name} />
-                        <WatchlistPinButton entityType="deal" entityId={deal.id} entityName={deal.client_name} section="/sales" />
-                        {deal.stage !== "مكتملة" && deal.stage !== "مرفوض مع سبب" && (() => {
-                          const daysSince = Math.floor((Date.now() - new Date(deal.updated_at).getTime()) / 86400000);
-                          if (daysSince < 3) return null;
-                          return (
-                            <span className={`absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[11px] font-bold px-1 ${
-                              daysSince >= 7 ? "bg-red-500 text-white" : "bg-amber-500 text-white"
-                            }`} title={`${daysSince} يوم بدون تحديث`}>
-                              {daysSince}
-                            </span>
-                          );
-                        })()}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        onClick={() => setAssignDeal(deal)}
-                        title="تعيين لموظف"
-                        className="text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10"
-                      >
-                        <UserPlus className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        onClick={() => openEditModal(deal)}
-                        title="تعديل"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="icon-xs"
-                        onClick={() => confirmDelete(deal.id)}
-                        title="حذف"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ); })
-            )}
-          </TableBody>
-        </Table>
-        {/* Pagination */}
-        {filteredDeals.length > DEALS_PER_PAGE && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-border">
-            <span className="text-xs text-muted-foreground">
-              عرض {((currentPage - 1) * DEALS_PER_PAGE) + 1}–{Math.min(currentPage * DEALS_PER_PAGE, filteredDeals.length)} من {filteredDeals.length}
-            </span>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium border border-border hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-              >
-                السابق
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
-                .reduce<(number | string)[]>((acc, p, i, arr) => {
-                  if (i > 0 && (arr[i - 1] as number) < p - 1) acc.push("...");
-                  acc.push(p);
-                  return acc;
-                }, [])
-                .map((p, i) =>
-                  typeof p === "string" ? (
-                    <span key={`dot-${i}`} className="px-1.5 text-xs text-muted-foreground">…</span>
-                  ) : (
-                    <button
-                      key={p}
-                      onClick={() => setCurrentPage(p)}
-                      className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${
-                        currentPage === p
-                          ? "bg-cyan/15 text-cyan border border-cyan/30"
-                          : "border border-border hover:bg-white/[0.06] text-muted-foreground"
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  )
-                )}
-              <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium border border-border hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-              >
-                التالي
-              </button>
-            </div>
-          </div>
-        )}
-        </div>
-        )}
-      </div>
 
       {/* ─── Sales Team Performance ─── */}
       {!loading && (
