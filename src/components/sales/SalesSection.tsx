@@ -2569,6 +2569,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
                   <div className="flex items-center gap-3 shrink-0 text-right">
                     <span className="text-sm font-bold text-amber">{formatMoney(d.deal_value)}</span>
                     <span className="text-[11px] text-muted-foreground">{formatDate(d.deal_date || d.created_at)}</span>
+                    <FollowUpLogButton entityType="deal" entityId={d.id} entityName={d.client_name} />
                   </div>
                 </div>
               ))
