@@ -420,6 +420,10 @@ export default function RenewalsPage() {
         }
         setRenewals(renewalsData);
         setEmployees(employeesData);
+        // Non-managers default to their own renewals
+        if (!isAdmin && authUser?.name) {
+          setRepFilter(prev => prev ?? authUser.name ?? null);
+        }
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -633,7 +637,7 @@ export default function RenewalsPage() {
   }, [renewals, summaryPeriod, customRange]);
 
   // Apply summary filter if active (overrides base filter to show matching renewals)
-  const filteredRenewals = summaryFilter
+  const filteredRenewals_summary = summaryFilter
     ? (() => {
         const ids = summaryFilter === "completed" || summaryFilter === "revenue" || summaryFilter === "success"
           ? achievementSummary.completedIds
@@ -644,6 +648,36 @@ export default function RenewalsPage() {
         return clientSearch ? result.filter(r => r.customer_name.toLowerCase().includes(clientSearch.toLowerCase()) || (r.client_code && r.client_code.toLowerCase().includes(clientSearch.toLowerCase()))) : result;
       })()
     : filteredRenewals_base;
+
+  /* ─── Focus filter (daily task boxes) ─── */
+  const [focusFilter, setFocusFilter] = useState<"overdue" | "today" | "week" | null>(null);
+
+  const todayStr = todayLocal();
+  const _activeRenewals = filteredRenewals_summary.filter(r => r.status !== "مكتمل" && r.status !== "ملغي بسبب");
+  const focusOverdue = _activeRenewals.filter(r => (r.renewal_date || "") < todayStr);
+  const focusToday   = _activeRenewals.filter(r => (r.renewal_date || "").slice(0, 10) === todayStr);
+  const in7Days = (() => { const d = new Date(); d.setDate(d.getDate() + 7); return d.toISOString().slice(0, 10); })();
+  const focusWeek    = _activeRenewals.filter(r => { const rd = (r.renewal_date || "").slice(0, 10); return rd > todayStr && rd <= in7Days; });
+
+  const filteredRenewals = focusFilter === "overdue" ? focusOverdue
+    : focusFilter === "today" ? focusToday
+    : focusFilter === "week" ? focusWeek
+    : filteredRenewals_summary;
+
+  // Priority sort: overdue → today → this week → rest (applied when no explicit sort active)
+  const prioritySorted = [...filteredRenewals].sort((a, b) => {
+    const getPriority = (r: typeof a) => {
+      if (r.status === "مكتمل" || r.status === "ملغي بسبب") return 4;
+      const rd = (r.renewal_date || "").slice(0, 10);
+      if (rd < todayStr) return 0;
+      if (rd === todayStr) return 1;
+      if (rd <= in7Days) return 2;
+      return 3;
+    };
+    const pa = getPriority(a), pb = getPriority(b);
+    if (pa !== pb) return pa - pb;
+    return (a.renewal_date || "").localeCompare(b.renewal_date || "");
+  });
 
   /* ─── Donut data ─── */
   const donutSegments = [
@@ -772,10 +806,10 @@ export default function RenewalsPage() {
   /* ─── Pagination ─── */
   const PAGE_SIZE = 25;
   const [currentPage, setCurrentPage] = useState(1);
-  const totalPages = Math.max(1, Math.ceil(filteredRenewals.length / PAGE_SIZE));
-  const paginatedRenewals = filteredRenewals.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(prioritySorted.length / PAGE_SIZE));
+  const paginatedRenewals = prioritySorted.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  useEffect(() => { setCurrentPage(1); }, [statusFilter, clientSearch, salesTypeTab, summaryFilter, monthFilter, tableDateFilter, tableCustomFrom, tableCustomTo]);
+  useEffect(() => { setCurrentPage(1); }, [statusFilter, clientSearch, salesTypeTab, summaryFilter, monthFilter, tableDateFilter, tableCustomFrom, tableCustomTo, focusFilter]);
 
   /* ─── Excel template download ─── */
   const [uploadStatus, setUploadStatus] = useState<"idle" | "importing" | "done" | "error">("idle");
@@ -1287,10 +1321,86 @@ export default function RenewalsPage() {
         </div>
       )}
 
+      {/* ─── Daily Focus Boxes ─── */}
+      {!loading && (
+        <div className="grid grid-cols-3 gap-3">
+          {/* Overdue */}
+          <button
+            onClick={() => setFocusFilter(focusFilter === "overdue" ? null : "overdue")}
+            className={`rounded-2xl p-4 text-right transition-all border ${
+              focusFilter === "overdue"
+                ? "bg-cc-red/15 border-cc-red/40 ring-1 ring-cc-red/30"
+                : "cc-card border-transparent hover:border-cc-red/30 hover:bg-cc-red/[0.06]"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className={`text-2xl font-extrabold ${focusFilter === "overdue" ? "text-cc-red" : focusOverdue.length > 0 ? "text-cc-red" : "text-muted-foreground"}`}>
+                {focusOverdue.length}
+              </span>
+              <span className="text-xl">{focusOverdue.length > 0 ? "🔴" : "✅"}</span>
+            </div>
+            <p className="text-sm font-bold text-foreground">متأخر</p>
+            <p className="text-[12px] text-muted-foreground mt-0.5">تجاوز موعد التجديد</p>
+          </button>
+          {/* Today */}
+          <button
+            onClick={() => setFocusFilter(focusFilter === "today" ? null : "today")}
+            className={`rounded-2xl p-4 text-right transition-all border ${
+              focusFilter === "today"
+                ? "bg-amber/15 border-amber/40 ring-1 ring-amber/30"
+                : "cc-card border-transparent hover:border-amber/30 hover:bg-amber/[0.06]"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className={`text-2xl font-extrabold ${focusFilter === "today" ? "text-amber" : focusToday.length > 0 ? "text-amber" : "text-muted-foreground"}`}>
+                {focusToday.length}
+              </span>
+              <span className="text-xl">🟡</span>
+            </div>
+            <p className="text-sm font-bold text-foreground">اليوم</p>
+            <p className="text-[12px] text-muted-foreground mt-0.5">موعدهم اليوم</p>
+          </button>
+          {/* This week */}
+          <button
+            onClick={() => setFocusFilter(focusFilter === "week" ? null : "week")}
+            className={`rounded-2xl p-4 text-right transition-all border ${
+              focusFilter === "week"
+                ? "bg-cyan/15 border-cyan/40 ring-1 ring-cyan/30"
+                : "cc-card border-transparent hover:border-cyan/30 hover:bg-cyan/[0.06]"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className={`text-2xl font-extrabold ${focusFilter === "week" ? "text-cyan" : focusWeek.length > 0 ? "text-cyan" : "text-muted-foreground"}`}>
+                {focusWeek.length}
+              </span>
+              <span className="text-xl">📅</span>
+            </div>
+            <p className="text-sm font-bold text-foreground">هذا الأسبوع</p>
+            <p className="text-[12px] text-muted-foreground mt-0.5">خلال 7 أيام القادمة</p>
+          </button>
+        </div>
+      )}
+
       {/* ─── Renewals Table ─── */}
       <div id="renewals-table" className="cc-card rounded-[14px] overflow-x-auto scroll-mt-4">
         <div className="px-4 pt-4 pb-0 flex items-center justify-between">
-          <h3 className="text-sm font-bold text-foreground">تذاكر التجديدات</h3>
+          <h3 className="text-sm font-bold text-foreground">
+            تذاكر التجديدات
+            {focusFilter && (
+              <span className={`mr-2 text-xs font-medium px-2 py-0.5 rounded-full ${
+                focusFilter === "overdue" ? "bg-cc-red/15 text-cc-red"
+                : focusFilter === "today" ? "bg-amber/15 text-amber"
+                : "bg-cyan/15 text-cyan"
+              }`}>
+                {focusFilter === "overdue" ? "متأخر" : focusFilter === "today" ? "اليوم" : "هذا الأسبوع"}
+              </span>
+            )}
+          </h3>
+          {focusFilter && (
+            <button onClick={() => setFocusFilter(null)} className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-lg hover:bg-white/[0.06]">
+              ✕ إلغاء الفلتر
+            </button>
+          )}
         </div>
         {/* Year + Month filter */}
         {availableYears.length > 1 && (
@@ -1609,7 +1719,7 @@ export default function RenewalsPage() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between px-1">
           <span className="text-xs text-muted-foreground">
-            عرض {((currentPage - 1) * PAGE_SIZE) + 1}–{Math.min(currentPage * PAGE_SIZE, filteredRenewals.length)} من {filteredRenewals.length}
+            عرض {((currentPage - 1) * PAGE_SIZE) + 1}–{Math.min(currentPage * PAGE_SIZE, prioritySorted.length)} من {prioritySorted.length}
           </span>
           <div className="flex items-center gap-1">
             <Button
