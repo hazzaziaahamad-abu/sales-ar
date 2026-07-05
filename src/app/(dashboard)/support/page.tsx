@@ -1138,30 +1138,6 @@ export default function SupportPage() {
               مشاركة
             </button>
           </div>
-          {/* Active category filter indicator */}
-          {categoryFilter && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-cyan/10 border border-cyan/20">
-              <span className="text-xs text-cyan font-medium">
-                {TICKET_CATEGORIES[categoryFilter]?.icon || "📋"} تصنيف: {categoryFilter}
-              </span>
-              <button
-                onClick={() => setCategoryFilter(null)}
-                className="mr-auto text-xs text-cyan hover:text-white font-medium px-2 py-1 rounded-md hover:bg-cyan/20 transition-colors"
-              >
-                ✕ إلغاء
-              </button>
-            </div>
-          )}
-          {/* Search */}
-          <div className="relative max-w-sm">
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-            <Input
-              value={clientSearch}
-              onChange={(e) => setClientSearch(e.target.value)}
-              placeholder="ابحث باسم العميل أو رقم الجوال..."
-              className="pr-9"
-            />
-          </div>
           {/* Date filter */}
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-xs text-muted-foreground shrink-0">الفترة:</span>
@@ -1187,6 +1163,30 @@ export default function SupportPage() {
                   className="text-[12px] bg-card border border-border rounded-lg px-2 py-1 text-foreground" />
               </div>
             )}
+          </div>
+          {/* Active category filter indicator */}
+          {categoryFilter && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-cyan/10 border border-cyan/20">
+              <span className="text-xs text-cyan font-medium">
+                {TICKET_CATEGORIES[categoryFilter]?.icon || "📋"} تصنيف: {categoryFilter}
+              </span>
+              <button
+                onClick={() => setCategoryFilter(null)}
+                className="mr-auto text-xs text-cyan hover:text-white font-medium px-2 py-1 rounded-md hover:bg-cyan/20 transition-colors"
+              >
+                ✕ إلغاء
+              </button>
+            </div>
+          )}
+          {/* Search */}
+          <div className="relative max-w-sm">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <Input
+              value={clientSearch}
+              onChange={(e) => setClientSearch(e.target.value)}
+              placeholder="ابحث باسم العميل أو رقم الجوال..."
+              className="pr-9"
+            />
           </div>
         </div>
         <Table>
