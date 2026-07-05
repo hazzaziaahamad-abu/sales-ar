@@ -1345,82 +1345,159 @@ export function SalesSection({ salesType }: SalesPageProps) {
         const todayRevenue = todayClosedDeals.reduce((s, d) => s + d.deal_value, 0);
         const pct = kpiGoal > 0 ? Math.min(100, Math.round((todayClosedCount / kpiGoal) * 100)) : 0;
         const goalReached = todayClosedCount >= kpiGoal && kpiGoal > 0;
-        const KPI_MSGS = [
+
+        /* greeting based on current hour */
+        const currentHour = new Date().getHours();
+        const greetingTime = currentHour < 12 ? "صباح الإنجاز" : currentHour < 17 ? "مساء الطموح" : "مساء النجاح";
+        const employeeName = authUser?.name ? authUser.name.split(" ")[0] : "أخي";
+
+        /* motivational messages — cycling per minute so they change without page reload */
+        const WELCOME_MSGS = [
+          { icon: "🎯", text: `هدفك اليوم ${kpiGoal} صفقة — كل مكالمة تقربك خطوة` },
+          { icon: "🔥", text: "الأبطال لا ينتظرون الظروف — يصنعونها بأيديهم" },
+          { icon: "💡", text: "يوم جديد = فرصة جديدة. ابدأ بأول اتصال الآن!" },
+          { icon: "⚡", text: "الفرق بين الممتاز والعادي: الممتاز يبدأ قبل ما يستعد" },
+          { icon: "🚀", text: "النجاح عادة يومية — ابدأ يومك بقرار واحد: سأغلق اليوم" },
+          { icon: "💪", text: "كل رفض يقربك من قبول — لا تتوقف بعد أول 'لا'" },
+          { icon: "🌟", text: "أفضل وقت لتسجيل أول صفقة اليوم هو الآن" },
+        ];
+        const welcomeMsg = WELCOME_MSGS[Math.floor(Date.now() / 60000) % WELCOME_MSGS.length];
+
+        /* 2-hour warning: show if less than 2 hours until 5 PM and zero completions today */
+        const twoHourAlert = !countdown.timeUp && countdown.h < 2 && todayClosedCount === 0;
+        const ALERT_MSGS = [
+          "لديك أقل من ساعتين — اتصل الآن بأكثر عميل مهيّأ لديك",
+          "الساعة تدق! ركّز على صفقة واحدة فقط وأغلقها",
+          "قبل نهاية اليوم — حدّد عميلاً واحداً وأعطه كل تركيزك",
+          "الوقت ينفد! تواصل مع أقرب عميل لك للإغلاق",
+        ];
+        const alertMsg = ALERT_MSGS[new Date().getMinutes() % ALERT_MSGS.length];
+
+        const KPI_GOAL_MSGS = [
           "🏆 أتممت هدفك اليومي! أنت نجم الفريق",
           "🔥 وصلت لهدفك! هذا ما يميّز الكبار",
           "⚡ الهدف محقّق! واصل بنفس الزخم",
           "💪 أنجزت هدفك! الفريق يفخر بك",
           "🚀 عظيم! بلغت هدفك اليومي — هل تضيف المزيد؟",
         ];
-        const kpiMsg = KPI_MSGS[todayClosedCount % KPI_MSGS.length];
+        const kpiMsg = KPI_GOAL_MSGS[todayClosedCount % KPI_GOAL_MSGS.length];
+
         return (
-          <div className={`rounded-2xl border px-5 py-4 ${goalReached ? "bg-gradient-to-l from-cc-green/10 via-amber/5 to-transparent border-cc-green/30" : "cc-card border-border"}`}>
-            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-              <div className="flex items-center gap-2">
-                <Target className="w-4 h-4 text-cc-purple" />
-                <span className="text-sm font-bold text-foreground">هدف اليوم</span>
-                {goalReached && <span className="text-[12px] font-bold text-cc-green bg-cc-green/10 border border-cc-green/20 px-2 py-0.5 rounded-full">{kpiMsg}</span>}
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[12px] text-muted-foreground">الهدف اليومي:</span>
-                {kpiGoalEditing ? (
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="number"
-                      min={1}
-                      value={kpiGoalInput}
-                      onChange={e => setKpiGoalInput(e.target.value)}
-                      onKeyDown={e => { if (e.key === "Enter") saveKpiGoal(); if (e.key === "Escape") setKpiGoalEditing(false); }}
-                      autoFocus
-                      className="w-14 text-center text-[13px] bg-card border border-amber/40 rounded-lg px-2 py-0.5 text-foreground"
-                    />
-                    <button onClick={saveKpiGoal} className="text-[12px] px-2 py-0.5 rounded-lg bg-cc-green/15 text-cc-green border border-cc-green/30 hover:bg-cc-green/25">حفظ</button>
-                    <button onClick={() => setKpiGoalEditing(false)} className="text-[12px] px-2 py-0.5 rounded-lg bg-muted/50 text-muted-foreground border border-border">إلغاء</button>
+          <div className="space-y-3">
+            {/* Welcome banner */}
+            <div className={`rounded-2xl border px-5 py-4 bg-gradient-to-l ${goalReached ? "from-cc-green/15 via-amber/5 to-transparent border-cc-green/30" : "from-cc-purple/10 via-cyan/5 to-transparent border-cc-purple/20"}`}>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-extrabold shrink-0 ${goalReached ? "bg-cc-green/20 text-cc-green" : "bg-cc-purple/20 text-cc-purple"}`}>
+                    {employeeName.charAt(0)}
                   </div>
-                ) : (
-                  <button
-                    onClick={() => { setKpiGoalInput(String(kpiGoal)); setKpiGoalEditing(true); }}
-                    className="flex items-center gap-1 text-[13px] font-bold text-amber hover:underline"
-                  >
-                    {kpiGoal} صفقة
-                    <Pencil className="w-3 h-3 opacity-60" />
-                  </button>
-                )}
+                  <div>
+                    <p className="text-sm font-bold text-foreground">
+                      {greetingTime}، {employeeName}! {goalReached ? "🏆" : "👋"}
+                    </p>
+                    {goalReached ? (
+                      <p className="text-[13px] text-cc-green font-semibold mt-0.5">{kpiMsg}</p>
+                    ) : (
+                      <p className="text-[13px] text-muted-foreground mt-0.5">
+                        <span className="text-amber font-bold">{welcomeMsg.icon}</span>{" "}
+                        {welcomeMsg.text}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="text-left shrink-0 hidden sm:block">
+                  <p className="text-[11px] text-muted-foreground">الوقت المتبقي</p>
+                  <p className={`text-sm font-mono font-bold ${countdown.h < 1 ? "text-cc-red" : countdown.h < 2 ? "text-amber" : "text-foreground"}`}>
+                    {countdown.timeUp ? "انتهى الدوام" : `${countdown.h}:${String(countdown.m).padStart(2, "0")}:${String(countdown.s).padStart(2, "0")}`}
+                  </p>
+                </div>
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-3 mb-3">
-              <div className="rounded-xl bg-card border border-border px-4 py-3 text-center">
-                <p className="text-[11px] text-muted-foreground mb-1">الهدف اليومي</p>
-                <p className="text-2xl font-extrabold text-amber">{kpiGoal}</p>
-                <p className="text-[11px] text-muted-foreground">صفقة</p>
+
+            {/* 2-hour end-of-day alert */}
+            {twoHourAlert && (
+              <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-cc-red/10 border border-cc-red/30">
+                <AlertTriangle className="w-5 h-5 text-cc-red shrink-0 animate-bounce" />
+                <div className="flex-1">
+                  <p className="text-[13px] font-bold text-cc-red">تنبيه — أقل من ساعتين على نهاية الدوام</p>
+                  <p className="text-[12px] text-muted-foreground mt-0.5">{alertMsg}</p>
+                </div>
+                <span className="text-cc-red font-mono font-bold text-sm shrink-0">
+                  {countdown.h}:{String(countdown.m).padStart(2, "0")}
+                </span>
               </div>
-              <div className={`rounded-xl border px-4 py-3 text-center ${goalReached ? "bg-cc-green/10 border-cc-green/30" : "bg-card border-border"}`}>
-                <p className="text-[11px] text-muted-foreground mb-1">مكتمل اليوم</p>
-                <p className={`text-2xl font-extrabold ${goalReached ? "text-cc-green" : "text-foreground"}`}>{todayClosedCount}</p>
-                <p className="text-[11px] text-muted-foreground">صفقة</p>
+            )}
+
+            {/* KPI numbers strip */}
+            <div className={`rounded-2xl border px-5 py-4 ${goalReached ? "bg-cc-green/[0.04] border-cc-green/20" : "cc-card border-border"}`}>
+              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <Target className="w-4 h-4 text-cc-purple" />
+                  <span className="text-sm font-bold text-foreground">هدف اليوم</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[12px] text-muted-foreground">الهدف:</span>
+                  {kpiGoalEditing ? (
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min={1}
+                        value={kpiGoalInput}
+                        onChange={e => setKpiGoalInput(e.target.value)}
+                        onKeyDown={e => { if (e.key === "Enter") saveKpiGoal(); if (e.key === "Escape") setKpiGoalEditing(false); }}
+                        autoFocus
+                        className="w-14 text-center text-[13px] bg-card border border-amber/40 rounded-lg px-2 py-0.5 text-foreground"
+                      />
+                      <button onClick={saveKpiGoal} className="text-[12px] px-2 py-0.5 rounded-lg bg-cc-green/15 text-cc-green border border-cc-green/30 hover:bg-cc-green/25">حفظ</button>
+                      <button onClick={() => setKpiGoalEditing(false)} className="text-[12px] px-2 py-0.5 rounded-lg bg-muted/50 text-muted-foreground border border-border">إلغاء</button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => { setKpiGoalInput(String(kpiGoal)); setKpiGoalEditing(true); }}
+                      className="flex items-center gap-1 text-[13px] font-bold text-amber hover:underline"
+                    >
+                      {kpiGoal} صفقة
+                      <Pencil className="w-3 h-3 opacity-60" />
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="rounded-xl bg-card border border-border px-4 py-3 text-center">
-                <p className="text-[11px] text-muted-foreground mb-1">إيراد اليوم</p>
-                <p className="text-2xl font-extrabold text-cc-green">{formatMoney(todayRevenue)}</p>
-                <p className="text-[11px] text-muted-foreground">ر.س</p>
+              <div className="grid grid-cols-3 gap-3 mb-3">
+                <div className="rounded-xl bg-card border border-border px-4 py-3 text-center">
+                  <p className="text-[11px] text-muted-foreground mb-1">الهدف اليومي</p>
+                  <p className="text-2xl font-extrabold text-amber">{kpiGoal}</p>
+                  <p className="text-[11px] text-muted-foreground">صفقة</p>
+                </div>
+                <div className={`rounded-xl border px-4 py-3 text-center ${goalReached ? "bg-cc-green/10 border-cc-green/30" : "bg-card border-border"}`}>
+                  <p className="text-[11px] text-muted-foreground mb-1">مكتمل اليوم</p>
+                  <p className={`text-2xl font-extrabold ${goalReached ? "text-cc-green" : "text-foreground"}`}>{todayClosedCount}</p>
+                  <p className="text-[11px] text-muted-foreground">صفقة</p>
+                </div>
+                <div className="rounded-xl bg-card border border-border px-4 py-3 text-center">
+                  <p className="text-[11px] text-muted-foreground mb-1">إيراد اليوم</p>
+                  <p className="text-2xl font-extrabold text-cc-green">{formatMoney(todayRevenue)}</p>
+                  <p className="text-[11px] text-muted-foreground">ر.س</p>
+                </div>
               </div>
-            </div>
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-[12px]">
-                <span className="text-muted-foreground">التقدم</span>
-                <span className={`font-bold ${goalReached ? "text-cc-green" : pct >= 50 ? "text-amber" : "text-muted-foreground"}`}>{pct}%</span>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-[12px]">
+                  <span className="text-muted-foreground">التقدم نحو الهدف</span>
+                  <span className={`font-bold ${goalReached ? "text-cc-green" : pct >= 50 ? "text-amber" : "text-muted-foreground"}`}>{pct}%</span>
+                </div>
+                <div className="h-2.5 rounded-full bg-white/[0.06] overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${goalReached ? "bg-cc-green" : pct >= 50 ? "bg-amber" : "bg-cyan"}`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {goalReached
+                    ? `أحسنت! أكملت ${todayClosedCount} من ${kpiGoal} صفقة`
+                    : todayClosedCount === 0
+                      ? `ابدأ بأول صفقة اليوم — الهدف ${kpiGoal} صفقة`
+                      : `${kpiGoal - todayClosedCount} صفقة متبقية لإتمام هدف اليوم`}
+                </p>
               </div>
-              <div className="h-2.5 rounded-full bg-white/[0.06] overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all duration-500 ${goalReached ? "bg-cc-green" : pct >= 50 ? "bg-amber" : "bg-cyan"}`}
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-              <p className="text-[11px] text-muted-foreground">
-                {goalReached
-                  ? `أحسنت! أكملت ${todayClosedCount} من ${kpiGoal} صفقة`
-                  : `${kpiGoal - todayClosedCount} صفقة متبقية لإتمام هدف اليوم`}
-              </p>
             </div>
           </div>
         );
