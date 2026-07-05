@@ -1068,10 +1068,10 @@ export default function SupportPage() {
         <div className="p-4 pb-0 space-y-3">
           {/* Status filter pills + share button */}
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-muted-foreground font-medium ml-1">الحالة:</span>
+            <span className="text-sm text-muted-foreground font-medium ml-1">الحالة:</span>
             <button
               onClick={() => { setCardFilter(null); setAchieveFilter(null); }}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${
+              className={`px-4 py-2 rounded-full text-sm font-semibold transition-all border ${
                 !cardFilter && !achieveFilter
                   ? "bg-foreground/10 text-foreground border-foreground/20"
                   : "bg-white/[0.04] text-muted-foreground hover:bg-white/[0.08] border-transparent"
@@ -1081,46 +1081,46 @@ export default function SupportPage() {
             </button>
             <button
               onClick={() => { setCardFilter(cardFilter === "مفتوح" ? null : "مفتوح"); setAchieveFilter(null); }}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border flex items-center gap-1.5 ${
+              className={`px-4 py-2 rounded-full text-sm font-semibold transition-all border flex items-center gap-2 ${
                 cardFilter === "مفتوح"
                   ? "bg-cc-red/15 text-cc-red border-cc-red/30 ring-1 ring-cc-red/20"
                   : "bg-white/[0.04] text-muted-foreground hover:bg-white/[0.08] border-transparent"
               }`}
             >
-              <span className="w-2 h-2 rounded-full bg-cc-red" />
+              <span className="w-2.5 h-2.5 rounded-full bg-cc-red" />
               مفتوح <span className="font-mono mr-1 opacity-70">{countOpen}</span>
             </button>
             <button
               onClick={() => { setCardFilter(cardFilter === "قيد الحل" ? null : "قيد الحل"); setAchieveFilter(null); }}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border flex items-center gap-1.5 ${
+              className={`px-4 py-2 rounded-full text-sm font-semibold transition-all border flex items-center gap-2 ${
                 cardFilter === "قيد الحل"
                   ? "bg-amber/15 text-amber border-amber/30 ring-1 ring-amber/20"
                   : "bg-white/[0.04] text-muted-foreground hover:bg-white/[0.08] border-transparent"
               }`}
             >
-              <span className="w-2 h-2 rounded-full bg-amber" />
+              <span className="w-2.5 h-2.5 rounded-full bg-amber" />
               قيد الحل <span className="font-mono mr-1 opacity-70">{countInProgress}</span>
             </button>
             <button
               onClick={() => { setCardFilter(cardFilter === "محلول" ? null : "محلول"); setAchieveFilter(null); }}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border flex items-center gap-1.5 ${
+              className={`px-4 py-2 rounded-full text-sm font-semibold transition-all border flex items-center gap-2 ${
                 cardFilter === "محلول"
                   ? "bg-cc-green/15 text-cc-green border-cc-green/30 ring-1 ring-cc-green/20"
                   : "bg-white/[0.04] text-muted-foreground hover:bg-white/[0.08] border-transparent"
               }`}
             >
-              <span className="w-2 h-2 rounded-full bg-cc-green" />
+              <span className="w-2.5 h-2.5 rounded-full bg-cc-green" />
               محلول <span className="font-mono mr-1 opacity-70">{countResolved}</span>
             </button>
             <button
               onClick={() => { setCardFilter(cardFilter === "عاجل" ? null : "عاجل"); setAchieveFilter(null); }}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border flex items-center gap-1.5 ${
+              className={`px-4 py-2 rounded-full text-sm font-semibold transition-all border flex items-center gap-2 ${
                 cardFilter === "عاجل"
                   ? "bg-orange-500/15 text-orange-400 border-orange-400/30 ring-1 ring-orange-400/20"
                   : "bg-white/[0.04] text-muted-foreground hover:bg-white/[0.08] border-transparent"
               }`}
             >
-              <span className="w-2 h-2 rounded-full bg-orange-400" />
+              <span className="w-2.5 h-2.5 rounded-full bg-orange-400" />
               عاجل <span className="font-mono mr-1 opacity-70">{countUrgent}</span>
             </button>
             {/* Share button */}
