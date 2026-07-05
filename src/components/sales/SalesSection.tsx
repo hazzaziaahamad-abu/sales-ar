@@ -83,6 +83,24 @@ import {
   ChevronDown,
 } from "lucide-react";
 
+/* ─── Deal health score ─── */
+function getDealHealthScore(deal: { stage: string; updated_at: string; deal_date: string; last_contact?: string | null }): { icon: string; label: string; color: string } {
+  if (deal.stage === "مكتملة") return { icon: "✅", label: "مكتمل", color: "text-cc-green" };
+  if (deal.stage === "مرفوض مع سبب" || deal.stage === "كنسل التجربة") return { icon: "⚫", label: "خسارة", color: "text-muted-foreground" };
+  const ref = deal.last_contact || deal.deal_date;
+  const daysSince = ref ? Math.floor((Date.now() - new Date(ref).getTime()) / 86400000) : 99;
+  const dealAge = deal.deal_date ? Math.floor((Date.now() - new Date(deal.deal_date).getTime()) / 86400000) : 0;
+  // Trial stuck too long
+  if (deal.stage === "تجريبي" && dealAge > 14) return { icon: "🔴", label: "تجريبي متأخر", color: "text-cc-red" };
+  if (deal.stage === "تجريبي" && dealAge > 7) return { icon: "🟡", label: "يحتاج متابعة", color: "text-amber" };
+  // No contact
+  if (daysSince >= 7) return { icon: "🔴", label: "صامت 7+ أيام", color: "text-cc-red" };
+  if (daysSince >= 3) return { icon: "🟡", label: "يحتاج تواصل", color: "text-amber" };
+  // Payment waiting
+  if (deal.stage === "انتظار الدفع") return { icon: "🟡", label: "ينتظر الدفع", color: "text-amber" };
+  return { icon: "🟢", label: "بخير", color: "text-cc-green" };
+}
+
 /* ─── Stage badge color mapping ─── */
 const STAGE_BADGE_COLOR: Record<string, "green" | "amber" | "purple" | "cyan" | "red" | "blue"> = {
   "قيد التواصل": "cyan",
@@ -506,6 +524,8 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const [tableDateFilter, setTableDateFilter] = useState<string | null>(null);
   const [tableCustomFrom, setTableCustomFrom] = useState("");
   const [tableCustomTo, setTableCustomTo] = useState("");
+  /* trial age filter: show only تجريبي deals older than N days */
+  const [trialDaysFilter, setTrialDaysFilter] = useState<number | null>(null);
   const { activeMonthIndex, filterCutoff } = useTopbarControls();
 
   /* time/month-filtered deals (used for all analytics + table) */
@@ -547,14 +567,21 @@ export function SalesSection({ salesType }: SalesPageProps) {
         return s >= _dateBounds[0] && s <= _dateBounds[1];
       })
     : baseFilteredDeals;
-  const filteredDeals = clientSearch
-    ? dateFilteredDeals.filter((d) => d.client_name.toLowerCase().includes(clientSearch.toLowerCase()) || (d.client_code && d.client_code.toLowerCase().includes(clientSearch.toLowerCase())) || (d.client_phone && d.client_phone.includes(clientSearch)))
+  const trialFilteredDeals = trialDaysFilter !== null
+    ? dateFilteredDeals.filter(d => {
+        if (d.stage !== "تجريبي") return false;
+        const age = Math.floor((Date.now() - new Date(d.deal_date || d.created_at).getTime()) / 86400000);
+        return age >= trialDaysFilter;
+      })
     : dateFilteredDeals;
+  const filteredDeals = clientSearch
+    ? trialFilteredDeals.filter((d) => d.client_name.toLowerCase().includes(clientSearch.toLowerCase()) || (d.client_code && d.client_code.toLowerCase().includes(clientSearch.toLowerCase())) || (d.client_phone && d.client_phone.includes(clientSearch)))
+    : trialFilteredDeals;
 
   const totalPages = Math.max(1, Math.ceil(filteredDeals.length / DEALS_PER_PAGE));
   const paginatedDeals = filteredDeals.slice((currentPage - 1) * DEALS_PER_PAGE, currentPage * DEALS_PER_PAGE);
 
-  useEffect(() => { setCurrentPage(1); }, [clientSearch, stageFilter, achieveFilter, repFilter, tableDateFilter, tableCustomFrom, tableCustomTo]);
+  useEffect(() => { setCurrentPage(1); }, [clientSearch, stageFilter, achieveFilter, repFilter, tableDateFilter, tableCustomFrom, tableCustomTo, trialDaysFilter]);
 
   useEffect(() => {
     setLoading(true);
@@ -1220,13 +1247,29 @@ export function SalesSection({ salesType }: SalesPageProps) {
             </div>
           )}
         </div>
-        <div className="p-4 pb-0 flex items-center gap-3">
+        <div className="p-4 pb-0 flex items-center gap-3 flex-wrap">
           <Input
             value={clientSearch}
             onChange={(e) => setClientSearch(e.target.value)}
             placeholder="ابحث باسم العميل أو رقم الجوال..."
             className="max-w-xs"
           />
+          {/* Trial age quick-filters */}
+          {[7, 14, 30].map(days => (
+            <button
+              key={days}
+              onClick={() => setTrialDaysFilter(trialDaysFilter === days ? null : days)}
+              className={`flex items-center gap-1 text-[12px] px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap ${
+                trialDaysFilter === days
+                  ? "bg-cc-purple/15 border-cc-purple/40 text-cc-purple font-semibold"
+                  : "border-border text-muted-foreground hover:text-foreground hover:bg-white/[0.06]"
+              }`}
+              title={`عرض التجريبي الذي مضى عليه أكثر من ${days} يوم`}
+            >
+              <FlaskConical className="w-3 h-3" />
+              تجريبي +{days}ي
+            </button>
+          ))}
           {filteredDeals.length > 0 && filteredDeals.every((d) => dailyTargetIds.has(d.id)) ? (
             <button onClick={deselectAll} className="text-[12px] px-2.5 py-1.5 rounded-lg border border-cc-red/30 text-cc-red hover:bg-cc-red/10 transition-colors whitespace-nowrap">
               <SquareCheck className="w-3 h-3 inline-block ml-1" />إلغاء تحديد الكل
@@ -1247,6 +1290,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
               <TableHead>المصدر</TableHead>
               <TableHead>الباقة</TableHead>
               <TableHead>المرحلة</TableHead>
+              <TableHead>النبضة</TableHead>
               <TableHead>القيمة</TableHead>
               <TableHead>المسؤول</TableHead>
               <TableHead>التاريخ</TableHead>
@@ -1279,8 +1323,8 @@ export function SalesSection({ salesType }: SalesPageProps) {
               ))
             ) : filteredDeals.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={15} className="text-center text-muted-foreground py-8">
-                  {stageFilter ? `لا توجد مبيعات في مرحلة "${stageFilter}"` : "لا توجد مبيعات"}
+                <TableCell colSpan={16} className="text-center text-muted-foreground py-8">
+                  {stageFilter ? `لا توجد مبيعات في مرحلة "${stageFilter}"` : trialDaysFilter ? `لا يوجد تجريبي مضى عليه أكثر من ${trialDaysFilter} يوم` : "لا توجد مبيعات"}
                 </TableCell>
               </TableRow>
             ) : (
@@ -1354,6 +1398,17 @@ export function SalesSection({ salesType }: SalesPageProps) {
                         </span>
                       )}
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    {(() => {
+                      const h = getDealHealthScore(deal);
+                      return (
+                        <span className={`flex items-center gap-1 text-xs font-medium ${h.color}`} title={h.label}>
+                          <span className="text-base leading-none">{h.icon}</span>
+                          <span className="hidden sm:inline">{h.label}</span>
+                        </span>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell className="font-bold text-cyan text-xs">
                     {formatMoneyFull(deal.deal_value)}
