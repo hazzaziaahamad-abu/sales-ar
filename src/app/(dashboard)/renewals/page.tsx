@@ -158,12 +158,13 @@ function getHealthScore(renewal: { status: string; updated_at: string; renewal_d
   if (renewal.status === "ملغي بسبب") return { icon: "⚫", label: "ملغي", color: "text-muted-foreground" };
   const daysSinceUpdate = Math.floor((Date.now() - new Date(renewal.updated_at).getTime()) / 86400000);
   const daysUntil = Math.ceil((new Date(renewal.renewal_date).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 86400000);
+  // Any renewal within 7 days or overdue → at least "يحتاج متابعة"
+  if (daysUntil < 0) return { icon: "🔴", label: "خطر", color: "text-cc-red" };
+  if (daysUntil <= 7) return { icon: "🟡", label: "يحتاج متابعة وتواصل", color: "text-amber" };
   let score = 100;
-  if (daysUntil < 0) score -= 40;
   if (daysSinceUpdate >= 7) score -= 35;
   else if (daysSinceUpdate >= 3) score -= 15;
   if (!hasNote) score -= 10;
-  if (renewal.status === "جاري المتابعة" || renewal.status === "انتظار الدفع") score += 10;
   if (score >= 75) return { icon: "🟢", label: "بخير", color: "text-cc-green" };
   if (score >= 45) return { icon: "🟡", label: "يحتاج متابعة", color: "text-amber" };
   return { icon: "🔴", label: "خطر", color: "text-cc-red" };
