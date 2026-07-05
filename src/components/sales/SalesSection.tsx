@@ -84,19 +84,17 @@ import {
 } from "lucide-react";
 
 /* ─── Deal health score ─── */
-function getDealHealthScore(deal: { stage: string; updated_at: string; deal_date: string; last_contact?: string | null }): { icon: string; label: string; color: string } {
+function getDealHealthScore(deal: { stage: string; updated_at: string; deal_date?: string | null; last_contact?: string | null; created_at: string }): { icon: string; label: string; color: string } {
   if (deal.stage === "مكتملة") return { icon: "✅", label: "مكتمل", color: "text-cc-green" };
   if (deal.stage === "مرفوض مع سبب" || deal.stage === "كنسل التجربة") return { icon: "⚫", label: "خسارة", color: "text-muted-foreground" };
   const ref = deal.last_contact || deal.deal_date;
   const daysSince = ref ? Math.floor((Date.now() - new Date(ref).getTime()) / 86400000) : 99;
-  const dealAge = deal.deal_date ? Math.floor((Date.now() - new Date(deal.deal_date).getTime()) / 86400000) : 0;
-  // Trial stuck too long
+  const dateBase = deal.deal_date || deal.created_at;
+  const dealAge = Math.floor((Date.now() - new Date(dateBase).getTime()) / 86400000);
   if (deal.stage === "تجريبي" && dealAge > 14) return { icon: "🔴", label: "تجريبي متأخر", color: "text-cc-red" };
   if (deal.stage === "تجريبي" && dealAge > 7) return { icon: "🟡", label: "يحتاج متابعة", color: "text-amber" };
-  // No contact
   if (daysSince >= 7) return { icon: "🔴", label: "صامت 7+ أيام", color: "text-cc-red" };
   if (daysSince >= 3) return { icon: "🟡", label: "يحتاج تواصل", color: "text-amber" };
-  // Payment waiting
   if (deal.stage === "انتظار الدفع") return { icon: "🟡", label: "ينتظر الدفع", color: "text-amber" };
   return { icon: "🟢", label: "بخير", color: "text-cc-green" };
 }
