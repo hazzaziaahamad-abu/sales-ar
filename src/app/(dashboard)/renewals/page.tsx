@@ -96,6 +96,7 @@ import {
   ChevronUp,
   ChevronLeft,
   ChevronRight,
+  MessageCircle,
 } from "lucide-react";
 
 /* ─── Permanently closed cancel reasons — excluded from main list ─── */
@@ -150,6 +151,22 @@ function getDaysRemainingStyle(days: number) {
   if (days <= 7) return { color: "text-cc-red", label: `${days} يوم` };
   if (days <= 30) return { color: "text-amber", label: `${days} يوم` };
   return { color: "text-cc-green", label: `${days} يوم` };
+}
+
+function getHealthScore(renewal: { status: string; updated_at: string; renewal_date: string }, hasNote: boolean): { icon: string; label: string; color: string } {
+  if (renewal.status === "مكتمل") return { icon: "✅", label: "مكتمل", color: "text-cc-green" };
+  if (renewal.status === "ملغي بسبب") return { icon: "⚫", label: "ملغي", color: "text-muted-foreground" };
+  const daysSinceUpdate = Math.floor((Date.now() - new Date(renewal.updated_at).getTime()) / 86400000);
+  const daysUntil = Math.ceil((new Date(renewal.renewal_date).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 86400000);
+  let score = 100;
+  if (daysUntil < 0) score -= 40;
+  if (daysSinceUpdate >= 7) score -= 35;
+  else if (daysSinceUpdate >= 3) score -= 15;
+  if (!hasNote) score -= 10;
+  if (renewal.status === "جاري المتابعة" || renewal.status === "انتظار الدفع") score += 10;
+  if (score >= 75) return { icon: "🟢", label: "بخير", color: "text-cc-green" };
+  if (score >= 45) return { icon: "🟡", label: "يحتاج متابعة", color: "text-amber" };
+  return { icon: "🔴", label: "خطر", color: "text-cc-red" };
 }
 
 function getPlanRecommendation(planName: string): { text: string; color: string; bg: string } | null {
@@ -390,6 +407,7 @@ export default function RenewalsPage() {
   const [tableDateFilter, setTableDateFilter] = useState<string | null>(null);
   const [tableCustomFrom, setTableCustomFrom] = useState("");
   const [tableCustomTo, setTableCustomTo] = useState("");
+  const [silentFilter, setSilentFilter] = useState(false);
   const PENDING_STATUSES = new Set(["مجدول", "مجدول تجديد", "جاري المتابعة", "انتظار الدفع"]);
   const listBase = statusFilter === "ملغي بسبب" ? monthFilteredRenewals : monthRenewals;
   const repFilteredRenewals = repFilter
@@ -407,9 +425,15 @@ export default function RenewalsPage() {
         return s >= _renewalDateBounds[0] && s <= _renewalDateBounds[1];
       })
     : statusFilteredRenewals;
-  const filteredRenewals_base = clientSearch
-    ? dateFilteredRenewals.filter((r) => r.customer_name.toLowerCase().includes(clientSearch.toLowerCase()) || (r.client_code && r.client_code.toLowerCase().includes(clientSearch.toLowerCase())))
+  const silentFilteredRenewals = silentFilter
+    ? dateFilteredRenewals.filter(r => {
+        if (r.status === "مكتمل" || r.status === "ملغي بسبب") return false;
+        return Math.floor((Date.now() - new Date(r.updated_at).getTime()) / 86400000) >= 7;
+      })
     : dateFilteredRenewals;
+  const filteredRenewals_base = clientSearch
+    ? silentFilteredRenewals.filter((r) => r.customer_name.toLowerCase().includes(clientSearch.toLowerCase()) || (r.client_code && r.client_code.toLowerCase().includes(clientSearch.toLowerCase())))
+    : silentFilteredRenewals;
 
   useEffect(() => {
     setLoading(true);
@@ -837,7 +861,7 @@ export default function RenewalsPage() {
   const totalPages = Math.max(1, Math.ceil(prioritySorted.length / PAGE_SIZE));
   const paginatedRenewals = prioritySorted.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  useEffect(() => { setCurrentPage(1); }, [statusFilter, clientSearch, salesTypeTab, summaryFilter, monthFilter, tableDateFilter, tableCustomFrom, tableCustomTo, focusFilter]);
+  useEffect(() => { setCurrentPage(1); }, [statusFilter, clientSearch, salesTypeTab, summaryFilter, monthFilter, tableDateFilter, tableCustomFrom, tableCustomTo, focusFilter, silentFilter]);
 
   /* ─── Excel template download ─── */
   const [uploadStatus, setUploadStatus] = useState<"idle" | "importing" | "done" | "error">("idle");
@@ -1575,13 +1599,25 @@ export default function RenewalsPage() {
             </div>
           )}
         </div>
-        <div className="px-4 pb-0 flex items-center gap-3 mt-3">
+        <div className="px-4 pb-0 flex items-center gap-3 mt-3 flex-wrap">
           <Input
             value={clientSearch}
             onChange={(e) => setClientSearch(e.target.value)}
             placeholder="ابحث باسم العميل..."
             className="max-w-xs"
           />
+          <button
+            onClick={() => setSilentFilter(v => !v)}
+            className={`flex items-center gap-1.5 text-[12px] px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap ${
+              silentFilter
+                ? "bg-cc-red/15 border-cc-red/40 text-cc-red font-semibold"
+                : "border-border text-muted-foreground hover:text-foreground hover:bg-white/[0.06]"
+            }`}
+            title="عرض العملاء الذين مضى أكثر من 7 أيام بدون تحديث"
+          >
+            <Bell className="w-3 h-3" />
+            صامت +7 أيام
+          </button>
           <button
             onClick={selectAllVisible}
             className="text-[12px] px-2.5 py-1.5 rounded-lg border border-cyan/30 text-cyan hover:bg-cyan/10 transition-colors whitespace-nowrap"
@@ -1602,6 +1638,7 @@ export default function RenewalsPage() {
               <TableHead>موعد التجديد</TableHead>
               <TableHead>تاريخ الدفع</TableHead>
               <TableHead>الأيام المتبقية</TableHead>
+              <TableHead>النبضة</TableHead>
               <TableHead>الحالة</TableHead>
               <TableHead>المسؤول</TableHead>
               <TableHead className="text-center">إجراءات</TableHead>
@@ -1611,14 +1648,14 @@ export default function RenewalsPage() {
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i}>
-                  {Array.from({ length: 10 }).map((_, j) => (
+                  {Array.from({ length: 11 }).map((_, j) => (
                     <TableCell key={j}><Skeleton className="h-4 w-20" /></TableCell>
                   ))}
                 </TableRow>
               ))
             ) : filteredRenewals.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
                   {statusFilter ? "لا توجد تجديدات مطابقة" : "لا توجد تجديدات بعد. اضغط \"إضافة تجديد\" لإضافة أول تجديد."}
                 </TableCell>
               </TableRow>
@@ -1722,6 +1759,18 @@ export default function RenewalsPage() {
                       </div>
                     </TableCell>
                     <TableCell>
+                      {(() => {
+                        const health = getHealthScore(renewal, !!latestNotes[renewal.id]);
+                        if (renewal.status === "مكتمل" || renewal.status === "ملغي بسبب") return <span className="text-base">{health.icon}</span>;
+                        return (
+                          <span className={`flex items-center gap-1 text-xs font-medium ${health.color}`} title={health.label}>
+                            <span className="text-base leading-none">{health.icon}</span>
+                            <span className="hidden sm:inline">{health.label}</span>
+                          </span>
+                        );
+                      })()}
+                    </TableCell>
+                    <TableCell>
                       <div className="flex items-center justify-center gap-1.5">
                         <span className={`inline-block px-2.5 py-1 rounded-full text-[12px] font-medium ${badge.bg} ${badge.color}`}>
                           {badge.text}
@@ -1743,6 +1792,26 @@ export default function RenewalsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-center gap-1">
+                        {renewal.customer_phone && renewal.status !== "مكتمل" && renewal.status !== "ملغي بسبب" && (() => {
+                          const phone = renewal.customer_phone.replace(/\D/g, "");
+                          const intlPhone = phone.startsWith("0") ? "966" + phone.slice(1) : phone;
+                          const daysUntil = getDaysRemaining(renewal.renewal_date);
+                          const urgency = daysUntil < 0 ? "تجاوز موعد التجديد" : daysUntil === 0 ? "ينتهي اليوم" : `ينتهي خلال ${daysUntil} يوم`;
+                          const msg = encodeURIComponent(
+                            `السلام عليكم ${renewal.customer_name}،\nنذكركم بأن اشتراككم في باقة "${renewal.plan_name}" ${urgency}.\nنرجو التواصل معنا لتجديد الاشتراك والاستمرار في الخدمة.\nشكراً لثقتكم 🙏`
+                          );
+                          return (
+                            <a
+                              href={`https://wa.me/${intlPhone}?text=${msg}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="إرسال تذكير واتساب"
+                              className="inline-flex items-center justify-center w-6 h-6 rounded hover:bg-green-500/10 text-green-500 transition-colors"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5" />
+                            </a>
+                          );
+                        })()}
                         <WatchlistPinButton entityType="renewal" entityId={renewal.id} entityName={renewal.customer_name} section="/renewals" />
                         <div className="relative">
                           <FollowUpLogButton entityType="renewal" entityId={renewal.id} entityName={renewal.customer_name} />
