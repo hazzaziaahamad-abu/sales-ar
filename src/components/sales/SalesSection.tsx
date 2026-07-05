@@ -1338,9 +1338,12 @@ export function SalesSection({ salesType }: SalesPageProps) {
 
       {/* ─── Daily Employee KPI Strip ─── */}
       {!loading && (() => {
-        const todayClosedDeals = deals.filter(d =>
-          d.stage === "مكتملة" && (d.close_date || d.updated_at || "").slice(0, 10) === todayStr
-        );
+        const todayClosedDeals = deals.filter(d => {
+          if (d.stage !== "مكتملة") return false;
+          const ts = d.close_date || d.updated_at;
+          if (!ts) return false;
+          try { return dateToLocal(new Date(ts)) === todayStr; } catch { return false; }
+        });
         const todayClosedCount = todayClosedDeals.length;
         const todayRevenue = todayClosedDeals.reduce((s, d) => s + d.deal_value, 0);
         const pct = kpiGoal > 0 ? Math.min(100, Math.round((todayClosedCount / kpiGoal) * 100)) : 0;
