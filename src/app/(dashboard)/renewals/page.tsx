@@ -152,6 +152,19 @@ function getDaysRemainingStyle(days: number) {
   return { color: "text-cc-green", label: `${days} يوم` };
 }
 
+function getPlanRecommendation(planName: string): { text: string; color: string; bg: string } | null {
+  const p = (planName || "").toLowerCase();
+  if (p.includes("تجريب") || p.includes("trial") || p.includes("مجاني"))
+    return { text: "💡 حوّله لباقة مدفوعة", color: "text-cc-purple", bg: "bg-purple-dim" };
+  if (p.includes("أساس") || p.includes("اساس") || p.includes("basic") || p.includes("starter") || p.includes("مبتدئ"))
+    return { text: "⬆️ اقترح ترقية للباقة المتوسطة", color: "text-cc-blue", bg: "bg-blue-dim" };
+  if (p.includes("متوسط") || p.includes("standard") || p.includes("medium") || p.includes("وسط"))
+    return { text: "✨ ذكّره بالمميزات غير المستخدمة", color: "text-amber", bg: "bg-amber-dim" };
+  if (p.includes("متقدم") || p.includes("premium") || p.includes("pro") || p.includes("enterprise") || p.includes("business") || p.includes("احترافي"))
+    return { text: "🎁 اعرض خصم ولاء للاحتفاظ به", color: "text-cc-green", bg: "bg-green-dim" };
+  return null;
+}
+
 export default function RenewalsPage() {
   const { activeOrgId: orgId, user: authUser } = useAuth();
   const isAdmin = authUser?.isSuperAdmin || authUser?.roleName === "مدير" || authUser?.roleName === "admin";
@@ -428,6 +441,22 @@ export default function RenewalsPage() {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [orgId]);
+
+  /* ─── Latest follow-up notes per renewal (for conversation history preview) ─── */
+  const [latestNotes, setLatestNotes] = useState<Record<string, string>>({});
+  const [notifDismissed, setNotifDismissed] = useState(false);
+
+  useEffect(() => {
+    fetchRecentFollowUpNotes(300)
+      .then((notes) => {
+        const map: Record<string, string> = {};
+        notes.filter(n => n.entity_type === "renewal").forEach(n => {
+          if (!map[n.entity_id]) map[n.entity_id] = n.note;
+        });
+        setLatestNotes(map);
+      })
+      .catch(console.error);
+  }, [renewals]);
 
   /* ─── Quote Commitment ─── */
   const todayStr = todayLocal();
@@ -1380,6 +1409,36 @@ export default function RenewalsPage() {
         </div>
       )}
 
+      {/* ─── Smart Notification Banner ─── */}
+      {!loading && !notifDismissed && (focusOverdue.length > 0 || focusToday.length > 0) && (
+        <div className="flex items-start gap-3 px-4 py-3 rounded-[14px] bg-gradient-to-l from-amber/[0.08] to-cc-red/[0.05] border border-amber/20">
+          <Bell className="w-4 h-4 text-amber mt-0.5 shrink-0 animate-pulse" />
+          <div className="flex-1 space-y-1">
+            {focusOverdue.length > 0 && (
+              <p className="text-sm text-cc-red font-semibold">
+                🔴 {focusOverdue.length} عميل تجاوز موعد التجديد — يحتاج تواصل عاجل
+              </p>
+            )}
+            {focusToday.length > 0 && (
+              <p className="text-sm text-amber font-semibold">
+                🟡 {focusToday.length} عميل موعدهم اليوم — لا تترك اليوم ينتهي بدون تواصل
+              </p>
+            )}
+            {focusWeek.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                📅 {focusWeek.length} عميل خلال الأسبوع القادم — ابدأ التحضير مبكراً
+              </p>
+            )}
+          </div>
+          <button
+            onClick={() => setNotifDismissed(true)}
+            className="text-muted-foreground hover:text-foreground text-xs px-2 py-1 rounded-lg hover:bg-white/[0.06] shrink-0"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* ─── Renewals Table ─── */}
       <div id="renewals-table" className="cc-card rounded-[14px] overflow-x-auto scroll-mt-4">
         <div className="px-4 pt-4 pb-0 flex items-center justify-between">
@@ -1601,25 +1660,45 @@ export default function RenewalsPage() {
                       {renewal.client_code || "—"}
                     </TableCell>
                     <TableCell className="font-medium text-foreground">
-                      <button
-                        onClick={() => { setProfileQuery(renewal.customer_phone || renewal.customer_name); setProfileOpen(true); }}
-                        className="hover:text-primary hover:underline transition-colors text-right"
-                      >
-                        {renewal.customer_name}
-                      </button>
-                      {isTarget && !isTargetDone && (
-                        <span className="mr-1.5 inline-block text-[11px] px-1.5 py-0.5 rounded bg-cyan/10 text-cyan font-medium">
-                          هدف اليوم
-                        </span>
-                      )}
-                      {isTargetDone && (
-                        <span className="mr-1.5 inline-block text-[11px] px-1.5 py-0.5 rounded bg-cc-green/15 text-cc-green font-medium">
-                          تم الإنجاز
-                        </span>
-                      )}
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <button
+                            onClick={() => { setProfileQuery(renewal.customer_phone || renewal.customer_name); setProfileOpen(true); }}
+                            className="hover:text-primary hover:underline transition-colors text-right"
+                          >
+                            {renewal.customer_name}
+                          </button>
+                          {isTarget && !isTargetDone && (
+                            <span className="text-[11px] px-1.5 py-0.5 rounded bg-cyan/10 text-cyan font-medium">
+                              هدف اليوم
+                            </span>
+                          )}
+                          {isTargetDone && (
+                            <span className="text-[11px] px-1.5 py-0.5 rounded bg-cc-green/15 text-cc-green font-medium">
+                              تم الإنجاز
+                            </span>
+                          )}
+                        </div>
+                        {latestNotes[renewal.id] && (
+                          <p className="text-[11px] text-muted-foreground max-w-[220px] truncate leading-tight" title={latestNotes[renewal.id]}>
+                            💬 {latestNotes[renewal.id]}
+                          </p>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-xs">
-                      {renewal.plan_name}
+                      <div className="flex flex-col gap-0.5">
+                        <span>{renewal.plan_name}</span>
+                        {(() => {
+                          const rec = getPlanRecommendation(renewal.plan_name);
+                          if (!rec || renewal.status === "مكتمل" || renewal.status === "ملغي بسبب") return null;
+                          return (
+                            <span className={`text-[11px] px-1.5 py-0.5 rounded-md ${rec.bg} ${rec.color} font-medium whitespace-nowrap`}>
+                              {rec.text}
+                            </span>
+                          );
+                        })()}
+                      </div>
                     </TableCell>
                     <TableCell className="font-bold text-cyan text-xs">
                       {formatMoneyFull(renewal.plan_price)}
