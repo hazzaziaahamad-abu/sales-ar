@@ -652,7 +652,6 @@ export default function RenewalsPage() {
   /* ─── Focus filter (daily task boxes) ─── */
   const [focusFilter, setFocusFilter] = useState<"overdue" | "today" | "week" | null>(null);
 
-  const todayStr = todayLocal();
   const _activeRenewals = filteredRenewals_summary.filter(r => r.status !== "مكتمل" && r.status !== "ملغي بسبب");
   const focusOverdue = _activeRenewals.filter(r => (r.renewal_date || "") < todayStr);
   const focusToday   = _activeRenewals.filter(r => (r.renewal_date || "").slice(0, 10) === todayStr);
