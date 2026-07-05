@@ -1224,7 +1224,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
       </div>
 
       {/* ─── Deal-close motivational banner ─── */}
-      {closeBanner && (
+      {isOffice && closeBanner && (
         <div className="relative flex items-center gap-4 px-5 py-4 rounded-2xl bg-gradient-to-l from-amber/20 via-cc-green/10 to-cyan/10 border border-amber/30 animate-pulse-once overflow-hidden">
           <div className="text-4xl">🎊</div>
           <div className="flex-1">
@@ -1238,8 +1238,8 @@ export function SalesSection({ salesType }: SalesPageProps) {
         </div>
       )}
 
-      {/* ─── Daily Focus Boxes ─── */}
-      {!loading && (() => {
+      {/* ─── Daily Focus Boxes (office only) ─── */}
+      {isOffice && !loading && (() => {
         const waitingDeals = repFilteredDeals.filter(d => d.stage === "انتظار الدفع");
         const negotiationDeals = repFilteredDeals.filter(d => d.stage === "تفاوض");
         const trialDeals = repFilteredDeals.filter(d => d.stage === "تجريبي");
