@@ -539,6 +539,25 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const [tableCustomTo, setTableCustomTo] = useState("");
   /* trial age filter: show only تجريبي deals older than N days */
   const [trialDaysFilter, setTrialDaysFilter] = useState<number | null>(null);
+
+  /* ─── Daily KPI strip ─── */
+  const kpiGoalKey = `daily_kpi_goal_${salesType}_${todayLocal()}`;
+  const [kpiGoal, setKpiGoal] = useState<number>(() => {
+    if (typeof window === "undefined") return 3;
+    try {
+      const saved = localStorage.getItem(`daily_kpi_goal_${salesType}_${todayLocal()}`);
+      return saved ? Math.max(1, parseInt(saved, 10)) : 3;
+    } catch { return 3; }
+  });
+  const [kpiGoalEditing, setKpiGoalEditing] = useState(false);
+  const [kpiGoalInput, setKpiGoalInput] = useState(String(kpiGoal));
+  function saveKpiGoal() {
+    const v = Math.max(1, parseInt(kpiGoalInput, 10) || 1);
+    setKpiGoal(v);
+    setKpiGoalInput(String(v));
+    try { localStorage.setItem(kpiGoalKey, String(v)); } catch {}
+    setKpiGoalEditing(false);
+  }
   const { activeMonthIndex, filterCutoff } = useTopbarControls();
 
   /* time/month-filtered deals (used for all analytics + table) */
@@ -1313,6 +1332,96 @@ export function SalesSection({ salesType }: SalesPageProps) {
                 )}
               </button>
             ))}
+          </div>
+        );
+      })()}
+
+      {/* ─── Daily Employee KPI Strip ─── */}
+      {!loading && (() => {
+        const todayClosedDeals = deals.filter(d =>
+          d.stage === "مكتملة" && (d.close_date || d.updated_at || "").slice(0, 10) === todayStr
+        );
+        const todayClosedCount = todayClosedDeals.length;
+        const todayRevenue = todayClosedDeals.reduce((s, d) => s + d.deal_value, 0);
+        const pct = kpiGoal > 0 ? Math.min(100, Math.round((todayClosedCount / kpiGoal) * 100)) : 0;
+        const goalReached = todayClosedCount >= kpiGoal && kpiGoal > 0;
+        const KPI_MSGS = [
+          "🏆 أتممت هدفك اليومي! أنت نجم الفريق",
+          "🔥 وصلت لهدفك! هذا ما يميّز الكبار",
+          "⚡ الهدف محقّق! واصل بنفس الزخم",
+          "💪 أنجزت هدفك! الفريق يفخر بك",
+          "🚀 عظيم! بلغت هدفك اليومي — هل تضيف المزيد؟",
+        ];
+        const kpiMsg = KPI_MSGS[todayClosedCount % KPI_MSGS.length];
+        return (
+          <div className={`rounded-2xl border px-5 py-4 ${goalReached ? "bg-gradient-to-l from-cc-green/10 via-amber/5 to-transparent border-cc-green/30" : "cc-card border-border"}`}>
+            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <Target className="w-4 h-4 text-cc-purple" />
+                <span className="text-sm font-bold text-foreground">هدف اليوم</span>
+                {goalReached && <span className="text-[12px] font-bold text-cc-green bg-cc-green/10 border border-cc-green/20 px-2 py-0.5 rounded-full">{kpiMsg}</span>}
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[12px] text-muted-foreground">الهدف اليومي:</span>
+                {kpiGoalEditing ? (
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min={1}
+                      value={kpiGoalInput}
+                      onChange={e => setKpiGoalInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter") saveKpiGoal(); if (e.key === "Escape") setKpiGoalEditing(false); }}
+                      autoFocus
+                      className="w-14 text-center text-[13px] bg-card border border-amber/40 rounded-lg px-2 py-0.5 text-foreground"
+                    />
+                    <button onClick={saveKpiGoal} className="text-[12px] px-2 py-0.5 rounded-lg bg-cc-green/15 text-cc-green border border-cc-green/30 hover:bg-cc-green/25">حفظ</button>
+                    <button onClick={() => setKpiGoalEditing(false)} className="text-[12px] px-2 py-0.5 rounded-lg bg-muted/50 text-muted-foreground border border-border">إلغاء</button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => { setKpiGoalInput(String(kpiGoal)); setKpiGoalEditing(true); }}
+                    className="flex items-center gap-1 text-[13px] font-bold text-amber hover:underline"
+                  >
+                    {kpiGoal} صفقة
+                    <Pencil className="w-3 h-3 opacity-60" />
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3 mb-3">
+              <div className="rounded-xl bg-card border border-border px-4 py-3 text-center">
+                <p className="text-[11px] text-muted-foreground mb-1">الهدف اليومي</p>
+                <p className="text-2xl font-extrabold text-amber">{kpiGoal}</p>
+                <p className="text-[11px] text-muted-foreground">صفقة</p>
+              </div>
+              <div className={`rounded-xl border px-4 py-3 text-center ${goalReached ? "bg-cc-green/10 border-cc-green/30" : "bg-card border-border"}`}>
+                <p className="text-[11px] text-muted-foreground mb-1">مكتمل اليوم</p>
+                <p className={`text-2xl font-extrabold ${goalReached ? "text-cc-green" : "text-foreground"}`}>{todayClosedCount}</p>
+                <p className="text-[11px] text-muted-foreground">صفقة</p>
+              </div>
+              <div className="rounded-xl bg-card border border-border px-4 py-3 text-center">
+                <p className="text-[11px] text-muted-foreground mb-1">إيراد اليوم</p>
+                <p className="text-2xl font-extrabold text-cc-green">{formatMoney(todayRevenue)}</p>
+                <p className="text-[11px] text-muted-foreground">ر.س</p>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-[12px]">
+                <span className="text-muted-foreground">التقدم</span>
+                <span className={`font-bold ${goalReached ? "text-cc-green" : pct >= 50 ? "text-amber" : "text-muted-foreground"}`}>{pct}%</span>
+              </div>
+              <div className="h-2.5 rounded-full bg-white/[0.06] overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${goalReached ? "bg-cc-green" : pct >= 50 ? "bg-amber" : "bg-cyan"}`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                {goalReached
+                  ? `أحسنت! أكملت ${todayClosedCount} من ${kpiGoal} صفقة`
+                  : `${kpiGoal - todayClosedCount} صفقة متبقية لإتمام هدف اليوم`}
+              </p>
+            </div>
           </div>
         );
       })()}
