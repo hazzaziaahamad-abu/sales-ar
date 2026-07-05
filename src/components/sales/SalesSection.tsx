@@ -533,8 +533,8 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const [achieveFilter, setAchieveFilter] = useState<string | null>(null);
   const [achieveFilterIds, setAchieveFilterIds] = useState<Set<string>>(new Set());
 
-  /* table date filter */
-  const [tableDateFilter, setTableDateFilter] = useState<string | null>(null);
+  /* table date filter — defaults to current month */
+  const [tableDateFilter, setTableDateFilter] = useState<string | null>("الشهر");
   const [tableCustomFrom, setTableCustomFrom] = useState("");
   const [tableCustomTo, setTableCustomTo] = useState("");
   /* trial age filter: show only تجريبي deals older than N days */
@@ -1240,9 +1240,9 @@ export function SalesSection({ salesType }: SalesPageProps) {
 
       {/* ─── Daily Focus Boxes ─── */}
       {!loading && (() => {
-        const waitingDeals = repFilteredDeals.filter(d => d.stage === "انتظار الدفع");
-        const negotiationDeals = repFilteredDeals.filter(d => d.stage === "تفاوض");
-        const trialDeals = repFilteredDeals.filter(d => d.stage === "تجريبي");
+        const waitingDeals = dateFilteredDeals.filter(d => d.stage === "انتظار الدفع");
+        const negotiationDeals = dateFilteredDeals.filter(d => d.stage === "تفاوض");
+        const trialDeals = dateFilteredDeals.filter(d => d.stage === "تجريبي");
         const oldTrials = trialDeals.filter(d => Math.floor((Date.now() - new Date(d.deal_date || d.created_at).getTime()) / 86400000) >= 7);
 
         const waitingValue = waitingDeals.reduce((s, d) => s + d.deal_value, 0);
