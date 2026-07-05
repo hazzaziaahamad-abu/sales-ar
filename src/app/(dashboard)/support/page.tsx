@@ -888,6 +888,218 @@ export default function SupportPage() {
         </div>
       )}
 
+      {/* -------- Tickets Table -------- */}
+      <div id="tickets-table" ref={tableRef} className="cc-card rounded-[14px] overflow-x-auto">
+        <div className="p-4 pb-0 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-foreground">تذاكر الدعم</h3>
+            <button
+              onClick={handleShareTable}
+              disabled={isTableExporting}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium text-muted-foreground hover:text-cyan hover:bg-cyan/10 transition-colors disabled:opacity-50 border border-transparent hover:border-cyan/20"
+              title="مشاركة الجدول كصورة"
+            >
+              {isTableExporting ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Share2 className="w-3.5 h-3.5" />
+              )}
+              مشاركة
+            </button>
+          </div>
+          {/* Date filter */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs text-muted-foreground shrink-0">الفترة:</span>
+            {(["اليوم", "أمس", "الأسبوع", "الشهر", "الشهر الماضي", "مخصص"] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setTableDateFilter(tableDateFilter === f ? null : f)}
+                className={`px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-colors border ${
+                  tableDateFilter === f
+                    ? "bg-cyan/15 text-cyan border-cyan/30"
+                    : "text-muted-foreground border-transparent hover:text-foreground hover:bg-white/[0.06]"
+                }`}
+              >
+                {f}
+              </button>
+            ))}
+            {tableDateFilter === "مخصص" && (
+              <div className="flex items-center gap-1.5">
+                <input type="date" value={tableCustomFrom} onChange={e => setTableCustomFrom(e.target.value)}
+                  className="text-[12px] bg-card border border-border rounded-lg px-2 py-1 text-foreground" />
+                <span className="text-xs text-muted-foreground">—</span>
+                <input type="date" value={tableCustomTo} onChange={e => setTableCustomTo(e.target.value)}
+                  className="text-[12px] bg-card border border-border rounded-lg px-2 py-1 text-foreground" />
+              </div>
+            )}
+          </div>
+          {/* Active category filter indicator */}
+          {categoryFilter && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-cyan/10 border border-cyan/20">
+              <span className="text-xs text-cyan font-medium">
+                {TICKET_CATEGORIES[categoryFilter]?.icon || "📋"} تصنيف: {categoryFilter}
+              </span>
+              <button
+                onClick={() => setCategoryFilter(null)}
+                className="mr-auto text-xs text-cyan hover:text-white font-medium px-2 py-1 rounded-md hover:bg-cyan/20 transition-colors"
+              >
+                ✕ إلغاء
+              </button>
+            </div>
+          )}
+          {/* Search */}
+          <div className="relative max-w-sm">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <Input
+              value={clientSearch}
+              onChange={(e) => setClientSearch(e.target.value)}
+              placeholder="ابحث باسم العميل أو رقم الجوال..."
+              className="pr-9"
+            />
+          </div>
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-right">#</TableHead>
+              <TableHead className="text-right">النوع</TableHead>
+              <TableHead className="text-right">العميل</TableHead>
+              <TableHead className="text-right">التاريخ</TableHead>
+              <TableHead className="text-right">الجوال</TableHead>
+              <TableHead className="text-right">التصنيف</TableHead>
+              <TableHead className="text-right">الوصف</TableHead>
+              <TableHead className="text-right">موعد التسليم</TableHead>
+              <TableHead className="text-right">الأولوية</TableHead>
+              <TableHead className="text-right">الحالة</TableHead>
+              <TableHead className="text-right">الموظف</TableHead>
+              <TableHead className="text-right">إجراءات</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              Array.from({ length: 6 }).map((_, index) => (
+                <TableRow key={index}>
+                  <TableCell className="text-right"><Skeleton className="mr-auto h-4 w-10" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="mr-auto h-6 w-14 rounded-full" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="mr-auto h-4 w-24" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="mr-auto h-4 w-20" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="mr-auto h-4 w-24" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="mr-auto h-6 w-16 rounded-full" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="mr-auto h-4 w-36" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="mr-auto h-4 w-20" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="mr-auto h-6 w-14 rounded-full" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="mr-auto h-6 w-16 rounded-full" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="mr-auto h-4 w-20" /></TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center gap-1">
+                      <Skeleton className="h-7 w-7 rounded-md" />
+                      <Skeleton className="h-7 w-7 rounded-md" />
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : filteredTickets.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
+                  {cardFilter ? `لا توجد تذاكر "${cardFilter}"` : "لا توجد تذاكر"}
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredTickets.map((ticket) => (
+                <TableRow key={ticket.id}>
+                  <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                    {ticket.ticket_number}
+                  </TableCell>
+                  <TableCell className="text-right text-xs">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] font-medium ${
+                      (ticket.request_type || "problem") === "service"
+                        ? "bg-cc-blue/10 text-cc-blue"
+                        : "bg-cc-red/10 text-cc-red"
+                    }`}>
+                      {(ticket.request_type || "problem") === "service" ? "خدمة" : "مشكلة"}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right text-xs font-medium">
+                    {ticket.client_name}
+                  </TableCell>
+                  <TableCell className="text-right text-xs text-muted-foreground">
+                    <div>{ticket.open_date ? formatDate(ticket.open_date) : "—"}</div>
+                    {ticket.open_time && <div className="text-[12px] text-muted-foreground/70" dir="ltr">{ticket.open_time}</div>}
+                  </TableCell>
+                  <TableCell className="text-right text-xs text-muted-foreground" dir="ltr">
+                    {ticket.client_phone ? formatPhone(ticket.client_phone) : "—"}
+                  </TableCell>
+                  <TableCell className="text-right text-xs">
+                    {ticket.issue_category ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan/10 text-cyan text-[12px] font-medium">
+                        {TICKET_CATEGORIES[ticket.issue_category]?.icon} {ticket.issue_category}
+                      </span>
+                    ) : <span className="text-muted-foreground">—</span>}
+                    {ticket.issue_subcategory && (
+                      <p className="text-[12px] text-muted-foreground mt-0.5">{ticket.issue_subcategory}</p>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right text-xs max-w-[200px] truncate">
+                    {ticket.issue}
+                  </TableCell>
+                  <TableCell className="text-right text-xs">
+                    {ticket.due_date ? (
+                      <span className={`flex items-center gap-1.5 ${DUE_DATE_STYLES[dueDateStatus(ticket.due_date)]}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${DUE_DATE_DOT[dueDateStatus(ticket.due_date)]}`} />
+                        {formatDate(ticket.due_date)}
+                      </span>
+                    ) : "—"}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <ColorBadge
+                      text={ticket.priority}
+                      color={priorityColor(ticket.priority)}
+                    />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <ColorBadge
+                      text={ticket.status}
+                      color={statusColor(ticket.status)}
+                    />
+                  </TableCell>
+                  <TableCell className="text-right text-xs">
+                    {ticket.assigned_agent_name || "—"}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center gap-1">
+                      <WatchlistPinButton entityType="ticket" entityId={ticket.id} entityName={ticket.client_name} section="/support" />
+                      <FollowUpLogButton
+                        entityType="ticket"
+                        entityId={ticket.id}
+                        entityName={ticket.client_name}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        onClick={() => openEditDialog(ticket)}
+                        title="تعديل"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                      {(authUser?.isSuperAdmin || authUser?.roleName === "مدير" || authUser?.roleName === "admin") && (
+                      <Button
+                        variant="destructive"
+                        size="icon-xs"
+                        onClick={() => confirmDelete(ticket.id)}
+                        title="حذف"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
       {/* -------- Employee Filter -------- */}
       {!loading && (
         <div className="flex items-center gap-3">
@@ -1123,218 +1335,6 @@ export default function SupportPage() {
           )}
         </div>
       )}
-
-      {/* -------- Tickets Table -------- */}
-      <div id="tickets-table" ref={tableRef} className="cc-card rounded-[14px] overflow-x-auto">
-        <div className="p-4 pb-0 space-y-3">
-          {/* Share button */}
-          <div className="flex items-center justify-end">
-            <button
-              onClick={handleShareTable}
-              disabled={isTableExporting}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium text-muted-foreground hover:text-cyan hover:bg-cyan/10 transition-colors disabled:opacity-50 border border-transparent hover:border-cyan/20"
-              title="مشاركة الجدول كصورة"
-            >
-              {isTableExporting ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Share2 className="w-3.5 h-3.5" />
-              )}
-              مشاركة
-            </button>
-          </div>
-          {/* Date filter */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-xs text-muted-foreground shrink-0">الفترة:</span>
-            {(["اليوم", "أمس", "الأسبوع", "الشهر", "الشهر الماضي", "مخصص"] as const).map((f) => (
-              <button
-                key={f}
-                onClick={() => setTableDateFilter(tableDateFilter === f ? null : f)}
-                className={`px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-colors border ${
-                  tableDateFilter === f
-                    ? "bg-cyan/15 text-cyan border-cyan/30"
-                    : "text-muted-foreground border-transparent hover:text-foreground hover:bg-white/[0.06]"
-                }`}
-              >
-                {f}
-              </button>
-            ))}
-            {tableDateFilter === "مخصص" && (
-              <div className="flex items-center gap-1.5">
-                <input type="date" value={tableCustomFrom} onChange={e => setTableCustomFrom(e.target.value)}
-                  className="text-[12px] bg-card border border-border rounded-lg px-2 py-1 text-foreground" />
-                <span className="text-xs text-muted-foreground">—</span>
-                <input type="date" value={tableCustomTo} onChange={e => setTableCustomTo(e.target.value)}
-                  className="text-[12px] bg-card border border-border rounded-lg px-2 py-1 text-foreground" />
-              </div>
-            )}
-          </div>
-          {/* Active category filter indicator */}
-          {categoryFilter && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-cyan/10 border border-cyan/20">
-              <span className="text-xs text-cyan font-medium">
-                {TICKET_CATEGORIES[categoryFilter]?.icon || "📋"} تصنيف: {categoryFilter}
-              </span>
-              <button
-                onClick={() => setCategoryFilter(null)}
-                className="mr-auto text-xs text-cyan hover:text-white font-medium px-2 py-1 rounded-md hover:bg-cyan/20 transition-colors"
-              >
-                ✕ إلغاء
-              </button>
-            </div>
-          )}
-          {/* Search */}
-          <div className="relative max-w-sm">
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-            <Input
-              value={clientSearch}
-              onChange={(e) => setClientSearch(e.target.value)}
-              placeholder="ابحث باسم العميل أو رقم الجوال..."
-              className="pr-9"
-            />
-          </div>
-        </div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-right">#</TableHead>
-              <TableHead className="text-right">النوع</TableHead>
-              <TableHead className="text-right">العميل</TableHead>
-              <TableHead className="text-right">التاريخ</TableHead>
-              <TableHead className="text-right">الجوال</TableHead>
-              <TableHead className="text-right">التصنيف</TableHead>
-              <TableHead className="text-right">الوصف</TableHead>
-              <TableHead className="text-right">موعد التسليم</TableHead>
-              <TableHead className="text-right">الأولوية</TableHead>
-              <TableHead className="text-right">الحالة</TableHead>
-              <TableHead className="text-right">الموظف</TableHead>
-              <TableHead className="text-right">إجراءات</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              Array.from({ length: 6 }).map((_, index) => (
-                <TableRow key={index}>
-                  <TableCell className="text-right"><Skeleton className="mr-auto h-4 w-10" /></TableCell>
-                  <TableCell className="text-right"><Skeleton className="mr-auto h-6 w-14 rounded-full" /></TableCell>
-                  <TableCell className="text-right"><Skeleton className="mr-auto h-4 w-24" /></TableCell>
-                  <TableCell className="text-right"><Skeleton className="mr-auto h-4 w-20" /></TableCell>
-                  <TableCell className="text-right"><Skeleton className="mr-auto h-4 w-24" /></TableCell>
-                  <TableCell className="text-right"><Skeleton className="mr-auto h-6 w-16 rounded-full" /></TableCell>
-                  <TableCell className="text-right"><Skeleton className="mr-auto h-4 w-36" /></TableCell>
-                  <TableCell className="text-right"><Skeleton className="mr-auto h-4 w-20" /></TableCell>
-                  <TableCell className="text-right"><Skeleton className="mr-auto h-6 w-14 rounded-full" /></TableCell>
-                  <TableCell className="text-right"><Skeleton className="mr-auto h-6 w-16 rounded-full" /></TableCell>
-                  <TableCell className="text-right"><Skeleton className="mr-auto h-4 w-20" /></TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center gap-1">
-                      <Skeleton className="h-7 w-7 rounded-md" />
-                      <Skeleton className="h-7 w-7 rounded-md" />
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : filteredTickets.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
-                  {cardFilter ? `لا توجد تذاكر "${cardFilter}"` : "لا توجد تذاكر"}
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredTickets.map((ticket) => (
-                <TableRow key={ticket.id}>
-                  <TableCell className="text-right font-mono text-xs text-muted-foreground">
-                    {ticket.ticket_number}
-                  </TableCell>
-                  <TableCell className="text-right text-xs">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] font-medium ${
-                      (ticket.request_type || "problem") === "service"
-                        ? "bg-cc-blue/10 text-cc-blue"
-                        : "bg-cc-red/10 text-cc-red"
-                    }`}>
-                      {(ticket.request_type || "problem") === "service" ? "خدمة" : "مشكلة"}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right text-xs font-medium">
-                    {ticket.client_name}
-                  </TableCell>
-                  <TableCell className="text-right text-xs text-muted-foreground">
-                    <div>{ticket.open_date ? formatDate(ticket.open_date) : "—"}</div>
-                    {ticket.open_time && <div className="text-[12px] text-muted-foreground/70" dir="ltr">{ticket.open_time}</div>}
-                  </TableCell>
-                  <TableCell className="text-right text-xs text-muted-foreground" dir="ltr">
-                    {ticket.client_phone ? formatPhone(ticket.client_phone) : "—"}
-                  </TableCell>
-                  <TableCell className="text-right text-xs">
-                    {ticket.issue_category ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan/10 text-cyan text-[12px] font-medium">
-                        {TICKET_CATEGORIES[ticket.issue_category]?.icon} {ticket.issue_category}
-                      </span>
-                    ) : <span className="text-muted-foreground">—</span>}
-                    {ticket.issue_subcategory && (
-                      <p className="text-[12px] text-muted-foreground mt-0.5">{ticket.issue_subcategory}</p>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right text-xs max-w-[200px] truncate">
-                    {ticket.issue}
-                  </TableCell>
-                  <TableCell className="text-right text-xs">
-                    {ticket.due_date ? (
-                      <span className={`flex items-center gap-1.5 ${DUE_DATE_STYLES[dueDateStatus(ticket.due_date)]}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${DUE_DATE_DOT[dueDateStatus(ticket.due_date)]}`} />
-                        {formatDate(ticket.due_date)}
-                      </span>
-                    ) : "—"}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <ColorBadge
-                      text={ticket.priority}
-                      color={priorityColor(ticket.priority)}
-                    />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <ColorBadge
-                      text={ticket.status}
-                      color={statusColor(ticket.status)}
-                    />
-                  </TableCell>
-                  <TableCell className="text-right text-xs">
-                    {ticket.assigned_agent_name || "—"}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center gap-1">
-                      <WatchlistPinButton entityType="ticket" entityId={ticket.id} entityName={ticket.client_name} section="/support" />
-                      <FollowUpLogButton
-                        entityType="ticket"
-                        entityId={ticket.id}
-                        entityName={ticket.client_name}
-                      />
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        onClick={() => openEditDialog(ticket)}
-                        title="تعديل"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </Button>
-                      {(authUser?.isSuperAdmin || authUser?.roleName === "مدير" || authUser?.roleName === "admin") && (
-                      <Button
-                        variant="destructive"
-                        size="icon-xs"
-                        onClick={() => confirmDelete(ticket.id)}
-                        title="حذف"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
 
       {/* -------- Activity Tracking Log -------- */}
       <div className="cc-card rounded-[14px] overflow-hidden">
