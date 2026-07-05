@@ -273,6 +273,25 @@ export default function RenewalsPage() {
     localStorage.setItem(todayKey, JSON.stringify([]));
   }
 
+  /* contact actions (call + whatsapp) — persisted per day in localStorage */
+  const contactKey = `contact_actions_${todayLocal()}`;
+  const [contactActions, setContactActions] = useState<Record<string, { call: boolean; whatsapp: boolean }>>(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      const saved = localStorage.getItem(contactKey);
+      return saved ? JSON.parse(saved) : {};
+    } catch { return {}; }
+  });
+
+  function toggleContactAction(id: string, type: "call" | "whatsapp") {
+    setContactActions((prev) => {
+      const cur = prev[id] || { call: false, whatsapp: false };
+      const next = { ...prev, [id]: { ...cur, [type]: !cur[type] } };
+      localStorage.setItem(contactKey, JSON.stringify(next));
+      return next;
+    });
+  }
+
   async function buildDailyReport() {
     const targetRenewals = renewals.filter((r) => dailyTargetIds.has(r.id));
     const completed = targetRenewals.filter((r) => r.status === "مكتمل");
@@ -1762,12 +1781,44 @@ export default function RenewalsPage() {
                     <TableCell>
                       {(() => {
                         const health = getHealthScore(renewal, !!latestNotes[renewal.id]);
-                        if (renewal.status === "مكتمل" || renewal.status === "ملغي بسبب") return <span className="text-base">{health.icon}</span>;
+                        if (renewal.status === "مكتمل" || renewal.status === "ملغي بسبب")
+                          return <span className="text-base">{health.icon}</span>;
+                        const daysUntil = Math.ceil((new Date(renewal.renewal_date).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 86400000);
+                        const needsAction = daysUntil <= 7;
+                        const ca = contactActions[renewal.id] || { call: false, whatsapp: false };
                         return (
-                          <span className={`flex items-center gap-1 text-xs font-medium ${health.color}`} title={health.label}>
-                            <span className="text-base leading-none">{health.icon}</span>
-                            <span className="hidden sm:inline">{health.label}</span>
-                          </span>
+                          <div className="flex flex-col gap-1.5 min-w-[110px]">
+                            <span className={`flex items-center gap-1 text-xs font-medium ${health.color}`} title={health.label}>
+                              <span className="text-base leading-none">{health.icon}</span>
+                              <span>{health.label}</span>
+                            </span>
+                            {needsAction && (
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  onClick={() => toggleContactAction(renewal.id, "call")}
+                                  title="تم الاتصال"
+                                  className={`flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-md border transition-all font-medium ${
+                                    ca.call
+                                      ? "bg-cc-green/15 border-cc-green/40 text-cc-green"
+                                      : "border-border text-muted-foreground hover:border-cc-green/40 hover:text-cc-green"
+                                  }`}
+                                >
+                                  {ca.call ? "✅" : "☎️"} اتصال
+                                </button>
+                                <button
+                                  onClick={() => toggleContactAction(renewal.id, "whatsapp")}
+                                  title="تم التواصل عبر واتساب"
+                                  className={`flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-md border transition-all font-medium ${
+                                    ca.whatsapp
+                                      ? "bg-cc-green/15 border-cc-green/40 text-cc-green"
+                                      : "border-border text-muted-foreground hover:border-cc-green/40 hover:text-cc-green"
+                                  }`}
+                                >
+                                  {ca.whatsapp ? "✅" : "💬"} واتس
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         );
                       })()}
                     </TableCell>
