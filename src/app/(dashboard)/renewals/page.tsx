@@ -1287,243 +1287,11 @@ export default function RenewalsPage() {
         </div>
       )}
 
-      {/* ─── Employee Filter ─── */}
-      {!loading && (
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <User className="w-4 h-4" />
-            <span className="font-medium">الموظف:</span>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            <button
-              onClick={() => setRepFilter(null)}
-              className={`px-3 py-1.5 rounded-xl text-xs transition-all border ${
-                !repFilter ? "bg-cyan/15 text-cyan font-medium border-cyan/30" : "text-muted-foreground hover:text-foreground border-border"
-              }`}
-            >
-              الكل
-            </button>
-            {[...new Set(renewals.map(r => r.assigned_rep).filter(Boolean))].map((name) => (
-              <button
-                key={name}
-                onClick={() => setRepFilter(repFilter === name ? null : name!)}
-                className={`px-3 py-1.5 rounded-xl text-xs transition-all border ${
-                  repFilter === name ? "bg-cyan/15 text-cyan font-medium border-cyan/30" : "text-muted-foreground hover:text-foreground border-border"
-                }`}
-              >
-                {name}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ─── 4 KPI Cards ─── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {loading ? (
-          Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)
-        ) : (
-          <>
-            <StatCard
-              value={analytics.total.toLocaleString()}
-              label="إجمالي التجديدات"
-              color="cyan"
-              icon={<Users className="w-4 h-4 text-cyan" />}
-              onClick={() => setStatusFilter(null)}
-              active={statusFilter === null}
-            />
-            <StatCard
-              value={analytics.renewed.toLocaleString()}
-              label="مكتمل"
-              color="green"
-              icon={<CheckCircle2 className="w-4 h-4 text-cc-green" />}
-              subtext={`${analytics.renewalRate}%`}
-              progress={analytics.renewalRate}
-              onClick={() => setStatusFilter(statusFilter === "مكتمل" ? null : "مكتمل")}
-              active={statusFilter === "مكتمل"}
-            />
-            <StatCard
-              value={analytics.cancelled.toLocaleString()}
-              label="ملغي بسبب"
-              color="red"
-              icon={<XCircle className="w-4 h-4 text-cc-red" />}
-              subtext={`${analytics.churnRate}%`}
-              onClick={() => setStatusFilter(statusFilter === "ملغي بسبب" ? null : "ملغي بسبب")}
-              active={statusFilter === "ملغي بسبب"}
-            />
-            <StatCard
-              value={(analytics.scheduled + analytics.following + analytics.waiting).toLocaleString()}
-              label="قيد المتابعة"
-              color="amber"
-              icon={<Clock className="w-4 h-4 text-amber" />}
-              subtext={analytics.total > 0 ? `${Math.round(((analytics.scheduled + analytics.following + analytics.waiting) / analytics.total) * 100)}%` : "0%"}
-              onClick={() => setStatusFilter(statusFilter === "pending" ? null : "pending")}
-              active={statusFilter === "pending"}
-            />
-          </>
-        )}
-      </div>
-
-      {/* ─── Target Tracking ─── */}
-      {!loading && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <TargetCard
-            label="معدل التجديد"
-            actual={analytics.renewalRate}
-            target={75}
-            unit="%"
-            status={renewalStatus}
-          />
-          <TargetCard
-            label="معدل الإلغاء (Churn)"
-            actual={analytics.churnRate}
-            target={15}
-            unit="%"
-            status={churnStatus}
-            inverted
-          />
-          <div className="cc-card rounded-[14px] p-5">
-            <div className="flex items-center gap-3 mb-2">
-              <TrendingDown className="w-5 h-5 text-cc-red" />
-              <p className="text-xs text-muted-foreground">خسارة الإيرادات</p>
-            </div>
-            <p className="text-2xl font-extrabold text-cc-red">
-              {formatMoneyFull(analytics.revenueLoss)}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              إجمالي الإيرادات المفقودة من العملاء الذين ألغوا
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* ─── Daily Target Summary ─── */}
-      {dailyTargetIds.size > 0 && !loading && (() => {
-        const targetRenewals = renewals.filter((r) => dailyTargetIds.has(r.id));
-        const completed = targetRenewals.filter((r) => r.status === "مكتمل").length;
-        const total = targetRenewals.length;
-        const remaining = total - completed;
-        const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
-        const allDone = remaining === 0 && total > 0;
-
-        const { h: hoursLeft, m: minutesLeft, s: secondsLeft, timeUp } = countdown;
-
-        const motivationMsg = allDone
-          ? "ممتاز! أنجزت كل أهداف اليوم 🏆"
-          : timeUp ? "انتهى وقت العمل! أكمل ما تبقى"
-          : rate >= 80 ? "أنت قريب جداً من الإنجاز! 💪"
-          : rate >= 50 ? `باقي ${remaining} فقط، استمر! 🔥`
-          : rate > 0 ? "بداية جيدة، واصل التقدم ⚡"
-          : `${total} عميل بانتظارك، ابدأ الآن! 🚀`;
-
-        const borderColor = allDone ? "border-cc-green/30" : "border-cyan/20";
-        const bgGrad = allDone
-          ? "bg-gradient-to-l from-cc-green/[0.06] to-transparent"
-          : "bg-gradient-to-l from-cyan/[0.04] to-transparent";
-
-        return (
-          <div className={`cc-card rounded-[14px] p-4 border ${borderColor} ${bgGrad} transition-all duration-500`}>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${allDone ? "bg-cc-green/15" : "bg-cyan/10"}`}>
-                  <Target className={`w-4 h-4 ${allDone ? "text-cc-green" : "text-cyan"}`} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-foreground">الهدف اليومي</h3>
-                  <span className="text-[12px] text-muted-foreground">
-                    {new Date().toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "long", day: "numeric", month: "short" })}
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className={`hidden sm:inline text-xs font-medium px-2.5 py-1 rounded-full ${
-                  allDone ? "bg-cc-green/15 text-cc-green" : rate >= 50 ? "bg-amber/15 text-amber" : "bg-cyan/10 text-cyan"
-                }`}>
-                  {motivationMsg}
-                </span>
-                <button
-                  onClick={shareReport}
-                  className="flex items-center gap-1 text-[12px] px-2 py-1.5 rounded-lg border border-cc-purple/30 text-cc-purple hover:bg-cc-purple/10 transition-colors"
-                  title="مشاركة التقرير"
-                >
-                  <Share2 className="w-3 h-3" />
-                  مشاركة
-                </button>
-                <button
-                  onClick={exportReport}
-                  className="flex items-center gap-1 text-[12px] px-2 py-1.5 rounded-lg border border-cyan/30 text-cyan hover:bg-cyan/10 transition-colors"
-                  title="تحميل التقرير"
-                >
-                  <Download className="w-3 h-3" />
-                  تصدير
-                </button>
-                <button
-                  onClick={deselectAll}
-                  className="text-[12px] text-muted-foreground hover:text-cc-red transition-colors"
-                >
-                  مسح
-                </button>
-              </div>
-            </div>
-
-            {/* Progress bar with segments */}
-            <div className="relative mb-3">
-              <div className="h-3 rounded-full bg-muted/40 overflow-hidden flex">
-                {targetRenewals.map((r) => (
-                  <div
-                    key={r.id}
-                    className={`h-full transition-all duration-700 ${
-                      r.status === "مكتمل" ? "bg-cc-green" : "bg-muted/60"
-                    }`}
-                    style={{ width: `${100 / total}%` }}
-                    title={`${r.customer_name} — ${r.status}`}
-                  />
-                ))}
-              </div>
-              <div className="flex items-center justify-between mt-1">
-                <span className="text-[12px] text-muted-foreground">{completed} / {total}</span>
-                <span className={`text-xs font-extrabold ${
-                  allDone ? "text-cc-green" : rate >= 50 ? "text-amber" : "text-cyan"
-                }`}>
-                  {rate}%
-                </span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-4 gap-3">
-              <div className="text-center p-2.5 rounded-lg bg-card/50 border border-border/30">
-                <p className="text-lg mb-0.5">{allDone ? "🏆" : timeUp ? "⏰" : hoursLeft < 2 ? "😰" : "🎯"}</p>
-                <p className="text-xl font-extrabold text-cyan">{total}</p>
-                <p className="text-[12px] text-muted-foreground mt-0.5">الهدف</p>
-              </div>
-              <div className="text-center p-2.5 rounded-lg bg-card/50 border border-border/30">
-                <p className="text-lg mb-0.5">{completed > 0 ? "✅" : "⭕"}</p>
-                <p className="text-xl font-extrabold text-cc-green">{completed}</p>
-                <p className="text-[12px] text-muted-foreground mt-0.5">مكتمل</p>
-              </div>
-              <div className="text-center p-2.5 rounded-lg bg-card/50 border border-border/30">
-                <p className="text-lg mb-0.5">{remaining === 0 ? "🎉" : remaining <= 2 ? "💪" : "⏳"}</p>
-                <p className={`text-xl font-extrabold ${remaining > 0 ? "text-amber" : "text-cc-green"}`}>{remaining}</p>
-                <p className="text-[12px] text-muted-foreground mt-0.5">متبقي</p>
-              </div>
-              <div className={`text-center p-2.5 rounded-lg border ${
-                allDone ? "bg-cc-green/10 border-cc-green/30" : timeUp ? "bg-red-500/10 border-red-500/30" : hoursLeft < 2 ? "bg-amber/10 border-amber/30" : "bg-card/50 border-border/30"
-              }`}>
-                <p className="text-lg mb-0.5">{allDone ? "🎊" : timeUp ? "🔴" : hoursLeft < 2 ? "🟡" : "🟢"}</p>
-                <p className={`text-xl font-extrabold ${
-                  allDone ? "text-cc-green" : timeUp ? "text-cc-red" : hoursLeft < 2 ? "text-amber" : "text-cyan"
-                }`}>
-                  {allDone ? "تم!" : timeUp ? "انتهى" : `${hoursLeft}:${String(minutesLeft).padStart(2, "0")}:${String(secondsLeft).padStart(2, "0")}`}
-                </p>
-                <p className="text-[12px] text-muted-foreground mt-0.5">{allDone ? "أنجزت الهدف" : "الوقت المتبقي"}</p>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
       {/* ─── Renewals Table ─── */}
       <div id="renewals-table" className="cc-card rounded-[14px] overflow-x-auto scroll-mt-4">
+        <div className="px-4 pt-4 pb-0 flex items-center justify-between">
+          <h3 className="text-sm font-bold text-foreground">تذاكر التجديدات</h3>
+        </div>
         {/* Year + Month filter */}
         {availableYears.length > 1 && (
           <div className="px-4 pt-4 pb-1 flex items-center gap-1.5 flex-wrap">
@@ -1887,6 +1655,241 @@ export default function RenewalsPage() {
           </div>
         </div>
       )}
+
+      {/* ─── Employee Filter ─── */}
+      {!loading && (
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <User className="w-4 h-4" />
+            <span className="font-medium">الموظف:</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              onClick={() => setRepFilter(null)}
+              className={`px-3 py-1.5 rounded-xl text-xs transition-all border ${
+                !repFilter ? "bg-cyan/15 text-cyan font-medium border-cyan/30" : "text-muted-foreground hover:text-foreground border-border"
+              }`}
+            >
+              الكل
+            </button>
+            {[...new Set(renewals.map(r => r.assigned_rep).filter(Boolean))].map((name) => (
+              <button
+                key={name}
+                onClick={() => setRepFilter(repFilter === name ? null : name!)}
+                className={`px-3 py-1.5 rounded-xl text-xs transition-all border ${
+                  repFilter === name ? "bg-cyan/15 text-cyan font-medium border-cyan/30" : "text-muted-foreground hover:text-foreground border-border"
+                }`}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ─── 4 KPI Cards ─── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {loading ? (
+          Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)
+        ) : (
+          <>
+            <StatCard
+              value={analytics.total.toLocaleString()}
+              label="إجمالي التجديدات"
+              color="cyan"
+              icon={<Users className="w-4 h-4 text-cyan" />}
+              onClick={() => setStatusFilter(null)}
+              active={statusFilter === null}
+            />
+            <StatCard
+              value={analytics.renewed.toLocaleString()}
+              label="مكتمل"
+              color="green"
+              icon={<CheckCircle2 className="w-4 h-4 text-cc-green" />}
+              subtext={`${analytics.renewalRate}%`}
+              progress={analytics.renewalRate}
+              onClick={() => setStatusFilter(statusFilter === "مكتمل" ? null : "مكتمل")}
+              active={statusFilter === "مكتمل"}
+            />
+            <StatCard
+              value={analytics.cancelled.toLocaleString()}
+              label="ملغي بسبب"
+              color="red"
+              icon={<XCircle className="w-4 h-4 text-cc-red" />}
+              subtext={`${analytics.churnRate}%`}
+              onClick={() => setStatusFilter(statusFilter === "ملغي بسبب" ? null : "ملغي بسبب")}
+              active={statusFilter === "ملغي بسبب"}
+            />
+            <StatCard
+              value={(analytics.scheduled + analytics.following + analytics.waiting).toLocaleString()}
+              label="قيد المتابعة"
+              color="amber"
+              icon={<Clock className="w-4 h-4 text-amber" />}
+              subtext={analytics.total > 0 ? `${Math.round(((analytics.scheduled + analytics.following + analytics.waiting) / analytics.total) * 100)}%` : "0%"}
+              onClick={() => setStatusFilter(statusFilter === "pending" ? null : "pending")}
+              active={statusFilter === "pending"}
+            />
+          </>
+        )}
+      </div>
+
+      {/* ─── Target Tracking ─── */}
+      {!loading && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <TargetCard
+            label="معدل التجديد"
+            actual={analytics.renewalRate}
+            target={75}
+            unit="%"
+            status={renewalStatus}
+          />
+          <TargetCard
+            label="معدل الإلغاء (Churn)"
+            actual={analytics.churnRate}
+            target={15}
+            unit="%"
+            status={churnStatus}
+            inverted
+          />
+          <div className="cc-card rounded-[14px] p-5">
+            <div className="flex items-center gap-3 mb-2">
+              <TrendingDown className="w-5 h-5 text-cc-red" />
+              <p className="text-xs text-muted-foreground">خسارة الإيرادات</p>
+            </div>
+            <p className="text-2xl font-extrabold text-cc-red">
+              {formatMoneyFull(analytics.revenueLoss)}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              إجمالي الإيرادات المفقودة من العملاء الذين ألغوا
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Daily Target Summary ─── */}
+      {dailyTargetIds.size > 0 && !loading && (() => {
+        const targetRenewals = renewals.filter((r) => dailyTargetIds.has(r.id));
+        const completed = targetRenewals.filter((r) => r.status === "مكتمل").length;
+        const total = targetRenewals.length;
+        const remaining = total - completed;
+        const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
+        const allDone = remaining === 0 && total > 0;
+
+        const { h: hoursLeft, m: minutesLeft, s: secondsLeft, timeUp } = countdown;
+
+        const motivationMsg = allDone
+          ? "ممتاز! أنجزت كل أهداف اليوم 🏆"
+          : timeUp ? "انتهى وقت العمل! أكمل ما تبقى"
+          : rate >= 80 ? "أنت قريب جداً من الإنجاز! 💪"
+          : rate >= 50 ? `باقي ${remaining} فقط، استمر! 🔥`
+          : rate > 0 ? "بداية جيدة، واصل التقدم ⚡"
+          : `${total} عميل بانتظارك، ابدأ الآن! 🚀`;
+
+        const borderColor = allDone ? "border-cc-green/30" : "border-cyan/20";
+        const bgGrad = allDone
+          ? "bg-gradient-to-l from-cc-green/[0.06] to-transparent"
+          : "bg-gradient-to-l from-cyan/[0.04] to-transparent";
+
+        return (
+          <div className={`cc-card rounded-[14px] p-4 border ${borderColor} ${bgGrad} transition-all duration-500`}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${allDone ? "bg-cc-green/15" : "bg-cyan/10"}`}>
+                  <Target className={`w-4 h-4 ${allDone ? "text-cc-green" : "text-cyan"}`} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">الهدف اليومي</h3>
+                  <span className="text-[12px] text-muted-foreground">
+                    {new Date().toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "long", day: "numeric", month: "short" })}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`hidden sm:inline text-xs font-medium px-2.5 py-1 rounded-full ${
+                  allDone ? "bg-cc-green/15 text-cc-green" : rate >= 50 ? "bg-amber/15 text-amber" : "bg-cyan/10 text-cyan"
+                }`}>
+                  {motivationMsg}
+                </span>
+                <button
+                  onClick={shareReport}
+                  className="flex items-center gap-1 text-[12px] px-2 py-1.5 rounded-lg border border-cc-purple/30 text-cc-purple hover:bg-cc-purple/10 transition-colors"
+                  title="مشاركة التقرير"
+                >
+                  <Share2 className="w-3 h-3" />
+                  مشاركة
+                </button>
+                <button
+                  onClick={exportReport}
+                  className="flex items-center gap-1 text-[12px] px-2 py-1.5 rounded-lg border border-cyan/30 text-cyan hover:bg-cyan/10 transition-colors"
+                  title="تحميل التقرير"
+                >
+                  <Download className="w-3 h-3" />
+                  تصدير
+                </button>
+                <button
+                  onClick={deselectAll}
+                  className="text-[12px] text-muted-foreground hover:text-cc-red transition-colors"
+                >
+                  مسح
+                </button>
+              </div>
+            </div>
+
+            {/* Progress bar with segments */}
+            <div className="relative mb-3">
+              <div className="h-3 rounded-full bg-muted/40 overflow-hidden flex">
+                {targetRenewals.map((r) => (
+                  <div
+                    key={r.id}
+                    className={`h-full transition-all duration-700 ${
+                      r.status === "مكتمل" ? "bg-cc-green" : "bg-muted/60"
+                    }`}
+                    style={{ width: `${100 / total}%` }}
+                    title={`${r.customer_name} — ${r.status}`}
+                  />
+                ))}
+              </div>
+              <div className="flex items-center justify-between mt-1">
+                <span className="text-[12px] text-muted-foreground">{completed} / {total}</span>
+                <span className={`text-xs font-extrabold ${
+                  allDone ? "text-cc-green" : rate >= 50 ? "text-amber" : "text-cyan"
+                }`}>
+                  {rate}%
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-4 gap-3">
+              <div className="text-center p-2.5 rounded-lg bg-card/50 border border-border/30">
+                <p className="text-lg mb-0.5">{allDone ? "🏆" : timeUp ? "⏰" : hoursLeft < 2 ? "😰" : "🎯"}</p>
+                <p className="text-xl font-extrabold text-cyan">{total}</p>
+                <p className="text-[12px] text-muted-foreground mt-0.5">الهدف</p>
+              </div>
+              <div className="text-center p-2.5 rounded-lg bg-card/50 border border-border/30">
+                <p className="text-lg mb-0.5">{completed > 0 ? "✅" : "⭕"}</p>
+                <p className="text-xl font-extrabold text-cc-green">{completed}</p>
+                <p className="text-[12px] text-muted-foreground mt-0.5">مكتمل</p>
+              </div>
+              <div className="text-center p-2.5 rounded-lg bg-card/50 border border-border/30">
+                <p className="text-lg mb-0.5">{remaining === 0 ? "🎉" : remaining <= 2 ? "💪" : "⏳"}</p>
+                <p className={`text-xl font-extrabold ${remaining > 0 ? "text-amber" : "text-cc-green"}`}>{remaining}</p>
+                <p className="text-[12px] text-muted-foreground mt-0.5">متبقي</p>
+              </div>
+              <div className={`text-center p-2.5 rounded-lg border ${
+                allDone ? "bg-cc-green/10 border-cc-green/30" : timeUp ? "bg-red-500/10 border-red-500/30" : hoursLeft < 2 ? "bg-amber/10 border-amber/30" : "bg-card/50 border-border/30"
+              }`}>
+                <p className="text-lg mb-0.5">{allDone ? "🎊" : timeUp ? "🔴" : hoursLeft < 2 ? "🟡" : "🟢"}</p>
+                <p className={`text-xl font-extrabold ${
+                  allDone ? "text-cc-green" : timeUp ? "text-cc-red" : hoursLeft < 2 ? "text-amber" : "text-cyan"
+                }`}>
+                  {allDone ? "تم!" : timeUp ? "انتهى" : `${hoursLeft}:${String(minutesLeft).padStart(2, "0")}:${String(secondsLeft).padStart(2, "0")}`}
+                </p>
+                <p className="text-[12px] text-muted-foreground mt-0.5">{allDone ? "أنجزت الهدف" : "الوقت المتبقي"}</p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ─── Charts Row ─── */}
       {!loading && analytics.total > 0 && (
