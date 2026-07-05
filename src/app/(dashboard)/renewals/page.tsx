@@ -1456,8 +1456,10 @@ export default function RenewalsPage() {
               </TableRow>
             ) : (
               paginatedRenewals.map((renewal) => {
-                const days = getDaysRemaining(renewal.renewal_date);
-                const daysStyle = getDaysRemainingStyle(days);
+                const days = renewal.status === "مكتمل" ? 0 : getDaysRemaining(renewal.renewal_date);
+                const daysStyle = renewal.status === "مكتمل"
+                  ? { color: "text-cc-green", label: "0 يوم" }
+                  : getDaysRemainingStyle(days);
                 const badge = STATUS_BADGE[renewal.status] || STATUS_BADGE["مجدول"];
 
                 const isTarget = dailyTargetIds.has(renewal.id);
