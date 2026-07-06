@@ -558,6 +558,20 @@ export function SalesSection({ salesType }: SalesPageProps) {
     try { localStorage.setItem(kpiGoalKey, String(v)); } catch {}
     setKpiGoalEditing(false);
   }
+
+  /* ─── Active tab (persisted per sales type) ─── */
+  const [activeTab, setActiveTab] = useState<"يومي" | "تحليلات">(() => {
+    if (typeof window === "undefined") return "يومي";
+    try {
+      const saved = localStorage.getItem(`sales_active_tab_${salesType}`);
+      return saved === "تحليلات" ? "تحليلات" : "يومي";
+    } catch { return "يومي"; }
+  });
+  function switchTab(tab: "يومي" | "تحليلات") {
+    setActiveTab(tab);
+    try { localStorage.setItem(`sales_active_tab_${salesType}`, tab); } catch {}
+  }
+
   const { activeMonthIndex, filterCutoff } = useTopbarControls();
 
   /* time/month-filtered deals (used for all analytics + table) */
@@ -1219,123 +1233,27 @@ export function SalesSection({ salesType }: SalesPageProps) {
         </div>
       </div>
 
-      {/* ─── Stage Summary Cards ─── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-        {loading
-          ? Array.from({ length: 6 }).map((_, i) => <StatCardSkeleton key={i} />)
-          : STAGE_SUMMARY.map((s) => {
-              const data = stageCounts[s.stage] || { count: 0, value: 0 };
-              const pct = totalDeals > 0 ? Math.round((data.count / totalDeals) * 100) : 0;
-              return (
-                <StatCard
-                  key={s.stage}
-                  value={String(data.count)}
-                  label={s.stage}
-                  color={s.color}
-                  progress={pct}
-                  icon={s.icon}
-                  subtext={formatMoney(data.value)}
-                  onClick={() => setStageFilter(stageFilter === s.stage ? null : s.stage)}
-                  active={stageFilter === s.stage}
-                />
-              );
-            })}
+      {/* ─── Tab Bar ─── */}
+      <div className="flex items-center gap-1 p-1 bg-card border border-border rounded-2xl w-fit">
+        {(["يومي", "تحليلات"] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => switchTab(tab)}
+            className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold transition-all ${
+              activeTab === tab
+                ? tab === "يومي"
+                  ? "bg-cyan/15 text-cyan border border-cyan/30"
+                  : "bg-cc-purple/15 text-cc-purple border border-cc-purple/30"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {tab === "يومي" ? "⭐ يومي" : "📊 تحليلات"}
+          </button>
+        ))}
       </div>
 
-      {/* ─── Deal-close motivational banner ─── */}
-      {closeBanner && (
-        <div className="relative flex items-center gap-4 px-5 py-4 rounded-2xl bg-gradient-to-l from-amber/20 via-cc-green/10 to-cyan/10 border border-amber/30 animate-pulse-once overflow-hidden">
-          <div className="text-4xl">🎊</div>
-          <div className="flex-1">
-            <p className="text-base font-extrabold text-amber">{closeBanner.msg}</p>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              تم إغلاق صفقة <span className="font-bold text-foreground">{closeBanner.name}</span> بقيمة <span className="font-bold text-cc-green">{formatMoneyFull(closeBanner.value)}</span>
-            </p>
-          </div>
-          <div className="text-4xl">🎊</div>
-          <button onClick={() => setCloseBanner(null)} className="absolute top-2 left-3 text-muted-foreground hover:text-foreground text-xs">✕</button>
-        </div>
-      )}
-
-      {/* ─── Daily Focus Boxes ─── */}
-      {!loading && (() => {
-        const waitingDeals = dateFilteredDeals.filter(d => d.stage === "انتظار الدفع");
-        const negotiationDeals = dateFilteredDeals.filter(d => d.stage === "تفاوض");
-        const trialDeals = dateFilteredDeals.filter(d => d.stage === "تجريبي");
-        const oldTrials = trialDeals.filter(d => Math.floor((Date.now() - new Date(d.deal_date || d.created_at).getTime()) / 86400000) >= 7);
-
-        const waitingValue = waitingDeals.reduce((s, d) => s + d.deal_value, 0);
-        const negotiationValue = negotiationDeals.reduce((s, d) => s + d.deal_value, 0);
-        const trialValue = trialDeals.reduce((s, d) => s + d.deal_value, 0);
-
-        const boxes = [
-          {
-            key: "انتظار الدفع",
-            icon: "💳",
-            label: "ينتظر الدفع",
-            sublabel: "اجمع الفلوس اليوم!",
-            count: waitingDeals.length,
-            value: waitingValue,
-            badge: null,
-            color: { card: "hover:border-amber/30 hover:bg-amber/[0.06]", active: "bg-amber/15 border-amber/40 ring-1 ring-amber/30", num: "text-amber", dot: "🟡" },
-          },
-          {
-            key: "تفاوض",
-            icon: "🤝",
-            label: "قيد التفاوض",
-            sublabel: "أقنعهم اليوم!",
-            count: negotiationDeals.length,
-            value: negotiationValue,
-            badge: null,
-            color: { card: "hover:border-cc-purple/30 hover:bg-cc-purple/[0.06]", active: "bg-cc-purple/15 border-cc-purple/40 ring-1 ring-cc-purple/30", num: "text-cc-purple", dot: "🟣" },
-          },
-          {
-            key: "تجريبي",
-            icon: "🧪",
-            label: "في التجربة",
-            sublabel: oldTrials.length > 0 ? `${oldTrials.length} منهم +7 أيام ⚠️` : "تابع رضا العميل",
-            count: trialDeals.length,
-            value: trialValue,
-            badge: oldTrials.length > 0 ? oldTrials.length : null,
-            color: { card: "hover:border-cc-blue/30 hover:bg-cc-blue/[0.06]", active: "bg-cc-blue/15 border-cc-blue/40 ring-1 ring-cc-blue/30", num: "text-cc-blue", dot: "🔵" },
-          },
-        ];
-
-        return (
-          <div className="grid grid-cols-3 gap-3">
-            {boxes.map(b => (
-              <button
-                key={b.key}
-                onClick={() => {
-                  setStageFilter(stageFilter === b.key ? null : b.key);
-                  setTimeout(() => document.getElementById("sales-table")?.scrollIntoView({ behavior: "smooth" }), 50);
-                }}
-                className={`rounded-2xl p-4 text-right transition-all border ${
-                  stageFilter === b.key ? b.color.active : `cc-card border-transparent ${b.color.card}`
-                }`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className={`text-2xl font-extrabold ${b.color.num}`}>{b.count}</span>
-                  <div className="flex items-center gap-1">
-                    {b.badge !== null && (
-                      <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-cc-red/15 text-cc-red border border-cc-red/20">
-                        {b.badge}
-                      </span>
-                    )}
-                    <span className="text-xl">{b.icon}</span>
-                  </div>
-                </div>
-                <p className="text-sm font-bold text-foreground">{b.label}</p>
-                <p className="text-[12px] text-muted-foreground mt-0.5">{b.sublabel}</p>
-                {b.value > 0 && (
-                  <p className={`text-[12px] font-bold mt-1.5 ${b.color.num}`}>{formatMoney(b.value)}</p>
-                )}
-              </button>
-            ))}
-          </div>
-        );
-      })()}
-
+      {activeTab === "يومي" && (
+        <div className="space-y-6">
       {/* ─── Daily Employee KPI Strip ─── */}
       {!loading && (() => {
         const todayClosedDeals = deals.filter(d => {
@@ -1502,6 +1420,123 @@ export function SalesSection({ salesType }: SalesPageProps) {
                 </p>
               </div>
             </div>
+          </div>
+        );
+      })()}
+
+      {/* ─── Stage Summary Cards ─── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+        {loading
+          ? Array.from({ length: 6 }).map((_, i) => <StatCardSkeleton key={i} />)
+          : STAGE_SUMMARY.map((s) => {
+              const data = stageCounts[s.stage] || { count: 0, value: 0 };
+              const pct = totalDeals > 0 ? Math.round((data.count / totalDeals) * 100) : 0;
+              return (
+                <StatCard
+                  key={s.stage}
+                  value={String(data.count)}
+                  label={s.stage}
+                  color={s.color}
+                  progress={pct}
+                  icon={s.icon}
+                  subtext={formatMoney(data.value)}
+                  onClick={() => setStageFilter(stageFilter === s.stage ? null : s.stage)}
+                  active={stageFilter === s.stage}
+                />
+              );
+            })}
+      </div>
+
+      {/* ─── Deal-close motivational banner ─── */}
+      {closeBanner && (
+        <div className="relative flex items-center gap-4 px-5 py-4 rounded-2xl bg-gradient-to-l from-amber/20 via-cc-green/10 to-cyan/10 border border-amber/30 animate-pulse-once overflow-hidden">
+          <div className="text-4xl">🎊</div>
+          <div className="flex-1">
+            <p className="text-base font-extrabold text-amber">{closeBanner.msg}</p>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              تم إغلاق صفقة <span className="font-bold text-foreground">{closeBanner.name}</span> بقيمة <span className="font-bold text-cc-green">{formatMoneyFull(closeBanner.value)}</span>
+            </p>
+          </div>
+          <div className="text-4xl">🎊</div>
+          <button onClick={() => setCloseBanner(null)} className="absolute top-2 left-3 text-muted-foreground hover:text-foreground text-xs">✕</button>
+        </div>
+      )}
+
+      {/* ─── Daily Focus Boxes ─── */}
+      {!loading && (() => {
+        const waitingDeals = dateFilteredDeals.filter(d => d.stage === "انتظار الدفع");
+        const negotiationDeals = dateFilteredDeals.filter(d => d.stage === "تفاوض");
+        const trialDeals = dateFilteredDeals.filter(d => d.stage === "تجريبي");
+        const oldTrials = trialDeals.filter(d => Math.floor((Date.now() - new Date(d.deal_date || d.created_at).getTime()) / 86400000) >= 7);
+
+        const waitingValue = waitingDeals.reduce((s, d) => s + d.deal_value, 0);
+        const negotiationValue = negotiationDeals.reduce((s, d) => s + d.deal_value, 0);
+        const trialValue = trialDeals.reduce((s, d) => s + d.deal_value, 0);
+
+        const boxes = [
+          {
+            key: "انتظار الدفع",
+            icon: "💳",
+            label: "ينتظر الدفع",
+            sublabel: "اجمع الفلوس اليوم!",
+            count: waitingDeals.length,
+            value: waitingValue,
+            badge: null,
+            color: { card: "hover:border-amber/30 hover:bg-amber/[0.06]", active: "bg-amber/15 border-amber/40 ring-1 ring-amber/30", num: "text-amber", dot: "🟡" },
+          },
+          {
+            key: "تفاوض",
+            icon: "🤝",
+            label: "قيد التفاوض",
+            sublabel: "أقنعهم اليوم!",
+            count: negotiationDeals.length,
+            value: negotiationValue,
+            badge: null,
+            color: { card: "hover:border-cc-purple/30 hover:bg-cc-purple/[0.06]", active: "bg-cc-purple/15 border-cc-purple/40 ring-1 ring-cc-purple/30", num: "text-cc-purple", dot: "🟣" },
+          },
+          {
+            key: "تجريبي",
+            icon: "🧪",
+            label: "في التجربة",
+            sublabel: oldTrials.length > 0 ? `${oldTrials.length} منهم +7 أيام ⚠️` : "تابع رضا العميل",
+            count: trialDeals.length,
+            value: trialValue,
+            badge: oldTrials.length > 0 ? oldTrials.length : null,
+            color: { card: "hover:border-cc-blue/30 hover:bg-cc-blue/[0.06]", active: "bg-cc-blue/15 border-cc-blue/40 ring-1 ring-cc-blue/30", num: "text-cc-blue", dot: "🔵" },
+          },
+        ];
+
+        return (
+          <div className="grid grid-cols-3 gap-3">
+            {boxes.map(b => (
+              <button
+                key={b.key}
+                onClick={() => {
+                  setStageFilter(stageFilter === b.key ? null : b.key);
+                  setTimeout(() => document.getElementById("sales-table")?.scrollIntoView({ behavior: "smooth" }), 50);
+                }}
+                className={`rounded-2xl p-4 text-right transition-all border ${
+                  stageFilter === b.key ? b.color.active : `cc-card border-transparent ${b.color.card}`
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className={`text-2xl font-extrabold ${b.color.num}`}>{b.count}</span>
+                  <div className="flex items-center gap-1">
+                    {b.badge !== null && (
+                      <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-cc-red/15 text-cc-red border border-cc-red/20">
+                        {b.badge}
+                      </span>
+                    )}
+                    <span className="text-xl">{b.icon}</span>
+                  </div>
+                </div>
+                <p className="text-sm font-bold text-foreground">{b.label}</p>
+                <p className="text-[12px] text-muted-foreground mt-0.5">{b.sublabel}</p>
+                {b.value > 0 && (
+                  <p className={`text-[12px] font-bold mt-1.5 ${b.color.num}`}>{formatMoney(b.value)}</p>
+                )}
+              </button>
+            ))}
           </div>
         );
       })()}
@@ -1867,7 +1902,11 @@ export function SalesSection({ salesType }: SalesPageProps) {
         </div>
         )}
       </div>
+        </div>
+      )}
 
+      {activeTab === "تحليلات" && (
+        <div className="space-y-6">
       {/* ─── Financial Summary Row ─── */}
       {!loading && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -2591,6 +2630,8 @@ export function SalesSection({ salesType }: SalesPageProps) {
           </TabsContent>
         )}
       </Tabs>
+        </div>
+      )}
 
       {/* ─── Add / Edit Deal Modal ─── */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
