@@ -2679,6 +2679,70 @@ export async function removeQuoteCommitment(
   if (error) throw error;
 }
 
+// ── Employee Daily Goals ──────────────────────────────────────────
+export async function upsertDailyGoal(
+  orgId: string,
+  repName: string,
+  salesType: string,
+  goalDate: string,
+  goalCount: number
+): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("employee_daily_goals")
+    .upsert(
+      { org_id: orgId, rep_name: repName, sales_type: salesType, goal_date: goalDate, goal_count: goalCount, updated_at: new Date().toISOString() },
+      { onConflict: "org_id,rep_name,sales_type,goal_date" }
+    );
+  if (error) throw error;
+}
+
+export async function fetchDailyGoals(
+  orgId: string,
+  salesType: string,
+  goalDate: string
+): Promise<{ rep_name: string; goal_count: number }[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("employee_daily_goals")
+    .select("rep_name, goal_count")
+    .eq("org_id", orgId)
+    .eq("sales_type", salesType)
+    .eq("goal_date", goalDate);
+  if (error) throw error;
+  return data ?? [];
+}
+
+// ── User Presence ──────────────────────────────────────────────────
+export async function pingPresence(
+  orgId: string,
+  userName: string,
+  presenceDate: string
+): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc("upsert_user_presence", {
+    p_org_id: orgId,
+    p_user_name: userName,
+    p_date: presenceDate,
+    p_now: new Date().toISOString(),
+  });
+  if (error) console.error("presence ping failed:", error);
+}
+
+export async function fetchPresence(
+  orgId: string,
+  presenceDate: string
+): Promise<{ user_name: string; first_seen_at: string; last_seen_at: string }[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("user_presence")
+    .select("user_name, first_seen_at, last_seen_at")
+    .eq("org_id", orgId)
+    .eq("presence_date", presenceDate);
+  if (error) throw error;
+  return data ?? [];
+}
+
 // ── Training Session Logs ──────────────────────────────────────────
 export async function createTrainingSession(session: {
   org_id: string;

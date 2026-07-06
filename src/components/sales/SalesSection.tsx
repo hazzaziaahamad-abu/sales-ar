@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { Deal, Marketer, Package, Employee, EmployeeTask } from "@/types";
 import { triggerSaleCelebration } from "@/components/layout/sale-celebration";
-import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createFollowUpNote, fetchRecentFollowUpNotes, fetchPackages, fetchQuoteCommitments, addQuoteCommitment, removeQuoteCommitment, fetchEmployees, fetchEmployeeTasks, createEmployeeTask, createRenewal, fetchRenewals, createDealKpiStages } from "@/lib/supabase/db";
+import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createFollowUpNote, fetchRecentFollowUpNotes, fetchPackages, fetchQuoteCommitments, addQuoteCommitment, removeQuoteCommitment, fetchEmployees, fetchEmployeeTasks, createEmployeeTask, createRenewal, fetchRenewals, createDealKpiStages, upsertDailyGoal, fetchDailyGoals, pingPresence, fetchPresence } from "@/lib/supabase/db";
 import { checkDealsForFollowUp, buildFollowUpTask, type FollowUpAction } from "@/lib/auto-followup";
 import { StarEmployeeCard, Leaderboard } from "@/components/star-employee";
 import { AssignTaskModal } from "@/components/tasks/AssignTaskModal";
@@ -540,8 +540,12 @@ export function SalesSection({ salesType }: SalesPageProps) {
   /* trial age filter: show only تجريبي deals older than N days */
   const [trialDaysFilter, setTrialDaysFilter] = useState<number | null>(null);
 
+  /* ─── Shared per-day values (used by KPI strip, commitments, presence) ─── */
+  const todayStr = todayLocal();
+  const myName = authUser?.name || authUser?.email || "";
+
   /* ─── Daily KPI strip ─── */
-  const kpiGoalKey = `daily_kpi_goal_${salesType}_${todayLocal()}`;
+  const kpiGoalKey = `daily_kpi_goal_${salesType}_${todayStr}`;
   const [kpiGoal, setKpiGoal] = useState<number>(() => {
     if (typeof window === "undefined") return 3;
     try {
@@ -557,7 +561,44 @@ export function SalesSection({ salesType }: SalesPageProps) {
     setKpiGoalInput(String(v));
     try { localStorage.setItem(kpiGoalKey, String(v)); } catch {}
     setKpiGoalEditing(false);
+    /* persist to DB so manager can see it */
+    if (orgId && myName) {
+      upsertDailyGoal(orgId, myName, salesType, todayStr, v).catch(console.error);
+    }
   }
+
+  /* ─── Manager view: rep goals + presence ─── */
+  const [repGoals, setRepGoals] = useState<{ rep_name: string; goal_count: number }[]>([]);
+  const [repPresence, setRepPresence] = useState<{ user_name: string; first_seen_at: string; last_seen_at: string }[]>([]);
+
+  /* Presence heartbeat: ping every 2 minutes while tab is open */
+  useEffect(() => {
+    if (!orgId || !myName) return;
+    pingPresence(orgId, myName, todayStr).catch(console.error);
+    const id = setInterval(() => pingPresence(orgId, myName, todayStr).catch(console.error), 120_000);
+    return () => clearInterval(id);
+  }, [orgId, myName, todayStr]);
+
+  /* Manager: fetch goals + presence for today */
+  useEffect(() => {
+    if (!orgId || !isAdmin) return;
+    Promise.all([
+      fetchDailyGoals(orgId, salesType, todayStr),
+      fetchPresence(orgId, todayStr),
+    ])
+      .then(([goals, presence]) => {
+        setRepGoals(goals);
+        setRepPresence(presence);
+      })
+      .catch(console.error);
+    /* refresh every 30s so manager sees live status */
+    const id = setInterval(() => {
+      Promise.all([fetchDailyGoals(orgId, salesType, todayStr), fetchPresence(orgId, todayStr)])
+        .then(([goals, presence]) => { setRepGoals(goals); setRepPresence(presence); })
+        .catch(console.error);
+    }, 30_000);
+    return () => clearInterval(id);
+  }, [orgId, salesType, todayStr, isAdmin]);
 
   /* ─── Active tab (persisted per sales type) ─── */
   const [activeTab, setActiveTab] = useState<"يومي" | "تحليلات">(() => {
@@ -653,9 +694,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
   }, [orgId, salesType]);
 
   /* ─── Quote Commitment ─── */
-  const todayStr = todayLocal();
   const [commitments, setCommitments] = useState<{ user_name: string; created_at: string }[]>([]);
-  const myName = authUser?.name || authUser?.email || "";
   const hasCommitted = commitments.some((c) => c.user_name === myName);
 
   useEffect(() => {
@@ -1907,6 +1946,140 @@ export function SalesSection({ salesType }: SalesPageProps) {
 
       {activeTab === "تحليلات" && (
         <div className="space-y-6">
+
+      {/* ─── Manager: Rep KPI Overview ─── */}
+      {isAdmin && !loading && (() => {
+        /* build rep list from deals + goals + presence */
+        const repNames = [...new Set([
+          ...deals.map(d => d.assigned_rep_name).filter(Boolean) as string[],
+          ...repGoals.map(g => g.rep_name),
+          ...repPresence.map(p => p.user_name),
+        ])];
+        if (repNames.length === 0) return null;
+
+        const goalMap = Object.fromEntries(repGoals.map(g => [g.rep_name, g.goal_count]));
+        const presenceMap = Object.fromEntries(repPresence.map(p => [p.user_name, p]));
+
+        return (
+          <div className="cc-card rounded-2xl overflow-hidden">
+            <div className="px-5 py-3 border-b border-border flex items-center gap-2">
+              <Target className="w-4 h-4 text-cc-purple" />
+              <h3 className="text-sm font-bold text-foreground">نظرة المدير — أداء الفريق اليوم</h3>
+              <span className="text-[12px] text-muted-foreground mr-auto">يتحدث كل 30 ثانية</span>
+            </div>
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {repNames.map(rep => {
+                const presence = presenceMap[rep];
+                const goal = goalMap[rep] ?? null;
+
+                /* online status */
+                const lastSeen = presence ? new Date(presence.last_seen_at) : null;
+                const minsAgo = lastSeen ? Math.floor((Date.now() - lastSeen.getTime()) / 60000) : null;
+                const online = minsAgo !== null && minsAgo < 5;
+                const away   = minsAgo !== null && minsAgo < 30 && !online;
+                const statusDot = online ? "bg-cc-green" : away ? "bg-amber" : "bg-muted-foreground/40";
+                const statusLabel = online ? "متواجد" : away ? "غائب قليلاً" : "غير متاح";
+                const statusColor = online ? "text-cc-green" : away ? "text-amber" : "text-muted-foreground";
+
+                /* day start */
+                const firstSeen = presence?.first_seen_at
+                  ? new Date(presence.first_seen_at).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit", hour12: true })
+                  : null;
+
+                /* today's completed deals */
+                const todayClosed = deals.filter(d =>
+                  d.assigned_rep_name === rep &&
+                  d.stage === "مكتملة" &&
+                  (() => { const ts = d.close_date || d.updated_at; if (!ts) return false; try { return dateToLocal(new Date(ts)) === todayStr; } catch { return false; } })()
+                );
+                const closedCount = todayClosed.length;
+                const revenue = todayClosed.reduce((s, d) => s + d.deal_value, 0);
+                const pct = goal ? Math.min(100, Math.round((closedCount / goal) * 100)) : 0;
+                const goalReached = goal !== null && closedCount >= goal;
+
+                /* active stage buckets */
+                const repActive = deals.filter(d => d.assigned_rep_name === rep && !["مكتملة","مرفوض مع سبب","كنسل التجربة"].includes(d.stage));
+                const buckets: Record<string,number> = {};
+                repActive.forEach(d => { buckets[d.stage] = (buckets[d.stage] || 0) + 1; });
+
+                const avatarColors = ["bg-cyan/20 text-cyan","bg-cc-green/20 text-cc-green","bg-amber/20 text-amber","bg-cc-purple/20 text-cc-purple","bg-cc-blue/20 text-cc-blue","bg-pink-500/20 text-pink-400"];
+                const avatarColor = avatarColors[repNames.indexOf(rep) % avatarColors.length];
+
+                return (
+                  <div key={rep} className={`rounded-xl border p-4 transition-all ${goalReached ? "border-cc-green/30 bg-cc-green/[0.04]" : "border-border bg-card/50"}`}>
+                    {/* Header row */}
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="relative shrink-0">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${avatarColor}`}>
+                          {rep.charAt(0)}
+                        </div>
+                        <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-card ${statusDot}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-foreground truncate">{rep}</p>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[11px] font-medium ${statusColor}`}>{statusLabel}</span>
+                          {firstSeen && (
+                            <span className="text-[11px] text-muted-foreground">· بدأ {firstSeen}</span>
+                          )}
+                        </div>
+                      </div>
+                      {goalReached && <span className="text-lg">🏆</span>}
+                    </div>
+
+                    {/* Goal progress */}
+                    <div className="mb-3">
+                      <div className="flex items-center justify-between text-[12px] mb-1">
+                        <span className="text-muted-foreground">
+                          الهدف: <span className="font-bold text-amber">{goal ?? "—"}</span>
+                          {goal && <span className="text-muted-foreground"> صفقة</span>}
+                        </span>
+                        <span className={`font-bold ${goalReached ? "text-cc-green" : pct >= 50 ? "text-amber" : "text-muted-foreground"}`}>
+                          {closedCount}/{goal ?? "?"} {goal ? `(${pct}%)` : ""}
+                        </span>
+                      </div>
+                      {goal ? (
+                        <div className="h-2 rounded-full bg-white/[0.06] overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${goalReached ? "bg-cc-green" : pct >= 50 ? "bg-amber" : "bg-cyan"}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-muted-foreground italic">لم يحدد هدفاً بعد</p>
+                      )}
+                    </div>
+
+                    {/* Stats row */}
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      <div className="rounded-lg bg-card border border-border px-3 py-2 text-center">
+                        <p className={`text-lg font-extrabold ${goalReached ? "text-cc-green" : "text-foreground"}`}>{closedCount}</p>
+                        <p className="text-[11px] text-muted-foreground">مكتمل اليوم</p>
+                      </div>
+                      <div className="rounded-lg bg-card border border-border px-3 py-2 text-center">
+                        <p className="text-lg font-extrabold text-cc-green">{formatMoney(revenue)}</p>
+                        <p className="text-[11px] text-muted-foreground">إيراد اليوم</p>
+                      </div>
+                    </div>
+
+                    {/* Active stage buckets */}
+                    {Object.keys(buckets).length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {Object.entries(buckets).map(([stage, count]) => (
+                          <span key={stage} className="text-[11px] px-1.5 py-0.5 rounded-full bg-white/[0.05] border border-border text-muted-foreground">
+                            {stage} <span className="font-bold text-foreground">{count}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ─── Financial Summary Row ─── */}
       {!loading && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
