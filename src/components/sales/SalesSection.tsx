@@ -1557,21 +1557,42 @@ export function SalesSection({ salesType }: SalesPageProps) {
             className="max-w-xs"
           />
           {/* Trial age quick-filters */}
-          {[7, 14, 30].map(days => (
-            <button
-              key={days}
-              onClick={() => setTrialDaysFilter(trialDaysFilter === days ? null : days)}
-              className={`flex items-center gap-1 text-[12px] px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap ${
-                trialDaysFilter === days
-                  ? "bg-cc-purple/15 border-cc-purple/40 text-cc-purple font-semibold"
-                  : "border-border text-muted-foreground hover:text-foreground hover:bg-white/[0.06]"
-              }`}
-              title={`عرض التجريبي الذي مضى عليه أكثر من ${days} يوم`}
-            >
-              <FlaskConical className="w-3 h-3" />
-              تجريبي +{days}ي
-            </button>
-          ))}
+          <button
+            onClick={() => setTrialDaysFilter(trialDaysFilter === 7 ? null : 7)}
+            className={`flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded-lg border font-semibold transition-all whitespace-nowrap ${
+              trialDaysFilter === 7
+                ? "bg-cc-blue/20 border-cc-blue/50 text-cc-blue ring-1 ring-cc-blue/30"
+                : "bg-cc-blue/[0.06] border-cc-blue/20 text-cc-blue/70 hover:border-cc-blue/40 hover:text-cc-blue"
+            }`}
+            title="عرض التجريبي الذي مضى عليه أكثر من 7 أيام"
+          >
+            <FlaskConical className="w-3 h-3" />
+            تجريبي +7ي
+          </button>
+          <button
+            onClick={() => setTrialDaysFilter(trialDaysFilter === 14 ? null : 14)}
+            className={`flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded-lg border font-semibold transition-all whitespace-nowrap ${
+              trialDaysFilter === 14
+                ? "bg-amber/20 border-amber/50 text-amber ring-1 ring-amber/30"
+                : "bg-amber/[0.06] border-amber/25 text-amber/70 hover:border-amber/45 hover:text-amber"
+            }`}
+            title="عرض التجريبي الذي مضى عليه أكثر من 14 يوم"
+          >
+            <FlaskConical className="w-3 h-3" />
+            تجريبي +14ي
+          </button>
+          <button
+            onClick={() => setTrialDaysFilter(trialDaysFilter === 30 ? null : 30)}
+            className={`flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded-lg border font-semibold transition-all whitespace-nowrap ${
+              trialDaysFilter === 30
+                ? "bg-cc-red/20 border-cc-red/60 text-cc-red ring-1 ring-cc-red/30"
+                : "bg-cc-red/[0.08] border-cc-red/35 text-cc-red/80 hover:border-cc-red/55 hover:text-cc-red"
+            }`}
+            title="عرض التجريبي الذي مضى عليه أكثر من 30 يوم"
+          >
+            <FlaskConical className="w-3 h-3" />
+            تجريبي +30ي
+          </button>
           {filteredDeals.length > 0 && filteredDeals.every((d) => dailyTargetIds.has(d.id)) ? (
             <button onClick={deselectAll} className="text-[12px] px-2.5 py-1.5 rounded-lg border border-cc-red/30 text-cc-red hover:bg-cc-red/10 transition-colors whitespace-nowrap">
               <SquareCheck className="w-3 h-3 inline-block ml-1" />إلغاء تحديد الكل
