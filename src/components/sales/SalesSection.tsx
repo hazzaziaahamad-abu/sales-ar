@@ -525,6 +525,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
   /* card filter */
   const [stageFilter, setStageFilter] = useState<string | null>(null);
   const [clientSearch, setClientSearch] = useState("");
+  const [searchAllTime, setSearchAllTime] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const DEALS_PER_PAGE = 20;
   const [repFilter, setRepFilter] = useState<string | null>(null);
@@ -662,7 +663,12 @@ export function SalesSection({ salesType }: SalesPageProps) {
       })
     : dateFilteredDeals;
   const filteredDeals = clientSearch
-    ? trialFilteredDeals.filter((d) => d.client_name.toLowerCase().includes(clientSearch.toLowerCase()) || (d.client_code && d.client_code.toLowerCase().includes(clientSearch.toLowerCase())) || (d.client_phone && d.client_phone.includes(clientSearch)))
+    ? (searchAllTime ? baseFilteredDeals : trialFilteredDeals).filter(
+        (d) =>
+          d.client_name.toLowerCase().includes(clientSearch.toLowerCase()) ||
+          (d.client_code && d.client_code.toLowerCase().includes(clientSearch.toLowerCase())) ||
+          (d.client_phone && d.client_phone.includes(clientSearch))
+      )
     : trialFilteredDeals;
 
   const totalPages = Math.max(1, Math.ceil(filteredDeals.length / DEALS_PER_PAGE));
@@ -1630,6 +1636,17 @@ export function SalesSection({ salesType }: SalesPageProps) {
             placeholder="ابحث باسم العميل أو رقم الجوال..."
             className="max-w-xs"
           />
+          <button
+            onClick={() => setSearchAllTime((v) => !v)}
+            title={searchAllTime ? "البحث في كل الفترات — انقر لتقييده بالفترة المحددة" : "انقر للبحث في كل الفترات"}
+            className={`flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded-lg border font-semibold transition-all whitespace-nowrap ${
+              searchAllTime
+                ? "bg-amber-500/20 border-amber-400/50 text-amber-400 ring-1 ring-amber-400/30"
+                : "border-border text-muted-foreground hover:text-foreground hover:bg-white/[0.06]"
+            }`}
+          >
+            🔍 كل الفترات
+          </button>
           {/* Trial age quick-filters */}
           <button
             onClick={() => setTrialDaysFilter(trialDaysFilter === 7 ? null : 7)}
