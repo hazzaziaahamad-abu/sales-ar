@@ -16,6 +16,7 @@ import type { Ticket, Employee, ActivityLog } from "@/types";
 import { AchievementSummary } from "@/components/achievement-summary";
 import { FollowUpLogButton } from "@/components/follow-up-log";
 import { WatchlistPinButton } from "@/components/watchlist-pin-button";
+import { ClientProfilePanel } from "@/components/client-profile-panel";
 import { StatCard } from "@/components/ui/stat-card";
 import { ColorBadge } from "@/components/ui/color-badge";
 import { Button } from "@/components/ui/button";
@@ -222,6 +223,8 @@ export default function SupportPage() {
   // Table share
   const tableRef = useRef<HTMLDivElement>(null);
   const [isTableExporting, setIsTableExporting] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileQuery, setProfileQuery] = useState("");
 
   const handleShareTable = useCallback(async () => {
     if (!tableRef.current || isTableExporting) return;
@@ -1020,7 +1023,12 @@ export default function SupportPage() {
                     </span>
                   </TableCell>
                   <TableCell className="text-right text-xs font-medium">
-                    {ticket.client_name}
+                    <button
+                      onClick={() => { setProfileQuery(ticket.client_phone || ticket.client_name); setProfileOpen(true); }}
+                      className="hover:text-cyan hover:underline transition-colors text-right"
+                    >
+                      {ticket.client_name}
+                    </button>
                   </TableCell>
                   <TableCell className="text-right text-xs text-muted-foreground">
                     <div>{ticket.open_date ? formatDate(ticket.open_date) : "—"}</div>
@@ -1777,6 +1785,12 @@ export default function SupportPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ClientProfilePanel
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        initialQuery={profileQuery}
+      />
     </div>
   );
 }
