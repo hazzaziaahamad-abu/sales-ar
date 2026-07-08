@@ -1195,200 +1195,6 @@ export default function RenewalsPage() {
         })}
       </div>
 
-      {/* ─── Achievement Summary ─── */}
-      {!loading && (
-        <div className="cc-card rounded-[14px] p-5 border border-cyan/10 bg-gradient-to-l from-cyan/[0.03] to-transparent">
-          {/* Header + period selector */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-            <div className="flex items-center gap-2">
-              <Award className="w-5 h-5 text-cyan" />
-              <h3 className="text-sm font-bold text-foreground">ملخص الإنجازات</h3>
-            </div>
-            <div className="flex items-center gap-1.5 bg-white/[0.05] rounded-lg p-1 border border-white/[0.06]">
-              {([
-                { key: "today" as SummaryPeriod, label: "اليوم" },
-                { key: "week" as SummaryPeriod, label: "الأسبوع" },
-                { key: "month" as SummaryPeriod, label: "الشهر" },
-                { key: "quarter" as SummaryPeriod, label: "الربع" },
-                { key: "custom" as SummaryPeriod, label: "مخصص" },
-              ]).map(p => (
-                <button
-                  key={p.key}
-                  onClick={() => { setSummaryPeriod(p.key); setSummaryFilter(null); }}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                    summaryPeriod === p.key
-                      ? "bg-cyan text-white shadow-lg"
-                      : "text-muted-foreground hover:text-foreground hover:bg-white/[0.10]"
-                  }`}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Custom date range */}
-          {summaryPeriod === "custom" && (
-            <div className="flex items-center gap-3 mb-4 p-3 rounded-lg bg-white/[0.05] border border-white/[0.06]">
-              <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
-              <div className="flex items-center gap-2 flex-1">
-                <input
-                  type="date"
-                  value={customRange.from}
-                  onChange={e => setCustomRange(prev => ({ ...prev, from: e.target.value }))}
-                  className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/10 text-foreground text-xs focus:outline-none focus:border-cyan/50"
-                  dir="ltr"
-                />
-                <span className="text-xs text-muted-foreground">إلى</span>
-                <input
-                  type="date"
-                  value={customRange.to}
-                  onChange={e => setCustomRange(prev => ({ ...prev, to: e.target.value }))}
-                  className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/10 text-foreground text-xs focus:outline-none focus:border-cyan/50"
-                  dir="ltr"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Achievement cards - clickable to filter table */}
-          {summaryFilter && (
-            <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-lg bg-cyan/10 border border-cyan/20">
-              <span className="text-xs text-cyan font-medium">🔍 عرض: {
-                summaryFilter === "completed" ? "التجديدات المكتملة" :
-                summaryFilter === "revenue" ? "الإيرادات المحققة" :
-                summaryFilter === "contacted" ? "تم التواصل معهم" :
-                summaryFilter === "success" ? "نسبة النجاح" :
-                "الإيرادات المفقودة"
-              } ({filteredRenewals.length} عميل)</span>
-              <button
-                onClick={() => setSummaryFilter(null)}
-                className="mr-auto text-xs text-cyan hover:text-white font-medium px-2 py-1 rounded-md hover:bg-cyan/20 transition-colors"
-              >
-                ✕ إلغاء الفلتر
-              </button>
-            </div>
-          )}
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 mb-4">
-            <button
-              onClick={() => { setSummaryFilter(summaryFilter === "completed" ? null : "completed"); setStatusFilter(null); document.getElementById("renewals-table")?.scrollIntoView({ behavior: "smooth" }); }}
-              className={`p-3 rounded-[14px] text-center transition-all cursor-pointer ${
-                summaryFilter === "completed" ? "bg-cc-green/20 border-2 border-cc-green/50 ring-2 ring-cc-green/20" : "bg-cc-green/10 border border-cc-green/20 hover:bg-cc-green/15 hover:scale-[1.02]"
-              }`}
-            >
-              <CheckCircle2 className="w-5 h-5 text-cc-green mx-auto mb-1" />
-              <p className="text-2xl font-bold text-cc-green">{achievementSummary.completed}</p>
-              <p className="text-[12px] text-muted-foreground mt-0.5">تجديد مكتمل</p>
-            </button>
-            <button
-              onClick={() => { setSummaryFilter(summaryFilter === "revenue" ? null : "revenue"); setStatusFilter(null); document.getElementById("renewals-table")?.scrollIntoView({ behavior: "smooth" }); }}
-              className={`p-3 rounded-[14px] text-center transition-all cursor-pointer ${
-                summaryFilter === "revenue" ? "bg-cyan/20 border-2 border-cyan/50 ring-2 ring-cyan/20" : "bg-cyan/10 border border-cyan/20 hover:bg-cyan/15 hover:scale-[1.02]"
-              }`}
-            >
-              <TrendingUp className="w-5 h-5 text-cyan mx-auto mb-1" />
-              <p className="text-2xl font-bold text-cyan">{formatMoneyFull(achievementSummary.completedRevenue)}</p>
-              <p className="text-[12px] text-muted-foreground mt-0.5">إيرادات محققة</p>
-            </button>
-            <button
-              onClick={() => { setSummaryFilter(summaryFilter === "contacted" ? null : "contacted"); setStatusFilter(null); document.getElementById("renewals-table")?.scrollIntoView({ behavior: "smooth" }); }}
-              className={`p-3 rounded-[14px] text-center transition-all cursor-pointer ${
-                summaryFilter === "contacted" ? "bg-cc-purple/20 border-2 border-cc-purple/50 ring-2 ring-cc-purple/20" : "bg-cc-purple/10 border border-cc-purple/20 hover:bg-cc-purple/15 hover:scale-[1.02]"
-              }`}
-            >
-              <Users className="w-5 h-5 text-cc-purple mx-auto mb-1" />
-              <p className="text-2xl font-bold text-cc-purple">{achievementSummary.contacted}</p>
-              <p className="text-[12px] text-muted-foreground mt-0.5">تم التواصل</p>
-            </button>
-            <button
-              onClick={() => { setSummaryFilter(summaryFilter === "success" ? null : "success"); setStatusFilter(null); document.getElementById("renewals-table")?.scrollIntoView({ behavior: "smooth" }); }}
-              className={`p-3 rounded-[14px] text-center transition-all cursor-pointer ${
-                summaryFilter === "success" ? "bg-amber/20 border-2 border-amber/50 ring-2 ring-amber/20" : "bg-amber/10 border border-amber/20 hover:bg-amber/15 hover:scale-[1.02]"
-              }`}
-            >
-              <Zap className="w-5 h-5 text-amber mx-auto mb-1" />
-              <p className="text-2xl font-bold text-amber">{achievementSummary.successRate}%</p>
-              <p className="text-[12px] text-muted-foreground mt-0.5">نسبة النجاح</p>
-            </button>
-            <button
-              onClick={() => { setSummaryFilter(summaryFilter === "lost" ? null : "lost"); setStatusFilter(null); document.getElementById("renewals-table")?.scrollIntoView({ behavior: "smooth" }); }}
-              className={`p-3 rounded-[14px] text-center transition-all cursor-pointer col-span-2 md:col-span-1 ${
-                summaryFilter === "lost" ? "bg-cc-red/20 border-2 border-cc-red/50 ring-2 ring-cc-red/20" : "bg-cc-red/10 border border-cc-red/20 hover:bg-cc-red/15 hover:scale-[1.02]"
-              }`}
-            >
-              <TrendingDown className="w-5 h-5 text-cc-red mx-auto mb-1" />
-              <p className="text-2xl font-bold text-cc-red">{formatMoneyFull(achievementSummary.lostRevenue)}</p>
-              <p className="text-[12px] text-muted-foreground mt-0.5">إيرادات مفقودة</p>
-            </button>
-          </div>
-
-          {/* Progress bar + extra info */}
-          <div className="flex items-center gap-4 flex-wrap">
-            {/* Success rate bar */}
-            <div className="flex-1 min-w-[200px]">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[13px] text-muted-foreground">معدل الإنجاز</span>
-                <span className={`text-xs font-bold ${
-                  achievementSummary.successRate >= 70 ? "text-cc-green" :
-                  achievementSummary.successRate >= 40 ? "text-amber" : "text-cc-red"
-                }`}>{achievementSummary.successRate}%</span>
-              </div>
-              <div className="h-2.5 bg-white/[0.04] rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all duration-700 ${
-                    achievementSummary.successRate >= 70 ? "bg-gradient-to-l from-emerald-400 to-emerald-600" :
-                    achievementSummary.successRate >= 40 ? "bg-gradient-to-l from-amber-400 to-amber-600" :
-                    "bg-gradient-to-l from-red-400 to-red-600"
-                  }`}
-                  style={{ width: `${achievementSummary.successRate}%` }}
-                />
-              </div>
-            </div>
-
-            {achievementSummary.avgDealValue > 0 && (
-              <div className="text-center px-3 py-1.5 rounded-lg bg-white/[0.05] border border-white/[0.06]">
-                <p className="text-xs font-bold text-foreground">{formatMoneyFull(achievementSummary.avgDealValue)}</p>
-                <p className="text-[12px] text-muted-foreground">متوسط القيمة</p>
-              </div>
-            )}
-
-            {achievementSummary.topRep && (
-              <div className="text-center px-3 py-1.5 rounded-lg bg-amber/10 border border-amber/20">
-                <p className="text-xs font-bold text-amber">🏆 {achievementSummary.topRep.name}</p>
-                <p className="text-[12px] text-muted-foreground">{achievementSummary.topRep.count} تجديد</p>
-              </div>
-            )}
-          </div>
-
-          {/* Plan/Package breakdown */}
-          {achievementSummary.planBreakdown.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-white/[0.06]">
-              <p className="text-[13px] text-muted-foreground mb-2.5 font-medium">📦 توزيع الباقات المنجزة</p>
-              <div className="flex flex-wrap gap-2">
-                {achievementSummary.planBreakdown.map(p => (
-                  <div key={p.plan} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.06]">
-                    <span className="text-xs font-bold text-cc-green">{p.count}</span>
-                    <span className="text-xs text-foreground">{p.plan}</span>
-                    <span className="text-[12px] text-muted-foreground">({formatMoneyFull(p.revenue)})</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Recommendations */}
-          {achievementSummary.recommendations.length > 0 && (
-            <div className="mt-3 space-y-1.5">
-              {achievementSummary.recommendations.map((rec, i) => (
-                <div key={i} className="px-3 py-2 rounded-lg bg-amber/[0.06] border border-amber/15 text-xs text-amber">
-                  {rec}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* ─── Daily Focus Boxes ─── */}
       {!loading && (
         <div className="grid grid-cols-3 gap-3">
@@ -1960,6 +1766,197 @@ export default function RenewalsPage() {
               <ChevronLeft className="w-4 h-4" />
             </Button>
           </div>
+        </div>
+      )}
+
+      {/* ─── Achievement Summary ─── */}
+      {!loading && (
+        <div className="cc-card rounded-[14px] p-5 border border-cyan/10 bg-gradient-to-l from-cyan/[0.03] to-transparent">
+          {/* Header + period selector */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <Award className="w-5 h-5 text-cyan" />
+              <h3 className="text-sm font-bold text-foreground">ملخص الإنجازات</h3>
+            </div>
+            <div className="flex items-center gap-1.5 bg-white/[0.05] rounded-lg p-1 border border-white/[0.06]">
+              {([
+                { key: "today" as SummaryPeriod, label: "اليوم" },
+                { key: "week" as SummaryPeriod, label: "الأسبوع" },
+                { key: "month" as SummaryPeriod, label: "الشهر" },
+                { key: "quarter" as SummaryPeriod, label: "الربع" },
+                { key: "custom" as SummaryPeriod, label: "مخصص" },
+              ]).map(p => (
+                <button
+                  key={p.key}
+                  onClick={() => { setSummaryPeriod(p.key); setSummaryFilter(null); }}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                    summaryPeriod === p.key
+                      ? "bg-cyan text-white shadow-lg"
+                      : "text-muted-foreground hover:text-foreground hover:bg-white/[0.10]"
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Custom date range */}
+          {summaryPeriod === "custom" && (
+            <div className="flex items-center gap-3 mb-4 p-3 rounded-lg bg-white/[0.05] border border-white/[0.06]">
+              <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
+              <div className="flex items-center gap-2 flex-1">
+                <input
+                  type="date"
+                  value={customRange.from}
+                  onChange={e => setCustomRange(prev => ({ ...prev, from: e.target.value }))}
+                  className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/10 text-foreground text-xs focus:outline-none focus:border-cyan/50"
+                  dir="ltr"
+                />
+                <span className="text-xs text-muted-foreground">إلى</span>
+                <input
+                  type="date"
+                  value={customRange.to}
+                  onChange={e => setCustomRange(prev => ({ ...prev, to: e.target.value }))}
+                  className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/10 text-foreground text-xs focus:outline-none focus:border-cyan/50"
+                  dir="ltr"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Achievement cards - clickable to filter table */}
+          {summaryFilter && (
+            <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-lg bg-cyan/10 border border-cyan/20">
+              <span className="text-xs text-cyan font-medium">🔍 عرض: {
+                summaryFilter === "completed" ? "التجديدات المكتملة" :
+                summaryFilter === "revenue" ? "الإيرادات المحققة" :
+                summaryFilter === "contacted" ? "تم التواصل معهم" :
+                summaryFilter === "success" ? "نسبة النجاح" :
+                "الإيرادات المفقودة"
+              } ({filteredRenewals.length} عميل)</span>
+              <button
+                onClick={() => setSummaryFilter(null)}
+                className="mr-auto text-xs text-cyan hover:text-white font-medium px-2 py-1 rounded-md hover:bg-cyan/20 transition-colors"
+              >
+                ✕ إلغاء الفلتر
+              </button>
+            </div>
+          )}
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 mb-4">
+            <button
+              onClick={() => { setSummaryFilter(summaryFilter === "completed" ? null : "completed"); setStatusFilter(null); document.getElementById("renewals-table")?.scrollIntoView({ behavior: "smooth" }); }}
+              className={`p-3 rounded-[14px] text-center transition-all cursor-pointer ${
+                summaryFilter === "completed" ? "bg-cc-green/20 border-2 border-cc-green/50 ring-2 ring-cc-green/20" : "bg-cc-green/10 border border-cc-green/20 hover:bg-cc-green/15 hover:scale-[1.02]"
+              }`}
+            >
+              <CheckCircle2 className="w-5 h-5 text-cc-green mx-auto mb-1" />
+              <p className="text-2xl font-bold text-cc-green">{achievementSummary.completed}</p>
+              <p className="text-[12px] text-muted-foreground mt-0.5">تجديد مكتمل</p>
+            </button>
+            <button
+              onClick={() => { setSummaryFilter(summaryFilter === "revenue" ? null : "revenue"); setStatusFilter(null); document.getElementById("renewals-table")?.scrollIntoView({ behavior: "smooth" }); }}
+              className={`p-3 rounded-[14px] text-center transition-all cursor-pointer ${
+                summaryFilter === "revenue" ? "bg-cyan/20 border-2 border-cyan/50 ring-2 ring-cyan/20" : "bg-cyan/10 border border-cyan/20 hover:bg-cyan/15 hover:scale-[1.02]"
+              }`}
+            >
+              <TrendingUp className="w-5 h-5 text-cyan mx-auto mb-1" />
+              <p className="text-2xl font-bold text-cyan">{formatMoneyFull(achievementSummary.completedRevenue)}</p>
+              <p className="text-[12px] text-muted-foreground mt-0.5">إيرادات محققة</p>
+            </button>
+            <button
+              onClick={() => { setSummaryFilter(summaryFilter === "contacted" ? null : "contacted"); setStatusFilter(null); document.getElementById("renewals-table")?.scrollIntoView({ behavior: "smooth" }); }}
+              className={`p-3 rounded-[14px] text-center transition-all cursor-pointer ${
+                summaryFilter === "contacted" ? "bg-cc-purple/20 border-2 border-cc-purple/50 ring-2 ring-cc-purple/20" : "bg-cc-purple/10 border border-cc-purple/20 hover:bg-cc-purple/15 hover:scale-[1.02]"
+              }`}
+            >
+              <Users className="w-5 h-5 text-cc-purple mx-auto mb-1" />
+              <p className="text-2xl font-bold text-cc-purple">{achievementSummary.contacted}</p>
+              <p className="text-[12px] text-muted-foreground mt-0.5">تم التواصل</p>
+            </button>
+            <button
+              onClick={() => { setSummaryFilter(summaryFilter === "success" ? null : "success"); setStatusFilter(null); document.getElementById("renewals-table")?.scrollIntoView({ behavior: "smooth" }); }}
+              className={`p-3 rounded-[14px] text-center transition-all cursor-pointer ${
+                summaryFilter === "success" ? "bg-amber/20 border-2 border-amber/50 ring-2 ring-amber/20" : "bg-amber/10 border border-amber/20 hover:bg-amber/15 hover:scale-[1.02]"
+              }`}
+            >
+              <Zap className="w-5 h-5 text-amber mx-auto mb-1" />
+              <p className="text-2xl font-bold text-amber">{achievementSummary.successRate}%</p>
+              <p className="text-[12px] text-muted-foreground mt-0.5">نسبة النجاح</p>
+            </button>
+            <button
+              onClick={() => { setSummaryFilter(summaryFilter === "lost" ? null : "lost"); setStatusFilter(null); document.getElementById("renewals-table")?.scrollIntoView({ behavior: "smooth" }); }}
+              className={`p-3 rounded-[14px] text-center transition-all cursor-pointer col-span-2 md:col-span-1 ${
+                summaryFilter === "lost" ? "bg-cc-red/20 border-2 border-cc-red/50 ring-2 ring-cc-red/20" : "bg-cc-red/10 border border-cc-red/20 hover:bg-cc-red/15 hover:scale-[1.02]"
+              }`}
+            >
+              <TrendingDown className="w-5 h-5 text-cc-red mx-auto mb-1" />
+              <p className="text-2xl font-bold text-cc-red">{formatMoneyFull(achievementSummary.lostRevenue)}</p>
+              <p className="text-[12px] text-muted-foreground mt-0.5">إيرادات مفقودة</p>
+            </button>
+          </div>
+
+          {/* Progress bar + extra info */}
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex-1 min-w-[200px]">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[13px] text-muted-foreground">معدل الإنجاز</span>
+                <span className={`text-xs font-bold ${
+                  achievementSummary.successRate >= 70 ? "text-cc-green" :
+                  achievementSummary.successRate >= 40 ? "text-amber" : "text-cc-red"
+                }`}>{achievementSummary.successRate}%</span>
+              </div>
+              <div className="h-2.5 bg-white/[0.04] rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-700 ${
+                    achievementSummary.successRate >= 70 ? "bg-gradient-to-l from-emerald-400 to-emerald-600" :
+                    achievementSummary.successRate >= 40 ? "bg-gradient-to-l from-amber-400 to-amber-600" :
+                    "bg-gradient-to-l from-red-400 to-red-600"
+                  }`}
+                  style={{ width: `${achievementSummary.successRate}%` }}
+                />
+              </div>
+            </div>
+            {achievementSummary.avgDealValue > 0 && (
+              <div className="text-center px-3 py-1.5 rounded-lg bg-white/[0.05] border border-white/[0.06]">
+                <p className="text-xs font-bold text-foreground">{formatMoneyFull(achievementSummary.avgDealValue)}</p>
+                <p className="text-[12px] text-muted-foreground">متوسط القيمة</p>
+              </div>
+            )}
+            {achievementSummary.topRep && (
+              <div className="text-center px-3 py-1.5 rounded-lg bg-amber/10 border border-amber/20">
+                <p className="text-xs font-bold text-amber">🏆 {achievementSummary.topRep.name}</p>
+                <p className="text-[12px] text-muted-foreground">{achievementSummary.topRep.count} تجديد</p>
+              </div>
+            )}
+          </div>
+
+          {/* Plan/Package breakdown */}
+          {achievementSummary.planBreakdown.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-white/[0.06]">
+              <p className="text-[13px] text-muted-foreground mb-2.5 font-medium">📦 توزيع الباقات المنجزة</p>
+              <div className="flex flex-wrap gap-2">
+                {achievementSummary.planBreakdown.map(p => (
+                  <div key={p.plan} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.06]">
+                    <span className="text-xs font-bold text-cc-green">{p.count}</span>
+                    <span className="text-xs text-foreground">{p.plan}</span>
+                    <span className="text-[12px] text-muted-foreground">({formatMoneyFull(p.revenue)})</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Recommendations */}
+          {achievementSummary.recommendations.length > 0 && (
+            <div className="mt-3 space-y-1.5">
+              {achievementSummary.recommendations.map((rec, i) => (
+                <div key={i} className="px-3 py-2 rounded-lg bg-amber/[0.06] border border-amber/15 text-xs text-amber">
+                  {rec}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
