@@ -128,13 +128,13 @@ export async function fetchClientProfile(query: string): Promise<ClientProfileDa
 
   const [dealsRes, renewalsRes, ticketsRes] = await Promise.all([
     isPhone
-      ? supabase.from("deals").select("*").eq("org_id", orgId).eq("client_phone", q).order("created_at", { ascending: false })
+      ? supabase.from("deals").select("*").eq("org_id", orgId).ilike("client_phone", `%${q}%`).order("created_at", { ascending: false })
       : supabase.from("deals").select("*").eq("org_id", orgId).ilike("client_name", `%${q}%`).order("created_at", { ascending: false }),
     isPhone
-      ? supabase.from("renewals").select("*").eq("org_id", orgId).eq("customer_phone", q).order("created_at", { ascending: false })
+      ? supabase.from("renewals").select("*").eq("org_id", orgId).ilike("customer_phone", `%${q}%`).order("created_at", { ascending: false })
       : supabase.from("renewals").select("*").eq("org_id", orgId).ilike("customer_name", `%${q}%`).order("created_at", { ascending: false }),
     isPhone
-      ? supabase.from("tickets").select("*").eq("org_id", orgId).eq("client_phone", q).order("created_at", { ascending: false })
+      ? supabase.from("tickets").select("*").eq("org_id", orgId).ilike("client_phone", `%${q}%`).order("created_at", { ascending: false })
       : supabase.from("tickets").select("*").eq("org_id", orgId).ilike("client_name", `%${q}%`).order("created_at", { ascending: false }),
   ]);
 
