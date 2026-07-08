@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
@@ -238,6 +238,66 @@ function MentionAlertBanner({ mentions, onRefresh }: { mentions: MentionNotifica
           <span className="text-[12px] text-muted-foreground">و {mentions.length - 12} منشن آخر...</span>
         </div>
       )}
+    </div>
+  );
+}
+
+function BrowserNotifBanner() {
+  const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    if (Notification.permission !== "default") return;
+    if (localStorage.getItem("notif-perm-dismissed")) return;
+    // Small delay so it doesn't pop immediately on page load
+    const t = setTimeout(() => setShow(true), 3000);
+    return () => clearTimeout(t);
+  }, []);
+
+  if (!show) return null;
+
+  const request = async () => {
+    setShow(false);
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") {
+      localStorage.setItem("notif-perm-dismissed", "1");
+    }
+  };
+
+  const dismiss = () => {
+    localStorage.setItem("notif-perm-dismissed", "1");
+    setShow(false);
+  };
+
+  return (
+    <div className="fixed bottom-20 left-4 right-4 sm:left-auto sm:right-6 sm:w-80 z-50 animate-in slide-in-from-bottom-4 duration-300">
+      <div className="rounded-2xl border border-border bg-card shadow-2xl shadow-black/40 p-4">
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-xl bg-cyan/10 flex items-center justify-center shrink-0 text-lg">
+            🔔
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-bold text-foreground">تفعيل إشعارات المتصفح</p>
+            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+              احصل على إشعارات فورية للمنشنات والمهام حتى لو كنت في تبويب آخر
+            </p>
+            <div className="flex gap-2 mt-3">
+              <button
+                onClick={request}
+                className="flex-1 py-1.5 rounded-lg bg-cyan text-black text-xs font-bold hover:bg-cyan/90 transition-colors"
+              >
+                تفعيل
+              </button>
+              <button
+                onClick={dismiss}
+                className="px-3 py-1.5 rounded-lg border border-border text-muted-foreground text-xs hover:bg-muted/10 transition-colors"
+              >
+                لاحقاً
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -651,6 +711,7 @@ export default function DashboardLayout({
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [recentMentions, setRecentMentions] = useState<MentionNotification[]>([]);
   const [dueReminders, setDueReminders] = useState<Reminder[]>([]);
+  const shownBrowserNotifs = useRef<Set<string>>(new Set());
 
   // Load live notifications from DB
   useEffect(() => {
@@ -678,6 +739,21 @@ export default function DashboardLayout({
       const fresh = newNotifs.filter((n) => !existingIds.has(n.id));
       return [...fresh, ...prev];
     });
+
+    // Fire browser notifications for new unread items
+    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+      newNotifs
+        .filter((n) => !n.isRead && !shownBrowserNotifs.current.has(n.id))
+        .forEach((n) => {
+          shownBrowserNotifs.current.add(n.id);
+          try {
+            const title = n.type === "mention" ? "منشن جديد 💬" : "إشعار جديد 🔔";
+            new Notification(title, { body: n.message, icon: "/favicon.ico", dir: "rtl", lang: "ar" });
+          } catch {
+            // Browser may block — fail silently
+          }
+        });
+    }
   }, []);
 
   const unreadCount = useMemo(() => notifications.filter((n) => !n.isRead).length, [notifications]);
@@ -742,6 +818,8 @@ export default function DashboardLayout({
             }
           />
         )}
+
+        <BrowserNotifBanner />
 
         {/* AI Chat — hidden on agent page */}
         {!isAgentPage && (
