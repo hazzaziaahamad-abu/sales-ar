@@ -7,10 +7,11 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { fetchClientProfile, fetchClientBio, upsertClientBio, fetchDealKpiStages, upsertDealKpiStage, createDealKpiStages, fetchEmployees, KPI_STAGES, updateDeal, type ClientProfileData } from "@/lib/supabase/db";
+import { fetchClientProfile, fetchClientBio, upsertClientBio, fetchDealKpiStages, upsertDealKpiStage, createDealKpiStages, fetchEmployees, KPI_STAGES, updateDeal, createFollowUpNote, type ClientProfileData } from "@/lib/supabase/db";
 import { getTopContributor } from "@/components/sales/SalesKPIDashboard";
+import { FollowUpLogButton } from "@/components/follow-up-log";
 import { useAuth } from "@/lib/auth-context";
-import { Search, Phone, User, ShoppingBag, RefreshCw, Headphones, FileText, ChevronDown, ChevronUp, Clock, X, Pencil, Check, StickyNote, BarChart2, Trophy } from "lucide-react";
+import { Search, Phone, User, ShoppingBag, RefreshCw, Headphones, FileText, ChevronDown, ChevronUp, Clock, X, Pencil, Check, StickyNote, BarChart2, Trophy, MessageSquarePlus, Send } from "lucide-react";
 import type { Deal, Renewal, Ticket, FollowUpNote, DealKpiStage, Employee } from "@/types";
 
 const STAGE_COLORS: Record<string, string> = {
@@ -178,7 +179,10 @@ function DealCard({ deal, notes, employees }: { deal: Deal; notes: FollowUpNote[
     <div className="rounded-lg border border-border/40 bg-card/50 p-2.5 space-y-1.5">
       <div className="flex items-center justify-between gap-2">
         <StatusBadge label={deal.stage} colorMap={STAGE_COLORS} />
-        <span className="text-[12px] text-muted-foreground">{formatDate(deal.created_at)}</span>
+        <div className="flex items-center gap-1.5">
+          <FollowUpLogButton entityType="deal" entityId={deal.id} entityName={deal.client_name} />
+          <span className="text-[12px] text-muted-foreground">{formatDate(deal.created_at)}</span>
+        </div>
       </div>
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-foreground">{isSupport ? "دعم" : "مكتب"} · {deal.plan || "—"}</span>
@@ -234,7 +238,10 @@ function RenewalCard({ renewal, notes }: { renewal: Renewal; notes: FollowUpNote
     <div className="rounded-lg border border-border/40 bg-card/50 p-2.5 space-y-1.5">
       <div className="flex items-center justify-between gap-2">
         <StatusBadge label={renewal.status} colorMap={RENEWAL_COLORS} />
-        <span className="text-[12px] text-muted-foreground">{formatDate(renewal.renewal_date)}</span>
+        <div className="flex items-center gap-1.5">
+          <FollowUpLogButton entityType="renewal" entityId={renewal.id} entityName={renewal.customer_name} />
+          <span className="text-[12px] text-muted-foreground">{formatDate(renewal.renewal_date)}</span>
+        </div>
       </div>
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-foreground">{renewal.plan_name}</span>
@@ -311,6 +318,8 @@ export function ClientProfilePanel({ open, onClose, initialQuery }: ClientProfil
   const [bioSaving, setBioSaving] = useState(false);
   const [bioKey, setBioKey] = useState("");
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [quickNote, setQuickNote] = useState("");
+  const [quickNoteSaving, setQuickNoteSaving] = useState(false);
 
   useEffect(() => {
     fetchEmployees().then(setEmployees).catch(() => {});
@@ -386,8 +395,27 @@ export function ClientProfilePanel({ open, onClose, initialQuery }: ClientProfil
       setBioDraft("");
       setBioEditing(false);
       setBioKey("");
+      setQuickNote("");
     }, 300);
   };
+
+  const addQuickNote = useCallback(async () => {
+    if (!quickNote.trim() || !data) return;
+    const activeDeal = data.deals.find(d => d.stage !== "مرفوض مع سبب") || data.deals[0];
+    const activeRenewal = !activeDeal ? data.renewals[0] : null;
+    const entityType = activeDeal ? "deal" : activeRenewal ? "renewal" : null;
+    const entityId = activeDeal?.id || activeRenewal?.id;
+    if (!entityType || !entityId) return;
+    setQuickNoteSaving(true);
+    try {
+      const authorName = user?.name || user?.email || "مستخدم";
+      const created = await createFollowUpNote(entityType, entityId, quickNote.trim(), authorName);
+      setData(prev => prev ? { ...prev, notes: [created, ...prev.notes] } : prev);
+      setQuickNote("");
+    } catch { /* silent */ } finally {
+      setQuickNoteSaving(false);
+    }
+  }, [quickNote, data, user]);
 
   const clientName = data?.deals[0]?.client_name || data?.renewals[0]?.customer_name || data?.tickets[0]?.client_name || "";
   const clientPhone = data?.deals[0]?.client_phone || data?.renewals[0]?.customer_phone || data?.tickets[0]?.client_phone || "";
@@ -532,6 +560,38 @@ export function ClientProfilePanel({ open, onClose, initialQuery }: ClientProfil
                   <p className="text-[12px] text-muted-foreground/50">لا توجد نبذة — اضغط "إضافة" لكتابة ملاحظات عن العميل</p>
                 )}
               </div>
+
+              {/* Quick follow-up note */}
+              {(data.deals.length > 0 || data.renewals.length > 0) && (
+                <div className="rounded-xl border border-border/50 bg-muted/20 p-3">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <MessageSquarePlus className="w-3.5 h-3.5 text-cyan-400" />
+                    <span className="text-xs font-bold text-foreground">إضافة متابعة</span>
+                  </div>
+                  <div className="flex gap-2 items-start">
+                    <textarea
+                      value={quickNote}
+                      onChange={(e) => setQuickNote(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter" && e.ctrlKey) addQuickNote(); }}
+                      placeholder="اكتب ملاحظة المتابعة... (Ctrl+Enter للإرسال)"
+                      className="flex-1 min-h-[64px] rounded-lg border border-border/50 bg-background/50 p-2 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-cyan-400/50 resize-none"
+                      dir="rtl"
+                    />
+                    <button
+                      onClick={addQuickNote}
+                      disabled={!quickNote.trim() || quickNoteSaving}
+                      className="p-2 rounded-lg bg-cyan-500/15 text-cyan-400 border border-cyan-400/30 hover:bg-cyan-500/25 disabled:opacity-40 transition-colors"
+                      title="إرسال"
+                    >
+                      {quickNoteSaving ? (
+                        <div className="w-4 h-4 border border-cyan-400/40 border-t-cyan-400 rounded-full animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Timeline */}
               {data.notes.length > 0 && (
