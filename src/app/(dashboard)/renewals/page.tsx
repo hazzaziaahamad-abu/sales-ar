@@ -477,10 +477,6 @@ export default function RenewalsPage() {
         }
         setRenewals(renewalsData);
         setEmployees(employeesData);
-        // Non-managers default to their own renewals
-        if (!isAdmin && authUser?.name) {
-          setRepFilter(prev => prev ?? authUser.name ?? null);
-        }
       })
       .catch(console.error)
       .finally(() => setLoading(false));
