@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { Employee, FollowUpNote } from "@/types";
-import { fetchFollowUpNotes, createFollowUpNote, updateFollowUpNote, deleteFollowUpNote, fetchEmployees, createMentionNotification, createReminder, fetchUpcomingReminders, dismissReminder } from "@/lib/supabase/db";
+import { fetchFollowUpNotes, createFollowUpNote, updateFollowUpNote, deleteFollowUpNote, fetchEmployees, fetchUserProfiles, createMentionNotification, createReminder, fetchUpcomingReminders, dismissReminder } from "@/lib/supabase/db";
 import type { Reminder } from "@/lib/supabase/db";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -36,8 +36,9 @@ export function FollowUpLogButton({ entityType, entityId, entityName }: FollowUp
   /* Delete confirm state */
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  /* Employees for @mention */
+  /* People for @mention (employees + user profiles merged) */
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [mentionNames, setMentionNames] = useState<string[]>([]);
   const [showMentions, setShowMentions] = useState(false);
   const [mentionFilter, setMentionFilter] = useState("");
   const [mentionIndex, setMentionIndex] = useState(0);
@@ -58,15 +59,21 @@ export function FollowUpLogButton({ entityType, entityId, entityName }: FollowUp
       fetchFollowUpNotes(entityType, entityId),
       fetchEmployees(),
       fetchUpcomingReminders(),
-    ]).then(([n, e, r]) => {
+      fetchUserProfiles(),
+    ]).then(([n, e, r, profiles]) => {
       setNotes(n);
-      setEmployees(e);
+      setEmployees(e as Employee[]);
       setReminders((r as Reminder[]).filter((rem) => rem.entity_id === entityId));
+      // Merge employee names + user profile names (dedup, user_profiles takes priority for name matching)
+      const empNames = (e as Employee[]).map((emp) => emp.name);
+      const profileNames = (profiles as { id: string; name: string; email: string }[]).map((p) => p.name).filter(Boolean);
+      const merged = [...new Set([...profileNames, ...empNames])];
+      setMentionNames(merged);
     }).catch(console.error).finally(() => setLoading(false));
   }, [open, entityType, entityId]);
 
-  const filteredEmployees = employees.filter((e) =>
-    !mentionFilter || e.name.includes(mentionFilter)
+  const filteredEmployees = mentionNames.filter((name) =>
+    !mentionFilter || name.includes(mentionFilter)
   );
 
   const insertMention = useCallback((name: string) => {
@@ -118,7 +125,7 @@ export function FollowUpLogButton({ entityType, entityId, entityName }: FollowUp
         setMentionIndex((i) => Math.max(i - 1, 0));
       } else if (e.key === "Enter" || e.key === "Tab") {
         e.preventDefault();
-        insertMention(filteredEmployees[mentionIndex].name);
+        insertMention(filteredEmployees[mentionIndex]);
       } else if (e.key === "Escape") {
         setShowMentions(false);
       }
@@ -128,13 +135,7 @@ export function FollowUpLogButton({ entityType, entityId, entityName }: FollowUp
   }
 
   function extractMentions(text: string): string[] {
-    const mentioned: string[] = [];
-    for (const emp of employees) {
-      if (text.includes(`@${emp.name}`)) {
-        mentioned.push(emp.name);
-      }
-    }
-    return [...new Set(mentioned)];
+    return [...new Set(mentionNames.filter((name) => text.includes(`@${name}`)))];
   }
 
   async function handleAdd() {
@@ -146,7 +147,7 @@ export function FollowUpLogButton({ entityType, entityId, entityName }: FollowUp
       setNotes((prev) => [created, ...prev]);
 
       const mentionedNames = extractMentions(newNote);
-      console.log("[mention] extracted names:", mentionedNames, "from employees:", employees.map(e => e.name));
+      console.log("[mention] extracted names:", mentionedNames, "from mention list:", mentionNames);
       const notified = new Set<string>();
       for (const name of mentionedNames) {
         if (name === authorName) continue; // no self-notification
@@ -281,19 +282,18 @@ export function FollowUpLogButton({ entityType, entityId, entityName }: FollowUp
                 {/* Mention suggestions dropdown */}
                 {showMentions && filteredEmployees.length > 0 && (
                   <div className="absolute top-full mt-1 right-0 w-full min-w-[280px] bg-card border border-border rounded-lg shadow-lg z-50 max-h-[200px] overflow-y-auto">
-                    {filteredEmployees.map((emp, idx) => (
+                    {filteredEmployees.map((name, idx) => (
                       <button
-                        key={emp.id}
-                        onClick={() => insertMention(emp.name)}
+                        key={name}
+                        onClick={() => insertMention(name)}
                         className={`w-full flex items-center gap-2 px-3 py-2.5 text-right text-sm transition-colors ${
                           idx === mentionIndex ? "bg-cyan/10 text-cyan" : "text-foreground hover:bg-white/5"
                         }`}
                       >
                         <div className="w-7 h-7 rounded-full bg-amber/15 text-amber flex items-center justify-center text-xs font-bold flex-shrink-0">
-                          {emp.name.charAt(0)}
+                          {name.charAt(0)}
                         </div>
-                        <span className="font-medium whitespace-nowrap">{emp.name}</span>
-                        {emp.role && <span className="text-[12px] text-muted-foreground mr-auto whitespace-nowrap">{emp.role}</span>}
+                        <span className="font-medium whitespace-nowrap">{name}</span>
                       </button>
                     ))}
                   </div>

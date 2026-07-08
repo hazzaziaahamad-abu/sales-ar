@@ -7,7 +7,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { fetchClientProfile, fetchClientBio, upsertClientBio, fetchDealKpiStages, upsertDealKpiStage, createDealKpiStages, fetchEmployees, KPI_STAGES, updateDeal, createFollowUpNote, createMentionNotification, createReminder, type ClientProfileData } from "@/lib/supabase/db";
+import { fetchClientProfile, fetchClientBio, upsertClientBio, fetchDealKpiStages, upsertDealKpiStage, createDealKpiStages, fetchEmployees, fetchUserProfiles, KPI_STAGES, updateDeal, createFollowUpNote, createMentionNotification, createReminder, type ClientProfileData } from "@/lib/supabase/db";
 import { getTopContributor } from "@/components/sales/SalesKPIDashboard";
 import { FollowUpLogButton } from "@/components/follow-up-log";
 import { useAuth } from "@/lib/auth-context";
@@ -360,6 +360,7 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
   const [bioSaving, setBioSaving] = useState(false);
   const [bioKey, setBioKey] = useState("");
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [mentionNames, setMentionNames] = useState<string[]>([]);
   const [quickNote, setQuickNote] = useState("");
   const [quickNoteSaving, setQuickNoteSaving] = useState(false);
   const quickNoteRef = useRef<HTMLTextAreaElement>(null);
@@ -375,7 +376,12 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
   const [savingReminder, setSavingReminder] = useState(false);
 
   useEffect(() => {
-    fetchEmployees().then(setEmployees).catch(() => {});
+    Promise.all([fetchEmployees(), fetchUserProfiles()]).then(([emps, profiles]) => {
+      setEmployees(emps);
+      const empNames = emps.map((e) => e.name);
+      const profileNames = profiles.map((p) => p.name).filter(Boolean);
+      setMentionNames([...new Set([...profileNames, ...empNames])]);
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -455,7 +461,7 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
     }, 300);
   };
 
-  const filteredEmployees = employees.filter(e => !mentionFilter || e.name.includes(mentionFilter));
+  const filteredEmployees = mentionNames.filter(name => !mentionFilter || name.includes(mentionFilter));
 
   const insertMention = useCallback((name: string) => {
     const ta = quickNoteRef.current;
@@ -497,7 +503,7 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
     if (showMentions && filteredEmployees.length > 0) {
       if (e.key === "ArrowDown") { e.preventDefault(); setMentionIndex(i => Math.min(i + 1, filteredEmployees.length - 1)); return; }
       if (e.key === "ArrowUp") { e.preventDefault(); setMentionIndex(i => Math.max(i - 1, 0)); return; }
-      if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); insertMention(filteredEmployees[mentionIndex].name); return; }
+      if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); insertMention(filteredEmployees[mentionIndex]); return; }
       if (e.key === "Escape") { setShowMentions(false); return; }
     }
     if (e.key === "Enter" && e.ctrlKey) addQuickNote();
@@ -517,12 +523,13 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
       setData(prev => prev ? { ...prev, notes: [created, ...prev.notes] } : prev);
       const entityName = activeDeal?.client_name || activeRenewal?.customer_name || "";
       const notified = new Set<string>();
-      for (const emp of employees) {
-        if (!quickNote.includes(`@${emp.name}`)) continue;
-        if (emp.name === authorName) continue; // no self-notification
-        if (notified.has(emp.name)) continue;  // no duplicates
-        notified.add(emp.name);
-        createMentionNotification(created.id, entityType, entityId, entityName, emp.name, authorName, quickNote.trim()).catch(() => {});
+      for (const name of mentionNames) {
+        if (!quickNote.includes(`@${name}`)) continue;
+        if (name === authorName) continue;
+        if (notified.has(name)) continue;
+        notified.add(name);
+        createMentionNotification(created.id, entityType, entityId, entityName, name, authorName, quickNote.trim())
+          .catch((err) => console.error("[mention] failed:", err));
       }
       setQuickNote("");
     } catch { /* silent */ } finally {
@@ -722,15 +729,14 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
                       {/* Mention dropdown */}
                       {showMentions && filteredEmployees.length > 0 && (
                         <div className="absolute top-full mt-1 right-0 w-full bg-card border border-border rounded-lg shadow-lg z-50 max-h-[160px] overflow-y-auto">
-                          {filteredEmployees.map((emp, idx) => (
+                          {filteredEmployees.map((name, idx) => (
                             <button
-                              key={emp.id}
-                              onClick={() => insertMention(emp.name)}
+                              key={name}
+                              onClick={() => insertMention(name)}
                               className={`w-full flex items-center gap-2 px-3 py-2 text-right text-xs transition-colors ${idx === mentionIndex ? "bg-cyan-500/10 text-cyan-400" : "text-foreground hover:bg-white/5"}`}
                             >
-                              <div className="w-6 h-6 rounded-full bg-amber-500/15 text-amber-400 flex items-center justify-center text-[10px] font-bold shrink-0">{emp.name.charAt(0)}</div>
-                              <span>{emp.name}</span>
-                              {emp.role && <span className="text-[11px] text-muted-foreground mr-auto">{emp.role}</span>}
+                              <div className="w-6 h-6 rounded-full bg-amber-500/15 text-amber-400 flex items-center justify-center text-[10px] font-bold shrink-0">{name.charAt(0)}</div>
+                              <span>{name}</span>
                             </button>
                           ))}
                         </div>
