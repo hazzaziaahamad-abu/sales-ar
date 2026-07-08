@@ -163,15 +163,15 @@ export async function fetchClientProfile(query: string): Promise<ClientProfileDa
   return { deals, renewals, tickets, notes };
 }
 
-export async function fetchClientBio(clientKey: string): Promise<string> {
+export async function fetchClientBio(clientKey: string): Promise<{ bio: string; menuUrl: string }> {
   const supabase = createClient();
   const { data } = await supabase
     .from("client_bios")
-    .select("bio")
+    .select("bio, menu_url")
     .eq("org_id", getOrgId())
     .eq("client_key", clientKey)
     .single();
-  return data?.bio || "";
+  return { bio: data?.bio || "", menuUrl: data?.menu_url || "" };
 }
 
 export async function upsertClientBio(clientKey: string, bio: string, userName?: string): Promise<void> {
@@ -181,6 +181,18 @@ export async function upsertClientBio(clientKey: string, bio: string, userName?:
     .from("client_bios")
     .upsert(
       { org_id: orgId, client_key: clientKey, bio, updated_by: userName || null, updated_at: new Date().toISOString() },
+      { onConflict: "org_id,client_key" }
+    );
+  if (error) throw error;
+}
+
+export async function upsertClientMenuUrl(clientKey: string, menuUrl: string, userName?: string): Promise<void> {
+  const supabase = createClient();
+  const orgId = getOrgId();
+  const { error } = await supabase
+    .from("client_bios")
+    .upsert(
+      { org_id: orgId, client_key: clientKey, menu_url: menuUrl, updated_by: userName || null, updated_at: new Date().toISOString() },
       { onConflict: "org_id,client_key" }
     );
   if (error) throw error;

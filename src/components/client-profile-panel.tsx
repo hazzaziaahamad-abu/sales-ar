@@ -7,7 +7,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { fetchClientProfile, fetchClientBio, upsertClientBio, fetchDealKpiStages, upsertDealKpiStage, createDealKpiStages, fetchEmployees, fetchUserProfiles, KPI_STAGES, updateDeal, createFollowUpNote, createMentionNotification, createReminder, type ClientProfileData } from "@/lib/supabase/db";
+import { fetchClientProfile, fetchClientBio, upsertClientBio, upsertClientMenuUrl, fetchDealKpiStages, upsertDealKpiStage, createDealKpiStages, fetchEmployees, fetchUserProfiles, KPI_STAGES, updateDeal, createFollowUpNote, createMentionNotification, createReminder, type ClientProfileData } from "@/lib/supabase/db";
 import { getTopContributor } from "@/components/sales/SalesKPIDashboard";
 import { FollowUpLogButton } from "@/components/follow-up-log";
 import { useAuth } from "@/lib/auth-context";
@@ -359,6 +359,11 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
   const [bioDraft, setBioDraft] = useState("");
   const [bioSaving, setBioSaving] = useState(false);
   const [bioKey, setBioKey] = useState("");
+  const [menuUrl, setMenuUrl] = useState("");
+  const [menuUrlDraft, setMenuUrlDraft] = useState("");
+  const [menuUrlEditing, setMenuUrlEditing] = useState(false);
+  const [menuUrlSaving, setMenuUrlSaving] = useState(false);
+  const [menuUrlCopied, setMenuUrlCopied] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [mentionNames, setMentionNames] = useState<string[]>([]);
   const [quickNote, setQuickNote] = useState("");
@@ -395,12 +400,16 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
     if (!key) return;
     setBioKey(key);
     try {
-      const b = await fetchClientBio(key);
+      const { bio: b, menuUrl: m } = await fetchClientBio(key);
       setBio(b);
       setBioDraft(b);
+      setMenuUrl(m);
+      setMenuUrlDraft(m);
     } catch {
       setBio("");
       setBioDraft("");
+      setMenuUrl("");
+      setMenuUrlDraft("");
     }
   }, []);
 
@@ -417,6 +426,20 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
       setBioSaving(false);
     }
   }, [bioKey, bioDraft, user?.name]);
+
+  const saveMenuUrl = useCallback(async () => {
+    if (!bioKey) return;
+    setMenuUrlSaving(true);
+    try {
+      await upsertClientMenuUrl(bioKey, menuUrlDraft.trim(), user?.name);
+      setMenuUrl(menuUrlDraft.trim());
+      setMenuUrlEditing(false);
+    } catch {
+      // silent
+    } finally {
+      setMenuUrlSaving(false);
+    }
+  }, [bioKey, menuUrlDraft, user?.name]);
 
   const doSearch = useCallback(async (q: string) => {
     if (!q.trim()) return;
@@ -705,6 +728,71 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
                   <p className="text-xs text-foreground/70 whitespace-pre-line leading-relaxed">{bio}</p>
                 ) : (
                   <p className="text-[12px] text-muted-foreground/50">لا توجد نبذة — اضغط "إضافة" لكتابة ملاحظات عن العميل</p>
+                )}
+              </div>
+
+              {/* Menu URL */}
+              <div className="rounded-xl border border-border/50 bg-muted/20 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm">🔗</span>
+                    <span className="text-xs font-bold text-foreground">رابط المنيو</span>
+                  </div>
+                  {!menuUrlEditing ? (
+                    <button
+                      onClick={() => { setMenuUrlDraft(menuUrl); setMenuUrlEditing(true); }}
+                      className="flex items-center gap-0.5 text-[12px] text-muted-foreground hover:text-foreground"
+                    >
+                      <Pencil className="w-3 h-3" /> {menuUrl ? "تعديل" : "إضافة"}
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <button onClick={saveMenuUrl} disabled={menuUrlSaving} className="flex items-center gap-0.5 text-[12px] text-emerald-400 hover:underline disabled:opacity-50">
+                        <Check className="w-3 h-3" /> حفظ
+                      </button>
+                      <button onClick={() => { setMenuUrlEditing(false); setMenuUrlDraft(menuUrl); }} className="text-[12px] text-muted-foreground hover:underline">
+                        إلغاء
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {menuUrlEditing ? (
+                  <input
+                    type="url"
+                    value={menuUrlDraft}
+                    onChange={(e) => setMenuUrlDraft(e.target.value)}
+                    placeholder="https://..."
+                    className="w-full text-xs bg-background/50 border border-border/50 rounded-lg px-2 py-1.5 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                    dir="ltr"
+                  />
+                ) : menuUrl ? (
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={menuUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 text-xs text-cyan-400 hover:underline truncate"
+                      dir="ltr"
+                    >
+                      {menuUrl}
+                    </a>
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(menuUrl); setMenuUrlCopied(true); setTimeout(() => setMenuUrlCopied(false), 2000); }}
+                      className="text-[11px] px-2 py-0.5 rounded border border-border/50 text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                    >
+                      {menuUrlCopied ? "✓ تم" : "نسخ"}
+                    </button>
+                    <a
+                      href={`https://wa.me/?text=${encodeURIComponent(menuUrl)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] px-2 py-0.5 rounded border border-green-600/40 text-green-400 hover:bg-green-500/10 transition-colors shrink-0"
+                    >
+                      واتساب
+                    </a>
+                  </div>
+                ) : (
+                  <p className="text-[12px] text-muted-foreground/50">لا يوجد رابط — اضغط "إضافة" لإضافة رابط المنيو</p>
                 )}
               </div>
 
