@@ -1,17 +1,17 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { fetchClientProfile, fetchClientBio, upsertClientBio, fetchDealKpiStages, upsertDealKpiStage, createDealKpiStages, fetchEmployees, KPI_STAGES, updateDeal, createFollowUpNote, type ClientProfileData } from "@/lib/supabase/db";
+import { fetchClientProfile, fetchClientBio, upsertClientBio, fetchDealKpiStages, upsertDealKpiStage, createDealKpiStages, fetchEmployees, KPI_STAGES, updateDeal, createFollowUpNote, createMentionNotification, createReminder, type ClientProfileData } from "@/lib/supabase/db";
 import { getTopContributor } from "@/components/sales/SalesKPIDashboard";
 import { FollowUpLogButton } from "@/components/follow-up-log";
 import { useAuth } from "@/lib/auth-context";
-import { Search, Phone, User, ShoppingBag, RefreshCw, Headphones, FileText, ChevronDown, ChevronUp, Clock, X, Pencil, Check, StickyNote, BarChart2, Trophy, MessageSquarePlus, Send } from "lucide-react";
+import { Search, Phone, User, ShoppingBag, RefreshCw, Headphones, FileText, ChevronDown, ChevronUp, Clock, X, Pencil, Check, StickyNote, BarChart2, Trophy, MessageSquarePlus, Send, AtSign, Bell, BellOff, CalendarClock } from "lucide-react";
 import type { Deal, Renewal, Ticket, FollowUpNote, DealKpiStage, Employee } from "@/types";
 
 const STAGE_COLORS: Record<string, string> = {
@@ -320,6 +320,17 @@ export function ClientProfilePanel({ open, onClose, initialQuery }: ClientProfil
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [quickNote, setQuickNote] = useState("");
   const [quickNoteSaving, setQuickNoteSaving] = useState(false);
+  const quickNoteRef = useRef<HTMLTextAreaElement>(null);
+  /* @mention */
+  const [showMentions, setShowMentions] = useState(false);
+  const [mentionFilter, setMentionFilter] = useState("");
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const [mentionStart, setMentionStart] = useState(-1);
+  /* reminder */
+  const [showReminderPicker, setShowReminderPicker] = useState(false);
+  const [reminderDate, setReminderDate] = useState("");
+  const [reminderTime, setReminderTime] = useState("");
+  const [savingReminder, setSavingReminder] = useState(false);
 
   useEffect(() => {
     fetchEmployees().then(setEmployees).catch(() => {});
@@ -396,8 +407,59 @@ export function ClientProfilePanel({ open, onClose, initialQuery }: ClientProfil
       setBioEditing(false);
       setBioKey("");
       setQuickNote("");
+      setShowReminderPicker(false);
+      setReminderDate("");
+      setReminderTime("");
     }, 300);
   };
+
+  const filteredEmployees = employees.filter(e => !mentionFilter || e.name.includes(mentionFilter));
+
+  const insertMention = useCallback((name: string) => {
+    const ta = quickNoteRef.current;
+    if (!ta || mentionStart === -1) return;
+    const before = quickNote.slice(0, mentionStart);
+    const after = quickNote.slice(ta.selectionStart);
+    const next = before + `@${name} ` + after;
+    setQuickNote(next);
+    setShowMentions(false);
+    setMentionFilter("");
+    setMentionStart(-1);
+    setTimeout(() => {
+      ta.focus();
+      const pos = before.length + name.length + 2;
+      ta.setSelectionRange(pos, pos);
+    }, 0);
+  }, [quickNote, mentionStart]);
+
+  function handleQuickNoteChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const val = e.target.value;
+    setQuickNote(val);
+    const cursor = e.target.selectionStart;
+    const before = val.slice(0, cursor);
+    const atIdx = before.lastIndexOf("@");
+    if (atIdx !== -1 && (atIdx === 0 || before[atIdx - 1] === " " || before[atIdx - 1] === "\n")) {
+      const query = before.slice(atIdx + 1);
+      if (!query.includes("\n")) {
+        setMentionStart(atIdx);
+        setMentionFilter(query);
+        setShowMentions(true);
+        setMentionIndex(0);
+        return;
+      }
+    }
+    setShowMentions(false);
+  }
+
+  function handleQuickNoteKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (showMentions && filteredEmployees.length > 0) {
+      if (e.key === "ArrowDown") { e.preventDefault(); setMentionIndex(i => Math.min(i + 1, filteredEmployees.length - 1)); return; }
+      if (e.key === "ArrowUp") { e.preventDefault(); setMentionIndex(i => Math.max(i - 1, 0)); return; }
+      if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); insertMention(filteredEmployees[mentionIndex].name); return; }
+      if (e.key === "Escape") { setShowMentions(false); return; }
+    }
+    if (e.key === "Enter" && e.ctrlKey) addQuickNote();
+  }
 
   const addQuickNote = useCallback(async () => {
     if (!quickNote.trim() || !data) return;
@@ -411,11 +473,44 @@ export function ClientProfilePanel({ open, onClose, initialQuery }: ClientProfil
       const authorName = user?.name || user?.email || "مستخدم";
       const created = await createFollowUpNote(entityType, entityId, quickNote.trim(), authorName);
       setData(prev => prev ? { ...prev, notes: [created, ...prev.notes] } : prev);
+      const mentionedNames: string[] = [];
+      for (const emp of employees) { if (quickNote.includes(`@${emp.name}`)) mentionedNames.push(emp.name); }
+      const entityName = activeDeal?.client_name || activeRenewal?.customer_name || "";
+      for (const name of mentionedNames) {
+        createMentionNotification(created.id, entityType, entityId, entityName, name, authorName, quickNote.trim()).catch(() => {});
+      }
       setQuickNote("");
     } catch { /* silent */ } finally {
       setQuickNoteSaving(false);
     }
-  }, [quickNote, data, user]);
+  }, [quickNote, data, user, employees]);
+
+  async function saveQuickReminder() {
+    if (!reminderDate || !reminderTime || !data) return;
+    const activeDeal = data.deals.find(d => d.stage !== "مرفوض مع سبب") || data.deals[0];
+    const activeRenewal = !activeDeal ? data.renewals[0] : null;
+    const entityType = activeDeal ? "deal" : activeRenewal ? "renewal" : null;
+    const entityId = activeDeal?.id || activeRenewal?.id;
+    if (!entityType || !entityId) return;
+    setSavingReminder(true);
+    try {
+      const authorName = user?.name || user?.email || "مستخدم";
+      const entityName = activeDeal?.client_name || activeRenewal?.customer_name || "";
+      await createReminder({
+        entity_type: entityType,
+        entity_id: entityId,
+        entity_name: entityName,
+        note_text: quickNote.trim() || undefined,
+        remind_at: new Date(`${reminderDate}T${reminderTime}:00`).toISOString(),
+        user_name: authorName,
+      });
+      setShowReminderPicker(false);
+      setReminderDate("");
+      setReminderTime("");
+    } catch { /* silent */ } finally {
+      setSavingReminder(false);
+    }
+  }
 
   const clientName = data?.deals[0]?.client_name || data?.renewals[0]?.customer_name || data?.tickets[0]?.client_name || "";
   const clientPhone = data?.deals[0]?.client_phone || data?.renewals[0]?.customer_phone || data?.tickets[0]?.client_phone || "";
@@ -563,33 +658,101 @@ export function ClientProfilePanel({ open, onClose, initialQuery }: ClientProfil
 
               {/* Quick follow-up note */}
               {(data.deals.length > 0 || data.renewals.length > 0) && (
-                <div className="rounded-xl border border-border/50 bg-muted/20 p-3">
-                  <div className="flex items-center gap-1.5 mb-2">
+                <div className="rounded-xl border border-border/50 bg-muted/20 p-3 space-y-2">
+                  <div className="flex items-center gap-1.5">
                     <MessageSquarePlus className="w-3.5 h-3.5 text-cyan-400" />
                     <span className="text-xs font-bold text-foreground">إضافة متابعة</span>
                   </div>
-                  <div className="flex gap-2 items-start">
-                    <textarea
-                      value={quickNote}
-                      onChange={(e) => setQuickNote(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter" && e.ctrlKey) addQuickNote(); }}
-                      placeholder="اكتب ملاحظة المتابعة... (Ctrl+Enter للإرسال)"
-                      className="flex-1 min-h-[64px] rounded-lg border border-border/50 bg-background/50 p-2 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-cyan-400/50 resize-none"
-                      dir="rtl"
-                    />
-                    <button
-                      onClick={addQuickNote}
-                      disabled={!quickNote.trim() || quickNoteSaving}
-                      className="p-2 rounded-lg bg-cyan-500/15 text-cyan-400 border border-cyan-400/30 hover:bg-cyan-500/25 disabled:opacity-40 transition-colors"
-                      title="إرسال"
-                    >
-                      {quickNoteSaving ? (
-                        <div className="w-4 h-4 border border-cyan-400/40 border-t-cyan-400 rounded-full animate-spin" />
-                      ) : (
-                        <Send className="w-4 h-4" />
+                  <div className="flex gap-2 items-start relative">
+                    <div className="flex-1 relative">
+                      <textarea
+                        ref={quickNoteRef}
+                        value={quickNote}
+                        onChange={handleQuickNoteChange}
+                        onKeyDown={handleQuickNoteKeyDown}
+                        placeholder="اكتب ملاحظة... اكتب @ لمنشن موظف (Ctrl+Enter للإرسال)"
+                        className="w-full min-h-[64px] rounded-lg border border-border/50 bg-background/50 p-2 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-cyan-400/50 resize-none"
+                        dir="rtl"
+                      />
+                      {/* Mention dropdown */}
+                      {showMentions && filteredEmployees.length > 0 && (
+                        <div className="absolute top-full mt-1 right-0 w-full bg-card border border-border rounded-lg shadow-lg z-50 max-h-[160px] overflow-y-auto">
+                          {filteredEmployees.map((emp, idx) => (
+                            <button
+                              key={emp.id}
+                              onClick={() => insertMention(emp.name)}
+                              className={`w-full flex items-center gap-2 px-3 py-2 text-right text-xs transition-colors ${idx === mentionIndex ? "bg-cyan-500/10 text-cyan-400" : "text-foreground hover:bg-white/5"}`}
+                            >
+                              <div className="w-6 h-6 rounded-full bg-amber-500/15 text-amber-400 flex items-center justify-center text-[10px] font-bold shrink-0">{emp.name.charAt(0)}</div>
+                              <span>{emp.name}</span>
+                              {emp.role && <span className="text-[11px] text-muted-foreground mr-auto">{emp.role}</span>}
+                            </button>
+                          ))}
+                        </div>
                       )}
-                    </button>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <button
+                        onClick={addQuickNote}
+                        disabled={!quickNote.trim() || quickNoteSaving}
+                        className="p-2 rounded-lg bg-cyan-500/15 text-cyan-400 border border-cyan-400/30 hover:bg-cyan-500/25 disabled:opacity-40 transition-colors"
+                        title="إرسال"
+                      >
+                        {quickNoteSaving ? <div className="w-4 h-4 border border-cyan-400/40 border-t-cyan-400 rounded-full animate-spin" /> : <Send className="w-4 h-4" />}
+                      </button>
+                      <button
+                        onClick={() => {
+                          const ta = quickNoteRef.current;
+                          if (!ta) return;
+                          const cursor = ta.selectionStart;
+                          const before = quickNote.slice(0, cursor);
+                          const after = quickNote.slice(cursor);
+                          const needSpace = before.length > 0 && before[before.length - 1] !== " ";
+                          const prefix = needSpace ? " @" : "@";
+                          setQuickNote(before + prefix + after);
+                          setMentionStart(before.length + (needSpace ? 1 : 0));
+                          setShowMentions(true);
+                          setMentionFilter("");
+                          setTimeout(() => { ta.focus(); const pos = cursor + prefix.length; ta.setSelectionRange(pos, pos); }, 0);
+                        }}
+                        className="p-2 rounded-lg border border-amber-400/30 text-amber-400 hover:bg-amber-400/10 transition-colors"
+                        title="منشن موظف @"
+                      >
+                        <AtSign className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setShowReminderPicker(p => !p)}
+                        className={`p-2 rounded-lg border transition-colors ${showReminderPicker ? "border-purple-400/60 bg-purple-400/15 text-purple-400" : "border-purple-400/30 text-purple-400 hover:bg-purple-400/10"}`}
+                        title="تذكير بتاريخ ووقت"
+                      >
+                        <Bell className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
+                  {/* Reminder picker */}
+                  {showReminderPicker && (
+                    <div className="p-2.5 rounded-lg border border-purple-400/30 bg-purple-400/5 space-y-2">
+                      <p className="text-[12px] font-medium text-purple-400 flex items-center gap-1.5">
+                        <CalendarClock className="w-3.5 h-3.5" /> تذكيرني في:
+                      </p>
+                      <div className="flex gap-2">
+                        <input type="date" value={reminderDate} onChange={e => setReminderDate(e.target.value)}
+                          className="flex-1 rounded-md border border-border bg-card px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-purple-400" />
+                        <input type="time" value={reminderTime} onChange={e => setReminderTime(e.target.value)}
+                          className="w-24 rounded-md border border-border bg-card px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-purple-400" />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={saveQuickReminder}
+                          disabled={!reminderDate || !reminderTime || savingReminder}
+                          className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-md text-xs font-medium bg-purple-400/20 text-purple-400 hover:bg-purple-400/30 disabled:opacity-40 transition-colors"
+                        >
+                          <Bell className="w-3 h-3" />{savingReminder ? "جاري الحفظ..." : "حفظ التذكير"}
+                        </button>
+                        <button onClick={() => setShowReminderPicker(false)} className="px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:bg-white/5 transition-colors">إلغاء</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
