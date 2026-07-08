@@ -281,20 +281,61 @@ function RenewalCard({ renewal, notes }: { renewal: Renewal; notes: FollowUpNote
   );
 }
 
+const TICKET_TYPE_LABEL: Record<string, string> = {
+  problem: "مشكلة",
+  service: "خدمة",
+};
+
 function TicketCard({ ticket }: { ticket: Ticket }) {
   return (
     <div className="rounded-lg border border-border/40 bg-card/50 p-2.5 space-y-1.5">
       <div className="flex items-center justify-between gap-2">
-        <StatusBadge label={ticket.status} colorMap={TICKET_COLORS} />
-        <span className="text-[12px] text-muted-foreground">{formatDate(ticket.created_at)}</span>
+        <div className="flex items-center gap-1.5">
+          <StatusBadge label={ticket.status} colorMap={TICKET_COLORS} />
+          {ticket.request_type && (
+            <span className={`text-[11px] px-1.5 py-0.5 rounded-full border font-medium ${
+              ticket.request_type === "problem"
+                ? "bg-red-500/10 text-red-400 border-red-500/20"
+                : "bg-sky-500/10 text-sky-400 border-sky-500/20"
+            }`}>
+              {TICKET_TYPE_LABEL[ticket.request_type] || ticket.request_type}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <FollowUpLogButton entityType="ticket" entityId={ticket.id} entityName={ticket.client_name} />
+          <span className="text-[12px] text-muted-foreground">{formatDate(ticket.created_at)}</span>
+        </div>
       </div>
-      <p className="text-xs text-foreground">{ticket.issue}</p>
-      <div className="flex items-center gap-3 text-[12px] text-muted-foreground">
-        {ticket.priority && <span>الأولوية: {ticket.priority}</span>}
+
+      {ticket.ticket_number && (
+        <p className="text-[11px] text-muted-foreground/60">رقم التذكرة: #{ticket.ticket_number}</p>
+      )}
+
+      <p className="text-xs text-foreground leading-relaxed">{ticket.issue}</p>
+
+      {(ticket.issue_category || ticket.issue_subcategory) && (
+        <p className="text-[12px] text-muted-foreground">
+          {ticket.issue_category}{ticket.issue_subcategory ? ` ← ${ticket.issue_subcategory}` : ""}
+        </p>
+      )}
+
+      <div className="flex items-center gap-3 text-[12px] text-muted-foreground flex-wrap">
+        {ticket.priority && (
+          <span className={`font-medium ${
+            ticket.priority === "عاجل" ? "text-red-400" :
+            ticket.priority === "عالي" ? "text-orange-400" :
+            ticket.priority === "متوسط" ? "text-amber-400" : "text-muted-foreground"
+          }`}>
+            {ticket.priority}
+          </span>
+        )}
         {ticket.assigned_agent_name && <span>الفني: {ticket.assigned_agent_name}</span>}
+        {ticket.due_date && <span className="text-orange-400/80">الاستحقاق: {formatDate(ticket.due_date)}</span>}
       </div>
+
       {ticket.resolved_date && (
-        <p className="text-[12px] text-emerald-400/70">تم الحل: {formatDate(ticket.resolved_date)}</p>
+        <p className="text-[12px] text-emerald-400/70">✓ تم الحل: {formatDate(ticket.resolved_date)}</p>
       )}
     </div>
   );
@@ -807,17 +848,40 @@ export function ClientProfilePanel({ open, onClose, initialQuery }: ClientProfil
               )}
 
               {/* Tickets */}
-              {data.tickets.length > 0 && (
-                <SectionToggle
-                  title="تذاكر الدعم"
-                  icon={<Headphones className="w-3.5 h-3.5 text-orange-400" />}
-                  count={data.tickets.length}
-                >
-                  {data.tickets.map(t => (
-                    <TicketCard key={t.id} ticket={t} />
-                  ))}
-                </SectionToggle>
-              )}
+              {data.tickets.length > 0 && (() => {
+                const open = data.tickets.filter(t => t.status === "مفتوح").length;
+                const inProgress = data.tickets.filter(t => t.status === "قيد المعالجة").length;
+                const resolved = data.tickets.filter(t => t.status === "محلول").length;
+                return (
+                  <SectionToggle
+                    title="طلبات الدعم"
+                    icon={<Headphones className="w-3.5 h-3.5 text-orange-400" />}
+                    count={data.tickets.length}
+                  >
+                    {/* Summary row */}
+                    <div className="flex gap-2 mb-1">
+                      {open > 0 && (
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 font-medium">
+                          {open} مفتوح
+                        </span>
+                      )}
+                      {inProgress > 0 && (
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium">
+                          {inProgress} قيد المعالجة
+                        </span>
+                      )}
+                      {resolved > 0 && (
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
+                          {resolved} محلول
+                        </span>
+                      )}
+                    </div>
+                    {data.tickets.map(t => (
+                      <TicketCard key={t.id} ticket={t} />
+                    ))}
+                  </SectionToggle>
+                );
+              })()}
             </>
           )}
 
