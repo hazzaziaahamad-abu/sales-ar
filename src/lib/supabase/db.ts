@@ -1439,7 +1439,7 @@ export async function createMentionNotification(
   noteText: string
 ): Promise<void> {
   const supabase = createClient();
-  await supabase.from("mention_notifications").insert({
+  const { error } = await supabase.from("mention_notifications").insert({
     org_id: getOrgId(),
     note_id: noteId,
     entity_type: entityType,
@@ -1449,6 +1449,7 @@ export async function createMentionNotification(
     author_name: authorName,
     note_text: noteText,
   });
+  if (error) throw error;
 }
 
 export async function fetchMentionNotifications(userName: string): Promise<MentionNotification[]> {

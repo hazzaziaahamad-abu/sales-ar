@@ -146,12 +146,15 @@ export function FollowUpLogButton({ entityType, entityId, entityName }: FollowUp
       setNotes((prev) => [created, ...prev]);
 
       const mentionedNames = extractMentions(newNote);
+      console.log("[mention] extracted names:", mentionedNames, "from employees:", employees.map(e => e.name));
       const notified = new Set<string>();
       for (const name of mentionedNames) {
         if (name === authorName) continue; // no self-notification
         if (notified.has(name)) continue;  // no duplicates in same message
         notified.add(name);
-        createMentionNotification(created.id, entityType, entityId, entityName, name, authorName, newNote.trim()).catch(console.error);
+        createMentionNotification(created.id, entityType, entityId, entityName, name, authorName, newNote.trim())
+          .then(() => console.log("[mention] notification created for:", name))
+          .catch((err) => console.error("[mention] FAILED to create notification for:", name, err));
       }
 
       setNewNote("");
