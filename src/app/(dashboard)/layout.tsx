@@ -14,7 +14,8 @@ import { WelcomePopup } from "@/components/layout/welcome-popup";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { OrgProvider } from "@/lib/org-context";
 import { Skeleton } from "@/components/ui/skeleton";
-import { fetchDeals, fetchSalesTargets, fetchSalesActivities, fetchTickets, fetchMentionNotifications, markMentionNotificationsRead, fetchRecentFollowUpNotes, fetchDueReminders, dismissReminder } from "@/lib/supabase/db";
+import { fetchDeals, fetchSalesTargets, fetchSalesActivities, fetchTickets, fetchMentionNotifications, markMentionNotificationsRead, markSingleMentionRead, fetchRecentFollowUpNotes, fetchDueReminders, dismissReminder } from "@/lib/supabase/db";
+import { createClient } from "@/lib/supabase/client";
 import type { Reminder } from "@/lib/supabase/db";
 import type { AppNotification, MentionNotification } from "@/types";
 import { CCThemeProvider } from "@/lib/theme-context";
@@ -49,27 +50,37 @@ function MentionNotifLoader({ onLoad, onMentions }: { onLoad: (n: AppNotificatio
   const { user } = useAuth();
   const pathname = usePathname();
 
+  const buildAppNotifs = useCallback((mentions: MentionNotification[]): AppNotification[] => {
+    return mentions.filter((m) => !m.is_read).map((m) => ({
+      id: `mention-${m.id}`,
+      type: "mention" as const,
+      icon: "💬",
+      message: `${m.author_name} أشار إليك في "${m.entity_name}": ${m.note_text.slice(0, 70)}${m.note_text.length > 70 ? "..." : ""}`,
+      section: m.entity_type === "deal" ? "sales" : m.entity_type === "ticket" ? "support" : "renewals",
+      timestamp: m.created_at,
+      isRead: false,
+      metadata: {
+        entityId: m.entity_id,
+        entityType: m.entity_type,
+        noteId: m.note_id,
+        entityName: m.entity_name,
+        mentionNotifId: m.id,
+      },
+    }));
+  }, []);
+
   const loadMentions = useCallback(() => {
     if (!user?.name) return;
     fetchMentionNotifications(user.name).then((mentions) => {
       const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
       const recent = mentions.filter((m) => new Date(m.created_at).getTime() > oneDayAgo);
       onMentions(recent);
-      const unread = recent.filter((m) => !m.is_read);
-      const notifs: AppNotification[] = unread.map((m) => ({
-        id: `mention-${m.id}`,
-        type: "crud_action" as const,
-        icon: "💬",
-        message: `${m.author_name} أشار إليك في متابعة "${m.entity_name}": ${m.note_text.slice(0, 60)}...`,
-        section: m.entity_type === "deal" ? "sales" : m.entity_type === "ticket" ? "support" : "renewals",
-        timestamp: m.created_at,
-        isRead: false,
-      }));
+      const notifs = buildAppNotifs(recent);
       if (notifs.length > 0) onLoad(notifs);
     }).catch(console.error);
-  }, [user?.name, onLoad, onMentions]);
+  }, [user?.name, onLoad, onMentions, buildAppNotifs]);
 
-  // Check on page load, on every navigation, and every 60s while tab is visible
+  // Poll: page load, navigation, every 60s, window focus
   useEffect(() => { loadMentions(); }, [loadMentions, pathname]);
   useEffect(() => {
     const onFocus = () => loadMentions();
@@ -78,7 +89,62 @@ function MentionNotifLoader({ onLoad, onMentions }: { onLoad: (n: AppNotificatio
     return () => { window.removeEventListener("focus", onFocus); clearInterval(interval); };
   }, [loadMentions]);
 
+  // Supabase Realtime — instant mention notifications
+  useEffect(() => {
+    if (!user?.name) return;
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`mention-notifs-${user.name}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "mention_notifications",
+          filter: `mentioned_name=eq.${user.name}`,
+        },
+        (payload) => {
+          const m = payload.new as MentionNotification;
+          // Re-fetch to keep list consistent (simpler than managing prev state across closure)
+          if (user?.name) fetchMentionNotifications(user.name).then(onMentions).catch(console.error);
+          const notif: AppNotification = {
+            id: `mention-${m.id}`,
+            type: "mention",
+            icon: "💬",
+            message: `${m.author_name} أشار إليك في "${m.entity_name}": ${m.note_text.slice(0, 70)}${m.note_text.length > 70 ? "..." : ""}`,
+            section: m.entity_type === "deal" ? "sales" : m.entity_type === "ticket" ? "support" : "renewals",
+            timestamp: m.created_at,
+            isRead: false,
+            metadata: {
+              entityId: m.entity_id,
+              entityType: m.entity_type,
+              noteId: m.note_id,
+              entityName: m.entity_name,
+              mentionNotifId: m.id,
+            },
+          };
+          onLoad([notif]);
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.name, onLoad, onMentions]);
+
   return null;
+}
+
+const MENTION_SECTION_PATH: Record<string, string> = {
+  deal: "/sales",
+  ticket: "/support",
+  renewal: "/renewals",
+};
+
+function buildMentionUrl(m: MentionNotification): string {
+  const base = MENTION_SECTION_PATH[m.entity_type] || "/sales";
+  const params = new URLSearchParams();
+  if (m.entity_name) params.set("profile", m.entity_name);
+  if (m.note_id) params.set("noteId", m.note_id);
+  return `${base}?${params.toString()}`;
 }
 
 function MentionAlertBanner({ mentions, onRefresh }: { mentions: MentionNotification[]; onRefresh: () => void }) {
@@ -89,10 +155,9 @@ function MentionAlertBanner({ mentions, onRefresh }: { mentions: MentionNotifica
 
   const unreadCount = mentions.filter((m) => !m.is_read && !markedIds.has(m.id)).length;
 
-  const SECTION_PATH: Record<string, string> = {
-    deal: "/sales",
-    ticket: "/support",
-    renewal: "/renewals",
+  const markRead = (ids: string[]) => {
+    markMentionNotificationsRead(ids).catch(console.error);
+    setMarkedIds((prev) => { const next = new Set(prev); ids.forEach((id) => next.add(id)); return next; });
   };
 
   return (
@@ -117,8 +182,7 @@ function MentionAlertBanner({ mentions, onRefresh }: { mentions: MentionNotifica
           <button
             onClick={() => {
               const unreadIds = mentions.filter((m) => !m.is_read && !markedIds.has(m.id)).map((m) => m.id);
-              markMentionNotificationsRead(unreadIds).catch(console.error);
-              setMarkedIds((prev) => { const next = new Set(prev); unreadIds.forEach((id) => next.add(id)); return next; });
+              markRead(unreadIds);
               onRefresh();
             }}
             className="text-[12px] px-3 py-1.5 rounded-lg border border-amber-500/30 text-amber-400 hover:bg-amber-500/10 transition-colors shrink-0"
@@ -134,9 +198,8 @@ function MentionAlertBanner({ mentions, onRefresh }: { mentions: MentionNotifica
             <button
               key={m.id}
               onClick={() => {
-                const base = SECTION_PATH[m.entity_type] || "/sales";
-                const hasProfile = m.entity_type === "deal" || m.entity_type === "renewal";
-                router.push(hasProfile ? `${base}?profile=${encodeURIComponent(m.entity_name)}` : base);
+                if (isNew) markRead([m.id]);
+                router.push(buildMentionUrl(m));
               }}
               className={`w-full text-right px-4 py-2.5 flex items-center gap-3 hover:bg-white/[0.04] transition-colors ${isNew ? "" : "opacity-50"}`}
             >
@@ -475,13 +538,23 @@ export default function DashboardLayout({
           <NotificationPanel
             notifications={notifications}
             onClose={() => setNotifOpen(false)}
-            onMarkAllRead={() =>
-              setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })))
-            }
+            onMarkAllRead={() => {
+              // Mark all mention notifications as read in DB
+              const mentionIds = notifications
+                .filter((n) => n.type === "mention" && !n.isRead && n.metadata?.mentionNotifId)
+                .map((n) => n.metadata!.mentionNotifId!);
+              if (mentionIds.length > 0) markMentionNotificationsRead(mentionIds).catch(console.error);
+              setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+            }}
             onClearAll={() => {
               setNotifications([]);
               setNotifOpen(false);
             }}
+            onMarkOneRead={(appId) =>
+              setNotifications((prev) =>
+                prev.map((n) => (n.id === appId ? { ...n, isRead: true } : n))
+              )
+            }
           />
         )}
 

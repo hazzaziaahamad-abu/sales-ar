@@ -1465,11 +1465,21 @@ export async function fetchMentionNotifications(userName: string): Promise<Menti
 }
 
 export async function markMentionNotificationsRead(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
   const supabase = createClient();
   await supabase
     .from("mention_notifications")
     .update({ is_read: true })
     .in("id", ids)
+    .eq("org_id", getOrgId());
+}
+
+export async function markSingleMentionRead(id: string): Promise<void> {
+  const supabase = createClient();
+  await supabase
+    .from("mention_notifications")
+    .update({ is_read: true })
+    .eq("id", id)
     .eq("org_id", getOrgId());
 }
 

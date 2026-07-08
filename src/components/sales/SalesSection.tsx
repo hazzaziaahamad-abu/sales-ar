@@ -254,10 +254,14 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const [profileQuery, setProfileQuery] = useState("");
   const searchParams = useSearchParams();
 
+  const [profileNoteId, setProfileNoteId] = useState<string | undefined>(undefined);
+
   useEffect(() => {
     const p = searchParams.get("profile");
+    const n = searchParams.get("noteId");
     if (p) {
       setProfileQuery(p);
+      setProfileNoteId(n || undefined);
       setProfileOpen(true);
     }
   }, [searchParams]);
@@ -3108,6 +3112,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
         open={profileOpen}
         onClose={() => setProfileOpen(false)}
         initialQuery={profileQuery}
+        highlightNoteId={profileNoteId}
       />
 
       {/* ─── Auto Follow-up Reminders (bottom) ─── */}

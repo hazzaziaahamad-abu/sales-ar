@@ -345,9 +345,10 @@ interface ClientProfilePanelProps {
   open: boolean;
   onClose: () => void;
   initialQuery?: string;
+  highlightNoteId?: string; // scroll to & highlight a specific note
 }
 
-export function ClientProfilePanel({ open, onClose, initialQuery }: ClientProfilePanelProps) {
+export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteId }: ClientProfilePanelProps) {
   const { user } = useAuth();
   const [search, setSearch] = useState(initialQuery || "");
   const [loading, setLoading] = useState(false);
@@ -514,11 +515,14 @@ export function ClientProfilePanel({ open, onClose, initialQuery }: ClientProfil
       const authorName = user?.name || user?.email || "مستخدم";
       const created = await createFollowUpNote(entityType, entityId, quickNote.trim(), authorName);
       setData(prev => prev ? { ...prev, notes: [created, ...prev.notes] } : prev);
-      const mentionedNames: string[] = [];
-      for (const emp of employees) { if (quickNote.includes(`@${emp.name}`)) mentionedNames.push(emp.name); }
       const entityName = activeDeal?.client_name || activeRenewal?.customer_name || "";
-      for (const name of mentionedNames) {
-        createMentionNotification(created.id, entityType, entityId, entityName, name, authorName, quickNote.trim()).catch(() => {});
+      const notified = new Set<string>();
+      for (const emp of employees) {
+        if (!quickNote.includes(`@${emp.name}`)) continue;
+        if (emp.name === authorName) continue; // no self-notification
+        if (notified.has(emp.name)) continue;  // no duplicates
+        notified.add(emp.name);
+        createMentionNotification(created.id, entityType, entityId, entityName, emp.name, authorName, quickNote.trim()).catch(() => {});
       }
       setQuickNote("");
     } catch { /* silent */ } finally {
@@ -805,18 +809,31 @@ export function ClientProfilePanel({ open, onClose, initialQuery }: ClientProfil
                   count={data.notes.length}
                 >
                   <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                    {data.notes.slice(0, 15).map(n => (
-                      <div key={n.id} className="flex gap-2 text-[12px] p-1.5 rounded-lg bg-muted/20">
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary/50 mt-1.5 shrink-0" />
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5 text-muted-foreground">
-                            <span>{formatDate(n.created_at)}</span>
-                            <span className="font-medium text-foreground/80">{n.author_name}</span>
+                    {data.notes.slice(0, 15).map(n => {
+                      const isHighlighted = highlightNoteId === n.id;
+                      return (
+                        <div
+                          key={n.id}
+                          id={`note-${n.id}`}
+                          ref={isHighlighted ? (el) => { el?.scrollIntoView({ behavior: "smooth", block: "center" }); } : undefined}
+                          className={`flex gap-2 text-[12px] p-1.5 rounded-lg transition-colors ${
+                            isHighlighted
+                              ? "bg-amber-500/15 border border-amber-500/30 ring-1 ring-amber-500/20"
+                              : "bg-muted/20"
+                          }`}
+                        >
+                          <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${isHighlighted ? "bg-amber-400" : "bg-primary/50"}`} />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 text-muted-foreground">
+                              <span>{formatDate(n.created_at)}</span>
+                              <span className={`font-medium ${isHighlighted ? "text-amber-400" : "text-foreground/80"}`}>{n.author_name}</span>
+                              {isHighlighted && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-bold">المنشن</span>}
+                            </div>
+                            <p className="text-foreground/60 whitespace-pre-line break-words">{n.note}</p>
                           </div>
-                          <p className="text-foreground/60 whitespace-pre-line break-words">{n.note}</p>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </SectionToggle>
               )}
