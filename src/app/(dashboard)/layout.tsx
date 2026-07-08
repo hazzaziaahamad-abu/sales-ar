@@ -14,10 +14,10 @@ import { WelcomePopup } from "@/components/layout/welcome-popup";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { OrgProvider } from "@/lib/org-context";
 import { Skeleton } from "@/components/ui/skeleton";
-import { fetchDeals, fetchSalesTargets, fetchSalesActivities, fetchTickets, fetchMentionNotifications, markMentionNotificationsRead, markSingleMentionRead, fetchRecentFollowUpNotes, fetchDueReminders, dismissReminder } from "@/lib/supabase/db";
+import { fetchDeals, fetchSalesTargets, fetchSalesActivities, fetchTickets, fetchRenewals, fetchEmployeeTasks, fetchMentionNotifications, markMentionNotificationsRead, markSingleMentionRead, fetchRecentFollowUpNotes, fetchDueReminders, dismissReminder } from "@/lib/supabase/db";
 import { createClient } from "@/lib/supabase/client";
 import type { Reminder } from "@/lib/supabase/db";
-import type { AppNotification, MentionNotification } from "@/types";
+import type { AppNotification, MentionNotification, Deal, Ticket, Renewal, EmployeeTask } from "@/types";
 import { CCThemeProvider } from "@/lib/theme-context";
 import { saudiDateStr } from "@/lib/utils/format";
 import { PageTracker } from "@/components/layout/page-tracker";
@@ -287,12 +287,40 @@ async function generateLiveNotifications(): Promise<AppNotification[]> {
   const notifications: AppNotification[] = [];
 
   try {
-    const [deals, targets, activities, tickets] = await Promise.allSettled([
+    const [deals, targets, activities, tickets, renewals] = await Promise.allSettled([
       fetchDeals(),
       fetchSalesTargets(),
       fetchSalesActivities(),
       fetchTickets(),
+      fetchRenewals(),
     ]);
+
+    // Renewals due within 7 days
+    if (renewals.status === "fulfilled") {
+      const todayMs = Date.now();
+      const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+      renewals.value
+        .filter((r) => {
+          if (r.status === "مكتمل" || r.status === "ملغي بسبب") return false;
+          const renewalMs = new Date(r.renewal_date).getTime();
+          return renewalMs >= todayMs && renewalMs <= todayMs + sevenDaysMs;
+        })
+        .slice(0, 8)
+        .forEach((r) => {
+          const daysLeft = Math.ceil((new Date(r.renewal_date).getTime() - todayMs) / (1000 * 60 * 60 * 24));
+          const urgent = daysLeft <= 2;
+          notifications.push({
+            id: `renewal-due-${r.id}`,
+            type: "urgent_ticket",
+            icon: urgent ? "⚠️" : "🔄",
+            message: `تجديد "${r.customer_name}" — ${r.plan_name} — بعد ${daysLeft} يوم${urgent ? " (عاجل)" : ""}`,
+            section: "renewals",
+            timestamp: now,
+            isRead: false,
+            metadata: { entityId: r.id, entityName: r.customer_name, entityType: "renewal" },
+          });
+        });
+    }
 
     // Unsolved urgent tickets from DB
     if (tickets.status === "fulfilled") {
@@ -423,6 +451,162 @@ async function generateLiveNotifications(): Promise<AppNotification[]> {
   return notifications;
 }
 
+/* ─── Live Realtime Notifications (tasks / tickets / deals) ─────────────────── */
+function LiveNotifSubscriptions({ onLoad }: { onLoad: (n: AppNotification[]) => void }) {
+  const { user } = useAuth();
+
+  /* On mount: show pending tasks assigned to me */
+  useEffect(() => {
+    if (!user?.id) return;
+    fetchEmployeeTasks({ assigned_to: user.id })
+      .then((tasks) => {
+        const pending = tasks.filter(
+          (t) => t.status === "pending" || t.status === "in_progress"
+        );
+        if (pending.length === 0) return;
+        const notifs: AppNotification[] = pending.slice(0, 5).map((t) => ({
+          id: `task-pending-${t.id}`,
+          type: "crud_action" as const,
+          icon: t.priority === "urgent" || t.priority === "high" ? "🔴" : "📋",
+          message: `مهمة ${t.priority === "urgent" ? "عاجلة" : t.priority === "high" ? "بأولوية عالية" : "مُسندة"}: "${t.title}"${t.due_date ? ` — الموعد: ${t.due_date}` : ""}`,
+          section: "my-tasks",
+          timestamp: t.created_at,
+          isRead: false,
+          metadata: { entityId: t.id },
+        }));
+        onLoad(notifs);
+      })
+      .catch(console.error);
+  }, [user?.id, onLoad]);
+
+  /* Realtime subscriptions */
+  useEffect(() => {
+    if (!user?.id || !user?.name) return;
+    const supabase = createClient();
+
+    /* 1. Task assigned to me (INSERT) */
+    const taskCh = supabase
+      .channel(`live-task-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "employee_tasks", filter: `assigned_to=eq.${user.id}` },
+        (payload) => {
+          const t = payload.new as EmployeeTask;
+          onLoad([{
+            id: `task-new-${t.id}`,
+            type: "crud_action",
+            icon: t.priority === "urgent" ? "🔴" : "📋",
+            message: `${t.assigned_by_name || "مدير"} أسند إليك مهمة${t.priority === "urgent" ? " عاجلة" : ""}: "${t.title}"${t.due_date ? ` — الموعد: ${t.due_date}` : ""}`,
+            section: "my-tasks",
+            timestamp: t.created_at,
+            isRead: false,
+            metadata: { entityId: t.id },
+          }]);
+        }
+      )
+      .subscribe();
+
+    /* 2. Ticket assigned to me (INSERT or reassignment UPDATE) */
+    const ticketCh = supabase
+      .channel(`live-ticket-${user.name}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "tickets", filter: `assigned_agent_name=eq.${user.name}` },
+        (payload) => {
+          const t = payload.new as Ticket;
+          onLoad([{
+            id: `ticket-new-${t.id}`,
+            type: "urgent_ticket",
+            icon: t.priority === "عاجل" ? "🚨" : "🎫",
+            message: `تذكرة${t.priority === "عاجل" ? " عاجلة" : ""} أُسندت إليك: "${t.issue}" — ${t.client_name}`,
+            section: "support",
+            timestamp: t.created_at,
+            isRead: false,
+            metadata: { entityId: t.id },
+          }]);
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "tickets", filter: `assigned_agent_name=eq.${user.name}` },
+        (payload) => {
+          const oldAgent = (payload.old as Partial<Ticket>)?.assigned_agent_name;
+          if (oldAgent === user.name) return; // wasn't a reassignment
+          const t = payload.new as Ticket;
+          onLoad([{
+            id: `ticket-reassigned-${t.id}-${Date.now()}`,
+            type: "urgent_ticket",
+            icon: "🎫",
+            message: `تذكرة أُعيد إسنادها إليك: "${t.issue}" — ${t.client_name}`,
+            section: "support",
+            timestamp: new Date().toISOString(),
+            isRead: false,
+            metadata: { entityId: t.id },
+          }]);
+        }
+      )
+      .subscribe();
+
+    /* 3. My deal changes stage (UPDATE) */
+    const dealCh = supabase
+      .channel(`live-deal-stage-${user.name}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "deals", filter: `assigned_rep_name=eq.${user.name}` },
+        (payload) => {
+          const oldStage = (payload.old as Partial<Deal>)?.stage;
+          const d = payload.new as Deal;
+          if (!oldStage || oldStage === d.stage) return;
+          const closed = d.stage === "مكتملة";
+          onLoad([{
+            id: `deal-stage-${d.id}-${d.stage}`,
+            type: "crud_action",
+            icon: closed ? "🏆" : "📊",
+            message: closed
+              ? `🎉 صفقة "${d.client_name}" أُغلقت بقيمة ${d.deal_value.toLocaleString()} ر.س`
+              : `صفقة "${d.client_name}" انتقلت إلى مرحلة "${d.stage}"`,
+            section: d.sales_type === "support" ? "support-sales" : "sales",
+            timestamp: new Date().toISOString(),
+            isRead: false,
+            metadata: { entityId: d.id, entityName: d.client_name },
+          }]);
+        }
+      )
+      .subscribe();
+
+    /* 4. New deal assigned to me (INSERT) */
+    const dealNewCh = supabase
+      .channel(`live-deal-new-${user.name}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "deals", filter: `assigned_rep_name=eq.${user.name}` },
+        (payload) => {
+          const d = payload.new as Deal;
+          onLoad([{
+            id: `deal-new-${d.id}`,
+            type: "crud_action",
+            icon: "💼",
+            message: `صفقة جديدة أُسندت إليك: "${d.client_name}"${d.plan ? ` — ${d.plan}` : ""}`,
+            section: d.sales_type === "support" ? "support-sales" : "sales",
+            timestamp: d.created_at,
+            isRead: false,
+            metadata: { entityId: d.id, entityName: d.client_name },
+          }]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(taskCh);
+      supabase.removeChannel(ticketCh);
+      supabase.removeChannel(dealCh);
+      supabase.removeChannel(dealNewCh);
+    };
+  }, [user?.id, user?.name, onLoad]);
+
+  return null;
+}
+
 function RemindersBanner({ reminders, onDismiss }: { reminders: Reminder[]; onDismiss: (id: string) => void }) {
   if (reminders.length === 0) return null;
   return (
@@ -506,6 +690,7 @@ export default function DashboardLayout({
     <AuthProvider>
     <TopbarProvider>
       <MentionNotifLoader onLoad={addNotifications} onMentions={setRecentMentions} />
+      <LiveNotifSubscriptions onLoad={addNotifications} />
       <PageTracker />
       <SaleCelebration />
       <WelcomePopup />

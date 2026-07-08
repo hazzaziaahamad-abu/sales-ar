@@ -27,6 +27,7 @@ function timeAgo(timestamp: string): string {
 
 const SECTION_PATH: Record<string, string> = {
   support: "/support",
+  "support-sales": "/support-sales",
   development: "/development",
   team: "/team",
   sales: "/sales",
@@ -34,6 +35,7 @@ const SECTION_PATH: Record<string, string> = {
   partnerships: "/partnerships",
   renewals: "/renewals",
   satisfaction: "/satisfaction",
+  "my-tasks": "/my-tasks",
 };
 
 export function NotificationPanel({
