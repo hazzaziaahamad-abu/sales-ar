@@ -682,7 +682,7 @@ export default function RenewalsPage() {
         plan_name: form.plan_name,
         plan_price: form.plan_price,
         renewal_date: form.renewal_date,
-        payment_date: form.payment_date ? dateToTimestamp(form.payment_date) : (isCompleting ? saudiTimestamp() : undefined),
+        payment_date: form.payment_date ? dateToTimestamp(form.payment_date) : (isCompleting ? saudiTimestamp() : null),
         status: form.status,
         cancel_reason: form.status === "ملغي بسبب" ? form.cancel_reason || undefined : undefined,
         assigned_rep: form.assigned_rep || undefined,
@@ -735,6 +735,7 @@ export default function RenewalsPage() {
       setModalOpen(false);
     } catch (err) {
       console.error(err);
+      alert("حدث خطأ أثناء الحفظ. حاول مرة أخرى.");
     } finally {
       setSaving(false);
     }
