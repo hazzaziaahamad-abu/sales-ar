@@ -50,16 +50,18 @@ import { countPendingDeals } from "@/lib/supabase/db";
 
 export const NAV_ITEMS = [
   { label: "نظرة عامة", href: "/dashboard", slug: "dashboard", icon: LayoutDashboard, color: "cyan", group: "عام" },
-  { label: "لوحة المدير", href: "/manager", slug: "manager", icon: Briefcase, color: "violet", group: "عام" },
+  { label: "غرفة العمليات", href: "/operations", slug: "operations", icon: BrainCircuit, color: "violet", group: "عام" },
   { label: "انضباط الإغلاق", href: "/discipline", slug: "discipline", icon: ShieldAlert, color: "amber", group: "عام" },
   { label: "التحديثات الأخيرة", href: "/recent-updates", slug: "recent-updates", icon: History, color: "cyan", group: "عام" },
-  { label: "السكرتير التنفيذي", href: "/secretary", slug: "secretary", icon: BrainCircuit, color: "violet", group: "الإدارة التنفيذية" },
   { label: "قائمة الطلبات", href: "/requests", slug: "requests", icon: Inbox, color: "violet", group: "الإدارة التنفيذية" },
+  // مخفية مؤقتاً — مدمجة في غرفة العمليات
+  // { label: "السكرتير التنفيذي", href: "/secretary", slug: "secretary", icon: BrainCircuit, color: "violet", group: "الإدارة التنفيذية" },
+  // { label: "لوحة المدير", href: "/manager", slug: "manager", icon: Briefcase, color: "violet", group: "عام" },
+  // { label: "الاجتماع الأسبوعي", href: "/weekly", slug: "weekly", icon: ClipboardList, color: "violet", group: "المتابعة" },
   { label: "مبيعات المكتب", href: "/sales", slug: "sales", icon: TrendingUp, color: "emerald", group: "المبيعات والدعم" },
   { label: "مبيعات الدعم", href: "/support-sales", slug: "support-sales", icon: TrendingUp, color: "orange", group: "المبيعات والدعم" },
   { label: "الدعم", href: "/support", slug: "support", icon: Headphones, color: "orange", group: "المبيعات والدعم" },
   // Hidden: merged into "مهامي" — { label: "دليل المبيعات", href: "/sales-guide", slug: "sales-guide", icon: BookOpen, color: "amber" },
-  { label: "الاجتماع الأسبوعي", href: "/weekly", slug: "weekly", icon: ClipboardList, color: "violet", group: "المتابعة" },
   { label: "التجديدات", href: "/renewals", slug: "renewals", icon: RefreshCw, color: "sky", group: "المتابعة" },
   { label: "تحسين التجديدات", href: "/renewal-boost", slug: "renewal-boost", icon: Zap, color: "amber", group: "المتابعة" },
   { label: "معمل الاستعادة", href: "/recovery-lab", slug: "recovery-lab", icon: FlaskConical, color: "violet", group: "المتابعة" },

@@ -35,6 +35,7 @@ const PAGE_SLUG_MAP: Record<string, string> = {
   "/upload": "upload",
   "/agent": "agent",
   "/users": "users",
+  "/operations": "operations",
   "/weekly": "weekly",
   "/academy": "academy",
   "/secretary": "secretary",
