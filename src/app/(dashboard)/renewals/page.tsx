@@ -719,17 +719,23 @@ export default function RenewalsPage() {
     : filteredRenewals_base;
 
   /* ─── Focus filter (daily task boxes) ─── */
-  const [focusFilter, setFocusFilter] = useState<"overdue" | "today" | "week" | null>(null);
+  const [focusFilter, setFocusFilter] = useState<"overdue" | "today" | "week" | "month" | null>(null);
 
   const _activeRenewals = filteredRenewals_summary.filter(r => r.status !== "مكتمل" && r.status !== "ملغي بسبب");
   const focusOverdue = _activeRenewals.filter(r => (r.renewal_date || "") < todayStr);
   const focusToday   = _activeRenewals.filter(r => (r.renewal_date || "").slice(0, 10) === todayStr);
   const in7Days = (() => { const d = new Date(); d.setDate(d.getDate() + 7); return d.toISOString().slice(0, 10); })();
   const focusWeek    = _activeRenewals.filter(r => { const rd = (r.renewal_date || "").slice(0, 10); return rd > todayStr && rd <= in7Days; });
+  const focusMonth   = _activeRenewals.filter(r => {
+    const rd = new Date(r.renewal_date);
+    const now = new Date();
+    return rd.getFullYear() === now.getFullYear() && rd.getMonth() === now.getMonth();
+  });
 
   const filteredRenewals = focusFilter === "overdue" ? focusOverdue
     : focusFilter === "today" ? focusToday
     : focusFilter === "week" ? focusWeek
+    : focusFilter === "month" ? focusMonth
     : filteredRenewals_summary;
 
   // Priority sort: overdue → today → this week → rest (applied when no explicit sort active)
@@ -1198,7 +1204,7 @@ export default function RenewalsPage() {
 
       {/* ─── Daily Focus Boxes ─── */}
       {!loading && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {/* Overdue */}
           <button
             onClick={() => setFocusFilter(focusFilter === "overdue" ? null : "overdue")}
@@ -1252,6 +1258,24 @@ export default function RenewalsPage() {
             </div>
             <p className="text-sm font-bold text-foreground">هذا الأسبوع</p>
             <p className="text-[12px] text-muted-foreground mt-0.5">خلال 7 أيام القادمة</p>
+          </button>
+          {/* This month */}
+          <button
+            onClick={() => setFocusFilter(focusFilter === "month" ? null : "month")}
+            className={`rounded-2xl p-4 text-right transition-all border ${
+              focusFilter === "month"
+                ? "bg-cc-purple/15 border-cc-purple/40 ring-1 ring-cc-purple/30"
+                : "cc-card border-transparent hover:border-cc-purple/30 hover:bg-cc-purple/[0.06]"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className={`text-2xl font-extrabold ${focusFilter === "month" ? "text-cc-purple" : focusMonth.length > 0 ? "text-cc-purple" : "text-muted-foreground"}`}>
+                {focusMonth.length}
+              </span>
+              <span className="text-xl">📆</span>
+            </div>
+            <p className="text-sm font-bold text-foreground">هذا الشهر</p>
+            <p className="text-[12px] text-muted-foreground mt-0.5">تجديدات الشهر الحالي</p>
           </button>
         </div>
       )}
