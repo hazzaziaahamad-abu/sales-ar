@@ -4,12 +4,14 @@ import { useRouter } from "next/navigation";
 import type { AppNotification } from "@/types";
 import { Button } from "@/components/ui/button";
 import { X, CheckCheck } from "lucide-react";
+import { markSingleMentionRead } from "@/lib/supabase/db";
 
 interface NotificationPanelProps {
   notifications: AppNotification[];
   onClose: () => void;
   onMarkAllRead: () => void;
   onClearAll: () => void;
+  onMarkOneRead?: (id: string) => void;
 }
 
 function timeAgo(timestamp: string): string {
@@ -25,6 +27,7 @@ function timeAgo(timestamp: string): string {
 
 const SECTION_PATH: Record<string, string> = {
   support: "/support",
+  "support-sales": "/support-sales",
   development: "/development",
   team: "/team",
   sales: "/sales",
@@ -32,6 +35,7 @@ const SECTION_PATH: Record<string, string> = {
   partnerships: "/partnerships",
   renewals: "/renewals",
   satisfaction: "/satisfaction",
+  "my-tasks": "/my-tasks",
 };
 
 export function NotificationPanel({
@@ -39,9 +43,29 @@ export function NotificationPanel({
   onClose,
   onMarkAllRead,
   onClearAll,
+  onMarkOneRead,
 }: NotificationPanelProps) {
   const router = useRouter();
   const unreadCount = notifications.filter((n) => !n.isRead).length;
+
+  function handleNotifClick(n: AppNotification) {
+    // Mark as read in UI
+    onMarkOneRead?.(n.id);
+
+    // If it's a mention, mark in DB + navigate with noteId
+    if (n.type === "mention" && n.metadata?.mentionNotifId) {
+      markSingleMentionRead(n.metadata.mentionNotifId).catch(console.error);
+      const base = SECTION_PATH[n.section] || "/sales";
+      const params = new URLSearchParams();
+      if (n.metadata.entityName) params.set("profile", n.metadata.entityName);
+      if (n.metadata.noteId) params.set("noteId", n.metadata.noteId);
+      router.push(`${base}?${params.toString()}`);
+    } else {
+      const path = SECTION_PATH[n.section];
+      if (path) router.push(path);
+    }
+    onClose();
+  }
 
   return (
     <>
@@ -83,13 +107,9 @@ export function NotificationPanel({
             notifications.map((n) => (
               <button
                 key={n.id}
-                onClick={() => {
-                  const path = SECTION_PATH[n.section];
-                  if (path) router.push(path);
-                  onClose();
-                }}
+                onClick={() => handleNotifClick(n)}
                 className={`w-full text-right px-4 py-3 border-b border-border/50 hover:bg-white/[0.05] transition-colors ${
-                  !n.isRead ? "bg-cyan/[0.03]" : ""
+                  !n.isRead ? (n.type === "mention" ? "bg-amber-500/[0.04]" : "bg-cyan/[0.03]") : ""
                 }`}
               >
                 <div className="flex items-start gap-3">
@@ -102,7 +122,9 @@ export function NotificationPanel({
                       {timeAgo(n.timestamp)}
                     </p>
                   </div>
-                  {!n.isRead && <span className="w-2 h-2 rounded-full bg-cyan shrink-0 mt-1.5" />}
+                  {!n.isRead && (
+                    <span className={`w-2 h-2 rounded-full shrink-0 mt-1.5 ${n.type === "mention" ? "bg-amber-400" : "bg-cyan"}`} />
+                  )}
                 </div>
               </button>
             ))

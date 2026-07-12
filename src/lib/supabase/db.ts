@@ -127,15 +127,15 @@ export async function fetchClientProfile(query: string): Promise<ClientProfileDa
   const isPhone = /^\d+$/.test(q.replace(/[\s\-+()]/g, ""));
 
   const [dealsRes, renewalsRes, ticketsRes] = await Promise.all([
-    isPhone
-      ? supabase.from("deals").select("*").eq("org_id", orgId).eq("client_phone", q).order("created_at", { ascending: false })
-      : supabase.from("deals").select("*").eq("org_id", orgId).ilike("client_name", `%${q}%`).order("created_at", { ascending: false }),
-    isPhone
-      ? supabase.from("renewals").select("*").eq("org_id", orgId).eq("customer_phone", q).order("created_at", { ascending: false })
-      : supabase.from("renewals").select("*").eq("org_id", orgId).ilike("customer_name", `%${q}%`).order("created_at", { ascending: false }),
-    isPhone
-      ? supabase.from("tickets").select("*").eq("org_id", orgId).eq("client_phone", q).order("created_at", { ascending: false })
-      : supabase.from("tickets").select("*").eq("org_id", orgId).ilike("client_name", `%${q}%`).order("created_at", { ascending: false }),
+    supabase.from("deals").select("*").eq("org_id", orgId)
+      .or(`client_name.ilike.%${q}%,client_phone.ilike.%${q}%`)
+      .order("created_at", { ascending: false }),
+    supabase.from("renewals").select("*").eq("org_id", orgId)
+      .or(`customer_name.ilike.%${q}%,customer_phone.ilike.%${q}%`)
+      .order("created_at", { ascending: false }),
+    supabase.from("tickets").select("*").eq("org_id", orgId)
+      .or(`client_name.ilike.%${q}%,client_phone.ilike.%${q}%`)
+      .order("created_at", { ascending: false }),
   ]);
 
   const deals = (dealsRes.data ?? []) as Deal[];
@@ -163,15 +163,15 @@ export async function fetchClientProfile(query: string): Promise<ClientProfileDa
   return { deals, renewals, tickets, notes };
 }
 
-export async function fetchClientBio(clientKey: string): Promise<string> {
+export async function fetchClientBio(clientKey: string): Promise<{ bio: string; menuUrl: string }> {
   const supabase = createClient();
   const { data } = await supabase
     .from("client_bios")
-    .select("bio")
+    .select("bio, menu_url")
     .eq("org_id", getOrgId())
     .eq("client_key", clientKey)
     .single();
-  return data?.bio || "";
+  return { bio: data?.bio || "", menuUrl: data?.menu_url || "" };
 }
 
 export async function upsertClientBio(clientKey: string, bio: string, userName?: string): Promise<void> {
@@ -181,6 +181,18 @@ export async function upsertClientBio(clientKey: string, bio: string, userName?:
     .from("client_bios")
     .upsert(
       { org_id: orgId, client_key: clientKey, bio, updated_by: userName || null, updated_at: new Date().toISOString() },
+      { onConflict: "org_id,client_key" }
+    );
+  if (error) throw error;
+}
+
+export async function upsertClientMenuUrl(clientKey: string, menuUrl: string, userName?: string): Promise<void> {
+  const supabase = createClient();
+  const orgId = getOrgId();
+  const { error } = await supabase
+    .from("client_bios")
+    .upsert(
+      { org_id: orgId, client_key: clientKey, menu_url: menuUrl, updated_by: userName || null, updated_at: new Date().toISOString() },
       { onConflict: "org_id,client_key" }
     );
   if (error) throw error;
@@ -1439,7 +1451,7 @@ export async function createMentionNotification(
   noteText: string
 ): Promise<void> {
   const supabase = createClient();
-  await supabase.from("mention_notifications").insert({
+  const { error } = await supabase.from("mention_notifications").insert({
     org_id: getOrgId(),
     note_id: noteId,
     entity_type: entityType,
@@ -1449,6 +1461,7 @@ export async function createMentionNotification(
     author_name: authorName,
     note_text: noteText,
   });
+  if (error) throw error;
 }
 
 export async function fetchMentionNotifications(userName: string): Promise<MentionNotification[]> {
@@ -1465,11 +1478,21 @@ export async function fetchMentionNotifications(userName: string): Promise<Menti
 }
 
 export async function markMentionNotificationsRead(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
   const supabase = createClient();
   await supabase
     .from("mention_notifications")
     .update({ is_read: true })
     .in("id", ids)
+    .eq("org_id", getOrgId());
+}
+
+export async function markSingleMentionRead(id: string): Promise<void> {
+  const supabase = createClient();
+  await supabase
+    .from("mention_notifications")
+    .update({ is_read: true })
+    .eq("id", id)
     .eq("org_id", getOrgId());
 }
 
@@ -2679,6 +2702,70 @@ export async function removeQuoteCommitment(
   if (error) throw error;
 }
 
+// ── Employee Daily Goals ──────────────────────────────────────────
+export async function upsertDailyGoal(
+  orgId: string,
+  repName: string,
+  salesType: string,
+  goalDate: string,
+  goalCount: number
+): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("employee_daily_goals")
+    .upsert(
+      { org_id: orgId, rep_name: repName, sales_type: salesType, goal_date: goalDate, goal_count: goalCount, updated_at: new Date().toISOString() },
+      { onConflict: "org_id,rep_name,sales_type,goal_date" }
+    );
+  if (error) throw error;
+}
+
+export async function fetchDailyGoals(
+  orgId: string,
+  salesType: string,
+  goalDate: string
+): Promise<{ rep_name: string; goal_count: number }[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("employee_daily_goals")
+    .select("rep_name, goal_count")
+    .eq("org_id", orgId)
+    .eq("sales_type", salesType)
+    .eq("goal_date", goalDate);
+  if (error) throw error;
+  return data ?? [];
+}
+
+// ── User Presence ──────────────────────────────────────────────────
+export async function pingPresence(
+  orgId: string,
+  userName: string,
+  presenceDate: string
+): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc("upsert_user_presence", {
+    p_org_id: orgId,
+    p_user_name: userName,
+    p_date: presenceDate,
+    p_now: new Date().toISOString(),
+  });
+  if (error) console.error("presence ping failed:", error);
+}
+
+export async function fetchPresence(
+  orgId: string,
+  presenceDate: string
+): Promise<{ user_name: string; first_seen_at: string; last_seen_at: string }[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("user_presence")
+    .select("user_name, first_seen_at, last_seen_at")
+    .eq("org_id", orgId)
+    .eq("presence_date", presenceDate);
+  if (error) throw error;
+  return data ?? [];
+}
+
 // ── Training Session Logs ──────────────────────────────────────────
 export async function createTrainingSession(session: {
   org_id: string;
@@ -3177,4 +3264,153 @@ export async function upsertDealKpiStage(
       completed_at: new Date().toISOString(),
     });
   }
+}
+
+// ─── REMINDERS ───────────────────────────────────────────────────────────────
+
+export interface Reminder {
+  id: string;
+  user_id: string;
+  user_name: string | null;
+  entity_type: string;
+  entity_id: string;
+  entity_name: string;
+  note_text: string | null;
+  remind_at: string;
+  dismissed: boolean;
+  created_at: string;
+}
+
+export async function createReminder(r: {
+  entity_type: string;
+  entity_id: string;
+  entity_name: string;
+  note_text?: string;
+  remind_at: string;
+  user_name: string;
+}): Promise<Reminder> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+  const { data, error } = await supabase
+    .from("reminders")
+    .insert({ ...r, user_id: user.id })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Reminder;
+}
+
+export async function fetchDueReminders(): Promise<Reminder[]> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("reminders")
+    .select("*")
+    .eq("user_id", user.id)
+    .eq("dismissed", false)
+    .lte("remind_at", now)
+    .order("remind_at", { ascending: true });
+  if (error) return [];
+  return (data ?? []) as Reminder[];
+}
+
+export async function dismissReminder(id: string): Promise<void> {
+  const supabase = createClient();
+  await supabase.from("reminders").update({ dismissed: true }).eq("id", id);
+}
+
+export async function fetchUpcomingReminders(): Promise<Reminder[]> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data, error } = await supabase
+    .from("reminders")
+    .select("*")
+    .eq("user_id", user.id)
+    .eq("dismissed", false)
+    .order("remind_at", { ascending: true })
+    .limit(20);
+  if (error) return [];
+  return (data ?? []) as Reminder[];
+}
+
+// ─── MANAGER WATCHLIST ────────────────────────────────────────────────────────
+
+export interface WatchlistItem {
+  id: string;
+  user_id: string;
+  entity_type: string;
+  entity_id: string;
+  entity_name: string;
+  section: string;
+  note: string | null;
+  resolved: boolean;
+  created_at: string;
+}
+
+export async function addToWatchlist(item: {
+  entity_type: string;
+  entity_id: string;
+  entity_name: string;
+  section: string;
+  note?: string;
+}): Promise<void> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+  await supabase.from("manager_watchlist").upsert(
+    { ...item, user_id: user.id, resolved: false },
+    { onConflict: "user_id,entity_id" }
+  );
+}
+
+export async function removeFromWatchlist(entityId: string): Promise<void> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from("manager_watchlist")
+    .delete()
+    .eq("user_id", user.id)
+    .eq("entity_id", entityId);
+}
+
+export async function fetchWatchlist(): Promise<WatchlistItem[]> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data, error } = await supabase
+    .from("manager_watchlist")
+    .select("*")
+    .eq("user_id", user.id)
+    .eq("resolved", false)
+    .order("created_at", { ascending: false });
+  if (error) return [];
+  return (data ?? []) as WatchlistItem[];
+}
+
+export async function resolveWatchlistItem(entityId: string): Promise<void> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from("manager_watchlist")
+    .update({ resolved: true })
+    .eq("user_id", user.id)
+    .eq("entity_id", entityId);
+}
+
+export async function isInWatchlist(entityId: string): Promise<boolean> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+  const { data } = await supabase
+    .from("manager_watchlist")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("entity_id", entityId)
+    .eq("resolved", false)
+    .maybeSingle();
+  return !!data;
 }

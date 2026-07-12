@@ -31,8 +31,9 @@ import {
   getKpiStatus,
   KPI_STATUS_STYLES,
 } from "@/lib/utils/constants";
-import { formatMoneyFull, formatDate, formatPhone, formatPercent, todayLocal, dateToTimestamp, saudiTimestamp } from "@/lib/utils/format";
+import { formatMoneyFull, formatDate, formatPhone, formatPercent, todayLocal, dateToTimestamp, saudiTimestamp, tableDateBounds } from "@/lib/utils/format";
 import { FollowUpLogButton } from "@/components/follow-up-log";
+import { WatchlistPinButton } from "@/components/watchlist-pin-button";
 import { StatCard } from "@/components/ui/stat-card";
 import { DonutChart } from "@/components/ui/donut-chart";
 import { LineChart } from "@/components/ui/line-chart";
@@ -95,6 +96,7 @@ import {
   ChevronUp,
   ChevronLeft,
   ChevronRight,
+  MessageCircle,
 } from "lucide-react";
 
 /* ─── Permanently closed cancel reasons — excluded from main list ─── */
@@ -149,6 +151,36 @@ function getDaysRemainingStyle(days: number) {
   if (days <= 7) return { color: "text-cc-red", label: `${days} يوم` };
   if (days <= 30) return { color: "text-amber", label: `${days} يوم` };
   return { color: "text-cc-green", label: `${days} يوم` };
+}
+
+function getHealthScore(renewal: { status: string; updated_at: string; renewal_date: string }, hasNote: boolean): { icon: string; label: string; color: string } {
+  if (renewal.status === "مكتمل") return { icon: "✅", label: "مكتمل", color: "text-cc-green" };
+  if (renewal.status === "ملغي بسبب") return { icon: "⚫", label: "ملغي", color: "text-muted-foreground" };
+  const daysSinceUpdate = Math.floor((Date.now() - new Date(renewal.updated_at).getTime()) / 86400000);
+  const daysUntil = Math.ceil((new Date(renewal.renewal_date).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 86400000);
+  // Any renewal within 7 days or overdue → at least "يحتاج متابعة"
+  if (daysUntil < 0) return { icon: "🔴", label: "خطر", color: "text-cc-red" };
+  if (daysUntil <= 7) return { icon: "🟡", label: "يحتاج متابعة وتواصل", color: "text-amber" };
+  let score = 100;
+  if (daysSinceUpdate >= 7) score -= 35;
+  else if (daysSinceUpdate >= 3) score -= 15;
+  if (!hasNote) score -= 10;
+  if (score >= 75) return { icon: "🟢", label: "بخير", color: "text-cc-green" };
+  if (score >= 45) return { icon: "🟡", label: "يحتاج متابعة", color: "text-amber" };
+  return { icon: "🔴", label: "خطر", color: "text-cc-red" };
+}
+
+function getPlanRecommendation(planName: string): { text: string; color: string; bg: string } | null {
+  const p = (planName || "").toLowerCase();
+  if (p.includes("تجريب") || p.includes("trial") || p.includes("مجاني"))
+    return { text: "💡 حوّله لباقة مدفوعة", color: "text-cc-purple", bg: "bg-purple-dim" };
+  if (p.includes("أساس") || p.includes("اساس") || p.includes("basic") || p.includes("starter") || p.includes("مبتدئ"))
+    return { text: "⬆️ اقترح ترقية للباقة المتوسطة", color: "text-cc-blue", bg: "bg-blue-dim" };
+  if (p.includes("متوسط") || p.includes("standard") || p.includes("medium") || p.includes("وسط"))
+    return { text: "✨ ذكّره بالمميزات غير المستخدمة", color: "text-amber", bg: "bg-amber-dim" };
+  if (p.includes("متقدم") || p.includes("premium") || p.includes("pro") || p.includes("enterprise") || p.includes("business") || p.includes("احترافي"))
+    return { text: "🎁 اعرض خصم ولاء للاحتفاظ به", color: "text-cc-green", bg: "bg-green-dim" };
+  return null;
 }
 
 export default function RenewalsPage() {
@@ -239,6 +271,25 @@ export default function RenewalsPage() {
   function deselectAll() {
     setDailyTargetIds(new Set());
     localStorage.setItem(todayKey, JSON.stringify([]));
+  }
+
+  /* contact actions (call + whatsapp) — persisted per day in localStorage */
+  const contactKey = `contact_actions_${todayLocal()}`;
+  const [contactActions, setContactActions] = useState<Record<string, { call: boolean; whatsapp: boolean }>>(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      const saved = localStorage.getItem(contactKey);
+      return saved ? JSON.parse(saved) : {};
+    } catch { return {}; }
+  });
+
+  function toggleContactAction(id: string, type: "call" | "whatsapp") {
+    setContactActions((prev) => {
+      const cur = prev[id] || { call: false, whatsapp: false };
+      const next = { ...prev, [id]: { ...cur, [type]: !cur[type] } };
+      localStorage.setItem(contactKey, JSON.stringify(next));
+      return next;
+    });
   }
 
   async function buildDailyReport() {
@@ -372,10 +423,12 @@ export default function RenewalsPage() {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [clientSearch, setClientSearch] = useState("");
   const [repFilter, setRepFilter] = useState<string | null>(null);
-  const [urgencyFilter, setUrgencyFilter] = useState<"overdue" | "today" | "week" | "month" | null>(null);
   const [showClosed, setShowClosed] = useState(false);
+  const [tableDateFilter, setTableDateFilter] = useState<string | null>(null);
+  const [tableCustomFrom, setTableCustomFrom] = useState("");
+  const [tableCustomTo, setTableCustomTo] = useState("");
+  const [silentFilter, setSilentFilter] = useState(false);
   const PENDING_STATUSES = new Set(["مجدول", "مجدول تجديد", "جاري المتابعة", "انتظار الدفع"]);
-  const URGENCY_ACTIVE_STATUSES = new Set(["مجدول", "مجدول تجديد", "جاري المتابعة", "انتظار الدفع", "مؤجل مؤقتاً", "تواصل وقت آخر", "متردد"]);
   const listBase = statusFilter === "ملغي بسبب" ? monthFilteredRenewals : monthRenewals;
   const repFilteredRenewals = repFilter
     ? listBase.filter((r) => r.assigned_rep === repFilter)
@@ -385,9 +438,22 @@ export default function RenewalsPage() {
       ? repFilteredRenewals.filter((r) => PENDING_STATUSES.has(r.status))
       : repFilteredRenewals.filter((r) => r.status === statusFilter)
     : repFilteredRenewals;
-  const filteredRenewals_base = clientSearch
-    ? statusFilteredRenewals.filter((r) => r.customer_name.toLowerCase().includes(clientSearch.toLowerCase()) || (r.client_code && r.client_code.toLowerCase().includes(clientSearch.toLowerCase())))
+  const _renewalDateBounds = tableDateBounds(tableDateFilter || "", tableCustomFrom, tableCustomTo);
+  const dateFilteredRenewals = _renewalDateBounds
+    ? statusFilteredRenewals.filter(r => {
+        const s = (r.renewal_date || "").slice(0, 10);
+        return s >= _renewalDateBounds[0] && s <= _renewalDateBounds[1];
+      })
     : statusFilteredRenewals;
+  const silentFilteredRenewals = silentFilter
+    ? dateFilteredRenewals.filter(r => {
+        if (r.status === "مكتمل" || r.status === "ملغي بسبب") return false;
+        return Math.floor((Date.now() - new Date(r.updated_at).getTime()) / 86400000) >= 7;
+      })
+    : dateFilteredRenewals;
+  const filteredRenewals_base = clientSearch
+    ? silentFilteredRenewals.filter((r) => r.customer_name.toLowerCase().includes(clientSearch.toLowerCase()) || (r.client_code && r.client_code.toLowerCase().includes(clientSearch.toLowerCase())))
+    : silentFilteredRenewals;
 
   useEffect(() => {
     setLoading(true);
@@ -415,6 +481,22 @@ export default function RenewalsPage() {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [orgId]);
+
+  /* ─── Latest follow-up notes per renewal (for conversation history preview) ─── */
+  const [latestNotes, setLatestNotes] = useState<Record<string, string>>({});
+  const [notifDismissed, setNotifDismissed] = useState(false);
+
+  useEffect(() => {
+    fetchRecentFollowUpNotes(300)
+      .then((notes) => {
+        const map: Record<string, string> = {};
+        notes.filter(n => n.entity_type === "renewal").forEach(n => {
+          if (!map[n.entity_id]) map[n.entity_id] = n.note;
+        });
+        setLatestNotes(map);
+      })
+      .catch(console.error);
+  }, [renewals]);
 
   /* ─── Quote Commitment ─── */
   const todayStr = todayLocal();
@@ -623,40 +705,8 @@ export default function RenewalsPage() {
     };
   }, [renewals, summaryPeriod, customRange]);
 
-  /* ─── Urgency quick stats (cross-month, active renewals only) ─── */
-  const urgencyStats = useMemo(() => {
-    const todayStr = todayLocal();
-    const now = new Date(); now.setHours(0, 0, 0, 0);
-    const base = (repFilter ? typedRenewals.filter(r => r.assigned_rep === repFilter) : typedRenewals)
-      .filter(r => URGENCY_ACTIVE_STATUSES.has(r.status));
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-    return {
-      overdue: base.filter(r => getDaysRemaining(r.renewal_date) < 0).length,
-      today: base.filter(r => r.renewal_date === todayStr).length,
-      week: base.filter(r => { const d = getDaysRemaining(r.renewal_date); return d >= 0 && d <= 7; }).length,
-      month: base.filter(r => { const rd = new Date(r.renewal_date); return rd >= monthStart && rd <= monthEnd; }).length,
-    };
-  }, [typedRenewals, repFilter]);
-
-  // Apply urgency/summary filter if active (overrides base filter)
-  const filteredRenewals = urgencyFilter
-    ? (() => {
-        const todayStr = todayLocal();
-        const now = new Date(); now.setHours(0, 0, 0, 0);
-        let base = (repFilter ? typedRenewals.filter(r => r.assigned_rep === repFilter) : typedRenewals)
-          .filter(r => URGENCY_ACTIVE_STATUSES.has(r.status));
-        if (urgencyFilter === "overdue") base = base.filter(r => getDaysRemaining(r.renewal_date) < 0);
-        else if (urgencyFilter === "today") base = base.filter(r => r.renewal_date === todayStr);
-        else if (urgencyFilter === "week") base = base.filter(r => { const d = getDaysRemaining(r.renewal_date); return d >= 0 && d <= 7; });
-        else if (urgencyFilter === "month") {
-          const ms = new Date(now.getFullYear(), now.getMonth(), 1);
-          const me = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-          base = base.filter(r => { const rd = new Date(r.renewal_date); return rd >= ms && rd <= me; });
-        }
-        return clientSearch ? base.filter(r => r.customer_name.toLowerCase().includes(clientSearch.toLowerCase()) || (r.client_code && r.client_code.toLowerCase().includes(clientSearch.toLowerCase()))) : base;
-      })()
-    : summaryFilter
+  // Apply summary filter if active (overrides base filter to show matching renewals)
+  const filteredRenewals_summary = summaryFilter
     ? (() => {
         const ids = summaryFilter === "completed" || summaryFilter === "revenue" || summaryFilter === "success"
           ? achievementSummary.completedIds
@@ -667,6 +717,41 @@ export default function RenewalsPage() {
         return clientSearch ? result.filter(r => r.customer_name.toLowerCase().includes(clientSearch.toLowerCase()) || (r.client_code && r.client_code.toLowerCase().includes(clientSearch.toLowerCase()))) : result;
       })()
     : filteredRenewals_base;
+
+  /* ─── Focus filter (daily task boxes) ─── */
+  const [focusFilter, setFocusFilter] = useState<"overdue" | "today" | "week" | "month" | null>(null);
+
+  const _activeRenewals = filteredRenewals_summary.filter(r => r.status !== "مكتمل" && r.status !== "ملغي بسبب");
+  const focusOverdue = _activeRenewals.filter(r => (r.renewal_date || "") < todayStr);
+  const focusToday   = _activeRenewals.filter(r => (r.renewal_date || "").slice(0, 10) === todayStr);
+  const in7Days = (() => { const d = new Date(); d.setDate(d.getDate() + 7); return d.toISOString().slice(0, 10); })();
+  const focusWeek    = _activeRenewals.filter(r => { const rd = (r.renewal_date || "").slice(0, 10); return rd > todayStr && rd <= in7Days; });
+  const focusMonth   = _activeRenewals.filter(r => {
+    const rd = new Date(r.renewal_date);
+    const now = new Date();
+    return rd.getFullYear() === now.getFullYear() && rd.getMonth() === now.getMonth();
+  });
+
+  const filteredRenewals = focusFilter === "overdue" ? focusOverdue
+    : focusFilter === "today" ? focusToday
+    : focusFilter === "week" ? focusWeek
+    : focusFilter === "month" ? focusMonth
+    : filteredRenewals_summary;
+
+  // Priority sort: overdue → today → this week → rest (applied when no explicit sort active)
+  const prioritySorted = [...filteredRenewals].sort((a, b) => {
+    const getPriority = (r: typeof a) => {
+      if (r.status === "مكتمل" || r.status === "ملغي بسبب") return 4;
+      const rd = (r.renewal_date || "").slice(0, 10);
+      if (rd < todayStr) return 0;
+      if (rd === todayStr) return 1;
+      if (rd <= in7Days) return 2;
+      return 3;
+    };
+    const pa = getPriority(a), pb = getPriority(b);
+    if (pa !== pb) return pa - pb;
+    return (a.renewal_date || "").localeCompare(b.renewal_date || "");
+  });
 
   /* ─── Donut data ─── */
   const donutSegments = [
@@ -796,10 +881,10 @@ export default function RenewalsPage() {
   /* ─── Pagination ─── */
   const PAGE_SIZE = 25;
   const [currentPage, setCurrentPage] = useState(1);
-  const totalPages = Math.max(1, Math.ceil(filteredRenewals.length / PAGE_SIZE));
-  const paginatedRenewals = filteredRenewals.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(prioritySorted.length / PAGE_SIZE));
+  const paginatedRenewals = prioritySorted.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  useEffect(() => { setCurrentPage(1); }, [statusFilter, clientSearch, salesTypeTab, summaryFilter, urgencyFilter, monthFilter]);
+  useEffect(() => { setCurrentPage(1); }, [statusFilter, clientSearch, salesTypeTab, summaryFilter, monthFilter, tableDateFilter, tableCustomFrom, tableCustomTo, focusFilter, silentFilter]);
 
   /* ─── Excel template download ─── */
   const [uploadStatus, setUploadStatus] = useState<"idle" | "importing" | "done" | "error">("idle");
@@ -850,7 +935,10 @@ export default function RenewalsPage() {
       const ws = workbook.Sheets[workbook.SheetNames[0]];
       const json = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" }) as unknown[][];
 
-      const headerRowIdx = json.length > 1 && (json[1] as unknown[]).filter(c => c !== "").length >= 3 ? 1 : 0;
+      const HEADER_KEYWORDS = ["اسم", "عميل", "جوال", "هاتف", "phone", "تاريخ", "باقة", "خطة", "حالة", "مسؤول", "name", "plan", "status"];
+      const isHeaderRow = (row: unknown[]) =>
+        row.some(c => HEADER_KEYWORDS.some(k => String(c).trim().toLowerCase().includes(k)));
+      const headerRowIdx = isHeaderRow(json[0] as unknown[]) ? 0 : isHeaderRow(json[1] as unknown[]) ? 1 : 0;
       const headers = (json[headerRowIdx] as unknown[]).map(h => String(h).trim().toLowerCase());
       const rows = json.slice(headerRowIdx + 1).filter(r => (r as unknown[]).some(c => c !== "" && c != null));
 
@@ -877,7 +965,12 @@ export default function RenewalsPage() {
       const cell = (row: unknown[], f: string) => {
         const idx = colMap[f];
         if (idx === undefined || idx < 0 || row[idx] == null || row[idx] === "") return "";
-        return String(row[idx]).trim();
+        const raw = row[idx];
+        // Phone numbers stored as floats lose the leading zero — convert to int string
+        if (f === "customer_phone" && typeof raw === "number") {
+          return String(Math.round(raw));
+        }
+        return String(raw).trim();
       };
 
       const toDate = (val: unknown): string | undefined => {
@@ -1109,6 +1202,598 @@ export default function RenewalsPage() {
         })}
       </div>
 
+      {/* ─── Daily Focus Boxes ─── */}
+      {!loading && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {/* Overdue */}
+          <button
+            onClick={() => setFocusFilter(focusFilter === "overdue" ? null : "overdue")}
+            className={`rounded-2xl p-4 text-right transition-all border ${
+              focusFilter === "overdue"
+                ? "bg-cc-red/15 border-cc-red/40 ring-1 ring-cc-red/30"
+                : "cc-card border-transparent hover:border-cc-red/30 hover:bg-cc-red/[0.06]"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className={`text-2xl font-extrabold ${focusFilter === "overdue" ? "text-cc-red" : focusOverdue.length > 0 ? "text-cc-red" : "text-muted-foreground"}`}>
+                {focusOverdue.length}
+              </span>
+              <span className="text-xl">{focusOverdue.length > 0 ? "🔴" : "✅"}</span>
+            </div>
+            <p className="text-sm font-bold text-foreground">متأخر</p>
+            <p className="text-[12px] text-muted-foreground mt-0.5">تجاوز موعد التجديد</p>
+          </button>
+          {/* Today */}
+          <button
+            onClick={() => setFocusFilter(focusFilter === "today" ? null : "today")}
+            className={`rounded-2xl p-4 text-right transition-all border ${
+              focusFilter === "today"
+                ? "bg-amber/15 border-amber/40 ring-1 ring-amber/30"
+                : "cc-card border-transparent hover:border-amber/30 hover:bg-amber/[0.06]"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className={`text-2xl font-extrabold ${focusFilter === "today" ? "text-amber" : focusToday.length > 0 ? "text-amber" : "text-muted-foreground"}`}>
+                {focusToday.length}
+              </span>
+              <span className="text-xl">🟡</span>
+            </div>
+            <p className="text-sm font-bold text-foreground">اليوم</p>
+            <p className="text-[12px] text-muted-foreground mt-0.5">موعدهم اليوم</p>
+          </button>
+          {/* This week */}
+          <button
+            onClick={() => setFocusFilter(focusFilter === "week" ? null : "week")}
+            className={`rounded-2xl p-4 text-right transition-all border ${
+              focusFilter === "week"
+                ? "bg-cyan/15 border-cyan/40 ring-1 ring-cyan/30"
+                : "cc-card border-transparent hover:border-cyan/30 hover:bg-cyan/[0.06]"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className={`text-2xl font-extrabold ${focusFilter === "week" ? "text-cyan" : focusWeek.length > 0 ? "text-cyan" : "text-muted-foreground"}`}>
+                {focusWeek.length}
+              </span>
+              <span className="text-xl">📅</span>
+            </div>
+            <p className="text-sm font-bold text-foreground">هذا الأسبوع</p>
+            <p className="text-[12px] text-muted-foreground mt-0.5">خلال 7 أيام القادمة</p>
+          </button>
+          {/* This month */}
+          <button
+            onClick={() => setFocusFilter(focusFilter === "month" ? null : "month")}
+            className={`rounded-2xl p-4 text-right transition-all border ${
+              focusFilter === "month"
+                ? "bg-cc-purple/15 border-cc-purple/40 ring-1 ring-cc-purple/30"
+                : "cc-card border-transparent hover:border-cc-purple/30 hover:bg-cc-purple/[0.06]"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className={`text-2xl font-extrabold ${focusFilter === "month" ? "text-cc-purple" : focusMonth.length > 0 ? "text-cc-purple" : "text-muted-foreground"}`}>
+                {focusMonth.length}
+              </span>
+              <span className="text-xl">📆</span>
+            </div>
+            <p className="text-sm font-bold text-foreground">هذا الشهر</p>
+            <p className="text-[12px] text-muted-foreground mt-0.5">تجديدات الشهر الحالي</p>
+          </button>
+        </div>
+      )}
+
+      {/* ─── Smart Notification Banner ─── */}
+      {!loading && !notifDismissed && (focusOverdue.length > 0 || focusToday.length > 0) && (
+        <div className="flex items-start gap-3 px-4 py-3 rounded-[14px] bg-gradient-to-l from-amber/[0.08] to-cc-red/[0.05] border border-amber/20">
+          <Bell className="w-4 h-4 text-amber mt-0.5 shrink-0 animate-pulse" />
+          <div className="flex-1 space-y-1">
+            {focusOverdue.length > 0 && (
+              <p className="text-sm text-cc-red font-semibold">
+                🔴 {focusOverdue.length} عميل تجاوز موعد التجديد — يحتاج تواصل عاجل
+              </p>
+            )}
+            {focusToday.length > 0 && (
+              <p className="text-sm text-amber font-semibold">
+                🟡 {focusToday.length} عميل موعدهم اليوم — لا تترك اليوم ينتهي بدون تواصل
+              </p>
+            )}
+            {focusWeek.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                📅 {focusWeek.length} عميل خلال الأسبوع القادم — ابدأ التحضير مبكراً
+              </p>
+            )}
+          </div>
+          <button
+            onClick={() => setNotifDismissed(true)}
+            className="text-muted-foreground hover:text-foreground text-xs px-2 py-1 rounded-lg hover:bg-white/[0.06] shrink-0"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* ─── Renewals Table ─── */}
+      <div id="renewals-table" className="cc-card rounded-[14px] overflow-x-auto scroll-mt-4">
+        <div className="px-4 pt-4 pb-0 flex items-center justify-between">
+          <h3 className="text-sm font-bold text-foreground">
+            تذاكر التجديدات
+            {focusFilter && (
+              <span className={`mr-2 text-xs font-medium px-2 py-0.5 rounded-full ${
+                focusFilter === "overdue" ? "bg-cc-red/15 text-cc-red"
+                : focusFilter === "today" ? "bg-amber/15 text-amber"
+                : "bg-cyan/15 text-cyan"
+              }`}>
+                {focusFilter === "overdue" ? "متأخر" : focusFilter === "today" ? "اليوم" : "هذا الأسبوع"}
+              </span>
+            )}
+          </h3>
+          {focusFilter && (
+            <button onClick={() => setFocusFilter(null)} className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-lg hover:bg-white/[0.06]">
+              ✕ إلغاء الفلتر
+            </button>
+          )}
+        </div>
+        {/* Year + Month filter */}
+        {availableYears.length > 1 && (
+          <div className="px-4 pt-4 pb-1 flex items-center gap-1.5 flex-wrap">
+            <CalendarDays className="w-4 h-4 text-muted-foreground shrink-0" />
+            {availableYears.map((y) => (
+              <button
+                key={y}
+                onClick={() => setYearFilter(y)}
+                className={`px-3 py-1 rounded-lg text-[12px] font-semibold transition-colors border ${
+                  yearFilter === y
+                    ? "bg-amber/15 text-amber border-amber/30"
+                    : "text-muted-foreground border-transparent hover:text-foreground hover:bg-white/[0.06]"
+                }`}
+              >
+                {y}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className={`px-4 ${availableYears.length > 1 ? "pt-1" : "pt-4"} pb-2 flex items-center gap-1.5 flex-wrap`}>
+          <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
+          <button
+            onClick={() => setMonthFilter(-1)}
+            className={`px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-colors border ${
+              monthFilter === -1
+                ? "bg-cyan/15 text-cyan border-cyan/30"
+                : "text-muted-foreground border-transparent hover:text-foreground hover:bg-white/[0.06]"
+            }`}
+          >
+            الكل
+          </button>
+          {MONTHS_AR.map((m, i) => (
+            <button
+              key={i}
+              onClick={() => setMonthFilter(i)}
+              className={`px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-colors border ${
+                monthFilter === i
+                  ? "bg-cyan/15 text-cyan border-cyan/30"
+                  : "text-muted-foreground border-transparent hover:text-foreground hover:bg-white/[0.06]"
+              }`}
+            >
+              {m.slice(0, 3)}
+            </button>
+          ))}
+        </div>
+        {/* Month completion summary */}
+        {monthFilter !== -1 && (() => {
+          const total = monthFilteredRenewals.length;
+          const completed = monthFilteredRenewals.filter(r => r.status === "مكتمل").length;
+          const cancelled = monthFilteredRenewals.filter(r => r.status === "ملغي بسبب").length;
+          const pending = total - completed - cancelled;
+          const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+          return (
+            <div className="px-4 pb-2">
+              <div className="flex items-center gap-4 rounded-xl bg-white/[0.03] border border-border/50 px-4 py-2.5">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-foreground">
+                        إنجاز {MONTHS_AR[monthFilter]}
+                      </span>
+                      <span className={`text-[11px] font-medium ${pct >= 80 ? "text-cc-green" : pct >= 50 ? "text-amber" : "text-muted-foreground"}`}>
+                        {pct === 100 ? "ممتاز! تم إنجاز الكل" : pct >= 80 ? "أحسنتم! قاربتم على الإنجاز" : pct >= 50 ? "في المسار الصحيح، واصلوا!" : pct >= 25 ? "بداية جيدة، كملوا!" : total > 0 ? "يلا نبدأ! الشهر بانتظاركم" : ""}
+                      </span>
+                    </div>
+                    <span className={`text-sm font-extrabold ${pct >= 80 ? "text-cc-green" : pct >= 50 ? "text-amber" : "text-cc-red"}`}>
+                      {pct}%
+                    </span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-white/[0.08] overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${pct >= 80 ? "bg-cc-green" : pct >= 50 ? "bg-amber" : "bg-cc-red"}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 text-[12px] shrink-0">
+                  <span className="text-cc-green font-semibold">{completed} مكتمل</span>
+                  <span className="text-muted-foreground">|</span>
+                  <span className="text-amber font-semibold">{pending} معلّق</span>
+                  <span className="text-muted-foreground">|</span>
+                  <span className="text-cc-red font-semibold">{cancelled} ملغي</span>
+                  <span className="text-muted-foreground">|</span>
+                  <span className="text-foreground font-bold">{total} إجمالي</span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+        {/* Date filter */}
+        <div className="px-4 pt-3 pb-0 flex items-center gap-1.5 flex-wrap">
+          <span className="text-xs text-muted-foreground shrink-0">الفترة:</span>
+          {(["اليوم", "أمس", "الأسبوع", "الشهر", "الشهر الماضي", "مخصص"] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setTableDateFilter(tableDateFilter === f ? null : f)}
+              className={`px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-colors border ${
+                tableDateFilter === f
+                  ? "bg-cyan/15 text-cyan border-cyan/30"
+                  : "text-muted-foreground border-transparent hover:text-foreground hover:bg-white/[0.06]"
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+          {tableDateFilter === "مخصص" && (
+            <div className="flex items-center gap-1.5">
+              <input type="date" value={tableCustomFrom} onChange={e => setTableCustomFrom(e.target.value)}
+                className="text-[12px] bg-card border border-border rounded-lg px-2 py-1 text-foreground" />
+              <span className="text-xs text-muted-foreground">—</span>
+              <input type="date" value={tableCustomTo} onChange={e => setTableCustomTo(e.target.value)}
+                className="text-[12px] bg-card border border-border rounded-lg px-2 py-1 text-foreground" />
+            </div>
+          )}
+        </div>
+        <div className="px-4 pb-0 flex items-center gap-3 mt-3 flex-wrap">
+          <Input
+            value={clientSearch}
+            onChange={(e) => setClientSearch(e.target.value)}
+            placeholder="ابحث باسم العميل..."
+            className="max-w-xs"
+          />
+          <button
+            onClick={() => setSilentFilter(v => !v)}
+            className={`flex items-center gap-1.5 text-[12px] px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap ${
+              silentFilter
+                ? "bg-cc-red/15 border-cc-red/40 text-cc-red font-semibold"
+                : "border-border text-muted-foreground hover:text-foreground hover:bg-white/[0.06]"
+            }`}
+            title="عرض العملاء الذين مضى أكثر من 7 أيام بدون تحديث"
+          >
+            <Bell className="w-3 h-3" />
+            صامت +7 أيام
+          </button>
+          <button
+            onClick={selectAllVisible}
+            className="text-[12px] px-2.5 py-1.5 rounded-lg border border-cyan/30 text-cyan hover:bg-cyan/10 transition-colors whitespace-nowrap"
+            title="تحديد الكل كهدف يومي"
+          >
+            <SquareCheck className="w-3 h-3 inline-block ml-1" />
+            تحديد الكل
+          </button>
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-10 text-center">هدف</TableHead>
+              <TableHead className="w-20">الكود</TableHead>
+              <TableHead>العميل</TableHead>
+              <TableHead>الخطة</TableHead>
+              <TableHead>السعر</TableHead>
+              <TableHead>موعد التجديد</TableHead>
+              <TableHead>تاريخ الدفع</TableHead>
+              <TableHead>الأيام المتبقية</TableHead>
+              <TableHead>النبضة</TableHead>
+              <TableHead>الحالة</TableHead>
+              <TableHead>المسؤول</TableHead>
+              <TableHead className="text-center">إجراءات</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  {Array.from({ length: 11 }).map((_, j) => (
+                    <TableCell key={j}><Skeleton className="h-4 w-20" /></TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : filteredRenewals.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
+                  {statusFilter ? "لا توجد تجديدات مطابقة" : "لا توجد تجديدات بعد. اضغط \"إضافة تجديد\" لإضافة أول تجديد."}
+                </TableCell>
+              </TableRow>
+            ) : (
+              paginatedRenewals.map((renewal) => {
+                const days = renewal.status === "مكتمل" ? 0 : getDaysRemaining(renewal.renewal_date);
+                const daysStyle = renewal.status === "مكتمل"
+                  ? { color: "text-cc-green", label: "0 يوم" }
+                  : getDaysRemainingStyle(days);
+                const badge = STATUS_BADGE[renewal.status] || STATUS_BADGE["مجدول"];
+
+                const isTarget = dailyTargetIds.has(renewal.id);
+                const isTargetDone = isTarget && renewal.status === "مكتمل";
+
+                return (
+                  <TableRow
+                    key={renewal.id}
+                    className={isTarget ? (isTargetDone ? "bg-cc-green/[0.04]" : "bg-cyan/[0.04]") : ""}
+                  >
+                    <TableCell className="text-center">
+                      <button
+                        onClick={() => toggleDailyTarget(renewal.id)}
+                        className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                          isTargetDone
+                            ? "border-cc-green bg-cc-green text-white"
+                            : isTarget
+                            ? "border-cyan bg-cyan/20 text-cyan"
+                            : "border-muted-foreground/30 hover:border-cyan/50"
+                        }`}
+                      >
+                        {isTarget && (
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </button>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-xs font-mono">
+                      {renewal.client_code || "—"}
+                    </TableCell>
+                    <TableCell className="font-medium text-foreground">
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <button
+                            onClick={() => { setProfileQuery(renewal.customer_phone || renewal.customer_name); setProfileOpen(true); }}
+                            className="hover:text-primary hover:underline transition-colors text-right"
+                          >
+                            {renewal.customer_name}
+                          </button>
+                          {isTarget && !isTargetDone && (
+                            <span className="text-[11px] px-1.5 py-0.5 rounded bg-cyan/10 text-cyan font-medium">
+                              هدف اليوم
+                            </span>
+                          )}
+                          {isTargetDone && (
+                            <span className="text-[11px] px-1.5 py-0.5 rounded bg-cc-green/15 text-cc-green font-medium">
+                              تم الإنجاز
+                            </span>
+                          )}
+                        </div>
+                        {latestNotes[renewal.id] && (
+                          <p className="text-[11px] text-muted-foreground max-w-[220px] truncate leading-tight" title={latestNotes[renewal.id]}>
+                            💬 {latestNotes[renewal.id]}
+                          </p>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-xs">
+                      <div className="flex flex-col gap-0.5">
+                        <span>{renewal.plan_name}</span>
+                        {(() => {
+                          const rec = getPlanRecommendation(renewal.plan_name);
+                          if (!rec || renewal.status === "مكتمل" || renewal.status === "ملغي بسبب") return null;
+                          return (
+                            <span className={`text-[11px] px-1.5 py-0.5 rounded-md ${rec.bg} ${rec.color} font-medium whitespace-nowrap`}>
+                              {rec.text}
+                            </span>
+                          );
+                        })()}
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-bold text-cyan text-xs">
+                      {formatMoneyFull(renewal.plan_price)}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-xs">
+                      {formatDate(renewal.renewal_date)}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {renewal.payment_date ? (
+                        <span className="text-cc-green font-medium">{formatDate(renewal.payment_date)}</span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1.5">
+                        <CalendarDays className={`w-3.5 h-3.5 ${daysStyle.color}`} />
+                        <span className={`text-xs font-bold ${daysStyle.color}`}>
+                          {daysStyle.label}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {(() => {
+                        const health = getHealthScore(renewal, !!latestNotes[renewal.id]);
+                        if (renewal.status === "مكتمل" || renewal.status === "ملغي بسبب")
+                          return <span className="text-base">{health.icon}</span>;
+                        const daysUntil = Math.ceil((new Date(renewal.renewal_date).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 86400000);
+                        const needsAction = daysUntil <= 7;
+                        const ca = contactActions[renewal.id] || { call: false, whatsapp: false };
+                        return (
+                          <div className="flex flex-col gap-1.5 min-w-[110px]">
+                            <span className={`flex items-center gap-1 text-xs font-medium ${health.color}`} title={health.label}>
+                              <span className="text-base leading-none">{health.icon}</span>
+                              <span>{health.label}</span>
+                            </span>
+                            {needsAction && (
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  onClick={() => toggleContactAction(renewal.id, "call")}
+                                  title="تم الاتصال"
+                                  className={`flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-md border transition-all font-medium ${
+                                    ca.call
+                                      ? "bg-cc-green/15 border-cc-green/40 text-cc-green"
+                                      : "border-border text-muted-foreground hover:border-cc-green/40 hover:text-cc-green"
+                                  }`}
+                                >
+                                  {ca.call ? "✅" : "☎️"} اتصال
+                                </button>
+                                <button
+                                  onClick={() => toggleContactAction(renewal.id, "whatsapp")}
+                                  title="تم التواصل عبر واتساب"
+                                  className={`flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-md border transition-all font-medium ${
+                                    ca.whatsapp
+                                      ? "bg-cc-green/15 border-cc-green/40 text-cc-green"
+                                      : "border-border text-muted-foreground hover:border-cc-green/40 hover:text-cc-green"
+                                  }`}
+                                >
+                                  {ca.whatsapp ? "✅" : "💬"} واتس
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center justify-center gap-1.5">
+                        <span className={`inline-block px-2.5 py-1 rounded-full text-[12px] font-medium ${badge.bg} ${badge.color}`}>
+                          {badge.text}
+                          {renewal.status === "ملغي بسبب" && renewal.cancel_reason && (
+                            <span className="mr-1 text-[11px] opacity-70">({renewal.cancel_reason})</span>
+                          )}
+                        </span>
+                        {renewal.status === "ملغي بسبب" && ["قلة الاستخدام", "الادارة رفضت", "مشكلات تقنية", "مو حاب يجدد بدون سبب"].includes(renewal.cancel_reason || "") && (
+                          <span title="قابل لإعادة الاستهداف" className="flex items-center justify-center w-6 h-6 rounded-full bg-amber/10 text-amber cursor-default animate-pulse">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-xs">
+                      {renewal.assigned_rep || "—"}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center justify-center gap-1">
+                        {renewal.customer_phone && renewal.status !== "مكتمل" && renewal.status !== "ملغي بسبب" && (() => {
+                          const phone = renewal.customer_phone.replace(/\D/g, "");
+                          const intlPhone = phone.startsWith("0") ? "966" + phone.slice(1) : phone;
+                          const daysUntil = getDaysRemaining(renewal.renewal_date);
+                          const urgency = daysUntil < 0 ? "تجاوز موعد التجديد" : daysUntil === 0 ? "ينتهي اليوم" : `ينتهي خلال ${daysUntil} يوم`;
+                          const msg = encodeURIComponent(
+                            `السلام عليكم ${renewal.customer_name}،\nنذكركم بأن اشتراككم في باقة "${renewal.plan_name}" ${urgency}.\nنرجو التواصل معنا لتجديد الاشتراك والاستمرار في الخدمة.\nشكراً لثقتكم 🙏`
+                          );
+                          return (
+                            <a
+                              href={`https://wa.me/${intlPhone}?text=${msg}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="إرسال تذكير واتساب"
+                              className="inline-flex items-center justify-center w-6 h-6 rounded hover:bg-green-500/10 text-green-500 transition-colors"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5" />
+                            </a>
+                          );
+                        })()}
+                        <WatchlistPinButton entityType="renewal" entityId={renewal.id} entityName={renewal.customer_name} section="/renewals" />
+                        <div className="relative">
+                          <FollowUpLogButton entityType="renewal" entityId={renewal.id} entityName={renewal.customer_name} />
+                          {renewal.status !== "مكتمل" && renewal.status !== "ملغي بسبب" && (() => {
+                            const daysSince = Math.floor((Date.now() - new Date(renewal.updated_at).getTime()) / 86400000);
+                            if (daysSince < 3) return null;
+                            return (
+                              <span className={`absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[11px] font-bold px-1 ${
+                                daysSince >= 7 ? "bg-red-500 text-white" : "bg-amber-500 text-white"
+                              }`} title={`${daysSince} يوم بدون تحديث`}>
+                                {daysSince}
+                              </span>
+                            );
+                          })()}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          onClick={() => setAssignRenewal(renewal)}
+                          title="تعيين لموظف"
+                          className="text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10"
+                        >
+                          <UserPlus className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          onClick={() => openEditModal(renewal)}
+                          title="تعديل"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="icon-xs"
+                          onClick={() => confirmDelete(renewal.id)}
+                          title="حذف"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* ─── Pagination ─── */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-1">
+          <span className="text-xs text-muted-foreground">
+            عرض {((currentPage - 1) * PAGE_SIZE) + 1}–{Math.min(currentPage * PAGE_SIZE, prioritySorted.length)} من {prioritySorted.length}
+          </span>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              className="text-muted-foreground"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2)
+              .reduce<(number | "...")[]>((acc, p, i, arr) => {
+                if (i > 0 && p - (arr[i - 1]) > 1) acc.push("...");
+                acc.push(p);
+                return acc;
+              }, [])
+              .map((p, i) =>
+                p === "..." ? (
+                  <span key={`dot-${i}`} className="text-xs text-muted-foreground px-1">...</span>
+                ) : (
+                  <button
+                    key={p}
+                    onClick={() => setCurrentPage(p)}
+                    className={`min-w-[28px] h-7 rounded-lg text-xs font-semibold transition-colors ${
+                      currentPage === p
+                        ? "bg-cyan/15 text-cyan border border-cyan/30"
+                        : "text-muted-foreground hover:text-foreground hover:bg-white/[0.06]"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                )
+              )}
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              className="text-muted-foreground"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* ─── Achievement Summary ─── */}
       {!loading && (
         <div className="cc-card rounded-[14px] p-5 border border-cyan/10 bg-gradient-to-l from-cyan/[0.03] to-transparent">
@@ -1238,7 +1923,6 @@ export default function RenewalsPage() {
 
           {/* Progress bar + extra info */}
           <div className="flex items-center gap-4 flex-wrap">
-            {/* Success rate bar */}
             <div className="flex-1 min-w-[200px]">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-[13px] text-muted-foreground">معدل الإنجاز</span>
@@ -1258,14 +1942,12 @@ export default function RenewalsPage() {
                 />
               </div>
             </div>
-
             {achievementSummary.avgDealValue > 0 && (
               <div className="text-center px-3 py-1.5 rounded-lg bg-white/[0.05] border border-white/[0.06]">
                 <p className="text-xs font-bold text-foreground">{formatMoneyFull(achievementSummary.avgDealValue)}</p>
                 <p className="text-[12px] text-muted-foreground">متوسط القيمة</p>
               </div>
             )}
-
             {achievementSummary.topRep && (
               <div className="text-center px-3 py-1.5 rounded-lg bg-amber/10 border border-amber/20">
                 <p className="text-xs font-bold text-amber">🏆 {achievementSummary.topRep.name}</p>
@@ -1331,53 +2013,6 @@ export default function RenewalsPage() {
               </button>
             ))}
           </div>
-        </div>
-      )}
-
-      {/* ─── Urgency Quick Stats ─── */}
-      {!loading && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {urgencyFilter && (
-            <div className="col-span-2 md:col-span-4 flex items-center gap-2 px-3 py-2 rounded-lg bg-amber/10 border border-amber/20">
-              <span className="text-xs text-amber font-medium">🔍 عرض: {
-                urgencyFilter === "overdue" ? "التجديدات المتأخرة" :
-                urgencyFilter === "today" ? "تجديدات اليوم" :
-                urgencyFilter === "week" ? "تجديدات هذا الأسبوع" :
-                "تجديدات هذا الشهر"
-              } ({filteredRenewals.length} عميل)</span>
-              <button
-                onClick={() => setUrgencyFilter(null)}
-                className="mr-auto text-xs text-amber hover:text-white font-medium px-2 py-1 rounded-md hover:bg-amber/20 transition-colors"
-              >
-                ✕ إلغاء
-              </button>
-            </div>
-          )}
-          {([
-            { key: "overdue" as const, label: "متأخر", count: urgencyStats.overdue, emoji: "🔴", color: "text-cc-red", bg: "bg-cc-red/10", border: "border-cc-red/20", activeBg: "bg-cc-red/20", activeBorder: "border-cc-red/50 ring-2 ring-cc-red/20" },
-            { key: "today" as const, label: "اليوم", count: urgencyStats.today, emoji: "🟡", color: "text-amber", bg: "bg-amber/10", border: "border-amber/20", activeBg: "bg-amber/20", activeBorder: "border-amber/50 ring-2 ring-amber/20" },
-            { key: "week" as const, label: "هذا الأسبوع", count: urgencyStats.week, emoji: "📅", color: "text-cyan", bg: "bg-cyan/10", border: "border-cyan/20", activeBg: "bg-cyan/20", activeBorder: "border-cyan/50 ring-2 ring-cyan/20" },
-            { key: "month" as const, label: "هذا الشهر", count: urgencyStats.month, emoji: "📆", color: "text-cc-purple", bg: "bg-cc-purple/10", border: "border-cc-purple/20", activeBg: "bg-cc-purple/20", activeBorder: "border-cc-purple/50 ring-2 ring-cc-purple/20" },
-          ]).map(({ key, label, count, emoji, color, bg, border, activeBg, activeBorder }) => {
-            const active = urgencyFilter === key;
-            return (
-              <button
-                key={key}
-                onClick={() => {
-                  setUrgencyFilter(active ? null : key);
-                  setSummaryFilter(null);
-                  document.getElementById("renewals-table")?.scrollIntoView({ behavior: "smooth" });
-                }}
-                className={`p-3 rounded-[14px] text-center transition-all cursor-pointer border-2 ${
-                  active ? `${activeBg} ${activeBorder}` : `${bg} border-transparent hover:border-current/20 hover:scale-[1.02]`
-                }`}
-              >
-                <p className="text-lg mb-0.5">{emoji}</p>
-                <p className={`text-2xl font-bold ${color}`}>{count}</p>
-                <p className="text-[12px] text-muted-foreground mt-0.5">{label}</p>
-              </button>
-            );
-          })}
         </div>
       )}
 
@@ -1585,345 +2220,6 @@ export default function RenewalsPage() {
         );
       })()}
 
-      {/* ─── Renewals Table ─── */}
-      <div id="renewals-table" className="cc-card rounded-[14px] overflow-x-auto scroll-mt-4">
-        {/* Year + Month filter */}
-        {availableYears.length > 1 && (
-          <div className="px-4 pt-4 pb-1 flex items-center gap-1.5 flex-wrap">
-            <CalendarDays className="w-4 h-4 text-muted-foreground shrink-0" />
-            {availableYears.map((y) => (
-              <button
-                key={y}
-                onClick={() => setYearFilter(y)}
-                className={`px-3 py-1 rounded-lg text-[12px] font-semibold transition-colors border ${
-                  yearFilter === y
-                    ? "bg-amber/15 text-amber border-amber/30"
-                    : "text-muted-foreground border-transparent hover:text-foreground hover:bg-white/[0.06]"
-                }`}
-              >
-                {y}
-              </button>
-            ))}
-          </div>
-        )}
-        <div className={`px-4 ${availableYears.length > 1 ? "pt-1" : "pt-4"} pb-2 flex items-center gap-1.5 flex-wrap`}>
-          <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
-          <button
-            onClick={() => setMonthFilter(-1)}
-            className={`px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-colors border ${
-              monthFilter === -1
-                ? "bg-cyan/15 text-cyan border-cyan/30"
-                : "text-muted-foreground border-transparent hover:text-foreground hover:bg-white/[0.06]"
-            }`}
-          >
-            الكل
-          </button>
-          {MONTHS_AR.map((m, i) => (
-            <button
-              key={i}
-              onClick={() => setMonthFilter(i)}
-              className={`px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-colors border ${
-                monthFilter === i
-                  ? "bg-cyan/15 text-cyan border-cyan/30"
-                  : "text-muted-foreground border-transparent hover:text-foreground hover:bg-white/[0.06]"
-              }`}
-            >
-              {m.slice(0, 3)}
-            </button>
-          ))}
-        </div>
-        {/* Month completion summary */}
-        {monthFilter !== -1 && (() => {
-          const total = monthFilteredRenewals.length;
-          const completed = monthFilteredRenewals.filter(r => r.status === "مكتمل").length;
-          const cancelled = monthFilteredRenewals.filter(r => r.status === "ملغي بسبب").length;
-          const pending = total - completed - cancelled;
-          const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
-          return (
-            <div className="px-4 pb-2">
-              <div className="flex items-center gap-4 rounded-xl bg-white/[0.03] border border-border/50 px-4 py-2.5">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-foreground">
-                        إنجاز {MONTHS_AR[monthFilter]}
-                      </span>
-                      <span className={`text-[11px] font-medium ${pct >= 80 ? "text-cc-green" : pct >= 50 ? "text-amber" : "text-muted-foreground"}`}>
-                        {pct === 100 ? "ممتاز! تم إنجاز الكل" : pct >= 80 ? "أحسنتم! قاربتم على الإنجاز" : pct >= 50 ? "في المسار الصحيح، واصلوا!" : pct >= 25 ? "بداية جيدة، كملوا!" : total > 0 ? "يلا نبدأ! الشهر بانتظاركم" : ""}
-                      </span>
-                    </div>
-                    <span className={`text-sm font-extrabold ${pct >= 80 ? "text-cc-green" : pct >= 50 ? "text-amber" : "text-cc-red"}`}>
-                      {pct}%
-                    </span>
-                  </div>
-                  <div className="w-full h-2 rounded-full bg-white/[0.08] overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${pct >= 80 ? "bg-cc-green" : pct >= 50 ? "bg-amber" : "bg-cc-red"}`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 text-[12px] shrink-0">
-                  <span className="text-cc-green font-semibold">{completed} مكتمل</span>
-                  <span className="text-muted-foreground">|</span>
-                  <span className="text-amber font-semibold">{pending} معلّق</span>
-                  <span className="text-muted-foreground">|</span>
-                  <span className="text-cc-red font-semibold">{cancelled} ملغي</span>
-                  <span className="text-muted-foreground">|</span>
-                  <span className="text-foreground font-bold">{total} إجمالي</span>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-        <div className="px-4 pb-0 flex items-center gap-3">
-          <Input
-            value={clientSearch}
-            onChange={(e) => setClientSearch(e.target.value)}
-            placeholder="ابحث باسم العميل..."
-            className="max-w-xs"
-          />
-          <button
-            onClick={selectAllVisible}
-            className="text-[12px] px-2.5 py-1.5 rounded-lg border border-cyan/30 text-cyan hover:bg-cyan/10 transition-colors whitespace-nowrap"
-            title="تحديد الكل كهدف يومي"
-          >
-            <SquareCheck className="w-3 h-3 inline-block ml-1" />
-            تحديد الكل
-          </button>
-        </div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-10 text-center">هدف</TableHead>
-              <TableHead className="w-20">الكود</TableHead>
-              <TableHead>العميل</TableHead>
-              <TableHead>الخطة</TableHead>
-              <TableHead>السعر</TableHead>
-              <TableHead>موعد التجديد</TableHead>
-              <TableHead>تاريخ الدفع</TableHead>
-              <TableHead>الأيام المتبقية</TableHead>
-              <TableHead>الحالة</TableHead>
-              <TableHead>المسؤول</TableHead>
-              <TableHead className="text-center">إجراءات</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
-                  {Array.from({ length: 10 }).map((_, j) => (
-                    <TableCell key={j}><Skeleton className="h-4 w-20" /></TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : filteredRenewals.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
-                  {statusFilter ? "لا توجد تجديدات مطابقة" : "لا توجد تجديدات بعد. اضغط \"إضافة تجديد\" لإضافة أول تجديد."}
-                </TableCell>
-              </TableRow>
-            ) : (
-              paginatedRenewals.map((renewal) => {
-                const days = getDaysRemaining(renewal.renewal_date);
-                const daysStyle = getDaysRemainingStyle(days);
-                const badge = STATUS_BADGE[renewal.status] || STATUS_BADGE["مجدول"];
-
-                const isTarget = dailyTargetIds.has(renewal.id);
-                const isTargetDone = isTarget && renewal.status === "مكتمل";
-
-                return (
-                  <TableRow
-                    key={renewal.id}
-                    className={isTarget ? (isTargetDone ? "bg-cc-green/[0.04]" : "bg-cyan/[0.04]") : ""}
-                  >
-                    <TableCell className="text-center">
-                      <button
-                        onClick={() => toggleDailyTarget(renewal.id)}
-                        className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                          isTargetDone
-                            ? "border-cc-green bg-cc-green text-white"
-                            : isTarget
-                            ? "border-cyan bg-cyan/20 text-cyan"
-                            : "border-muted-foreground/30 hover:border-cyan/50"
-                        }`}
-                      >
-                        {isTarget && (
-                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </button>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs font-mono">
-                      {renewal.client_code || "—"}
-                    </TableCell>
-                    <TableCell className="font-medium text-foreground">
-                      <button
-                        onClick={() => { setProfileQuery(renewal.customer_phone || renewal.customer_name); setProfileOpen(true); }}
-                        className="hover:text-primary hover:underline transition-colors text-right"
-                      >
-                        {renewal.customer_name}
-                      </button>
-                      {isTarget && !isTargetDone && (
-                        <span className="mr-1.5 inline-block text-[11px] px-1.5 py-0.5 rounded bg-cyan/10 text-cyan font-medium">
-                          هدف اليوم
-                        </span>
-                      )}
-                      {isTargetDone && (
-                        <span className="mr-1.5 inline-block text-[11px] px-1.5 py-0.5 rounded bg-cc-green/15 text-cc-green font-medium">
-                          تم الإنجاز
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {renewal.plan_name}
-                    </TableCell>
-                    <TableCell className="font-bold text-cyan text-xs">
-                      {formatMoneyFull(renewal.plan_price)}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {formatDate(renewal.renewal_date)}
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      {renewal.payment_date ? (
-                        <span className="text-cc-green font-medium">{formatDate(renewal.payment_date)}</span>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1.5">
-                        <CalendarDays className={`w-3.5 h-3.5 ${daysStyle.color}`} />
-                        <span className={`text-xs font-bold ${daysStyle.color}`}>
-                          {daysStyle.label}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center justify-center gap-1.5">
-                        <span className={`inline-block px-2.5 py-1 rounded-full text-[12px] font-medium ${badge.bg} ${badge.color}`}>
-                          {badge.text}
-                          {renewal.status === "ملغي بسبب" && renewal.cancel_reason && (
-                            <span className="mr-1 text-[11px] opacity-70">({renewal.cancel_reason})</span>
-                          )}
-                        </span>
-                        {renewal.status === "ملغي بسبب" && ["قلة الاستخدام", "الادارة رفضت", "مشكلات تقنية", "مو حاب يجدد بدون سبب"].includes(renewal.cancel_reason || "") && (
-                          <span title="قابل لإعادة الاستهداف" className="flex items-center justify-center w-6 h-6 rounded-full bg-amber/10 text-amber cursor-default animate-pulse">
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
-                          </span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {renewal.assigned_rep || "—"}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center justify-center gap-1">
-                        <div className="relative">
-                          <FollowUpLogButton entityType="renewal" entityId={renewal.id} entityName={renewal.customer_name} />
-                          {renewal.status !== "مكتمل" && renewal.status !== "ملغي بسبب" && (() => {
-                            const daysSince = Math.floor((Date.now() - new Date(renewal.updated_at).getTime()) / 86400000);
-                            if (daysSince < 3) return null;
-                            return (
-                              <span className={`absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[11px] font-bold px-1 ${
-                                daysSince >= 7 ? "bg-red-500 text-white" : "bg-amber-500 text-white"
-                              }`} title={`${daysSince} يوم بدون تحديث`}>
-                                {daysSince}
-                              </span>
-                            );
-                          })()}
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon-xs"
-                          onClick={() => setAssignRenewal(renewal)}
-                          title="تعيين لموظف"
-                          className="text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10"
-                        >
-                          <UserPlus className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-xs"
-                          onClick={() => openEditModal(renewal)}
-                          title="تعديل"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="icon-xs"
-                          onClick={() => confirmDelete(renewal.id)}
-                          title="حذف"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* ─── Pagination ─── */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between px-1">
-          <span className="text-xs text-muted-foreground">
-            عرض {((currentPage - 1) * PAGE_SIZE) + 1}–{Math.min(currentPage * PAGE_SIZE, filteredRenewals.length)} من {filteredRenewals.length}
-          </span>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              disabled={currentPage >= totalPages}
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              className="text-muted-foreground"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1)
-              .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2)
-              .reduce<(number | "...")[]>((acc, p, i, arr) => {
-                if (i > 0 && p - (arr[i - 1]) > 1) acc.push("...");
-                acc.push(p);
-                return acc;
-              }, [])
-              .map((p, i) =>
-                p === "..." ? (
-                  <span key={`dot-${i}`} className="text-xs text-muted-foreground px-1">...</span>
-                ) : (
-                  <button
-                    key={p}
-                    onClick={() => setCurrentPage(p)}
-                    className={`min-w-[28px] h-7 rounded-lg text-xs font-semibold transition-colors ${
-                      currentPage === p
-                        ? "bg-cyan/15 text-cyan border border-cyan/30"
-                        : "text-muted-foreground hover:text-foreground hover:bg-white/[0.06]"
-                    }`}
-                  >
-                    {p}
-                  </button>
-                )
-              )}
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              disabled={currentPage <= 1}
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              className="text-muted-foreground"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      )}
-
       {/* ─── Charts Row ─── */}
       {!loading && analytics.total > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -2087,6 +2383,7 @@ export default function RenewalsPage() {
                         <TableCell className="text-muted-foreground text-xs">{renewal.assigned_rep || "—"}</TableCell>
                         <TableCell>
                           <div className="flex items-center justify-center gap-1">
+                            <WatchlistPinButton entityType="renewal" entityId={renewal.id} entityName={renewal.customer_name} section="/renewals" />
                             <FollowUpLogButton entityType="renewal" entityId={renewal.id} entityName={renewal.customer_name} />
                             <Button variant="ghost" size="icon-xs" onClick={() => openEditModal(renewal)} title="تعديل">
                               <Pencil className="w-3.5 h-3.5" />

@@ -75,6 +75,43 @@ export function todayLocal(): string {
   return saudiDateStr();
 }
 
+/** Returns [from, to] YYYY-MM-DD bounds for a quick date filter (Saudi time). Null if filter is inactive. */
+export function tableDateBounds(
+  filter: string,
+  customFrom?: string,
+  customTo?: string,
+): [string, string] | null {
+  const today = todayLocal();
+  const [y, mo, d] = today.split("-").map(Number);
+  const p = (n: number) => String(n).padStart(2, "0");
+
+  if (filter === "اليوم") return [today, today];
+
+  if (filter === "أمس") {
+    const prev = new Date(y, mo - 1, d - 1);
+    const s = `${prev.getFullYear()}-${p(prev.getMonth() + 1)}-${p(prev.getDate())}`;
+    return [s, s];
+  }
+
+  if (filter === "الأسبوع") {
+    const start = new Date(y, mo - 1, d - 6);
+    return [`${start.getFullYear()}-${p(start.getMonth() + 1)}-${p(start.getDate())}`, today];
+  }
+
+  if (filter === "الشهر") return [`${y}-${p(mo)}-01`, today];
+
+  if (filter === "الشهر الماضي") {
+    const first = new Date(y, mo - 2, 1);
+    const lmY = first.getFullYear();
+    const lmM = first.getMonth() + 1;
+    const lastDay = new Date(lmY, lmM, 0).getDate();
+    return [`${lmY}-${p(lmM)}-01`, `${lmY}-${p(lmM)}-${p(lastDay)}`];
+  }
+
+  if (filter === "مخصص" && customFrom && customTo) return [customFrom, customTo];
+  return null;
+}
+
 export function formatPhone(phone: string): string {
   if (!phone) return "";
   const cleaned = phone.replace(/\D/g, "");

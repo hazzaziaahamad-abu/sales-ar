@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { Employee, FollowUpNote } from "@/types";
-import { fetchFollowUpNotes, createFollowUpNote, updateFollowUpNote, deleteFollowUpNote, fetchEmployees, createMentionNotification } from "@/lib/supabase/db";
+import { fetchFollowUpNotes, createFollowUpNote, updateFollowUpNote, deleteFollowUpNote, fetchEmployees, fetchUserProfiles, createMentionNotification, createReminder, fetchUpcomingReminders, dismissReminder } from "@/lib/supabase/db";
+import type { Reminder } from "@/lib/supabase/db";
 import { useAuth } from "@/lib/auth-context";
 import {
   Dialog,
@@ -11,7 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { MessageSquarePlus, Send, Clock, AtSign, Pencil, Trash2, Check, X } from "lucide-react";
+import { MessageSquarePlus, Send, Clock, AtSign, Pencil, Trash2, Check, X, Bell, BellOff, CalendarClock } from "lucide-react";
 
 interface FollowUpLogProps {
   entityType: "deal" | "renewal" | "ticket";
@@ -35,13 +36,21 @@ export function FollowUpLogButton({ entityType, entityId, entityName }: FollowUp
   /* Delete confirm state */
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  /* Employees for @mention */
+  /* People for @mention (employees + user profiles merged) */
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [mentionNames, setMentionNames] = useState<string[]>([]);
   const [showMentions, setShowMentions] = useState(false);
   const [mentionFilter, setMentionFilter] = useState("");
   const [mentionIndex, setMentionIndex] = useState(0);
-  const [mentionStart, setMentionStart] = useState(-1); // cursor position of @
+  const [mentionStart, setMentionStart] = useState(-1);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  /* Reminder state */
+  const [showReminderPicker, setShowReminderPicker] = useState(false);
+  const [reminderDate, setReminderDate] = useState("");
+  const [reminderTime, setReminderTime] = useState("");
+  const [savingReminder, setSavingReminder] = useState(false);
+  const [reminders, setReminders] = useState<Reminder[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -49,14 +58,22 @@ export function FollowUpLogButton({ entityType, entityId, entityName }: FollowUp
     Promise.all([
       fetchFollowUpNotes(entityType, entityId),
       fetchEmployees(),
-    ]).then(([n, e]) => {
+      fetchUpcomingReminders(),
+      fetchUserProfiles(),
+    ]).then(([n, e, r, profiles]) => {
       setNotes(n);
-      setEmployees(e);
+      setEmployees(e as Employee[]);
+      setReminders((r as Reminder[]).filter((rem) => rem.entity_id === entityId));
+      // Merge employee names + user profile names (dedup, user_profiles takes priority for name matching)
+      const empNames = (e as Employee[]).map((emp) => emp.name);
+      const profileNames = (profiles as { id: string; name: string; email: string }[]).map((p) => p.name).filter(Boolean);
+      const merged = [...new Set([...profileNames, ...empNames])];
+      setMentionNames(merged);
     }).catch(console.error).finally(() => setLoading(false));
   }, [open, entityType, entityId]);
 
-  const filteredEmployees = employees.filter((e) =>
-    !mentionFilter || e.name.includes(mentionFilter)
+  const filteredEmployees = mentionNames.filter((name) =>
+    !mentionFilter || name.includes(mentionFilter)
   );
 
   const insertMention = useCallback((name: string) => {
@@ -108,7 +125,7 @@ export function FollowUpLogButton({ entityType, entityId, entityName }: FollowUp
         setMentionIndex((i) => Math.max(i - 1, 0));
       } else if (e.key === "Enter" || e.key === "Tab") {
         e.preventDefault();
-        insertMention(filteredEmployees[mentionIndex].name);
+        insertMention(filteredEmployees[mentionIndex]);
       } else if (e.key === "Escape") {
         setShowMentions(false);
       }
@@ -118,13 +135,7 @@ export function FollowUpLogButton({ entityType, entityId, entityName }: FollowUp
   }
 
   function extractMentions(text: string): string[] {
-    const mentioned: string[] = [];
-    for (const emp of employees) {
-      if (text.includes(`@${emp.name}`)) {
-        mentioned.push(emp.name);
-      }
-    }
-    return [...new Set(mentioned)];
+    return [...new Set(mentionNames.filter((name) => text.includes(`@${name}`)))];
   }
 
   async function handleAdd() {
@@ -136,8 +147,15 @@ export function FollowUpLogButton({ entityType, entityId, entityName }: FollowUp
       setNotes((prev) => [created, ...prev]);
 
       const mentionedNames = extractMentions(newNote);
+      console.log("[mention] extracted names:", mentionedNames, "from mention list:", mentionNames);
+      const notified = new Set<string>();
       for (const name of mentionedNames) {
-        createMentionNotification(created.id, entityType, entityId, entityName, name, authorName, newNote.trim()).catch(console.error);
+        if (name === authorName) continue; // no self-notification
+        if (notified.has(name)) continue;  // no duplicates in same message
+        notified.add(name);
+        createMentionNotification(created.id, entityType, entityId, entityName, name, authorName, newNote.trim())
+          .then(() => console.log("[mention] notification created for:", name))
+          .catch((err) => console.error("[mention] FAILED to create notification for:", name, err));
       }
 
       setNewNote("");
@@ -165,6 +183,32 @@ export function FollowUpLogButton({ entityType, entityId, entityName }: FollowUp
     }
   }
 
+  /* Reminder handler */
+  async function handleSaveReminder() {
+    if (!reminderDate || !reminderTime) return;
+    setSavingReminder(true);
+    try {
+      const remindAt = new Date(`${reminderDate}T${reminderTime}:00`).toISOString();
+      const authorName = user?.name || user?.email || "مستخدم";
+      const created = await createReminder({
+        entity_type: entityType,
+        entity_id: entityId,
+        entity_name: entityName,
+        note_text: newNote.trim() || undefined,
+        remind_at: remindAt,
+        user_name: authorName,
+      });
+      setReminders((prev) => [...prev, created]);
+      setShowReminderPicker(false);
+      setReminderDate("");
+      setReminderTime("");
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSavingReminder(false);
+    }
+  }
+
   /* Delete handler */
   async function handleDelete(noteId: string) {
     try {
@@ -174,6 +218,12 @@ export function FollowUpLogButton({ entityType, entityId, entityName }: FollowUp
     } catch (err) {
       console.error(err);
     }
+  }
+
+  function formatReminderTime(iso: string) {
+    const d = new Date(iso);
+    return d.toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "short", day: "numeric", month: "short" }) +
+      " " + d.toLocaleTimeString("ar-SA-u-ca-gregory", { hour: "2-digit", minute: "2-digit" });
   }
 
   function formatDateTime(iso: string) {
@@ -232,19 +282,18 @@ export function FollowUpLogButton({ entityType, entityId, entityName }: FollowUp
                 {/* Mention suggestions dropdown */}
                 {showMentions && filteredEmployees.length > 0 && (
                   <div className="absolute top-full mt-1 right-0 w-full min-w-[280px] bg-card border border-border rounded-lg shadow-lg z-50 max-h-[200px] overflow-y-auto">
-                    {filteredEmployees.map((emp, idx) => (
+                    {filteredEmployees.map((name, idx) => (
                       <button
-                        key={emp.id}
-                        onClick={() => insertMention(emp.name)}
+                        key={name}
+                        onClick={() => insertMention(name)}
                         className={`w-full flex items-center gap-2 px-3 py-2.5 text-right text-sm transition-colors ${
                           idx === mentionIndex ? "bg-cyan/10 text-cyan" : "text-foreground hover:bg-white/5"
                         }`}
                       >
                         <div className="w-7 h-7 rounded-full bg-amber/15 text-amber flex items-center justify-center text-xs font-bold flex-shrink-0">
-                          {emp.name.charAt(0)}
+                          {name.charAt(0)}
                         </div>
-                        <span className="font-medium whitespace-nowrap">{emp.name}</span>
-                        {emp.role && <span className="text-[12px] text-muted-foreground mr-auto whitespace-nowrap">{emp.role}</span>}
+                        <span className="font-medium whitespace-nowrap">{name}</span>
                       </button>
                     ))}
                   </div>
@@ -285,8 +334,80 @@ export function FollowUpLogButton({ entityType, entityId, entityName }: FollowUp
                 >
                   <AtSign className="w-3.5 h-3.5" />
                 </button>
+                <button
+                  onClick={() => setShowReminderPicker((p) => !p)}
+                  className={`p-1.5 rounded-md border transition-colors ${showReminderPicker ? "border-cc-purple/60 bg-cc-purple/15 text-cc-purple" : "border-cc-purple/30 text-cc-purple hover:bg-cc-purple/10"}`}
+                  title="تذكير بتاريخ ووقت"
+                >
+                  <Bell className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
+
+            {/* Reminder picker */}
+            {showReminderPicker && (
+              <div className="mt-2 p-3 rounded-lg border border-cc-purple/30 bg-cc-purple/5 space-y-2">
+                <p className="text-xs font-medium text-cc-purple flex items-center gap-1.5">
+                  <CalendarClock className="w-3.5 h-3.5" />
+                  تذكيرني بهذه الصفقة في:
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    value={reminderDate}
+                    onChange={(e) => setReminderDate(e.target.value)}
+                    className="flex-1 rounded-md border border-border bg-card px-2 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-cc-purple"
+                  />
+                  <input
+                    type="time"
+                    value={reminderTime}
+                    onChange={(e) => setReminderTime(e.target.value)}
+                    className="w-28 rounded-md border border-border bg-card px-2 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-cc-purple"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSaveReminder}
+                    disabled={!reminderDate || !reminderTime || savingReminder}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium bg-cc-purple/20 text-cc-purple hover:bg-cc-purple/30 disabled:opacity-40 transition-colors"
+                  >
+                    <Bell className="w-3 h-3" />
+                    {savingReminder ? "جاري الحفظ..." : "حفظ التذكير"}
+                  </button>
+                  <button
+                    onClick={() => setShowReminderPicker(false)}
+                    className="px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:bg-white/5 transition-colors"
+                  >
+                    إلغاء
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Active reminders for this entity */}
+            {reminders.length > 0 && (
+              <div className="mt-2 space-y-1.5">
+                {reminders.map((rem) => (
+                  <div key={rem.id} className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-lg border border-cc-purple/20 bg-cc-purple/5 text-xs">
+                    <div className="flex items-center gap-1.5 text-cc-purple min-w-0">
+                      <Bell className="w-3 h-3 shrink-0" />
+                      <span className="truncate">{formatReminderTime(rem.remind_at)}</span>
+                      {rem.note_text && <span className="text-muted-foreground truncate">— {rem.note_text.slice(0, 30)}</span>}
+                    </div>
+                    <button
+                      onClick={async () => {
+                        await dismissReminder(rem.id);
+                        setReminders((prev) => prev.filter((r) => r.id !== rem.id));
+                      }}
+                      className="p-0.5 rounded hover:bg-white/10 text-muted-foreground hover:text-red-400 transition-colors shrink-0"
+                      title="إلغاء التذكير"
+                    >
+                      <BellOff className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Notes list */}

@@ -424,12 +424,20 @@ export interface SalesMessageRating {
 
 export interface AppNotification {
   id: string;
-  type: "urgent_ticket" | "overdue_project" | "high_workload" | "near_complete" | "negotiating" | "crud_action";
+  type: "urgent_ticket" | "overdue_project" | "high_workload" | "near_complete" | "negotiating" | "crud_action" | "mention";
   icon: string;
   message: string;
   section: string;
   timestamp: string;
   isRead: boolean;
+  /** Extra routing info — used by mention notifications to navigate to the exact note */
+  metadata?: {
+    entityId?: string;
+    entityType?: "deal" | "renewal" | "ticket";
+    noteId?: string;
+    entityName?: string;
+    mentionNotifId?: string; // DB row id — used to mark as read
+  };
 }
 
 export interface FollowUpNote {

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { Deal, Marketer, Package, Employee, EmployeeTask } from "@/types";
 import { triggerSaleCelebration } from "@/components/layout/sale-celebration";
-import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createFollowUpNote, fetchRecentFollowUpNotes, fetchPackages, fetchQuoteCommitments, addQuoteCommitment, removeQuoteCommitment, fetchEmployees, fetchEmployeeTasks, createEmployeeTask, createRenewal, fetchRenewals, createDealKpiStages } from "@/lib/supabase/db";
+import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createFollowUpNote, fetchRecentFollowUpNotes, fetchPackages, fetchQuoteCommitments, addQuoteCommitment, removeQuoteCommitment, fetchEmployees, fetchEmployeeTasks, createEmployeeTask, createRenewal, fetchRenewals, createDealKpiStages, upsertDailyGoal, fetchDailyGoals, pingPresence, fetchPresence } from "@/lib/supabase/db";
 import { checkDealsForFollowUp, buildFollowUpTask, type FollowUpAction } from "@/lib/auto-followup";
 import { StarEmployeeCard, Leaderboard } from "@/components/star-employee";
 import { AssignTaskModal } from "@/components/tasks/AssignTaskModal";
@@ -14,8 +14,9 @@ import { useTopbarControls } from "@/components/layout/topbar-context";
 import { STAGES, SOURCES, SOURCE_COLORS, PLANS } from "@/lib/utils/constants";
 
 import SalesKPIsView from "@/components/SalesKPIsView";
-import { formatMoney, formatMoneyFull, formatDate, formatPhone, todayLocal, dateToLocal, dateToTimestamp, saudiTimestamp } from "@/lib/utils/format";
+import { formatMoney, formatMoneyFull, formatDate, formatPhone, todayLocal, dateToLocal, dateToTimestamp, saudiTimestamp, tableDateBounds } from "@/lib/utils/format";
 import { FollowUpLogButton } from "@/components/follow-up-log";
+import { WatchlistPinButton } from "@/components/watchlist-pin-button";
 import { ClientProfilePanel } from "@/components/client-profile-panel";
 import { AchievementSummary } from "@/components/achievement-summary";
 import SalesKPIDashboard from "@/components/sales/SalesKPIDashboard";
@@ -81,6 +82,22 @@ import {
   PhoneCall,
   ChevronDown,
 } from "lucide-react";
+
+/* ─── Deal health score ─── */
+function getDealHealthScore(deal: { stage: string; updated_at: string; deal_date?: string | null; last_contact?: string | null; created_at: string }): { icon: string; label: string; color: string } {
+  if (deal.stage === "مكتملة") return { icon: "✅", label: "مكتمل", color: "text-cc-green" };
+  if (deal.stage === "مرفوض مع سبب" || deal.stage === "كنسل التجربة") return { icon: "⚫", label: "خسارة", color: "text-muted-foreground" };
+  const ref = deal.last_contact || deal.deal_date;
+  const daysSince = ref ? Math.floor((Date.now() - new Date(ref).getTime()) / 86400000) : 99;
+  const dateBase = deal.deal_date || deal.created_at;
+  const dealAge = Math.floor((Date.now() - new Date(dateBase).getTime()) / 86400000);
+  if (deal.stage === "تجريبي" && dealAge > 14) return { icon: "🔴", label: "تجريبي متأخر", color: "text-cc-red" };
+  if (deal.stage === "تجريبي" && dealAge > 7) return { icon: "🟡", label: "يحتاج متابعة", color: "text-amber" };
+  if (daysSince >= 7) return { icon: "🔴", label: "صامت 7+ أيام", color: "text-cc-red" };
+  if (daysSince >= 3) return { icon: "🟡", label: "يحتاج تواصل", color: "text-amber" };
+  if (deal.stage === "انتظار الدفع") return { icon: "🟡", label: "ينتظر الدفع", color: "text-amber" };
+  return { icon: "🟢", label: "بخير", color: "text-cc-green" };
+}
 
 /* ─── Stage badge color mapping ─── */
 const STAGE_BADGE_COLOR: Record<string, "green" | "amber" | "purple" | "cyan" | "red" | "blue"> = {
@@ -237,10 +254,14 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const [profileQuery, setProfileQuery] = useState("");
   const searchParams = useSearchParams();
 
+  const [profileNoteId, setProfileNoteId] = useState<string | undefined>(undefined);
+
   useEffect(() => {
     const p = searchParams.get("profile");
+    const n = searchParams.get("noteId");
     if (p) {
       setProfileQuery(p);
+      setProfileNoteId(n || undefined);
       setProfileOpen(true);
     }
   }, [searchParams]);
@@ -490,9 +511,25 @@ export function SalesSection({ salesType }: SalesPageProps) {
     }
   }
 
+  /* deal-close motivational banner */
+  const [closeBanner, setCloseBanner] = useState<{ name: string; value: number; msg: string } | null>(null);
+  const CLOSE_MSGS = [
+    "🏆 أسطورة! الصفقات تنهار أمامك",
+    "🔥 محترف! هذا ما يميزك عن الباقين",
+    "⚡ رهيب! كل إغلاق يقربك من القمة",
+    "💪 قوة! العميل اختار الأفضل — أنت",
+    "🚀 إنجاز! الأرقام لا تكذب",
+    "🎯 دقيق! ضربتها في الصميم",
+    "🌟 نجم! الفريق فخور بك",
+    "💰 بالتوفيق! كل ريال يعكس جهدك",
+    "👑 ملك! هكذا يُكتب التاريخ",
+    "🔑 مفتاح! فتحت باباً جديداً لنجاحك",
+  ];
+
   /* card filter */
   const [stageFilter, setStageFilter] = useState<string | null>(null);
   const [clientSearch, setClientSearch] = useState("");
+  const [searchAllTime, setSearchAllTime] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const DEALS_PER_PAGE = 20;
   const [repFilter, setRepFilter] = useState<string | null>(null);
@@ -500,6 +537,87 @@ export function SalesSection({ salesType }: SalesPageProps) {
   /* achievement summary filter */
   const [achieveFilter, setAchieveFilter] = useState<string | null>(null);
   const [achieveFilterIds, setAchieveFilterIds] = useState<Set<string>>(new Set());
+
+  /* table date filter — defaults to current month */
+  const [tableDateFilter, setTableDateFilter] = useState<string | null>("الشهر");
+  const [tableCustomFrom, setTableCustomFrom] = useState("");
+  const [tableCustomTo, setTableCustomTo] = useState("");
+  /* trial age filter: show only تجريبي deals older than N days */
+  const [trialDaysFilter, setTrialDaysFilter] = useState<number | null>(null);
+
+  /* ─── Shared per-day values (used by KPI strip, commitments, presence) ─── */
+  const todayStr = todayLocal();
+  const myName = authUser?.name || authUser?.email || "";
+
+  /* ─── Daily KPI strip ─── */
+  const kpiGoalKey = `daily_kpi_goal_${salesType}_${todayStr}`;
+  const [kpiGoal, setKpiGoal] = useState<number>(() => {
+    if (typeof window === "undefined") return 3;
+    try {
+      const saved = localStorage.getItem(`daily_kpi_goal_${salesType}_${todayLocal()}`);
+      return saved ? Math.max(1, parseInt(saved, 10)) : 3;
+    } catch { return 3; }
+  });
+  const [kpiGoalEditing, setKpiGoalEditing] = useState(false);
+  const [kpiGoalInput, setKpiGoalInput] = useState(String(kpiGoal));
+  function saveKpiGoal() {
+    const v = Math.max(1, parseInt(kpiGoalInput, 10) || 1);
+    setKpiGoal(v);
+    setKpiGoalInput(String(v));
+    try { localStorage.setItem(kpiGoalKey, String(v)); } catch {}
+    setKpiGoalEditing(false);
+    /* persist to DB so manager can see it */
+    if (orgId && myName) {
+      upsertDailyGoal(orgId, myName, salesType, todayStr, v).catch(console.error);
+    }
+  }
+
+  /* ─── Manager view: rep goals + presence ─── */
+  const [repGoals, setRepGoals] = useState<{ rep_name: string; goal_count: number }[]>([]);
+  const [repPresence, setRepPresence] = useState<{ user_name: string; first_seen_at: string; last_seen_at: string }[]>([]);
+
+  /* Presence heartbeat: ping every 2 minutes while tab is open */
+  useEffect(() => {
+    if (!orgId || !myName) return;
+    pingPresence(orgId, myName, todayStr).catch(console.error);
+    const id = setInterval(() => pingPresence(orgId, myName, todayStr).catch(console.error), 120_000);
+    return () => clearInterval(id);
+  }, [orgId, myName, todayStr]);
+
+  /* Manager: fetch goals + presence for today */
+  useEffect(() => {
+    if (!orgId || !isAdmin) return;
+    Promise.all([
+      fetchDailyGoals(orgId, salesType, todayStr),
+      fetchPresence(orgId, todayStr),
+    ])
+      .then(([goals, presence]) => {
+        setRepGoals(goals);
+        setRepPresence(presence);
+      })
+      .catch(console.error);
+    /* refresh every 30s so manager sees live status */
+    const id = setInterval(() => {
+      Promise.all([fetchDailyGoals(orgId, salesType, todayStr), fetchPresence(orgId, todayStr)])
+        .then(([goals, presence]) => { setRepGoals(goals); setRepPresence(presence); })
+        .catch(console.error);
+    }, 30_000);
+    return () => clearInterval(id);
+  }, [orgId, salesType, todayStr, isAdmin]);
+
+  /* ─── Active tab (persisted per sales type) ─── */
+  const [activeTab, setActiveTab] = useState<"يومي" | "تحليلات">(() => {
+    if (typeof window === "undefined") return "يومي";
+    try {
+      const saved = localStorage.getItem(`sales_active_tab_${salesType}`);
+      return saved === "تحليلات" ? "تحليلات" : "يومي";
+    } catch { return "يومي"; }
+  });
+  function switchTab(tab: "يومي" | "تحليلات") {
+    setActiveTab(tab);
+    try { localStorage.setItem(`sales_active_tab_${salesType}`, tab); } catch {}
+  }
+
   const { activeMonthIndex, filterCutoff } = useTopbarControls();
 
   /* time/month-filtered deals (used for all analytics + table) */
@@ -534,14 +652,33 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const baseFilteredDeals = achieveFilter
     ? repOnlyDeals.filter(d => achieveFilterIds.has(d.id))
     : stageFilter ? repFilteredDeals.filter((d) => d.stage === stageFilter) : repFilteredDeals;
-  const filteredDeals = clientSearch
-    ? baseFilteredDeals.filter((d) => d.client_name.toLowerCase().includes(clientSearch.toLowerCase()) || (d.client_code && d.client_code.toLowerCase().includes(clientSearch.toLowerCase())) || (d.client_phone && d.client_phone.includes(clientSearch)))
+  const _dateBounds = tableDateBounds(tableDateFilter || "", tableCustomFrom, tableCustomTo);
+  const dateFilteredDeals = _dateBounds
+    ? baseFilteredDeals.filter(d => {
+        const s = (d.deal_date || d.created_at || "").slice(0, 10);
+        return s >= _dateBounds[0] && s <= _dateBounds[1];
+      })
     : baseFilteredDeals;
+  const trialFilteredDeals = trialDaysFilter !== null
+    ? dateFilteredDeals.filter(d => {
+        if (d.stage !== "تجريبي") return false;
+        const age = Math.floor((Date.now() - new Date(d.deal_date || d.created_at).getTime()) / 86400000);
+        return age >= trialDaysFilter;
+      })
+    : dateFilteredDeals;
+  const filteredDeals = clientSearch
+    ? (searchAllTime ? baseFilteredDeals : trialFilteredDeals).filter(
+        (d) =>
+          d.client_name.toLowerCase().includes(clientSearch.toLowerCase()) ||
+          (d.client_code && d.client_code.toLowerCase().includes(clientSearch.toLowerCase())) ||
+          (d.client_phone && d.client_phone.includes(clientSearch))
+      )
+    : trialFilteredDeals;
 
   const totalPages = Math.max(1, Math.ceil(filteredDeals.length / DEALS_PER_PAGE));
   const paginatedDeals = filteredDeals.slice((currentPage - 1) * DEALS_PER_PAGE, currentPage * DEALS_PER_PAGE);
 
-  useEffect(() => { setCurrentPage(1); }, [clientSearch, stageFilter, achieveFilter, repFilter]);
+  useEffect(() => { setCurrentPage(1); }, [clientSearch, stageFilter, achieveFilter, repFilter, tableDateFilter, tableCustomFrom, tableCustomTo, trialDaysFilter]);
 
   useEffect(() => {
     setLoading(true);
@@ -567,9 +704,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
   }, [orgId, salesType]);
 
   /* ─── Quote Commitment ─── */
-  const todayStr = todayLocal();
   const [commitments, setCommitments] = useState<{ user_name: string; created_at: string }[]>([]);
-  const myName = authUser?.name || authUser?.email || "";
   const hasCommitted = commitments.some((c) => c.user_name === myName);
 
   useEffect(() => {
@@ -887,6 +1022,9 @@ export function SalesSection({ salesType }: SalesPageProps) {
               value: form.deal_value,
               type: salesType === "support" ? "support" : "office",
             });
+            const msg = CLOSE_MSGS[Math.floor(Math.random() * CLOSE_MSGS.length)];
+            setCloseBanner({ name: form.client_name, value: form.deal_value, msg });
+            setTimeout(() => setCloseBanner(null), 7000);
             if (form.plan) {
               autoCreateRenewalFromDeal(editingId, form.client_name, form.client_phone, form.plan, form.deal_value, form.assigned_rep_name, salesType, author);
             }
@@ -929,6 +1067,9 @@ export function SalesSection({ salesType }: SalesPageProps) {
             value: form.deal_value,
             type: salesType === "support" ? "support" : "office",
           });
+          const msg = CLOSE_MSGS[Math.floor(Math.random() * CLOSE_MSGS.length)];
+          setCloseBanner({ name: form.client_name, value: form.deal_value, msg });
+          setTimeout(() => setCloseBanner(null), 7000);
           if (form.plan) {
             autoCreateRenewalFromDeal(created.id, form.client_name, form.client_phone, form.plan, form.deal_value, form.assigned_rep_name, salesType, authUser?.name || "النظام");
           }
@@ -1141,86 +1282,196 @@ export function SalesSection({ salesType }: SalesPageProps) {
         </div>
       </div>
 
-      {/* ─── Auto Follow-up Reminders ─── */}
-      {!loading && visibleFollowUps.length > 0 && (
-        <div className="cc-card rounded-[14px] border border-cc-red/20 bg-gradient-to-l from-cc-red/[0.04] via-amber/[0.03] to-transparent overflow-hidden">
-          <div className="p-4 flex items-center justify-between border-b border-border/30">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-cc-red/10 flex items-center justify-center relative">
-                <Bell className="w-4 h-4 text-cc-red" />
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-cc-red text-white text-[11px] font-bold flex items-center justify-center">
-                  {visibleFollowUps.length}
+      {/* ─── Tab Bar ─── */}
+      <div className="flex items-center gap-1 p-1 bg-card border border-border rounded-2xl w-fit">
+        {(["يومي", "تحليلات"] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => switchTab(tab)}
+            className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold transition-all ${
+              activeTab === tab
+                ? tab === "يومي"
+                  ? "bg-cyan/15 text-cyan border border-cyan/30"
+                  : "bg-cc-purple/15 text-cc-purple border border-cc-purple/30"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {tab === "يومي" ? "⭐ يومي" : "📊 تحليلات"}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "يومي" && (
+        <div className="space-y-6">
+      {/* ─── Daily Employee KPI Strip ─── */}
+      {!loading && (() => {
+        const todayClosedDeals = deals.filter(d => {
+          if (d.stage !== "مكتملة") return false;
+          const ts = d.close_date || d.updated_at;
+          if (!ts) return false;
+          try { return dateToLocal(new Date(ts)) === todayStr; } catch { return false; }
+        });
+        const todayClosedCount = todayClosedDeals.length;
+        const todayRevenue = todayClosedDeals.reduce((s, d) => s + d.deal_value, 0);
+        const pct = kpiGoal > 0 ? Math.min(100, Math.round((todayClosedCount / kpiGoal) * 100)) : 0;
+        const goalReached = todayClosedCount >= kpiGoal && kpiGoal > 0;
+
+        /* greeting based on current hour */
+        const currentHour = new Date().getHours();
+        const greetingTime = currentHour < 12 ? "صباح الإنجاز" : currentHour < 17 ? "مساء الطموح" : "مساء النجاح";
+        const employeeName = authUser?.name ? authUser.name.split(" ")[0] : "أخي";
+
+        /* motivational messages — cycling per minute so they change without page reload */
+        const WELCOME_MSGS = [
+          { icon: "🎯", text: `هدفك اليوم ${kpiGoal} صفقة — كل مكالمة تقربك خطوة` },
+          { icon: "🔥", text: "الأبطال لا ينتظرون الظروف — يصنعونها بأيديهم" },
+          { icon: "💡", text: "يوم جديد = فرصة جديدة. ابدأ بأول اتصال الآن!" },
+          { icon: "⚡", text: "الفرق بين الممتاز والعادي: الممتاز يبدأ قبل ما يستعد" },
+          { icon: "🚀", text: "النجاح عادة يومية — ابدأ يومك بقرار واحد: سأغلق اليوم" },
+          { icon: "💪", text: "كل رفض يقربك من قبول — لا تتوقف بعد أول 'لا'" },
+          { icon: "🌟", text: "أفضل وقت لتسجيل أول صفقة اليوم هو الآن" },
+        ];
+        const welcomeMsg = WELCOME_MSGS[Math.floor(Date.now() / 60000) % WELCOME_MSGS.length];
+
+        /* 2-hour warning: show if less than 2 hours until 5 PM and zero completions today */
+        const twoHourAlert = !countdown.timeUp && countdown.h < 2 && todayClosedCount === 0;
+        const ALERT_MSGS = [
+          "لديك أقل من ساعتين — اتصل الآن بأكثر عميل مهيّأ لديك",
+          "الساعة تدق! ركّز على صفقة واحدة فقط وأغلقها",
+          "قبل نهاية اليوم — حدّد عميلاً واحداً وأعطه كل تركيزك",
+          "الوقت ينفد! تواصل مع أقرب عميل لك للإغلاق",
+        ];
+        const alertMsg = ALERT_MSGS[new Date().getMinutes() % ALERT_MSGS.length];
+
+        const KPI_GOAL_MSGS = [
+          "🏆 أتممت هدفك اليومي! أنت نجم الفريق",
+          "🔥 وصلت لهدفك! هذا ما يميّز الكبار",
+          "⚡ الهدف محقّق! واصل بنفس الزخم",
+          "💪 أنجزت هدفك! الفريق يفخر بك",
+          "🚀 عظيم! بلغت هدفك اليومي — هل تضيف المزيد؟",
+        ];
+        const kpiMsg = KPI_GOAL_MSGS[todayClosedCount % KPI_GOAL_MSGS.length];
+
+        return (
+          <div className="space-y-3">
+            {/* Welcome banner */}
+            <div className={`rounded-2xl border px-5 py-4 bg-gradient-to-l ${goalReached ? "from-cc-green/15 via-amber/5 to-transparent border-cc-green/30" : "from-cc-purple/10 via-cyan/5 to-transparent border-cc-purple/20"}`}>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-extrabold shrink-0 ${goalReached ? "bg-cc-green/20 text-cc-green" : "bg-cc-purple/20 text-cc-purple"}`}>
+                    {employeeName.charAt(0)}
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-foreground">
+                      {greetingTime}، {employeeName}! {goalReached ? "🏆" : "👋"}
+                    </p>
+                    {goalReached ? (
+                      <p className="text-[13px] text-cc-green font-semibold mt-0.5">{kpiMsg}</p>
+                    ) : (
+                      <p className="text-[13px] text-muted-foreground mt-0.5">
+                        <span className="text-amber font-bold">{welcomeMsg.icon}</span>{" "}
+                        {welcomeMsg.text}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="text-left shrink-0 hidden sm:block">
+                  <p className="text-[11px] text-muted-foreground">الوقت المتبقي</p>
+                  <p className={`text-sm font-mono font-bold ${countdown.h < 1 ? "text-cc-red" : countdown.h < 2 ? "text-amber" : "text-foreground"}`}>
+                    {countdown.timeUp ? "انتهى الدوام" : `${countdown.h}:${String(countdown.m).padStart(2, "0")}:${String(countdown.s).padStart(2, "0")}`}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* 2-hour end-of-day alert */}
+            {twoHourAlert && (
+              <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-cc-red/10 border border-cc-red/30">
+                <AlertTriangle className="w-5 h-5 text-cc-red shrink-0 animate-bounce" />
+                <div className="flex-1">
+                  <p className="text-[13px] font-bold text-cc-red">تنبيه — أقل من ساعتين على نهاية الدوام</p>
+                  <p className="text-[12px] text-muted-foreground mt-0.5">{alertMsg}</p>
+                </div>
+                <span className="text-cc-red font-mono font-bold text-sm shrink-0">
+                  {countdown.h}:{String(countdown.m).padStart(2, "0")}
                 </span>
               </div>
-              <div className="text-right">
-                <h3 className="text-sm font-bold text-foreground">تنبيهات المتابعة التلقائية</h3>
-                <p className="text-[12px] text-muted-foreground">
-                  {visibleFollowUps.filter((a) => a.rule.priority === "urgent").length > 0
-                    ? `${visibleFollowUps.filter((a) => a.rule.priority === "urgent").length} تصعيد عاجل — `
-                    : ""}
-                  {visibleFollowUps.length} عميل يحتاج متابعة
+            )}
+
+            {/* KPI numbers strip */}
+            <div className={`rounded-2xl border px-5 py-4 ${goalReached ? "bg-cc-green/[0.04] border-cc-green/20" : "cc-card border-border"}`}>
+              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <Target className="w-4 h-4 text-cc-purple" />
+                  <span className="text-sm font-bold text-foreground">هدف اليوم</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[12px] text-muted-foreground">الهدف:</span>
+                  {kpiGoalEditing ? (
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min={1}
+                        value={kpiGoalInput}
+                        onChange={e => setKpiGoalInput(e.target.value)}
+                        onKeyDown={e => { if (e.key === "Enter") saveKpiGoal(); if (e.key === "Escape") setKpiGoalEditing(false); }}
+                        autoFocus
+                        className="w-14 text-center text-[13px] bg-card border border-amber/40 rounded-lg px-2 py-0.5 text-foreground"
+                      />
+                      <button onClick={saveKpiGoal} className="text-[12px] px-2 py-0.5 rounded-lg bg-cc-green/15 text-cc-green border border-cc-green/30 hover:bg-cc-green/25">حفظ</button>
+                      <button onClick={() => setKpiGoalEditing(false)} className="text-[12px] px-2 py-0.5 rounded-lg bg-muted/50 text-muted-foreground border border-border">إلغاء</button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => { setKpiGoalInput(String(kpiGoal)); setKpiGoalEditing(true); }}
+                      className="flex items-center gap-1 text-[13px] font-bold text-amber hover:underline"
+                    >
+                      {kpiGoal} صفقة
+                      <Pencil className="w-3 h-3 opacity-60" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3 mb-3">
+                <div className="rounded-xl bg-card border border-border px-4 py-3 text-center">
+                  <p className="text-[11px] text-muted-foreground mb-1">الهدف اليومي</p>
+                  <p className="text-2xl font-extrabold text-amber">{kpiGoal}</p>
+                  <p className="text-[11px] text-muted-foreground">صفقة</p>
+                </div>
+                <div className={`rounded-xl border px-4 py-3 text-center ${goalReached ? "bg-cc-green/10 border-cc-green/30" : "bg-card border-border"}`}>
+                  <p className="text-[11px] text-muted-foreground mb-1">مكتمل اليوم</p>
+                  <p className={`text-2xl font-extrabold ${goalReached ? "text-cc-green" : "text-foreground"}`}>{todayClosedCount}</p>
+                  <p className="text-[11px] text-muted-foreground">صفقة</p>
+                </div>
+                <div className="rounded-xl bg-card border border-border px-4 py-3 text-center">
+                  <p className="text-[11px] text-muted-foreground mb-1">إيراد اليوم</p>
+                  <p className="text-2xl font-extrabold text-cc-green">{formatMoney(todayRevenue)}</p>
+                  <p className="text-[11px] text-muted-foreground">ر.س</p>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-[12px]">
+                  <span className="text-muted-foreground">التقدم نحو الهدف</span>
+                  <span className={`font-bold ${goalReached ? "text-cc-green" : pct >= 50 ? "text-amber" : "text-muted-foreground"}`}>{pct}%</span>
+                </div>
+                <div className="h-2.5 rounded-full bg-white/[0.06] overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${goalReached ? "bg-cc-green" : pct >= 50 ? "bg-amber" : "bg-cyan"}`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {goalReached
+                    ? `أحسنت! أكملت ${todayClosedCount} من ${kpiGoal} صفقة`
+                    : todayClosedCount === 0
+                      ? `ابدأ بأول صفقة اليوم — الهدف ${kpiGoal} صفقة`
+                      : `${kpiGoal - todayClosedCount} صفقة متبقية لإتمام هدف اليوم`}
                 </p>
               </div>
             </div>
           </div>
-          <div className="divide-y divide-border/20 max-h-[320px] overflow-y-auto">
-            {visibleFollowUps.slice(0, 10).map((action) => {
-              const priorityStyles: Record<string, { bg: string; text: string; label: string }> = {
-                urgent: { bg: "bg-cc-red/10 border-cc-red/30", text: "text-cc-red", label: "عاجل" },
-                high: { bg: "bg-amber/10 border-amber/30", text: "text-amber", label: "مرتفع" },
-                medium: { bg: "bg-cc-blue/10 border-cc-blue/30", text: "text-cc-blue", label: "متوسط" },
-                low: { bg: "bg-muted/50 border-border", text: "text-muted-foreground", label: "منخفض" },
-              };
-              const ps = priorityStyles[action.rule.priority] || priorityStyles.medium;
-              return (
-                <div key={action.deal.id} className="px-4 py-3 flex items-center gap-3 hover:bg-muted/30 transition-colors">
-                  <div className={`shrink-0 w-7 h-7 rounded-full ${ps.bg} border flex items-center justify-center`}>
-                    {action.rule.priority === "urgent" ? (
-                      <AlertTriangle className={`w-3.5 h-3.5 ${ps.text}`} />
-                    ) : action.rule.taskType === "call" ? (
-                      <PhoneCall className={`w-3.5 h-3.5 ${ps.text}`} />
-                    ) : (
-                      <Bell className={`w-3.5 h-3.5 ${ps.text}`} />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-foreground truncate">{action.taskTitle}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className={`text-[12px] px-1.5 py-0.5 rounded-full border ${ps.bg} ${ps.text} font-semibold`}>
-                        {ps.label}
-                      </span>
-                      <span className="text-[12px] text-muted-foreground">{action.rule.label}</span>
-                      {action.deal.assigned_rep_name && (
-                        <span className="text-[12px] text-muted-foreground">• {action.deal.assigned_rep_name}</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      onClick={() => handleCreateFollowUpTask(action)}
-                      disabled={creatingFollowUpTask === action.deal.id}
-                      className="text-[12px] px-2.5 py-1.5 rounded-lg bg-cc-green/10 text-cc-green border border-cc-green/30 hover:bg-cc-green/20 transition-colors disabled:opacity-50 font-medium"
-                    >
-                      {creatingFollowUpTask === action.deal.id ? "جاري..." : "إنشاء مهمة"}
-                    </button>
-                    <button
-                      onClick={() => dismissFollowUp(action.deal.id)}
-                      className="text-[12px] px-2 py-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-                    >
-                      تخطي
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          {visibleFollowUps.length > 10 && (
-            <div className="px-4 py-2 text-center border-t border-border/30">
-              <span className="text-[12px] text-muted-foreground">و {visibleFollowUps.length - 10} تنبيه آخر...</span>
-            </div>
-          )}
-        </div>
-      )}
+        );
+      })()}
 
       {/* ─── Stage Summary Cards ─── */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
@@ -1244,6 +1495,611 @@ export function SalesSection({ salesType }: SalesPageProps) {
               );
             })}
       </div>
+
+      {/* ─── Deal-close motivational banner ─── */}
+      {closeBanner && (
+        <div className="relative flex items-center gap-4 px-5 py-4 rounded-2xl bg-gradient-to-l from-amber/20 via-cc-green/10 to-cyan/10 border border-amber/30 animate-pulse-once overflow-hidden">
+          <div className="text-4xl">🎊</div>
+          <div className="flex-1">
+            <p className="text-base font-extrabold text-amber">{closeBanner.msg}</p>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              تم إغلاق صفقة <span className="font-bold text-foreground">{closeBanner.name}</span> بقيمة <span className="font-bold text-cc-green">{formatMoneyFull(closeBanner.value)}</span>
+            </p>
+          </div>
+          <div className="text-4xl">🎊</div>
+          <button onClick={() => setCloseBanner(null)} className="absolute top-2 left-3 text-muted-foreground hover:text-foreground text-xs">✕</button>
+        </div>
+      )}
+
+      {/* ─── Daily Focus Boxes ─── */}
+      {!loading && (() => {
+        const waitingDeals = dateFilteredDeals.filter(d => d.stage === "انتظار الدفع");
+        const negotiationDeals = dateFilteredDeals.filter(d => d.stage === "تفاوض");
+        const trialDeals = dateFilteredDeals.filter(d => d.stage === "تجريبي");
+        const oldTrials = trialDeals.filter(d => Math.floor((Date.now() - new Date(d.deal_date || d.created_at).getTime()) / 86400000) >= 7);
+
+        const waitingValue = waitingDeals.reduce((s, d) => s + d.deal_value, 0);
+        const negotiationValue = negotiationDeals.reduce((s, d) => s + d.deal_value, 0);
+        const trialValue = trialDeals.reduce((s, d) => s + d.deal_value, 0);
+
+        const boxes = [
+          {
+            key: "انتظار الدفع",
+            icon: "💳",
+            label: "ينتظر الدفع",
+            sublabel: "اجمع الفلوس اليوم!",
+            count: waitingDeals.length,
+            value: waitingValue,
+            badge: null,
+            color: { card: "hover:border-amber/30 hover:bg-amber/[0.06]", active: "bg-amber/15 border-amber/40 ring-1 ring-amber/30", num: "text-amber", dot: "🟡" },
+          },
+          {
+            key: "تفاوض",
+            icon: "🤝",
+            label: "قيد التفاوض",
+            sublabel: "أقنعهم اليوم!",
+            count: negotiationDeals.length,
+            value: negotiationValue,
+            badge: null,
+            color: { card: "hover:border-cc-purple/30 hover:bg-cc-purple/[0.06]", active: "bg-cc-purple/15 border-cc-purple/40 ring-1 ring-cc-purple/30", num: "text-cc-purple", dot: "🟣" },
+          },
+          {
+            key: "تجريبي",
+            icon: "🧪",
+            label: "في التجربة",
+            sublabel: oldTrials.length > 0 ? `${oldTrials.length} منهم +7 أيام ⚠️` : "تابع رضا العميل",
+            count: trialDeals.length,
+            value: trialValue,
+            badge: oldTrials.length > 0 ? oldTrials.length : null,
+            color: { card: "hover:border-cc-blue/30 hover:bg-cc-blue/[0.06]", active: "bg-cc-blue/15 border-cc-blue/40 ring-1 ring-cc-blue/30", num: "text-cc-blue", dot: "🔵" },
+          },
+        ];
+
+        return (
+          <div className="grid grid-cols-3 gap-3">
+            {boxes.map(b => (
+              <button
+                key={b.key}
+                onClick={() => {
+                  setStageFilter(stageFilter === b.key ? null : b.key);
+                  setTimeout(() => document.getElementById("sales-table")?.scrollIntoView({ behavior: "smooth" }), 50);
+                }}
+                className={`rounded-2xl p-4 text-right transition-all border ${
+                  stageFilter === b.key ? b.color.active : `cc-card border-transparent ${b.color.card}`
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className={`text-2xl font-extrabold ${b.color.num}`}>{b.count}</span>
+                  <div className="flex items-center gap-1">
+                    {b.badge !== null && (
+                      <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-cc-red/15 text-cc-red border border-cc-red/20">
+                        {b.badge}
+                      </span>
+                    )}
+                    <span className="text-xl">{b.icon}</span>
+                  </div>
+                </div>
+                <p className="text-sm font-bold text-foreground">{b.label}</p>
+                <p className="text-[12px] text-muted-foreground mt-0.5">{b.sublabel}</p>
+                {b.value > 0 && (
+                  <p className={`text-[12px] font-bold mt-1.5 ${b.color.num}`}>{formatMoney(b.value)}</p>
+                )}
+              </button>
+            ))}
+          </div>
+        );
+      })()}
+
+      {/* ─── Deals Table ─── */}
+      <div id="sales-table" className="cc-card rounded-2xl overflow-hidden">
+        <button
+          type="button"
+          onClick={toggleDealsTable}
+          aria-expanded={dealsTableOpen}
+          aria-controls="sales-table-body"
+          className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-white/[0.03] transition-colors text-right"
+        >
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-bold text-foreground">قائمة الصفقات</h3>
+            <span className="text-[12px] text-muted-foreground">({filteredDeals.length})</span>
+          </div>
+          <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${dealsTableOpen ? "" : "-rotate-90"}`} />
+        </button>
+        {dealsTableOpen && (
+        <div id="sales-table-body" className="overflow-x-auto border-t border-border">
+        {/* Date filter */}
+        <div className="px-4 pt-3 pb-0 flex items-center gap-1.5 flex-wrap">
+          <span className="text-xs text-muted-foreground shrink-0">الفترة:</span>
+          {(["اليوم", "أمس", "الأسبوع", "الشهر", "الشهر الماضي", "مخصص"] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setTableDateFilter(tableDateFilter === f ? null : f)}
+              className={`px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-colors border ${
+                tableDateFilter === f
+                  ? "bg-cyan/15 text-cyan border-cyan/30"
+                  : "text-muted-foreground border-transparent hover:text-foreground hover:bg-white/[0.06]"
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+          {tableDateFilter === "مخصص" && (
+            <div className="flex items-center gap-1.5">
+              <input type="date" value={tableCustomFrom} onChange={e => setTableCustomFrom(e.target.value)}
+                className="text-[12px] bg-card border border-border rounded-lg px-2 py-1 text-foreground" />
+              <span className="text-xs text-muted-foreground">—</span>
+              <input type="date" value={tableCustomTo} onChange={e => setTableCustomTo(e.target.value)}
+                className="text-[12px] bg-card border border-border rounded-lg px-2 py-1 text-foreground" />
+            </div>
+          )}
+        </div>
+        <div className="p-4 pb-0 flex items-center gap-3 flex-wrap">
+          <Input
+            value={clientSearch}
+            onChange={(e) => setClientSearch(e.target.value)}
+            placeholder="ابحث باسم العميل أو رقم الجوال..."
+            className="max-w-xs"
+          />
+          <button
+            onClick={() => setSearchAllTime((v) => !v)}
+            title={searchAllTime ? "البحث في كل الفترات — انقر لتقييده بالفترة المحددة" : "انقر للبحث في كل الفترات"}
+            className={`flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded-lg border font-semibold transition-all whitespace-nowrap ${
+              searchAllTime
+                ? "bg-amber-500/20 border-amber-400/50 text-amber-400 ring-1 ring-amber-400/30"
+                : "border-border text-muted-foreground hover:text-foreground hover:bg-white/[0.06]"
+            }`}
+          >
+            🔍 كل الفترات
+          </button>
+          {/* Trial age quick-filters */}
+          <button
+            onClick={() => setTrialDaysFilter(trialDaysFilter === 7 ? null : 7)}
+            className={`flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded-lg border font-semibold transition-all whitespace-nowrap ${
+              trialDaysFilter === 7
+                ? "bg-cc-blue/20 border-cc-blue/50 text-cc-blue ring-1 ring-cc-blue/30"
+                : "bg-cc-blue/[0.06] border-cc-blue/20 text-cc-blue/70 hover:border-cc-blue/40 hover:text-cc-blue"
+            }`}
+            title="عرض التجريبي الذي مضى عليه أكثر من 7 أيام"
+          >
+            <FlaskConical className="w-3 h-3" />
+            تجريبي +7ي
+          </button>
+          <button
+            onClick={() => setTrialDaysFilter(trialDaysFilter === 14 ? null : 14)}
+            className={`flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded-lg border font-semibold transition-all whitespace-nowrap ${
+              trialDaysFilter === 14
+                ? "bg-amber/20 border-amber/50 text-amber ring-1 ring-amber/30"
+                : "bg-amber/[0.06] border-amber/25 text-amber/70 hover:border-amber/45 hover:text-amber"
+            }`}
+            title="عرض التجريبي الذي مضى عليه أكثر من 14 يوم"
+          >
+            <FlaskConical className="w-3 h-3" />
+            تجريبي +14ي
+          </button>
+          <button
+            onClick={() => setTrialDaysFilter(trialDaysFilter === 30 ? null : 30)}
+            className={`flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded-lg border font-semibold transition-all whitespace-nowrap ${
+              trialDaysFilter === 30
+                ? "bg-cc-red/20 border-cc-red/60 text-cc-red ring-1 ring-cc-red/30"
+                : "bg-cc-red/[0.08] border-cc-red/35 text-cc-red/80 hover:border-cc-red/55 hover:text-cc-red"
+            }`}
+            title="عرض التجريبي الذي مضى عليه أكثر من 30 يوم"
+          >
+            <FlaskConical className="w-3 h-3" />
+            تجريبي +30ي
+          </button>
+          {filteredDeals.length > 0 && filteredDeals.every((d) => dailyTargetIds.has(d.id)) ? (
+            <button onClick={deselectAll} className="text-[12px] px-2.5 py-1.5 rounded-lg border border-cc-red/30 text-cc-red hover:bg-cc-red/10 transition-colors whitespace-nowrap">
+              <SquareCheck className="w-3 h-3 inline-block ml-1" />إلغاء تحديد الكل
+            </button>
+          ) : (
+            <button onClick={selectAllVisible} className="text-[12px] px-2.5 py-1.5 rounded-lg border border-cyan/30 text-cyan hover:bg-cyan/10 transition-colors whitespace-nowrap">
+              <SquareCheck className="w-3 h-3 inline-block ml-1" />تحديد الكل
+            </button>
+          )}
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-10 text-center">هدف</TableHead>
+              <TableHead className="w-20">الكود</TableHead>
+              <TableHead>العميل</TableHead>
+              <TableHead>رقم الجوال</TableHead>
+              <TableHead>المصدر</TableHead>
+              <TableHead>الباقة</TableHead>
+              <TableHead>المرحلة</TableHead>
+              <TableHead>النبضة</TableHead>
+              <TableHead>القيمة</TableHead>
+              <TableHead>المسؤول</TableHead>
+              <TableHead>التاريخ</TableHead>
+              <TableHead>تاريخ الدفع</TableHead>
+              <TableHead>آخر تواصل</TableHead>
+              <TableHead>أيام بدون تواصل</TableHead>
+              <TableHead>ملاحظات</TableHead>
+              <TableHead className="text-center">إجراءات</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              Array.from({ length: 6 }).map((_, index) => (
+                <TableRow key={index}>
+                  <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                  <TableCell><Skeleton className="h-6 w-16 rounded-full" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                  <TableCell>
+                    <div className="flex items-center justify-center gap-1">
+                      <Skeleton className="h-7 w-7 rounded-md" />
+                      <Skeleton className="h-7 w-7 rounded-md" />
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : filteredDeals.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={16} className="text-center text-muted-foreground py-8">
+                  {stageFilter ? `لا توجد مبيعات في مرحلة "${stageFilter}"` : trialDaysFilter ? `لا يوجد تجريبي مضى عليه أكثر من ${trialDaysFilter} يوم` : "لا توجد مبيعات"}
+                </TableCell>
+              </TableRow>
+            ) : (
+              paginatedDeals.map((deal) => {
+                const isTarget = dailyTargetIds.has(deal.id);
+                const isTargetDone = isTarget && deal.stage === "مكتملة";
+                return (
+                <TableRow key={deal.id} className={isTarget ? (isTargetDone ? "bg-cc-green/[0.04]" : "bg-cyan/[0.04]") : ""}>
+                  <TableCell className="text-center">
+                    <button
+                      onClick={() => toggleDailyTarget(deal.id)}
+                      className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                        isTargetDone ? "border-cc-green bg-cc-green text-white"
+                        : isTarget ? "border-cyan bg-cyan/20 text-cyan"
+                        : "border-muted-foreground/30 hover:border-cyan/50"
+                      }`}
+                    >
+                      {isTarget && (
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </button>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-xs font-mono">
+                    {deal.client_code || "—"}
+                  </TableCell>
+                  <TableCell className="font-medium text-foreground">
+                    <button
+                      onClick={() => { setProfileQuery(deal.client_phone || deal.client_name); setProfileOpen(true); }}
+                      className="hover:text-primary hover:underline transition-colors text-right"
+                    >
+                      {deal.client_name}
+                    </button>
+                    {isTarget && !isTargetDone && (
+                      <span className="mr-1.5 inline-block text-[11px] px-1.5 py-0.5 rounded bg-cyan/10 text-cyan font-medium">هدف اليوم</span>
+                    )}
+                    {isTargetDone && (
+                      <span className="mr-1.5 inline-block text-[11px] px-1.5 py-0.5 rounded bg-cc-green/15 text-cc-green font-medium">تم الإنجاز</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-xs" dir="ltr">
+                    <button
+                      onClick={() => { if (deal.client_phone) { setProfileQuery(deal.client_phone); setProfileOpen(true); } }}
+                      className={deal.client_phone ? "hover:text-primary hover:underline transition-colors" : ""}
+                    >
+                      {deal.client_phone ? formatPhone(deal.client_phone) : "—"}
+                    </button>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-xs">
+                    {deal.source || "—"}
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-xs text-muted-foreground">{deal.plan || "—"}</span>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col gap-1">
+                      <ColorBadge
+                        text={deal.stage}
+                        color={STAGE_BADGE_COLOR[deal.stage] || "blue"}
+                      />
+                      {deal.stage === "اعادة الاتصال في وقت اخر" && deal.callback_date && (
+                        <span className={`text-[12px] px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 w-fit ${
+                          new Date(deal.callback_date).getTime() < Date.now()
+                            ? "bg-red-500/15 text-red-400"
+                            : new Date(deal.callback_date).getTime() - Date.now() < 3600000
+                            ? "bg-amber-500/15 text-amber-400"
+                            : "bg-sky-500/15 text-sky-400"
+                        }`}>
+                          📅 {new Date(deal.callback_date).toLocaleDateString("ar-SA")} — {new Date(deal.callback_date).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {(() => {
+                      const h = getDealHealthScore(deal);
+                      return (
+                        <span className={`flex items-center gap-1 text-xs font-medium ${h.color}`} title={h.label}>
+                          <span className="text-base leading-none">{h.icon}</span>
+                          <span className="hidden sm:inline">{h.label}</span>
+                        </span>
+                      );
+                    })()}
+                  </TableCell>
+                  <TableCell className="font-bold text-cyan text-xs">
+                    {formatMoneyFull(deal.deal_value)}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-xs">
+                    {deal.assigned_rep_name || "—"}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-xs">
+                    {deal.deal_date ? formatDate(deal.deal_date) : "—"}
+                  </TableCell>
+                  <TableCell className="text-xs">
+                    {deal.close_date ? (
+                      <span className="text-cc-green">{formatDate(deal.close_date)}</span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-xs">
+                    {deal.last_contact ? formatDate(deal.last_contact) : "—"}
+                  </TableCell>
+                  <TableCell className="text-xs">
+                    {(() => {
+                      const ref = deal.last_contact || deal.deal_date;
+                      if (!ref) return "—";
+                      const days = Math.floor((Date.now() - new Date(ref).getTime()) / 86400000);
+                      return (
+                        <span className={days > 7 ? "text-cc-red font-medium" : days > 3 ? "text-amber" : "text-cc-green"}>
+                          {days} يوم
+                        </span>
+                      );
+                    })()}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-xs max-w-[120px] truncate" title={deal.notes || ""}>
+                    {deal.notes || "—"}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center justify-center gap-1">
+                      <div className="relative">
+                        <FollowUpLogButton entityType="deal" entityId={deal.id} entityName={deal.client_name} />
+                        <WatchlistPinButton entityType="deal" entityId={deal.id} entityName={deal.client_name} section="/sales" />
+                        {deal.stage !== "مكتملة" && deal.stage !== "مرفوض مع سبب" && (() => {
+                          const daysSince = Math.floor((Date.now() - new Date(deal.updated_at).getTime()) / 86400000);
+                          if (daysSince < 3) return null;
+                          return (
+                            <span className={`absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[11px] font-bold px-1 ${
+                              daysSince >= 7 ? "bg-red-500 text-white" : "bg-amber-500 text-white"
+                            }`} title={`${daysSince} يوم بدون تحديث`}>
+                              {daysSince}
+                            </span>
+                          );
+                        })()}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        onClick={() => setAssignDeal(deal)}
+                        title="تعيين لموظف"
+                        className="text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10"
+                      >
+                        <UserPlus className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        onClick={() => openEditModal(deal)}
+                        title="تعديل"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="icon-xs"
+                        onClick={() => confirmDelete(deal.id)}
+                        title="حذف"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ); })
+            )}
+          </TableBody>
+        </Table>
+        {/* Pagination */}
+        {filteredDeals.length > DEALS_PER_PAGE && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+            <span className="text-xs text-muted-foreground">
+              عرض {((currentPage - 1) * DEALS_PER_PAGE) + 1}–{Math.min(currentPage * DEALS_PER_PAGE, filteredDeals.length)} من {filteredDeals.length}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium border border-border hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                السابق
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                .reduce<(number | string)[]>((acc, p, i, arr) => {
+                  if (i > 0 && (arr[i - 1] as number) < p - 1) acc.push("...");
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, i) =>
+                  typeof p === "string" ? (
+                    <span key={`dot-${i}`} className="px-1.5 text-xs text-muted-foreground">…</span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => setCurrentPage(p)}
+                      className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${
+                        currentPage === p
+                          ? "bg-cyan/15 text-cyan border border-cyan/30"
+                          : "border border-border hover:bg-white/[0.06] text-muted-foreground"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  )
+                )}
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium border border-border hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                التالي
+              </button>
+            </div>
+          </div>
+        )}
+        </div>
+        )}
+      </div>
+        </div>
+      )}
+
+      {activeTab === "تحليلات" && (
+        <div className="space-y-6">
+
+      {/* ─── Manager: Rep KPI Overview ─── */}
+      {isAdmin && !loading && (() => {
+        /* build rep list from deals + goals + presence */
+        const repNames = [...new Set([
+          ...deals.map(d => d.assigned_rep_name).filter(Boolean) as string[],
+          ...repGoals.map(g => g.rep_name),
+          ...repPresence.map(p => p.user_name),
+        ])];
+        if (repNames.length === 0) return null;
+
+        const goalMap = Object.fromEntries(repGoals.map(g => [g.rep_name, g.goal_count]));
+        const presenceMap = Object.fromEntries(repPresence.map(p => [p.user_name, p]));
+
+        return (
+          <div className="cc-card rounded-2xl overflow-hidden">
+            <div className="px-5 py-3 border-b border-border flex items-center gap-2">
+              <Target className="w-4 h-4 text-cc-purple" />
+              <h3 className="text-sm font-bold text-foreground">نظرة المدير — أداء الفريق اليوم</h3>
+              <span className="text-[12px] text-muted-foreground mr-auto">يتحدث كل 30 ثانية</span>
+            </div>
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {repNames.map(rep => {
+                const presence = presenceMap[rep];
+                const goal = goalMap[rep] ?? null;
+
+                /* online status */
+                const lastSeen = presence ? new Date(presence.last_seen_at) : null;
+                const minsAgo = lastSeen ? Math.floor((Date.now() - lastSeen.getTime()) / 60000) : null;
+                const online = minsAgo !== null && minsAgo < 5;
+                const away   = minsAgo !== null && minsAgo < 30 && !online;
+                const statusDot = online ? "bg-cc-green" : away ? "bg-amber" : "bg-muted-foreground/40";
+                const statusLabel = online ? "متواجد" : away ? "غائب قليلاً" : "غير متاح";
+                const statusColor = online ? "text-cc-green" : away ? "text-amber" : "text-muted-foreground";
+
+                /* day start */
+                const firstSeen = presence?.first_seen_at
+                  ? new Date(presence.first_seen_at).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit", hour12: true })
+                  : null;
+
+                /* today's completed deals */
+                const todayClosed = deals.filter(d =>
+                  d.assigned_rep_name === rep &&
+                  d.stage === "مكتملة" &&
+                  (() => { const ts = d.close_date || d.updated_at; if (!ts) return false; try { return dateToLocal(new Date(ts)) === todayStr; } catch { return false; } })()
+                );
+                const closedCount = todayClosed.length;
+                const revenue = todayClosed.reduce((s, d) => s + d.deal_value, 0);
+                const pct = goal ? Math.min(100, Math.round((closedCount / goal) * 100)) : 0;
+                const goalReached = goal !== null && closedCount >= goal;
+
+                /* active stage buckets */
+                const repActive = deals.filter(d => d.assigned_rep_name === rep && !["مكتملة","مرفوض مع سبب","كنسل التجربة"].includes(d.stage));
+                const buckets: Record<string,number> = {};
+                repActive.forEach(d => { buckets[d.stage] = (buckets[d.stage] || 0) + 1; });
+
+                const avatarColors = ["bg-cyan/20 text-cyan","bg-cc-green/20 text-cc-green","bg-amber/20 text-amber","bg-cc-purple/20 text-cc-purple","bg-cc-blue/20 text-cc-blue","bg-pink-500/20 text-pink-400"];
+                const avatarColor = avatarColors[repNames.indexOf(rep) % avatarColors.length];
+
+                return (
+                  <div key={rep} className={`rounded-xl border p-4 transition-all ${goalReached ? "border-cc-green/30 bg-cc-green/[0.04]" : "border-border bg-card/50"}`}>
+                    {/* Header row */}
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="relative shrink-0">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${avatarColor}`}>
+                          {rep.charAt(0)}
+                        </div>
+                        <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-card ${statusDot}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-foreground truncate">{rep}</p>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[11px] font-medium ${statusColor}`}>{statusLabel}</span>
+                          {firstSeen && (
+                            <span className="text-[11px] text-muted-foreground">· بدأ {firstSeen}</span>
+                          )}
+                        </div>
+                      </div>
+                      {goalReached && <span className="text-lg">🏆</span>}
+                    </div>
+
+                    {/* Goal progress */}
+                    <div className="mb-3">
+                      <div className="flex items-center justify-between text-[12px] mb-1">
+                        <span className="text-muted-foreground">
+                          الهدف: <span className="font-bold text-amber">{goal ?? "—"}</span>
+                          {goal && <span className="text-muted-foreground"> صفقة</span>}
+                        </span>
+                        <span className={`font-bold ${goalReached ? "text-cc-green" : pct >= 50 ? "text-amber" : "text-muted-foreground"}`}>
+                          {closedCount}/{goal ?? "?"} {goal ? `(${pct}%)` : ""}
+                        </span>
+                      </div>
+                      {goal ? (
+                        <div className="h-2 rounded-full bg-white/[0.06] overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${goalReached ? "bg-cc-green" : pct >= 50 ? "bg-amber" : "bg-cyan"}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-muted-foreground italic">لم يحدد هدفاً بعد</p>
+                      )}
+                    </div>
+
+                    {/* Stats row */}
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      <div className="rounded-lg bg-card border border-border px-3 py-2 text-center">
+                        <p className={`text-lg font-extrabold ${goalReached ? "text-cc-green" : "text-foreground"}`}>{closedCount}</p>
+                        <p className="text-[11px] text-muted-foreground">مكتمل اليوم</p>
+                      </div>
+                      <div className="rounded-lg bg-card border border-border px-3 py-2 text-center">
+                        <p className="text-lg font-extrabold text-cc-green">{formatMoney(revenue)}</p>
+                        <p className="text-[11px] text-muted-foreground">إيراد اليوم</p>
+                      </div>
+                    </div>
+
+                    {/* Active stage buckets */}
+                    {Object.keys(buckets).length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {Object.entries(buckets).map(([stage, count]) => (
+                          <span key={stage} className="text-[11px] px-1.5 py-0.5 rounded-full bg-white/[0.05] border border-border text-muted-foreground">
+                            {stage} <span className="font-bold text-foreground">{count}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ─── Financial Summary Row ─── */}
       {!loading && (
@@ -1580,292 +2436,6 @@ export function SalesSection({ salesType }: SalesPageProps) {
           </div>
         );
       })()}
-
-      {/* ─── Deals Table ─── */}
-      <div id="sales-table" className="cc-card rounded-2xl overflow-hidden">
-        <button
-          type="button"
-          onClick={toggleDealsTable}
-          aria-expanded={dealsTableOpen}
-          aria-controls="sales-table-body"
-          className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-white/[0.03] transition-colors text-right"
-        >
-          <div className="flex items-center gap-2">
-            <h3 className="text-sm font-bold text-foreground">قائمة الصفقات</h3>
-            <span className="text-[12px] text-muted-foreground">({filteredDeals.length})</span>
-          </div>
-          <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${dealsTableOpen ? "" : "-rotate-90"}`} />
-        </button>
-        {dealsTableOpen && (
-        <div id="sales-table-body" className="overflow-x-auto border-t border-border">
-        <div className="p-4 pb-0 flex items-center gap-3">
-          <Input
-            value={clientSearch}
-            onChange={(e) => setClientSearch(e.target.value)}
-            placeholder="ابحث باسم العميل أو رقم الجوال..."
-            className="max-w-xs"
-          />
-          {filteredDeals.length > 0 && filteredDeals.every((d) => dailyTargetIds.has(d.id)) ? (
-            <button onClick={deselectAll} className="text-[12px] px-2.5 py-1.5 rounded-lg border border-cc-red/30 text-cc-red hover:bg-cc-red/10 transition-colors whitespace-nowrap">
-              <SquareCheck className="w-3 h-3 inline-block ml-1" />إلغاء تحديد الكل
-            </button>
-          ) : (
-            <button onClick={selectAllVisible} className="text-[12px] px-2.5 py-1.5 rounded-lg border border-cyan/30 text-cyan hover:bg-cyan/10 transition-colors whitespace-nowrap">
-              <SquareCheck className="w-3 h-3 inline-block ml-1" />تحديد الكل
-            </button>
-          )}
-        </div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-10 text-center">هدف</TableHead>
-              <TableHead className="w-20">الكود</TableHead>
-              <TableHead>العميل</TableHead>
-              <TableHead>رقم الجوال</TableHead>
-              <TableHead>المصدر</TableHead>
-              <TableHead>الباقة</TableHead>
-              <TableHead>المرحلة</TableHead>
-              <TableHead>القيمة</TableHead>
-              <TableHead>المسؤول</TableHead>
-              <TableHead>التاريخ</TableHead>
-              <TableHead>تاريخ الدفع</TableHead>
-              <TableHead>آخر تواصل</TableHead>
-              <TableHead>أيام بدون تواصل</TableHead>
-              <TableHead>ملاحظات</TableHead>
-              <TableHead className="text-center">إجراءات</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              Array.from({ length: 6 }).map((_, index) => (
-                <TableRow key={index}>
-                  <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                  <TableCell><Skeleton className="h-6 w-16 rounded-full" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-center gap-1">
-                      <Skeleton className="h-7 w-7 rounded-md" />
-                      <Skeleton className="h-7 w-7 rounded-md" />
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : filteredDeals.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={15} className="text-center text-muted-foreground py-8">
-                  {stageFilter ? `لا توجد مبيعات في مرحلة "${stageFilter}"` : "لا توجد مبيعات"}
-                </TableCell>
-              </TableRow>
-            ) : (
-              paginatedDeals.map((deal) => {
-                const isTarget = dailyTargetIds.has(deal.id);
-                const isTargetDone = isTarget && deal.stage === "مكتملة";
-                return (
-                <TableRow key={deal.id} className={isTarget ? (isTargetDone ? "bg-cc-green/[0.04]" : "bg-cyan/[0.04]") : ""}>
-                  <TableCell className="text-center">
-                    <button
-                      onClick={() => toggleDailyTarget(deal.id)}
-                      className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                        isTargetDone ? "border-cc-green bg-cc-green text-white"
-                        : isTarget ? "border-cyan bg-cyan/20 text-cyan"
-                        : "border-muted-foreground/30 hover:border-cyan/50"
-                      }`}
-                    >
-                      {isTarget && (
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </button>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs font-mono">
-                    {deal.client_code || "—"}
-                  </TableCell>
-                  <TableCell className="font-medium text-foreground">
-                    <button
-                      onClick={() => { setProfileQuery(deal.client_phone || deal.client_name); setProfileOpen(true); }}
-                      className="hover:text-primary hover:underline transition-colors text-right"
-                    >
-                      {deal.client_name}
-                    </button>
-                    {isTarget && !isTargetDone && (
-                      <span className="mr-1.5 inline-block text-[11px] px-1.5 py-0.5 rounded bg-cyan/10 text-cyan font-medium">هدف اليوم</span>
-                    )}
-                    {isTargetDone && (
-                      <span className="mr-1.5 inline-block text-[11px] px-1.5 py-0.5 rounded bg-cc-green/15 text-cc-green font-medium">تم الإنجاز</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs" dir="ltr">
-                    <button
-                      onClick={() => { if (deal.client_phone) { setProfileQuery(deal.client_phone); setProfileOpen(true); } }}
-                      className={deal.client_phone ? "hover:text-primary hover:underline transition-colors" : ""}
-                    >
-                      {deal.client_phone ? formatPhone(deal.client_phone) : "—"}
-                    </button>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">
-                    {deal.source || "—"}
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-xs text-muted-foreground">{deal.plan || "—"}</span>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col gap-1">
-                      <ColorBadge
-                        text={deal.stage}
-                        color={STAGE_BADGE_COLOR[deal.stage] || "blue"}
-                      />
-                      {deal.stage === "اعادة الاتصال في وقت اخر" && deal.callback_date && (
-                        <span className={`text-[12px] px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 w-fit ${
-                          new Date(deal.callback_date).getTime() < Date.now()
-                            ? "bg-red-500/15 text-red-400"
-                            : new Date(deal.callback_date).getTime() - Date.now() < 3600000
-                            ? "bg-amber-500/15 text-amber-400"
-                            : "bg-sky-500/15 text-sky-400"
-                        }`}>
-                          📅 {new Date(deal.callback_date).toLocaleDateString("ar-SA")} — {new Date(deal.callback_date).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}
-                        </span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-bold text-cyan text-xs">
-                    {formatMoneyFull(deal.deal_value)}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">
-                    {deal.assigned_rep_name || "—"}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">
-                    {deal.deal_date ? formatDate(deal.deal_date) : "—"}
-                  </TableCell>
-                  <TableCell className="text-xs">
-                    {deal.close_date ? (
-                      <span className="text-cc-green">{formatDate(deal.close_date)}</span>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">
-                    {deal.last_contact ? formatDate(deal.last_contact) : "—"}
-                  </TableCell>
-                  <TableCell className="text-xs">
-                    {(() => {
-                      const ref = deal.last_contact || deal.deal_date;
-                      if (!ref) return "—";
-                      const days = Math.floor((Date.now() - new Date(ref).getTime()) / 86400000);
-                      return (
-                        <span className={days > 7 ? "text-cc-red font-medium" : days > 3 ? "text-amber" : "text-cc-green"}>
-                          {days} يوم
-                        </span>
-                      );
-                    })()}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs max-w-[120px] truncate" title={deal.notes || ""}>
-                    {deal.notes || "—"}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-center gap-1">
-                      <div className="relative">
-                        <FollowUpLogButton entityType="deal" entityId={deal.id} entityName={deal.client_name} />
-                        {deal.stage !== "مكتملة" && deal.stage !== "مرفوض مع سبب" && (() => {
-                          const daysSince = Math.floor((Date.now() - new Date(deal.updated_at).getTime()) / 86400000);
-                          if (daysSince < 3) return null;
-                          return (
-                            <span className={`absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[11px] font-bold px-1 ${
-                              daysSince >= 7 ? "bg-red-500 text-white" : "bg-amber-500 text-white"
-                            }`} title={`${daysSince} يوم بدون تحديث`}>
-                              {daysSince}
-                            </span>
-                          );
-                        })()}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        onClick={() => setAssignDeal(deal)}
-                        title="تعيين لموظف"
-                        className="text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10"
-                      >
-                        <UserPlus className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        onClick={() => openEditModal(deal)}
-                        title="تعديل"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="icon-xs"
-                        onClick={() => confirmDelete(deal.id)}
-                        title="حذف"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ); })
-            )}
-          </TableBody>
-        </Table>
-        {/* Pagination */}
-        {filteredDeals.length > DEALS_PER_PAGE && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-border">
-            <span className="text-xs text-muted-foreground">
-              عرض {((currentPage - 1) * DEALS_PER_PAGE) + 1}–{Math.min(currentPage * DEALS_PER_PAGE, filteredDeals.length)} من {filteredDeals.length}
-            </span>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium border border-border hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-              >
-                السابق
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
-                .reduce<(number | string)[]>((acc, p, i, arr) => {
-                  if (i > 0 && (arr[i - 1] as number) < p - 1) acc.push("...");
-                  acc.push(p);
-                  return acc;
-                }, [])
-                .map((p, i) =>
-                  typeof p === "string" ? (
-                    <span key={`dot-${i}`} className="px-1.5 text-xs text-muted-foreground">…</span>
-                  ) : (
-                    <button
-                      key={p}
-                      onClick={() => setCurrentPage(p)}
-                      className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${
-                        currentPage === p
-                          ? "bg-cyan/15 text-cyan border border-cyan/30"
-                          : "border border-border hover:bg-white/[0.06] text-muted-foreground"
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  )
-                )}
-              <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium border border-border hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-              >
-                التالي
-              </button>
-            </div>
-          </div>
-        )}
-        </div>
-        )}
-      </div>
 
       {/* ─── Sales Team Performance ─── */}
       {!loading && (
@@ -2254,6 +2824,8 @@ export function SalesSection({ salesType }: SalesPageProps) {
           </TabsContent>
         )}
       </Tabs>
+        </div>
+      )}
 
       {/* ─── Add / Edit Deal Modal ─── */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
@@ -2540,7 +3112,89 @@ export function SalesSection({ salesType }: SalesPageProps) {
         open={profileOpen}
         onClose={() => setProfileOpen(false)}
         initialQuery={profileQuery}
+        highlightNoteId={profileNoteId}
       />
+
+      {/* ─── Auto Follow-up Reminders (bottom) ─── */}
+      {!loading && visibleFollowUps.length > 0 && (
+        <div className="cc-card rounded-[14px] border border-cc-red/20 bg-gradient-to-l from-cc-red/[0.04] via-amber/[0.03] to-transparent overflow-hidden">
+          <div className="p-4 flex items-center justify-between border-b border-border/30">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-cc-red/10 flex items-center justify-center relative">
+                <Bell className="w-4 h-4 text-cc-red" />
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-cc-red text-white text-[11px] font-bold flex items-center justify-center">
+                  {visibleFollowUps.length}
+                </span>
+              </div>
+              <div className="text-right">
+                <h3 className="text-sm font-bold text-foreground">تنبيهات المتابعة التلقائية</h3>
+                <p className="text-[12px] text-muted-foreground">
+                  {visibleFollowUps.filter((a) => a.rule.priority === "urgent").length > 0
+                    ? `${visibleFollowUps.filter((a) => a.rule.priority === "urgent").length} تصعيد عاجل — `
+                    : ""}
+                  {visibleFollowUps.length} عميل يحتاج متابعة
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="divide-y divide-border/20 max-h-[320px] overflow-y-auto">
+            {visibleFollowUps.slice(0, 10).map((action) => {
+              const priorityStyles: Record<string, { bg: string; text: string; label: string }> = {
+                urgent: { bg: "bg-cc-red/10 border-cc-red/30", text: "text-cc-red", label: "عاجل" },
+                high: { bg: "bg-amber/10 border-amber/30", text: "text-amber", label: "مرتفع" },
+                medium: { bg: "bg-cc-blue/10 border-cc-blue/30", text: "text-cc-blue", label: "متوسط" },
+                low: { bg: "bg-muted/50 border-border", text: "text-muted-foreground", label: "منخفض" },
+              };
+              const ps = priorityStyles[action.rule.priority] || priorityStyles.medium;
+              return (
+                <div key={action.deal.id} className="px-4 py-3 flex items-center gap-3 hover:bg-muted/30 transition-colors">
+                  <div className={`shrink-0 w-7 h-7 rounded-full ${ps.bg} border flex items-center justify-center`}>
+                    {action.rule.priority === "urgent" ? (
+                      <AlertTriangle className={`w-3.5 h-3.5 ${ps.text}`} />
+                    ) : action.rule.taskType === "call" ? (
+                      <PhoneCall className={`w-3.5 h-3.5 ${ps.text}`} />
+                    ) : (
+                      <Bell className={`w-3.5 h-3.5 ${ps.text}`} />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-foreground truncate">{action.taskTitle}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className={`text-[12px] px-1.5 py-0.5 rounded-full border ${ps.bg} ${ps.text} font-semibold`}>
+                        {ps.label}
+                      </span>
+                      <span className="text-[12px] text-muted-foreground">{action.rule.label}</span>
+                      {action.deal.assigned_rep_name && (
+                        <span className="text-[12px] text-muted-foreground">• {action.deal.assigned_rep_name}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={() => handleCreateFollowUpTask(action)}
+                      disabled={creatingFollowUpTask === action.deal.id}
+                      className="text-[12px] px-2.5 py-1.5 rounded-lg bg-cc-green/10 text-cc-green border border-cc-green/30 hover:bg-cc-green/20 transition-colors disabled:opacity-50 font-medium"
+                    >
+                      {creatingFollowUpTask === action.deal.id ? "جاري..." : "إنشاء مهمة"}
+                    </button>
+                    <button
+                      onClick={() => dismissFollowUp(action.deal.id)}
+                      className="text-[12px] px-2 py-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                    >
+                      تخطي
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {visibleFollowUps.length > 10 && (
+            <div className="px-4 py-2 text-center border-t border-border/30">
+              <span className="text-[12px] text-muted-foreground">و {visibleFollowUps.length - 10} تنبيه آخر...</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Rep drill-down modal */}
       <Dialog open={!!repDrillDown} onOpenChange={(o) => { if (!o) setRepDrillDown(null); }}>
@@ -2569,6 +3223,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
                   <div className="flex items-center gap-3 shrink-0 text-right">
                     <span className="text-sm font-bold text-amber">{formatMoney(d.deal_value)}</span>
                     <span className="text-[11px] text-muted-foreground">{formatDate(d.deal_date || d.created_at)}</span>
+                    <FollowUpLogButton entityType="deal" entityId={d.id} entityName={d.client_name} />
                   </div>
                 </div>
               ))

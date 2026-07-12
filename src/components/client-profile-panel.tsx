@@ -1,16 +1,17 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { fetchClientProfile, fetchClientBio, upsertClientBio, fetchDealKpiStages, upsertDealKpiStage, createDealKpiStages, fetchEmployees, KPI_STAGES, updateDeal, type ClientProfileData } from "@/lib/supabase/db";
+import { fetchClientProfile, fetchClientBio, upsertClientBio, upsertClientMenuUrl, fetchDealKpiStages, upsertDealKpiStage, createDealKpiStages, fetchEmployees, fetchUserProfiles, KPI_STAGES, updateDeal, createFollowUpNote, createMentionNotification, createReminder, type ClientProfileData } from "@/lib/supabase/db";
 import { getTopContributor } from "@/components/sales/SalesKPIDashboard";
+import { FollowUpLogButton } from "@/components/follow-up-log";
 import { useAuth } from "@/lib/auth-context";
-import { Search, Phone, User, ShoppingBag, RefreshCw, Headphones, FileText, ChevronDown, ChevronUp, Clock, X, Pencil, Check, StickyNote, BarChart2, Trophy } from "lucide-react";
+import { Search, Phone, User, ShoppingBag, RefreshCw, Headphones, FileText, ChevronDown, ChevronUp, Clock, X, Pencil, Check, StickyNote, BarChart2, Trophy, MessageSquarePlus, Send, AtSign, Bell, BellOff, CalendarClock } from "lucide-react";
 import type { Deal, Renewal, Ticket, FollowUpNote, DealKpiStage, Employee } from "@/types";
 
 const STAGE_COLORS: Record<string, string> = {
@@ -178,7 +179,10 @@ function DealCard({ deal, notes, employees }: { deal: Deal; notes: FollowUpNote[
     <div className="rounded-lg border border-border/40 bg-card/50 p-2.5 space-y-1.5">
       <div className="flex items-center justify-between gap-2">
         <StatusBadge label={deal.stage} colorMap={STAGE_COLORS} />
-        <span className="text-[12px] text-muted-foreground">{formatDate(deal.created_at)}</span>
+        <div className="flex items-center gap-1.5">
+          <FollowUpLogButton entityType="deal" entityId={deal.id} entityName={deal.client_name} />
+          <span className="text-[12px] text-muted-foreground">{formatDate(deal.created_at)}</span>
+        </div>
       </div>
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-foreground">{isSupport ? "دعم" : "مكتب"} · {deal.plan || "—"}</span>
@@ -234,7 +238,10 @@ function RenewalCard({ renewal, notes }: { renewal: Renewal; notes: FollowUpNote
     <div className="rounded-lg border border-border/40 bg-card/50 p-2.5 space-y-1.5">
       <div className="flex items-center justify-between gap-2">
         <StatusBadge label={renewal.status} colorMap={RENEWAL_COLORS} />
-        <span className="text-[12px] text-muted-foreground">{formatDate(renewal.renewal_date)}</span>
+        <div className="flex items-center gap-1.5">
+          <FollowUpLogButton entityType="renewal" entityId={renewal.id} entityName={renewal.customer_name} />
+          <span className="text-[12px] text-muted-foreground">{formatDate(renewal.renewal_date)}</span>
+        </div>
       </div>
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-foreground">{renewal.plan_name}</span>
@@ -274,20 +281,61 @@ function RenewalCard({ renewal, notes }: { renewal: Renewal; notes: FollowUpNote
   );
 }
 
+const TICKET_TYPE_LABEL: Record<string, string> = {
+  problem: "مشكلة",
+  service: "خدمة",
+};
+
 function TicketCard({ ticket }: { ticket: Ticket }) {
   return (
     <div className="rounded-lg border border-border/40 bg-card/50 p-2.5 space-y-1.5">
       <div className="flex items-center justify-between gap-2">
-        <StatusBadge label={ticket.status} colorMap={TICKET_COLORS} />
-        <span className="text-[12px] text-muted-foreground">{formatDate(ticket.created_at)}</span>
+        <div className="flex items-center gap-1.5">
+          <StatusBadge label={ticket.status} colorMap={TICKET_COLORS} />
+          {ticket.request_type && (
+            <span className={`text-[11px] px-1.5 py-0.5 rounded-full border font-medium ${
+              ticket.request_type === "problem"
+                ? "bg-red-500/10 text-red-400 border-red-500/20"
+                : "bg-sky-500/10 text-sky-400 border-sky-500/20"
+            }`}>
+              {TICKET_TYPE_LABEL[ticket.request_type] || ticket.request_type}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <FollowUpLogButton entityType="ticket" entityId={ticket.id} entityName={ticket.client_name} />
+          <span className="text-[12px] text-muted-foreground">{formatDate(ticket.created_at)}</span>
+        </div>
       </div>
-      <p className="text-xs text-foreground">{ticket.issue}</p>
-      <div className="flex items-center gap-3 text-[12px] text-muted-foreground">
-        {ticket.priority && <span>الأولوية: {ticket.priority}</span>}
+
+      {ticket.ticket_number && (
+        <p className="text-[11px] text-muted-foreground/60">رقم التذكرة: #{ticket.ticket_number}</p>
+      )}
+
+      <p className="text-xs text-foreground leading-relaxed">{ticket.issue}</p>
+
+      {(ticket.issue_category || ticket.issue_subcategory) && (
+        <p className="text-[12px] text-muted-foreground">
+          {ticket.issue_category}{ticket.issue_subcategory ? ` ← ${ticket.issue_subcategory}` : ""}
+        </p>
+      )}
+
+      <div className="flex items-center gap-3 text-[12px] text-muted-foreground flex-wrap">
+        {ticket.priority && (
+          <span className={`font-medium ${
+            ticket.priority === "عاجل" ? "text-red-400" :
+            ticket.priority === "عالي" ? "text-orange-400" :
+            ticket.priority === "متوسط" ? "text-amber-400" : "text-muted-foreground"
+          }`}>
+            {ticket.priority}
+          </span>
+        )}
         {ticket.assigned_agent_name && <span>الفني: {ticket.assigned_agent_name}</span>}
+        {ticket.due_date && <span className="text-orange-400/80">الاستحقاق: {formatDate(ticket.due_date)}</span>}
       </div>
+
       {ticket.resolved_date && (
-        <p className="text-[12px] text-emerald-400/70">تم الحل: {formatDate(ticket.resolved_date)}</p>
+        <p className="text-[12px] text-emerald-400/70">✓ تم الحل: {formatDate(ticket.resolved_date)}</p>
       )}
     </div>
   );
@@ -297,9 +345,10 @@ interface ClientProfilePanelProps {
   open: boolean;
   onClose: () => void;
   initialQuery?: string;
+  highlightNoteId?: string; // scroll to & highlight a specific note
 }
 
-export function ClientProfilePanel({ open, onClose, initialQuery }: ClientProfilePanelProps) {
+export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteId }: ClientProfilePanelProps) {
   const { user } = useAuth();
   const [search, setSearch] = useState(initialQuery || "");
   const [loading, setLoading] = useState(false);
@@ -310,10 +359,34 @@ export function ClientProfilePanel({ open, onClose, initialQuery }: ClientProfil
   const [bioDraft, setBioDraft] = useState("");
   const [bioSaving, setBioSaving] = useState(false);
   const [bioKey, setBioKey] = useState("");
+  const [menuUrl, setMenuUrl] = useState("");
+  const [menuUrlDraft, setMenuUrlDraft] = useState("");
+  const [menuUrlEditing, setMenuUrlEditing] = useState(false);
+  const [menuUrlSaving, setMenuUrlSaving] = useState(false);
+  const [menuUrlCopied, setMenuUrlCopied] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [mentionNames, setMentionNames] = useState<string[]>([]);
+  const [quickNote, setQuickNote] = useState("");
+  const [quickNoteSaving, setQuickNoteSaving] = useState(false);
+  const quickNoteRef = useRef<HTMLTextAreaElement>(null);
+  /* @mention */
+  const [showMentions, setShowMentions] = useState(false);
+  const [mentionFilter, setMentionFilter] = useState("");
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const [mentionStart, setMentionStart] = useState(-1);
+  /* reminder */
+  const [showReminderPicker, setShowReminderPicker] = useState(false);
+  const [reminderDate, setReminderDate] = useState("");
+  const [reminderTime, setReminderTime] = useState("");
+  const [savingReminder, setSavingReminder] = useState(false);
 
   useEffect(() => {
-    fetchEmployees().then(setEmployees).catch(() => {});
+    Promise.all([fetchEmployees(), fetchUserProfiles()]).then(([emps, profiles]) => {
+      setEmployees(emps);
+      const empNames = emps.map((e) => e.name);
+      const profileNames = profiles.map((p) => p.name).filter(Boolean);
+      setMentionNames([...new Set([...profileNames, ...empNames])]);
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -327,12 +400,16 @@ export function ClientProfilePanel({ open, onClose, initialQuery }: ClientProfil
     if (!key) return;
     setBioKey(key);
     try {
-      const b = await fetchClientBio(key);
+      const { bio: b, menuUrl: m } = await fetchClientBio(key);
       setBio(b);
       setBioDraft(b);
+      setMenuUrl(m);
+      setMenuUrlDraft(m);
     } catch {
       setBio("");
       setBioDraft("");
+      setMenuUrl("");
+      setMenuUrlDraft("");
     }
   }, []);
 
@@ -349,6 +426,20 @@ export function ClientProfilePanel({ open, onClose, initialQuery }: ClientProfil
       setBioSaving(false);
     }
   }, [bioKey, bioDraft, user?.name]);
+
+  const saveMenuUrl = useCallback(async () => {
+    if (!bioKey) return;
+    setMenuUrlSaving(true);
+    try {
+      await upsertClientMenuUrl(bioKey, menuUrlDraft.trim(), user?.name);
+      setMenuUrl(menuUrlDraft.trim());
+      setMenuUrlEditing(false);
+    } catch {
+      // silent
+    } finally {
+      setMenuUrlSaving(false);
+    }
+  }, [bioKey, menuUrlDraft, user?.name]);
 
   const doSearch = useCallback(async (q: string) => {
     if (!q.trim()) return;
@@ -386,8 +477,115 @@ export function ClientProfilePanel({ open, onClose, initialQuery }: ClientProfil
       setBioDraft("");
       setBioEditing(false);
       setBioKey("");
+      setQuickNote("");
+      setShowReminderPicker(false);
+      setReminderDate("");
+      setReminderTime("");
     }, 300);
   };
+
+  const filteredEmployees = mentionNames.filter(name => !mentionFilter || name.includes(mentionFilter));
+
+  const insertMention = useCallback((name: string) => {
+    const ta = quickNoteRef.current;
+    if (!ta || mentionStart === -1) return;
+    const before = quickNote.slice(0, mentionStart);
+    const after = quickNote.slice(ta.selectionStart);
+    const next = before + `@${name} ` + after;
+    setQuickNote(next);
+    setShowMentions(false);
+    setMentionFilter("");
+    setMentionStart(-1);
+    setTimeout(() => {
+      ta.focus();
+      const pos = before.length + name.length + 2;
+      ta.setSelectionRange(pos, pos);
+    }, 0);
+  }, [quickNote, mentionStart]);
+
+  function handleQuickNoteChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const val = e.target.value;
+    setQuickNote(val);
+    const cursor = e.target.selectionStart;
+    const before = val.slice(0, cursor);
+    const atIdx = before.lastIndexOf("@");
+    if (atIdx !== -1 && (atIdx === 0 || before[atIdx - 1] === " " || before[atIdx - 1] === "\n")) {
+      const query = before.slice(atIdx + 1);
+      if (!query.includes("\n")) {
+        setMentionStart(atIdx);
+        setMentionFilter(query);
+        setShowMentions(true);
+        setMentionIndex(0);
+        return;
+      }
+    }
+    setShowMentions(false);
+  }
+
+  function handleQuickNoteKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (showMentions && filteredEmployees.length > 0) {
+      if (e.key === "ArrowDown") { e.preventDefault(); setMentionIndex(i => Math.min(i + 1, filteredEmployees.length - 1)); return; }
+      if (e.key === "ArrowUp") { e.preventDefault(); setMentionIndex(i => Math.max(i - 1, 0)); return; }
+      if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); insertMention(filteredEmployees[mentionIndex]); return; }
+      if (e.key === "Escape") { setShowMentions(false); return; }
+    }
+    if (e.key === "Enter" && e.ctrlKey) addQuickNote();
+  }
+
+  const addQuickNote = useCallback(async () => {
+    if (!quickNote.trim() || !data) return;
+    const activeDeal = data.deals.find(d => d.stage !== "مرفوض مع سبب") || data.deals[0];
+    const activeRenewal = !activeDeal ? data.renewals[0] : null;
+    const entityType = activeDeal ? "deal" : activeRenewal ? "renewal" : null;
+    const entityId = activeDeal?.id || activeRenewal?.id;
+    if (!entityType || !entityId) return;
+    setQuickNoteSaving(true);
+    try {
+      const authorName = user?.name || user?.email || "مستخدم";
+      const created = await createFollowUpNote(entityType, entityId, quickNote.trim(), authorName);
+      setData(prev => prev ? { ...prev, notes: [created, ...prev.notes] } : prev);
+      const entityName = activeDeal?.client_name || activeRenewal?.customer_name || "";
+      const notified = new Set<string>();
+      for (const name of mentionNames) {
+        if (!quickNote.includes(`@${name}`)) continue;
+        if (name === authorName) continue;
+        if (notified.has(name)) continue;
+        notified.add(name);
+        createMentionNotification(created.id, entityType, entityId, entityName, name, authorName, quickNote.trim())
+          .catch((err) => console.error("[mention] failed:", err));
+      }
+      setQuickNote("");
+    } catch { /* silent */ } finally {
+      setQuickNoteSaving(false);
+    }
+  }, [quickNote, data, user, employees]);
+
+  async function saveQuickReminder() {
+    if (!reminderDate || !reminderTime || !data) return;
+    const activeDeal = data.deals.find(d => d.stage !== "مرفوض مع سبب") || data.deals[0];
+    const activeRenewal = !activeDeal ? data.renewals[0] : null;
+    const entityType = activeDeal ? "deal" : activeRenewal ? "renewal" : null;
+    const entityId = activeDeal?.id || activeRenewal?.id;
+    if (!entityType || !entityId) return;
+    setSavingReminder(true);
+    try {
+      const authorName = user?.name || user?.email || "مستخدم";
+      const entityName = activeDeal?.client_name || activeRenewal?.customer_name || "";
+      await createReminder({
+        entity_type: entityType,
+        entity_id: entityId,
+        entity_name: entityName,
+        note_text: quickNote.trim() || undefined,
+        remind_at: new Date(`${reminderDate}T${reminderTime}:00`).toISOString(),
+        user_name: authorName,
+      });
+      setShowReminderPicker(false);
+      setReminderDate("");
+      setReminderTime("");
+    } catch { /* silent */ } finally {
+      setSavingReminder(false);
+    }
+  }
 
   const clientName = data?.deals[0]?.client_name || data?.renewals[0]?.customer_name || data?.tickets[0]?.client_name || "";
   const clientPhone = data?.deals[0]?.client_phone || data?.renewals[0]?.customer_phone || data?.tickets[0]?.client_phone || "";
@@ -533,6 +731,170 @@ export function ClientProfilePanel({ open, onClose, initialQuery }: ClientProfil
                 )}
               </div>
 
+              {/* Menu URL */}
+              <div className="rounded-xl border border-border/50 bg-muted/20 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm">🔗</span>
+                    <span className="text-xs font-bold text-foreground">رابط المنيو</span>
+                  </div>
+                  {!menuUrlEditing ? (
+                    <button
+                      onClick={() => { setMenuUrlDraft(menuUrl); setMenuUrlEditing(true); }}
+                      className="flex items-center gap-0.5 text-[12px] text-muted-foreground hover:text-foreground"
+                    >
+                      <Pencil className="w-3 h-3" /> {menuUrl ? "تعديل" : "إضافة"}
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <button onClick={saveMenuUrl} disabled={menuUrlSaving} className="flex items-center gap-0.5 text-[12px] text-emerald-400 hover:underline disabled:opacity-50">
+                        <Check className="w-3 h-3" /> حفظ
+                      </button>
+                      <button onClick={() => { setMenuUrlEditing(false); setMenuUrlDraft(menuUrl); }} className="text-[12px] text-muted-foreground hover:underline">
+                        إلغاء
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {menuUrlEditing ? (
+                  <input
+                    type="url"
+                    value={menuUrlDraft}
+                    onChange={(e) => setMenuUrlDraft(e.target.value)}
+                    placeholder="https://..."
+                    className="w-full text-xs bg-background/50 border border-border/50 rounded-lg px-2 py-1.5 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                    dir="ltr"
+                  />
+                ) : menuUrl ? (
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={menuUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 text-xs text-cyan-400 hover:underline truncate"
+                      dir="ltr"
+                    >
+                      {menuUrl}
+                    </a>
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(menuUrl); setMenuUrlCopied(true); setTimeout(() => setMenuUrlCopied(false), 2000); }}
+                      className="text-[11px] px-2 py-0.5 rounded border border-border/50 text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                    >
+                      {menuUrlCopied ? "✓ تم" : "نسخ"}
+                    </button>
+                    <a
+                      href={`https://wa.me/?text=${encodeURIComponent(menuUrl)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] px-2 py-0.5 rounded border border-green-600/40 text-green-400 hover:bg-green-500/10 transition-colors shrink-0"
+                    >
+                      واتساب
+                    </a>
+                  </div>
+                ) : (
+                  <p className="text-[12px] text-muted-foreground/50">لا يوجد رابط — اضغط "إضافة" لإضافة رابط المنيو</p>
+                )}
+              </div>
+
+              {/* Quick follow-up note */}
+              {(data.deals.length > 0 || data.renewals.length > 0) && (
+                <div className="rounded-xl border border-border/50 bg-muted/20 p-3 space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <MessageSquarePlus className="w-3.5 h-3.5 text-cyan-400" />
+                    <span className="text-xs font-bold text-foreground">إضافة متابعة</span>
+                  </div>
+                  <div className="flex gap-2 items-start relative">
+                    <div className="flex-1 relative">
+                      <textarea
+                        ref={quickNoteRef}
+                        value={quickNote}
+                        onChange={handleQuickNoteChange}
+                        onKeyDown={handleQuickNoteKeyDown}
+                        placeholder="اكتب ملاحظة... اكتب @ لمنشن موظف (Ctrl+Enter للإرسال)"
+                        className="w-full min-h-[64px] rounded-lg border border-border/50 bg-background/50 p-2 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-cyan-400/50 resize-none"
+                        dir="rtl"
+                      />
+                      {/* Mention dropdown */}
+                      {showMentions && filteredEmployees.length > 0 && (
+                        <div className="absolute top-full mt-1 right-0 w-full bg-card border border-border rounded-lg shadow-lg z-50 max-h-[160px] overflow-y-auto">
+                          {filteredEmployees.map((name, idx) => (
+                            <button
+                              key={name}
+                              onClick={() => insertMention(name)}
+                              className={`w-full flex items-center gap-2 px-3 py-2 text-right text-xs transition-colors ${idx === mentionIndex ? "bg-cyan-500/10 text-cyan-400" : "text-foreground hover:bg-white/5"}`}
+                            >
+                              <div className="w-6 h-6 rounded-full bg-amber-500/15 text-amber-400 flex items-center justify-center text-[10px] font-bold shrink-0">{name.charAt(0)}</div>
+                              <span>{name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <button
+                        onClick={addQuickNote}
+                        disabled={!quickNote.trim() || quickNoteSaving}
+                        className="p-2 rounded-lg bg-cyan-500/15 text-cyan-400 border border-cyan-400/30 hover:bg-cyan-500/25 disabled:opacity-40 transition-colors"
+                        title="إرسال"
+                      >
+                        {quickNoteSaving ? <div className="w-4 h-4 border border-cyan-400/40 border-t-cyan-400 rounded-full animate-spin" /> : <Send className="w-4 h-4" />}
+                      </button>
+                      <button
+                        onClick={() => {
+                          const ta = quickNoteRef.current;
+                          if (!ta) return;
+                          const cursor = ta.selectionStart;
+                          const before = quickNote.slice(0, cursor);
+                          const after = quickNote.slice(cursor);
+                          const needSpace = before.length > 0 && before[before.length - 1] !== " ";
+                          const prefix = needSpace ? " @" : "@";
+                          setQuickNote(before + prefix + after);
+                          setMentionStart(before.length + (needSpace ? 1 : 0));
+                          setShowMentions(true);
+                          setMentionFilter("");
+                          setTimeout(() => { ta.focus(); const pos = cursor + prefix.length; ta.setSelectionRange(pos, pos); }, 0);
+                        }}
+                        className="p-2 rounded-lg border border-amber-400/30 text-amber-400 hover:bg-amber-400/10 transition-colors"
+                        title="منشن موظف @"
+                      >
+                        <AtSign className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setShowReminderPicker(p => !p)}
+                        className={`p-2 rounded-lg border transition-colors ${showReminderPicker ? "border-purple-400/60 bg-purple-400/15 text-purple-400" : "border-purple-400/30 text-purple-400 hover:bg-purple-400/10"}`}
+                        title="تذكير بتاريخ ووقت"
+                      >
+                        <Bell className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  {/* Reminder picker */}
+                  {showReminderPicker && (
+                    <div className="p-2.5 rounded-lg border border-purple-400/30 bg-purple-400/5 space-y-2">
+                      <p className="text-[12px] font-medium text-purple-400 flex items-center gap-1.5">
+                        <CalendarClock className="w-3.5 h-3.5" /> تذكيرني في:
+                      </p>
+                      <div className="flex gap-2">
+                        <input type="date" value={reminderDate} onChange={e => setReminderDate(e.target.value)}
+                          className="flex-1 rounded-md border border-border bg-card px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-purple-400" />
+                        <input type="time" value={reminderTime} onChange={e => setReminderTime(e.target.value)}
+                          className="w-24 rounded-md border border-border bg-card px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-purple-400" />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={saveQuickReminder}
+                          disabled={!reminderDate || !reminderTime || savingReminder}
+                          className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-md text-xs font-medium bg-purple-400/20 text-purple-400 hover:bg-purple-400/30 disabled:opacity-40 transition-colors"
+                        >
+                          <Bell className="w-3 h-3" />{savingReminder ? "جاري الحفظ..." : "حفظ التذكير"}
+                        </button>
+                        <button onClick={() => setShowReminderPicker(false)} className="px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:bg-white/5 transition-colors">إلغاء</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Timeline */}
               {data.notes.length > 0 && (
                 <SectionToggle
@@ -541,18 +903,31 @@ export function ClientProfilePanel({ open, onClose, initialQuery }: ClientProfil
                   count={data.notes.length}
                 >
                   <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                    {data.notes.slice(0, 15).map(n => (
-                      <div key={n.id} className="flex gap-2 text-[12px] p-1.5 rounded-lg bg-muted/20">
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary/50 mt-1.5 shrink-0" />
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5 text-muted-foreground">
-                            <span>{formatDate(n.created_at)}</span>
-                            <span className="font-medium text-foreground/80">{n.author_name}</span>
+                    {data.notes.slice(0, 15).map(n => {
+                      const isHighlighted = highlightNoteId === n.id;
+                      return (
+                        <div
+                          key={n.id}
+                          id={`note-${n.id}`}
+                          ref={isHighlighted ? (el) => { el?.scrollIntoView({ behavior: "smooth", block: "center" }); } : undefined}
+                          className={`flex gap-2 text-[12px] p-1.5 rounded-lg transition-colors ${
+                            isHighlighted
+                              ? "bg-amber-500/15 border border-amber-500/30 ring-1 ring-amber-500/20"
+                              : "bg-muted/20"
+                          }`}
+                        >
+                          <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${isHighlighted ? "bg-amber-400" : "bg-primary/50"}`} />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 text-muted-foreground">
+                              <span>{formatDate(n.created_at)}</span>
+                              <span className={`font-medium ${isHighlighted ? "text-amber-400" : "text-foreground/80"}`}>{n.author_name}</span>
+                              {isHighlighted && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-bold">المنشن</span>}
+                            </div>
+                            <p className="text-foreground/60 whitespace-pre-line break-words">{n.note}</p>
                           </div>
-                          <p className="text-foreground/60 whitespace-pre-line break-words">{n.note}</p>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </SectionToggle>
               )}
@@ -584,17 +959,40 @@ export function ClientProfilePanel({ open, onClose, initialQuery }: ClientProfil
               )}
 
               {/* Tickets */}
-              {data.tickets.length > 0 && (
-                <SectionToggle
-                  title="تذاكر الدعم"
-                  icon={<Headphones className="w-3.5 h-3.5 text-orange-400" />}
-                  count={data.tickets.length}
-                >
-                  {data.tickets.map(t => (
-                    <TicketCard key={t.id} ticket={t} />
-                  ))}
-                </SectionToggle>
-              )}
+              {data.tickets.length > 0 && (() => {
+                const open = data.tickets.filter(t => t.status === "مفتوح").length;
+                const inProgress = data.tickets.filter(t => t.status === "قيد المعالجة").length;
+                const resolved = data.tickets.filter(t => t.status === "محلول").length;
+                return (
+                  <SectionToggle
+                    title="طلبات الدعم"
+                    icon={<Headphones className="w-3.5 h-3.5 text-orange-400" />}
+                    count={data.tickets.length}
+                  >
+                    {/* Summary row */}
+                    <div className="flex gap-2 mb-1">
+                      {open > 0 && (
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 font-medium">
+                          {open} مفتوح
+                        </span>
+                      )}
+                      {inProgress > 0 && (
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium">
+                          {inProgress} قيد المعالجة
+                        </span>
+                      )}
+                      {resolved > 0 && (
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
+                          {resolved} محلول
+                        </span>
+                      )}
+                    </div>
+                    {data.tickets.map(t => (
+                      <TicketCard key={t.id} ticket={t} />
+                    ))}
+                  </SectionToggle>
+                );
+              })()}
             </>
           )}
 
