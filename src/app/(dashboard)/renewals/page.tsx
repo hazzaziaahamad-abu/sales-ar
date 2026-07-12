@@ -372,8 +372,10 @@ export default function RenewalsPage() {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [clientSearch, setClientSearch] = useState("");
   const [repFilter, setRepFilter] = useState<string | null>(null);
+  const [urgencyFilter, setUrgencyFilter] = useState<"overdue" | "today" | "week" | "month" | null>(null);
   const [showClosed, setShowClosed] = useState(false);
   const PENDING_STATUSES = new Set(["مجدول", "مجدول تجديد", "جاري المتابعة", "انتظار الدفع"]);
+  const URGENCY_ACTIVE_STATUSES = new Set(["مجدول", "مجدول تجديد", "جاري المتابعة", "انتظار الدفع", "مؤجل مؤقتاً", "تواصل وقت آخر", "متردد"]);
   const listBase = statusFilter === "ملغي بسبب" ? monthFilteredRenewals : monthRenewals;
   const repFilteredRenewals = repFilter
     ? listBase.filter((r) => r.assigned_rep === repFilter)
@@ -621,8 +623,40 @@ export default function RenewalsPage() {
     };
   }, [renewals, summaryPeriod, customRange]);
 
-  // Apply summary filter if active (overrides base filter to show matching renewals)
-  const filteredRenewals = summaryFilter
+  /* ─── Urgency quick stats (cross-month, active renewals only) ─── */
+  const urgencyStats = useMemo(() => {
+    const todayStr = todayLocal();
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    const base = (repFilter ? typedRenewals.filter(r => r.assigned_rep === repFilter) : typedRenewals)
+      .filter(r => URGENCY_ACTIVE_STATUSES.has(r.status));
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    return {
+      overdue: base.filter(r => getDaysRemaining(r.renewal_date) < 0).length,
+      today: base.filter(r => r.renewal_date === todayStr).length,
+      week: base.filter(r => { const d = getDaysRemaining(r.renewal_date); return d >= 0 && d <= 7; }).length,
+      month: base.filter(r => { const rd = new Date(r.renewal_date); return rd >= monthStart && rd <= monthEnd; }).length,
+    };
+  }, [typedRenewals, repFilter]);
+
+  // Apply urgency/summary filter if active (overrides base filter)
+  const filteredRenewals = urgencyFilter
+    ? (() => {
+        const todayStr = todayLocal();
+        const now = new Date(); now.setHours(0, 0, 0, 0);
+        let base = (repFilter ? typedRenewals.filter(r => r.assigned_rep === repFilter) : typedRenewals)
+          .filter(r => URGENCY_ACTIVE_STATUSES.has(r.status));
+        if (urgencyFilter === "overdue") base = base.filter(r => getDaysRemaining(r.renewal_date) < 0);
+        else if (urgencyFilter === "today") base = base.filter(r => r.renewal_date === todayStr);
+        else if (urgencyFilter === "week") base = base.filter(r => { const d = getDaysRemaining(r.renewal_date); return d >= 0 && d <= 7; });
+        else if (urgencyFilter === "month") {
+          const ms = new Date(now.getFullYear(), now.getMonth(), 1);
+          const me = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+          base = base.filter(r => { const rd = new Date(r.renewal_date); return rd >= ms && rd <= me; });
+        }
+        return clientSearch ? base.filter(r => r.customer_name.toLowerCase().includes(clientSearch.toLowerCase()) || (r.client_code && r.client_code.toLowerCase().includes(clientSearch.toLowerCase()))) : base;
+      })()
+    : summaryFilter
     ? (() => {
         const ids = summaryFilter === "completed" || summaryFilter === "revenue" || summaryFilter === "success"
           ? achievementSummary.completedIds
@@ -765,7 +799,7 @@ export default function RenewalsPage() {
   const totalPages = Math.max(1, Math.ceil(filteredRenewals.length / PAGE_SIZE));
   const paginatedRenewals = filteredRenewals.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  useEffect(() => { setCurrentPage(1); }, [statusFilter, clientSearch, salesTypeTab, summaryFilter, monthFilter]);
+  useEffect(() => { setCurrentPage(1); }, [statusFilter, clientSearch, salesTypeTab, summaryFilter, urgencyFilter, monthFilter]);
 
   /* ─── Excel template download ─── */
   const [uploadStatus, setUploadStatus] = useState<"idle" | "importing" | "done" | "error">("idle");
@@ -1297,6 +1331,53 @@ export default function RenewalsPage() {
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* ─── Urgency Quick Stats ─── */}
+      {!loading && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {urgencyFilter && (
+            <div className="col-span-2 md:col-span-4 flex items-center gap-2 px-3 py-2 rounded-lg bg-amber/10 border border-amber/20">
+              <span className="text-xs text-amber font-medium">🔍 عرض: {
+                urgencyFilter === "overdue" ? "التجديدات المتأخرة" :
+                urgencyFilter === "today" ? "تجديدات اليوم" :
+                urgencyFilter === "week" ? "تجديدات هذا الأسبوع" :
+                "تجديدات هذا الشهر"
+              } ({filteredRenewals.length} عميل)</span>
+              <button
+                onClick={() => setUrgencyFilter(null)}
+                className="mr-auto text-xs text-amber hover:text-white font-medium px-2 py-1 rounded-md hover:bg-amber/20 transition-colors"
+              >
+                ✕ إلغاء
+              </button>
+            </div>
+          )}
+          {([
+            { key: "overdue" as const, label: "متأخر", count: urgencyStats.overdue, emoji: "🔴", color: "text-cc-red", bg: "bg-cc-red/10", border: "border-cc-red/20", activeBg: "bg-cc-red/20", activeBorder: "border-cc-red/50 ring-2 ring-cc-red/20" },
+            { key: "today" as const, label: "اليوم", count: urgencyStats.today, emoji: "🟡", color: "text-amber", bg: "bg-amber/10", border: "border-amber/20", activeBg: "bg-amber/20", activeBorder: "border-amber/50 ring-2 ring-amber/20" },
+            { key: "week" as const, label: "هذا الأسبوع", count: urgencyStats.week, emoji: "📅", color: "text-cyan", bg: "bg-cyan/10", border: "border-cyan/20", activeBg: "bg-cyan/20", activeBorder: "border-cyan/50 ring-2 ring-cyan/20" },
+            { key: "month" as const, label: "هذا الشهر", count: urgencyStats.month, emoji: "📆", color: "text-cc-purple", bg: "bg-cc-purple/10", border: "border-cc-purple/20", activeBg: "bg-cc-purple/20", activeBorder: "border-cc-purple/50 ring-2 ring-cc-purple/20" },
+          ]).map(({ key, label, count, emoji, color, bg, border, activeBg, activeBorder }) => {
+            const active = urgencyFilter === key;
+            return (
+              <button
+                key={key}
+                onClick={() => {
+                  setUrgencyFilter(active ? null : key);
+                  setSummaryFilter(null);
+                  document.getElementById("renewals-table")?.scrollIntoView({ behavior: "smooth" });
+                }}
+                className={`p-3 rounded-[14px] text-center transition-all cursor-pointer border-2 ${
+                  active ? `${activeBg} ${activeBorder}` : `${bg} border-transparent hover:border-current/20 hover:scale-[1.02]`
+                }`}
+              >
+                <p className="text-lg mb-0.5">{emoji}</p>
+                <p className={`text-2xl font-bold ${color}`}>{count}</p>
+                <p className="text-[12px] text-muted-foreground mt-0.5">{label}</p>
+              </button>
+            );
+          })}
         </div>
       )}
 
