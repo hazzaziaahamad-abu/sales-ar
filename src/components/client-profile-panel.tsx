@@ -719,7 +719,7 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
                               type="tel"
                               value={secondaryPhoneDraft}
                               onChange={(e) => setSecondaryPhoneDraft(e.target.value)}
-                              placeholder="05xxxxxxxx"
+                              placeholder="+966 أو رقم دولي"
                               className="text-xs bg-muted/30 border border-border/50 rounded px-1.5 py-0.5 w-28 focus:outline-none focus:ring-1 focus:ring-primary/50"
                               autoFocus
                               onKeyDown={(e) => { if (e.key === "Enter") saveSecondaryPhone(); if (e.key === "Escape") setSecondaryPhoneEditing(false); }}
