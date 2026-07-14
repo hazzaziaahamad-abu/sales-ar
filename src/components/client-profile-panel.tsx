@@ -370,6 +370,7 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
   const [secondaryPhoneDraft, setSecondaryPhoneDraft] = useState("");
   const [secondaryPhoneEditing, setSecondaryPhoneEditing] = useState(false);
   const [secondaryPhoneSaving, setSecondaryPhoneSaving] = useState(false);
+  const [secondaryPhoneError, setSecondaryPhoneError] = useState("");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [mentionNames, setMentionNames] = useState<string[]>([]);
   const [quickNote, setQuickNote] = useState("");
@@ -468,14 +469,19 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
   }, [bioKey, phoneVerified, user?.name]);
 
   const saveSecondaryPhone = useCallback(async () => {
-    if (!bioKey) return;
+    if (!bioKey) {
+      setSecondaryPhoneError("تعذّر الحفظ — أعد البحث وحاول مجدداً");
+      return;
+    }
     setSecondaryPhoneSaving(true);
+    setSecondaryPhoneError("");
     try {
       await upsertClientSecondaryPhone(bioKey, secondaryPhoneDraft.trim(), user?.name);
       setSecondaryPhone(secondaryPhoneDraft.trim());
       setSecondaryPhoneEditing(false);
-    } catch {
-      // silent
+    } catch (e) {
+      console.error("saveSecondaryPhone error:", e);
+      setSecondaryPhoneError("فشل الحفظ — تحقق من الاتصال أو صلاحيات قاعدة البيانات");
     } finally {
       setSecondaryPhoneSaving(false);
     }
@@ -713,23 +719,28 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
                           </button>
                         </div>
                         {secondaryPhoneEditing ? (
-                          <div className="flex items-center gap-1" dir="ltr">
-                            <PhoneCall className="w-3 h-3 text-muted-foreground shrink-0" />
-                            <input
-                              type="tel"
-                              value={secondaryPhoneDraft}
-                              onChange={(e) => setSecondaryPhoneDraft(e.target.value)}
-                              placeholder="+966 أو رقم دولي"
-                              className="text-xs bg-muted/30 border border-border/50 rounded px-1.5 py-0.5 w-28 focus:outline-none focus:ring-1 focus:ring-primary/50"
-                              autoFocus
-                              onKeyDown={(e) => { if (e.key === "Enter") saveSecondaryPhone(); if (e.key === "Escape") setSecondaryPhoneEditing(false); }}
-                            />
-                            <button onClick={saveSecondaryPhone} disabled={secondaryPhoneSaving} className="text-emerald-400 hover:text-emerald-300 disabled:opacity-50">
-                              <Check className="w-3 h-3" />
-                            </button>
-                            <button onClick={() => setSecondaryPhoneEditing(false)} className="text-muted-foreground hover:text-foreground">
-                              <X className="w-3 h-3" />
-                            </button>
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1" dir="ltr">
+                              <PhoneCall className="w-3 h-3 text-muted-foreground shrink-0" />
+                              <input
+                                type="tel"
+                                value={secondaryPhoneDraft}
+                                onChange={(e) => { setSecondaryPhoneDraft(e.target.value); setSecondaryPhoneError(""); }}
+                                placeholder="+966 أو رقم دولي"
+                                className={`text-xs bg-muted/30 border rounded px-1.5 py-0.5 w-28 focus:outline-none focus:ring-1 ${secondaryPhoneError ? "border-cc-red/50 focus:ring-cc-red/30" : "border-border/50 focus:ring-primary/50"}`}
+                                autoFocus
+                                onKeyDown={(e) => { if (e.key === "Enter") saveSecondaryPhone(); if (e.key === "Escape") setSecondaryPhoneEditing(false); }}
+                              />
+                              <button onClick={saveSecondaryPhone} disabled={secondaryPhoneSaving} className="text-emerald-400 hover:text-emerald-300 disabled:opacity-50">
+                                {secondaryPhoneSaving ? <span className="text-[10px]">...</span> : <Check className="w-3 h-3" />}
+                              </button>
+                              <button onClick={() => { setSecondaryPhoneEditing(false); setSecondaryPhoneError(""); }} className="text-muted-foreground hover:text-foreground">
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                            {secondaryPhoneError && (
+                              <p className="text-[11px] text-cc-red">{secondaryPhoneError}</p>
+                            )}
                           </div>
                         ) : secondaryPhone ? (
                           <div className="flex items-center gap-1.5" dir="ltr">
