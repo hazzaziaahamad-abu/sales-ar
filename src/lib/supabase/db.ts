@@ -163,15 +163,44 @@ export async function fetchClientProfile(query: string): Promise<ClientProfileDa
   return { deals, renewals, tickets, notes };
 }
 
-export async function fetchClientBio(clientKey: string): Promise<{ bio: string; menuUrl: string }> {
+export async function fetchClientBio(clientKey: string): Promise<{ bio: string; menuUrl: string; phoneVerified: boolean; secondaryPhone: string }> {
   const supabase = createClient();
   const { data } = await supabase
     .from("client_bios")
-    .select("bio, menu_url")
+    .select("bio, menu_url, phone_verified, secondary_phone")
     .eq("org_id", getOrgId())
     .eq("client_key", clientKey)
     .single();
-  return { bio: data?.bio || "", menuUrl: data?.menu_url || "" };
+  return {
+    bio: data?.bio || "",
+    menuUrl: data?.menu_url || "",
+    phoneVerified: data?.phone_verified || false,
+    secondaryPhone: data?.secondary_phone || "",
+  };
+}
+
+export async function upsertClientPhoneVerified(clientKey: string, phoneVerified: boolean, userName?: string): Promise<void> {
+  const supabase = createClient();
+  const orgId = getOrgId();
+  const { error } = await supabase
+    .from("client_bios")
+    .upsert(
+      { org_id: orgId, client_key: clientKey, phone_verified: phoneVerified, updated_by: userName || null, updated_at: new Date().toISOString() },
+      { onConflict: "org_id,client_key" }
+    );
+  if (error) throw error;
+}
+
+export async function upsertClientSecondaryPhone(clientKey: string, secondaryPhone: string, userName?: string): Promise<void> {
+  const supabase = createClient();
+  const orgId = getOrgId();
+  const { error } = await supabase
+    .from("client_bios")
+    .upsert(
+      { org_id: orgId, client_key: clientKey, secondary_phone: secondaryPhone, updated_by: userName || null, updated_at: new Date().toISOString() },
+      { onConflict: "org_id,client_key" }
+    );
+  if (error) throw error;
 }
 
 export async function upsertClientBio(clientKey: string, bio: string, userName?: string): Promise<void> {
