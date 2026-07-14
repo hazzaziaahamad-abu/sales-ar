@@ -460,7 +460,7 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
     setPhoneVerified(next);
     setPhoneVerifiedSaving(true);
     try {
-      await upsertClientPhoneVerified(bioKey, next, user?.name);
+      await upsertClientPhoneVerified(bioKey, next);
     } catch {
       setPhoneVerified(!next);
     } finally {
@@ -476,7 +476,7 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
     setSecondaryPhoneSaving(true);
     setSecondaryPhoneError("");
     try {
-      await upsertClientSecondaryPhone(bioKey, secondaryPhoneDraft.trim(), user?.name);
+      await upsertClientSecondaryPhone(bioKey, secondaryPhoneDraft.trim());
       setSecondaryPhone(secondaryPhoneDraft.trim());
       setSecondaryPhoneEditing(false);
     } catch (e) {
