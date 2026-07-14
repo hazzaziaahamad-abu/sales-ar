@@ -165,41 +165,43 @@ export async function fetchClientProfile(query: string): Promise<ClientProfileDa
 
 export async function fetchClientBio(clientKey: string): Promise<{ bio: string; menuUrl: string; phoneVerified: boolean; secondaryPhone: string }> {
   const supabase = createClient();
-  const { data } = await supabase
-    .from("client_bios")
-    .select("bio, menu_url, phone_verified, secondary_phone")
-    .eq("org_id", getOrgId())
-    .eq("client_key", clientKey)
-    .single();
+  const orgId = getOrgId();
+  const [bioRes, phoneRes] = await Promise.all([
+    supabase.from("client_bios").select("bio, menu_url").eq("org_id", orgId).eq("client_key", clientKey).single(),
+    supabase.from("sales_guide_settings").select("setting_value").eq("org_id", orgId).eq("setting_key", `client_phones_${clientKey}`).single(),
+  ]);
+  const phoneData = phoneRes.data?.setting_value as { verified?: boolean; secondary?: string } | null;
   return {
-    bio: data?.bio || "",
-    menuUrl: data?.menu_url || "",
-    phoneVerified: data?.phone_verified || false,
-    secondaryPhone: data?.secondary_phone || "",
+    bio: bioRes.data?.bio || "",
+    menuUrl: bioRes.data?.menu_url || "",
+    phoneVerified: phoneData?.verified || false,
+    secondaryPhone: phoneData?.secondary || "",
   };
 }
 
-export async function upsertClientPhoneVerified(clientKey: string, phoneVerified: boolean, userName?: string): Promise<void> {
+export async function upsertClientPhoneVerified(clientKey: string, phoneVerified: boolean): Promise<void> {
   const supabase = createClient();
   const orgId = getOrgId();
-  const { error } = await supabase
-    .from("client_bios")
-    .upsert(
-      { org_id: orgId, client_key: clientKey, phone_verified: phoneVerified, updated_by: userName || null, updated_at: new Date().toISOString() },
-      { onConflict: "org_id,client_key" }
-    );
+  const key = `client_phones_${clientKey}`;
+  const { data: existing } = await supabase.from("sales_guide_settings").select("setting_value").eq("org_id", orgId).eq("setting_key", key).single();
+  const prev = (existing?.setting_value as { verified?: boolean; secondary?: string }) || {};
+  const { error } = await supabase.from("sales_guide_settings").upsert(
+    { org_id: orgId, setting_key: key, setting_value: { ...prev, verified: phoneVerified }, updated_at: new Date().toISOString() },
+    { onConflict: "org_id,setting_key" }
+  );
   if (error) throw error;
 }
 
-export async function upsertClientSecondaryPhone(clientKey: string, secondaryPhone: string, userName?: string): Promise<void> {
+export async function upsertClientSecondaryPhone(clientKey: string, secondaryPhone: string): Promise<void> {
   const supabase = createClient();
   const orgId = getOrgId();
-  const { error } = await supabase
-    .from("client_bios")
-    .upsert(
-      { org_id: orgId, client_key: clientKey, secondary_phone: secondaryPhone, updated_by: userName || null, updated_at: new Date().toISOString() },
-      { onConflict: "org_id,client_key" }
-    );
+  const key = `client_phones_${clientKey}`;
+  const { data: existing } = await supabase.from("sales_guide_settings").select("setting_value").eq("org_id", orgId).eq("setting_key", key).single();
+  const prev = (existing?.setting_value as { verified?: boolean; secondary?: string }) || {};
+  const { error } = await supabase.from("sales_guide_settings").upsert(
+    { org_id: orgId, setting_key: key, setting_value: { ...prev, secondary: secondaryPhone }, updated_at: new Date().toISOString() },
+    { onConflict: "org_id,setting_key" }
+  );
   if (error) throw error;
 }
 
