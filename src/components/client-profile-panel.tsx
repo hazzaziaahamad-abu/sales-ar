@@ -7,11 +7,11 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { fetchClientProfile, fetchClientBio, upsertClientBio, upsertClientMenuUrl, fetchDealKpiStages, upsertDealKpiStage, createDealKpiStages, fetchEmployees, fetchUserProfiles, KPI_STAGES, updateDeal, createFollowUpNote, createMentionNotification, createReminder, type ClientProfileData } from "@/lib/supabase/db";
+import { fetchClientProfile, fetchClientBio, upsertClientBio, upsertClientMenuUrl, upsertClientPhoneVerified, upsertClientSecondaryPhone, fetchDealKpiStages, upsertDealKpiStage, createDealKpiStages, fetchEmployees, fetchUserProfiles, KPI_STAGES, updateDeal, createFollowUpNote, createMentionNotification, createReminder, type ClientProfileData } from "@/lib/supabase/db";
 import { getTopContributor } from "@/components/sales/SalesKPIDashboard";
 import { FollowUpLogButton } from "@/components/follow-up-log";
 import { useAuth } from "@/lib/auth-context";
-import { Search, Phone, User, ShoppingBag, RefreshCw, Headphones, FileText, ChevronDown, ChevronUp, Clock, X, Pencil, Check, StickyNote, BarChart2, Trophy, MessageSquarePlus, Send, AtSign, Bell, BellOff, CalendarClock } from "lucide-react";
+import { Search, Phone, User, ShoppingBag, RefreshCw, Headphones, FileText, ChevronDown, ChevronUp, Clock, X, Pencil, Check, StickyNote, BarChart2, Trophy, MessageSquarePlus, Send, AtSign, Bell, BellOff, CalendarClock, ShieldCheck, ShieldOff, Plus, PhoneCall } from "lucide-react";
 import type { Deal, Renewal, Ticket, FollowUpNote, DealKpiStage, Employee } from "@/types";
 
 const STAGE_COLORS: Record<string, string> = {
@@ -364,6 +364,12 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
   const [menuUrlEditing, setMenuUrlEditing] = useState(false);
   const [menuUrlSaving, setMenuUrlSaving] = useState(false);
   const [menuUrlCopied, setMenuUrlCopied] = useState(false);
+  const [phoneVerified, setPhoneVerified] = useState(false);
+  const [phoneVerifiedSaving, setPhoneVerifiedSaving] = useState(false);
+  const [secondaryPhone, setSecondaryPhone] = useState("");
+  const [secondaryPhoneDraft, setSecondaryPhoneDraft] = useState("");
+  const [secondaryPhoneEditing, setSecondaryPhoneEditing] = useState(false);
+  const [secondaryPhoneSaving, setSecondaryPhoneSaving] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [mentionNames, setMentionNames] = useState<string[]>([]);
   const [quickNote, setQuickNote] = useState("");
@@ -400,16 +406,22 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
     if (!key) return;
     setBioKey(key);
     try {
-      const { bio: b, menuUrl: m } = await fetchClientBio(key);
+      const { bio: b, menuUrl: m, phoneVerified: pv, secondaryPhone: sp } = await fetchClientBio(key);
       setBio(b);
       setBioDraft(b);
       setMenuUrl(m);
       setMenuUrlDraft(m);
+      setPhoneVerified(pv);
+      setSecondaryPhone(sp);
+      setSecondaryPhoneDraft(sp);
     } catch {
       setBio("");
       setBioDraft("");
       setMenuUrl("");
       setMenuUrlDraft("");
+      setPhoneVerified(false);
+      setSecondaryPhone("");
+      setSecondaryPhoneDraft("");
     }
   }, []);
 
@@ -440,6 +452,34 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
       setMenuUrlSaving(false);
     }
   }, [bioKey, menuUrlDraft, user?.name]);
+
+  const togglePhoneVerified = useCallback(async () => {
+    if (!bioKey) return;
+    const next = !phoneVerified;
+    setPhoneVerified(next);
+    setPhoneVerifiedSaving(true);
+    try {
+      await upsertClientPhoneVerified(bioKey, next, user?.name);
+    } catch {
+      setPhoneVerified(!next);
+    } finally {
+      setPhoneVerifiedSaving(false);
+    }
+  }, [bioKey, phoneVerified, user?.name]);
+
+  const saveSecondaryPhone = useCallback(async () => {
+    if (!bioKey) return;
+    setSecondaryPhoneSaving(true);
+    try {
+      await upsertClientSecondaryPhone(bioKey, secondaryPhoneDraft.trim(), user?.name);
+      setSecondaryPhone(secondaryPhoneDraft.trim());
+      setSecondaryPhoneEditing(false);
+    } catch {
+      // silent
+    } finally {
+      setSecondaryPhoneSaving(false);
+    }
+  }, [bioKey, secondaryPhoneDraft, user?.name]);
 
   const doSearch = useCallback(async (q: string) => {
     if (!q.trim()) return;
@@ -656,9 +696,58 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-foreground truncate">{clientName}</p>
                     {clientPhone && (
-                      <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5" dir="ltr">
-                        <Phone className="w-3 h-3" /> {clientPhone}
-                      </p>
+                      <div className="mt-0.5 space-y-1">
+                        <div className="flex items-center gap-1.5" dir="ltr">
+                          <Phone className="w-3 h-3 text-muted-foreground shrink-0" />
+                          <span className="text-xs text-muted-foreground">{clientPhone}</span>
+                          <button
+                            onClick={togglePhoneVerified}
+                            disabled={phoneVerifiedSaving || !bioKey}
+                            title={phoneVerified ? "تم التحقق من الرقم — اضغط لإلغاء التحقق" : "اضغط للتحقق من صحة الرقم"}
+                            className={`shrink-0 transition-colors disabled:opacity-50 ${phoneVerified ? "text-emerald-400 hover:text-red-400" : "text-muted-foreground/40 hover:text-emerald-400"}`}
+                          >
+                            {phoneVerified
+                              ? <ShieldCheck className="w-3.5 h-3.5" />
+                              : <ShieldOff className="w-3.5 h-3.5" />
+                            }
+                          </button>
+                        </div>
+                        {secondaryPhoneEditing ? (
+                          <div className="flex items-center gap-1" dir="ltr">
+                            <PhoneCall className="w-3 h-3 text-muted-foreground shrink-0" />
+                            <input
+                              type="tel"
+                              value={secondaryPhoneDraft}
+                              onChange={(e) => setSecondaryPhoneDraft(e.target.value)}
+                              placeholder="05xxxxxxxx"
+                              className="text-xs bg-muted/30 border border-border/50 rounded px-1.5 py-0.5 w-28 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                              autoFocus
+                              onKeyDown={(e) => { if (e.key === "Enter") saveSecondaryPhone(); if (e.key === "Escape") setSecondaryPhoneEditing(false); }}
+                            />
+                            <button onClick={saveSecondaryPhone} disabled={secondaryPhoneSaving} className="text-emerald-400 hover:text-emerald-300 disabled:opacity-50">
+                              <Check className="w-3 h-3" />
+                            </button>
+                            <button onClick={() => setSecondaryPhoneEditing(false)} className="text-muted-foreground hover:text-foreground">
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ) : secondaryPhone ? (
+                          <div className="flex items-center gap-1.5" dir="ltr">
+                            <PhoneCall className="w-3 h-3 text-muted-foreground shrink-0" />
+                            <span className="text-xs text-muted-foreground">{secondaryPhone}</span>
+                            <button onClick={() => { setSecondaryPhoneDraft(secondaryPhone); setSecondaryPhoneEditing(true); }} className="text-muted-foreground/40 hover:text-muted-foreground transition-colors">
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => { setSecondaryPhoneDraft(""); setSecondaryPhoneEditing(true); }}
+                            className="flex items-center gap-1 text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                          >
+                            <Plus className="w-3 h-3" /> رقم ثانٍ
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
