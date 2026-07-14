@@ -20,6 +20,31 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Testing
+
+Unit tests for the dashboard's business-logic layer are written with [Jest](https://jestjs.io/)
+(configured via `next/jest`, jsdom environment).
+
+```bash
+npm test              # run the full suite
+npm run test:watch    # watch mode
+npm run test:coverage # run with a coverage report
+```
+
+Tests live under `tests/` and mirror the `src/lib/` structure. They cover:
+
+- **`utils/format`** — money/percent/date formatting, Saudi-timezone helpers, date-range bounds, phone formatting
+- **`utils/value-maps`** — Excel→canonical stage/source/renewal-status mapping (incl. identity stability)
+- **`utils/constants`** — KPI status thresholds and constant integrity
+- **`kpi-calculations`** — deal credit distribution and per-employee aggregation
+- **`gamification`** — leaderboard scoring, badge awarding, star-employee selection
+- **`ai/scoring`** — weighted performance-score computation (with caps & guards)
+- **`ai/alerts`** — critical/warning/opportunity alert generation and ordering
+- **`auto-followup`** — follow-up rule matching, dedup against open tasks, task building
+- **`tasks/schedule`** — timezone-aware next-run computation and Arabic schedule descriptions
+- **`tasks/card`** — HMAC-signed task-card token sign/verify (tamper detection)
+- **`permissions`** — super-admin short-circuit, permission caching/invalidation (Supabase mocked)
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
