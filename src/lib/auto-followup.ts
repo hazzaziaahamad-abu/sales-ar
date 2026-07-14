@@ -70,15 +70,10 @@ export const FOLLOWUP_RULES: FollowUpRule[] = [
     message: "📞 تواصل مع عميل جديد — {client} لم يُتواصل معه منذ {days} أيام",
   },
   // ─── General rules (fallback for all active stages) ───
-  {
-    id: "general_7day",
-    label: "متابعة عامة",
-    stages: [],
-    daysThreshold: 7,
-    priority: "medium",
-    taskType: "followup",
-    message: "⏰ متابعة — {client} بدون تواصل منذ {days} أيام",
-  },
+  // Ordered by descending daysThreshold: the escalation (14d) must be checked
+  // before the general 7-day rule, otherwise the first-match-per-deal logic in
+  // checkDealsForFollowUp would let the 7-day rule always win and the escalation
+  // would never fire. A deal stale 7–13 days → general_7day; 14+ days → escalation.
   {
     id: "escalation_14day",
     label: "تصعيد للمدير",
@@ -88,6 +83,15 @@ export const FOLLOWUP_RULES: FollowUpRule[] = [
     taskType: "followup",
     message: "🚨 تصعيد — {client} بدون أي تواصل منذ {days} يوم! يحتاج تدخل",
     escalate: true,
+  },
+  {
+    id: "general_7day",
+    label: "متابعة عامة",
+    stages: [],
+    daysThreshold: 7,
+    priority: "medium",
+    taskType: "followup",
+    message: "⏰ متابعة — {client} بدون تواصل منذ {days} أيام",
   },
 ];
 

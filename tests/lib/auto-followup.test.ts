@@ -139,24 +139,34 @@ describe("checkDealsForFollowUp", () => {
     expect(actions[0].daysSinceContact).toBe(999);
   });
 
-  it("sorts higher-priority actions before lower-priority ones", () => {
+  it("sorts urgent actions before lower-priority ones", () => {
     const actions = checkDealsForFollowUp(
       [
         deal({ id: "medium", stage: "تجريبي", last_contact: daysAgoISO(5) }), // trial_check -> medium
-        deal({ id: "high", stage: "انتظار الدفع", last_contact: daysAgoISO(7) }), // payment_reminder -> high
+        deal({ id: "urgent", stage: "تجهيز", last_contact: daysAgoISO(20) }), // escalation_14day -> urgent
       ],
       []
     );
     expect(actions).toHaveLength(2);
-    expect(actions[0].rule.priority).toBe("high");
+    expect(actions[0].rule.priority).toBe("urgent");
     expect(actions[1].rule.priority).toBe("medium");
   });
 
-  it("lets an earlier general rule pre-empt the urgent escalation rule (per-deal dedup)", () => {
-    // A تجهيز deal at 20 days is caught by general_7day (medium, threshold 7),
-    // which is listed before escalation_14day, so only one medium action is produced.
+  it("escalates a deal stale >= 14 days over the 7-day general follow-up", () => {
+    // A تجهيز deal (no stage-specific rule) at 20 days must hit escalation_14day
+    // (urgent), which is ordered before general_7day.
     const actions = checkDealsForFollowUp(
       [deal({ id: "d1", stage: "تجهيز", last_contact: daysAgoISO(20) })],
+      []
+    );
+    expect(actions).toHaveLength(1);
+    expect(actions[0].rule.id).toBe("escalation_14day");
+    expect(actions[0].rule.priority).toBe("urgent");
+  });
+
+  it("uses the general 7-day rule for a deal stale between 7 and 13 days", () => {
+    const actions = checkDealsForFollowUp(
+      [deal({ id: "d1", stage: "تجهيز", last_contact: daysAgoISO(10) })],
       []
     );
     expect(actions).toHaveLength(1);
