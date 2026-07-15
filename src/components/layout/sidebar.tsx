@@ -58,7 +58,7 @@ export const NAV_ITEMS = [
   // { label: "السكرتير التنفيذي", href: "/secretary", slug: "secretary", icon: BrainCircuit, color: "violet", group: "الإدارة التنفيذية" },
   // { label: "لوحة المدير", href: "/manager", slug: "manager", icon: Briefcase, color: "violet", group: "عام" },
   // { label: "الاجتماع الأسبوعي", href: "/weekly", slug: "weekly", icon: ClipboardList, color: "violet", group: "المتابعة" },
-  { label: "مبيعات المكتب", href: "/sales", slug: "sales", icon: TrendingUp, color: "emerald", group: "المبيعات والدعم" },
+  { label: "المبيعات", href: "/sales", slug: "sales", icon: TrendingUp, color: "emerald", group: "المبيعات والدعم" },
   { label: "مبيعات الدعم", href: "/support-sales", slug: "support-sales", icon: TrendingUp, color: "orange", group: "المبيعات والدعم" },
   { label: "الدعم", href: "/support", slug: "support", icon: Headphones, color: "orange", group: "المبيعات والدعم" },
   // Hidden: merged into "مهامي" — { label: "دليل المبيعات", href: "/sales-guide", slug: "sales-guide", icon: BookOpen, color: "amber" },
