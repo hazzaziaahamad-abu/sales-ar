@@ -82,7 +82,7 @@ export default function RequestsPage() {
             <Inbox className="w-4 h-4 text-violet-400" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-foreground">قائمة الطلبات</h1>
+            <h1 className="text-lg font-bold text-foreground">نحجز هب</h1>
             <p className="text-xs text-muted-foreground">مراجعة طلبات إضافة العملاء الجديدة</p>
           </div>
         </div>
