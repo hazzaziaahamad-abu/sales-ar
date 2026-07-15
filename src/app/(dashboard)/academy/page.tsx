@@ -158,7 +158,7 @@ const SECTIONS = {
     ],
   },
   reservations: {
-    label: "إدارة الحجوزات",
+    label: "نحجز هب",
     icon: CalendarCheck,
     color: "violet",
     gradient: "from-violet-500/10 to-transparent",

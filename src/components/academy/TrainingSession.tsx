@@ -256,7 +256,7 @@ function ChatSession({ topic, platform, savedMessages, onReset }: { topic: strin
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const topicInfo = TOPICS.find((t) => t.key === topic)!;
-  const platformLabel = platform === "reservations" ? "حجوزات (نظام إدارة الحجوزات)" : "Menus (قائمة الطلبات)";
+  const platformLabel = platform === "reservations" ? "نحجز هب" : "Menus (قائمة الطلبات)";
   const { activeOrgId: orgId, user: authUser } = useAuth();
   const sessionIdRef = useRef<string | null>(null);
   const loggedRef = useRef(false);
