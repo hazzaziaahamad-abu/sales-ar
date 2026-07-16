@@ -1690,6 +1690,75 @@ export async function clearDailyTarget(id: string): Promise<void> {
   if (error) throw error;
 }
 
+// ─── DEAL ↔ TARGETING LINK ────────────────────────────────────────────────
+// Selecting a deal in the sales table mirrors it into قائمة الاستهداف so the
+// rep can follow up on it monthly and jump back to the deal in place.
+
+/** deal_ids already mirrored into the targeting list for a given month/year. */
+export async function fetchTargetedDealIds(
+  month: number,
+  year: number,
+  salesType: "office" | "support"
+): Promise<string[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("targeting_clients")
+    .select("deal_id")
+    .eq("org_id", getOrgId())
+    .eq("month", month)
+    .eq("year", year)
+    .eq("sales_type", salesType)
+    .not("deal_id", "is", null);
+  if (error) throw error;
+  return (data ?? []).map((r) => (r as { deal_id: string }).deal_id);
+}
+
+/** Add a deal to قائمة الاستهداف. Idempotent per (org, deal, month, year). */
+export async function addDealToTargeting(
+  deal: Deal,
+  month: number,
+  year: number,
+  salesType: "office" | "support"
+): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("targeting_clients")
+    .upsert(
+      {
+        org_id: getOrgId(),
+        deal_id: deal.id,
+        sales_type: salesType,
+        client_name: deal.client_name,
+        client_phone: deal.client_phone || null,
+        plan: deal.plan || null,
+        source: deal.source || null,
+        assigned_rep: deal.assigned_rep_name || null,
+        month,
+        year,
+        contact_status: "pending",
+      },
+      { onConflict: "org_id,deal_id,month,year", ignoreDuplicates: true }
+    );
+  if (error) throw error;
+}
+
+/** Remove a deal's mirrored row from قائمة الاستهداف. */
+export async function removeDealFromTargeting(
+  dealId: string,
+  month: number,
+  year: number
+): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("targeting_clients")
+    .delete()
+    .eq("org_id", getOrgId())
+    .eq("deal_id", dealId)
+    .eq("month", month)
+    .eq("year", year);
+  if (error) throw error;
+}
+
 // ─── GIFT OFFERS ──────────────────────────────────────────────────────────
 
 export async function fetchGiftOffers(): Promise<GiftOffer[]> {
