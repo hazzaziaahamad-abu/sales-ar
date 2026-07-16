@@ -480,6 +480,10 @@ export interface TargetClient {
   satisfaction_result?: "very_satisfied" | "satisfied" | "neutral" | "needs_improvement" | "unsatisfied";
   notes?: string;
   assigned_rep?: string;
+  /** When the row was created by selecting a deal, links back to that deal. */
+  deal_id?: string;
+  /** Sales section the linked deal belongs to (used to open it in place). */
+  sales_type?: "office" | "support";
   created_at: string;
   updated_at: string;
 }

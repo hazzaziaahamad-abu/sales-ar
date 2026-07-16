@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { Deal, Marketer, Package, Employee, EmployeeTask } from "@/types";
 import { triggerSaleCelebration } from "@/components/layout/sale-celebration";
-import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createFollowUpNote, fetchRecentFollowUpNotes, fetchPackages, fetchQuoteCommitments, addQuoteCommitment, removeQuoteCommitment, fetchEmployees, fetchEmployeeTasks, createEmployeeTask, createRenewal, fetchRenewals, createDealKpiStages, upsertDailyGoal, fetchDailyGoals, pingPresence, fetchPresence } from "@/lib/supabase/db";
+import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createFollowUpNote, fetchRecentFollowUpNotes, fetchPackages, fetchQuoteCommitments, addQuoteCommitment, removeQuoteCommitment, fetchEmployees, fetchEmployeeTasks, createEmployeeTask, createRenewal, fetchRenewals, createDealKpiStages, upsertDailyGoal, fetchDailyGoals, pingPresence, fetchPresence, fetchTargetedDealIds, addDealToTargeting, removeDealFromTargeting } from "@/lib/supabase/db";
 import { checkDealsForFollowUp, buildFollowUpTask, type FollowUpAction } from "@/lib/auto-followup";
 import { StarEmployeeCard, Leaderboard } from "@/components/star-employee";
 import { AssignTaskModal } from "@/components/tasks/AssignTaskModal";
@@ -305,13 +305,36 @@ export function SalesSection({ salesType }: SalesPageProps) {
     } catch { return new Set(); }
   });
 
-  function toggleDailyTarget(id: string) {
+  /* deals mirrored into قائمة الاستهداف for the current month (persistent, DB) */
+  const [targetedDealIds, setTargetedDealIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    const now = new Date();
+    fetchTargetedDealIds(now.getMonth() + 1, now.getFullYear(), salesType)
+      .then((ids) => setTargetedDealIds(new Set(ids)))
+      .catch(console.error);
+  }, [salesType, orgId]);
+
+  function toggleDailyTarget(deal: Deal) {
+    const id = deal.id;
+    const willAdd = !dailyTargetIds.has(id);
     setDailyTargetIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (willAdd) next.add(id); else next.delete(id);
       localStorage.setItem(salesTodayKey, JSON.stringify([...next]));
       return next;
     });
+    /* Mirror the selection into قائمة الاستهداف (persistent monthly list). */
+    const now = new Date();
+    const m = now.getMonth() + 1, y = now.getFullYear();
+    setTargetedDealIds((prev) => {
+      const next = new Set(prev);
+      if (willAdd) next.add(id); else next.delete(id);
+      return next;
+    });
+    (willAdd
+      ? addDealToTargeting(deal, m, y, salesType)
+      : removeDealFromTargeting(id, m, y)
+    ).catch(console.error);
   }
 
   function selectAllVisible() {
@@ -545,6 +568,11 @@ export function SalesSection({ salesType }: SalesPageProps) {
   /* trial age filter: show only تجريبي deals older than N days */
   const [trialDaysFilter, setTrialDaysFilter] = useState<number | null>(null);
 
+  /* deep-link highlight: when arriving from قائمة الاستهداف with ?deal=<id>,
+     reveal that deal in the table and flash its row. */
+  const [highlightDealId, setHighlightDealId] = useState<string | null>(null);
+  const handledDealParam = useRef<string | null>(null);
+
   /* ─── Shared per-day values (used by KPI strip, commitments, presence) ─── */
   const todayStr = todayLocal();
   const myName = authUser?.name || authUser?.email || "";
@@ -679,6 +707,30 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const paginatedDeals = filteredDeals.slice((currentPage - 1) * DEALS_PER_PAGE, currentPage * DEALS_PER_PAGE);
 
   useEffect(() => { setCurrentPage(1); }, [clientSearch, stageFilter, achieveFilter, repFilter, tableDateFilter, tableCustomFrom, tableCustomTo, trialDaysFilter]);
+
+  /* Deep-link from قائمة الاستهداف: ?deal=<id> reveals & flashes the row. */
+  useEffect(() => {
+    const dealId = searchParams.get("deal");
+    if (!dealId || handledDealParam.current === dealId) return;
+    if (deals.length === 0) return; // wait for deals to load, then retry
+    const target = deals.find((d) => d.id === dealId);
+    if (!target) return; // not in this sales section — leave param for the other page
+    handledDealParam.current = dealId;
+    // Clear filters that could hide the row, then narrow to just this deal.
+    setStageFilter(null);
+    setAchieveFilter(null);
+    setRepFilter(null);
+    setTrialDaysFilter(null);
+    setSearchAllTime(true);
+    setClientSearch(target.client_code || target.client_phone || target.client_name);
+    setDealsTableOpen(true);
+    setHighlightDealId(dealId);
+    const scrollTimer = setTimeout(() => {
+      document.getElementById(`deal-row-${dealId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 350);
+    const clearTimer = setTimeout(() => setHighlightDealId(null), 4000);
+    return () => { clearTimeout(scrollTimer); clearTimeout(clearTimer); };
+  }, [searchParams, deals]);
 
   useEffect(() => {
     setLoading(true);
@@ -1749,22 +1801,34 @@ export function SalesSection({ salesType }: SalesPageProps) {
               paginatedDeals.map((deal) => {
                 const isTarget = dailyTargetIds.has(deal.id);
                 const isTargetDone = isTarget && deal.stage === "مكتملة";
+                const inTargeting = targetedDealIds.has(deal.id);
+                const isHighlighted = highlightDealId === deal.id;
                 return (
-                <TableRow key={deal.id} className={isTarget ? (isTargetDone ? "bg-cc-green/[0.04]" : "bg-cyan/[0.04]") : ""}>
+                <TableRow
+                  key={deal.id}
+                  id={`deal-row-${deal.id}`}
+                  className={`${isTarget ? (isTargetDone ? "bg-cc-green/[0.04]" : "bg-cyan/[0.04]") : ""} ${
+                    isHighlighted ? "ring-2 ring-inset ring-fuchsia-500/70 bg-fuchsia-500/[0.06] animate-pulse" : ""
+                  }`}
+                >
                   <TableCell className="text-center">
                     <button
-                      onClick={() => toggleDailyTarget(deal.id)}
+                      onClick={() => toggleDailyTarget(deal)}
+                      title={inTargeting ? "مُضاف إلى قائمة الاستهداف — انقر للإزالة" : "أضف إلى قائمة الاستهداف"}
                       className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
                         isTargetDone ? "border-cc-green bg-cc-green text-white"
                         : isTarget ? "border-cyan bg-cyan/20 text-cyan"
+                        : inTargeting ? "border-fuchsia-500/60 bg-fuchsia-500/10 text-fuchsia-400"
                         : "border-muted-foreground/30 hover:border-cyan/50"
                       }`}
                     >
-                      {isTarget && (
+                      {isTarget ? (
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                         </svg>
-                      )}
+                      ) : inTargeting ? (
+                        <span className="w-1.5 h-1.5 rounded-full bg-fuchsia-400" />
+                      ) : null}
                     </button>
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs font-mono">
@@ -1782,6 +1846,9 @@ export function SalesSection({ salesType }: SalesPageProps) {
                     )}
                     {isTargetDone && (
                       <span className="mr-1.5 inline-block text-[11px] px-1.5 py-0.5 rounded bg-cc-green/15 text-cc-green font-medium">تم الإنجاز</span>
+                    )}
+                    {inTargeting && !isTarget && (
+                      <span className="mr-1.5 inline-block text-[11px] px-1.5 py-0.5 rounded bg-fuchsia-500/10 text-fuchsia-400 font-medium">في الاستهداف</span>
                     )}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs" dir="ltr">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { dateToLocal } from "@/lib/utils/format";
 import {
@@ -52,6 +53,7 @@ import {
   CalendarDays,
   Quote,
   Sparkles,
+  ExternalLink,
 } from "lucide-react";
 
 /* ---------- constants ---------- */
@@ -134,7 +136,15 @@ const EMPTY_FORM = {
 
 export default function TargetingPage() {
   const { activeOrgId } = useAuth();
+  const router = useRouter();
   const today = new Date();
+
+  /* Open a deal-linked client back in its sales table, flashing the row. */
+  function openDeal(c: TargetClient) {
+    if (!c.deal_id) return;
+    const base = c.sales_type === "support" ? "/support-sales" : "/sales";
+    router.push(`${base}?deal=${c.deal_id}`);
+  }
   const todayStr = dateToLocal(today);
 
   const [month, setMonth] = useState(today.getMonth() + 1);
@@ -547,7 +557,18 @@ export default function TargetingPage() {
                     {client.client_name.charAt(0)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-foreground truncate">{client.client_name}</p>
+                    {client.deal_id && !selectMode ? (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); openDeal(client); }}
+                        className="text-sm font-bold text-foreground truncate hover:text-fuchsia-400 hover:underline transition-colors text-right w-full flex items-center gap-1"
+                        title="فتح الصفقة في مكانها"
+                      >
+                        <span className="truncate">{client.client_name}</span>
+                        <ExternalLink className="w-3 h-3 shrink-0 text-fuchsia-400" />
+                      </button>
+                    ) : (
+                      <p className="text-sm font-bold text-foreground truncate">{client.client_name}</p>
+                    )}
                     <div className="flex items-center gap-2 mt-0.5">
                       {client.client_phone && (
                         <span className="text-[13px] text-muted-foreground flex items-center gap-1">
@@ -587,6 +608,11 @@ export default function TargetingPage() {
                       {client.assigned_rep}
                     </span>
                   )}
+                  {client.deal_id && (
+                    <span className="px-2 py-0.5 rounded-full bg-fuchsia-500/10 text-[12px] text-fuchsia-400 font-medium">
+                      من الصفقات
+                    </span>
+                  )}
                 </div>
 
                 {client.notes && (
@@ -607,6 +633,17 @@ export default function TargetingPage() {
                       <PhoneCall className="w-3.5 h-3.5" />
                       تسجيل تواصل
                     </Button>
+                    {client.deal_id && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1 text-xs text-fuchsia-400 hover:text-fuchsia-400"
+                        onClick={() => openDeal(client)}
+                        title="فتح الصفقة في مكانها"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
                     {isDaily ? (
                       <Button
                         variant="ghost"
