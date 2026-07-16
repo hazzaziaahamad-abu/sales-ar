@@ -332,7 +332,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
       return next;
     });
     (willAdd
-      ? addDealToTargeting(deal, m, y, salesType)
+      ? addDealToTargeting(deal, m, y, salesType, todayLocal())
       : removeDealFromTargeting(id, m, y)
     ).catch(console.error);
   }

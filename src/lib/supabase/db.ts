@@ -1713,19 +1713,25 @@ export async function fetchTargetedDealIds(
   return (data ?? []).map((r) => (r as { deal_id: string }).deal_id);
 }
 
-/** Add a deal to قائمة الاستهداف. Idempotent per (org, deal, month, year). */
+/**
+ * Add a deal to قائمة الاستهداف and flag it as the given day's target so it
+ * shows under the "هدف اليوم" filter. Idempotent per (org, deal, month, year);
+ * an existing row keeps its contact progress and only gets its target_date set.
+ */
 export async function addDealToTargeting(
   deal: Deal,
   month: number,
   year: number,
-  salesType: "office" | "support"
+  salesType: "office" | "support",
+  targetDate: string
 ): Promise<void> {
   const supabase = createClient();
+  const org = getOrgId();
   const { error } = await supabase
     .from("targeting_clients")
     .upsert(
       {
-        org_id: getOrgId(),
+        org_id: org,
         deal_id: deal.id,
         sales_type: salesType,
         client_name: deal.client_name,
@@ -1736,10 +1742,21 @@ export async function addDealToTargeting(
         month,
         year,
         contact_status: "pending",
+        target_date: targetDate,
       },
       { onConflict: "org_id,deal_id,month,year", ignoreDuplicates: true }
     );
   if (error) throw error;
+  // If the row already existed, the insert above was ignored — make sure it is
+  // still marked as today's target without clobbering its contact_status/notes.
+  const { error: updateError } = await supabase
+    .from("targeting_clients")
+    .update({ target_date: targetDate, updated_at: new Date().toISOString() })
+    .eq("org_id", org)
+    .eq("deal_id", deal.id)
+    .eq("month", month)
+    .eq("year", year);
+  if (updateError) throw updateError;
 }
 
 /** Remove a deal's mirrored row from قائمة الاستهداف. */
