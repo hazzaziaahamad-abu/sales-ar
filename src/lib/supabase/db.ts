@@ -163,19 +163,30 @@ export async function fetchClientProfile(query: string): Promise<ClientProfileDa
   return { deals, renewals, tickets, notes };
 }
 
-export async function fetchClientBio(clientKey: string): Promise<{ bio: string; menuUrl: string; phoneVerified: boolean; secondaryPhone: string }> {
+type ClientPhoneData = {
+  verified?: boolean;
+  secondary?: string;
+  primaryOverride?: string;
+  primaryComment?: string;
+  secondaryComment?: string;
+};
+
+export async function fetchClientBio(clientKey: string): Promise<{ bio: string; menuUrl: string; phoneVerified: boolean; secondaryPhone: string; primaryOverride: string; primaryComment: string; secondaryComment: string }> {
   const supabase = createClient();
   const orgId = getOrgId();
   const [bioRes, phoneRes] = await Promise.all([
     supabase.from("client_bios").select("bio, menu_url").eq("org_id", orgId).eq("client_key", clientKey).single(),
     supabase.from("sales_guide_settings").select("setting_value").eq("org_id", orgId).eq("setting_key", `client_phones_${clientKey}`).single(),
   ]);
-  const phoneData = phoneRes.data?.setting_value as { verified?: boolean; secondary?: string } | null;
+  const phoneData = phoneRes.data?.setting_value as ClientPhoneData | null;
   return {
     bio: bioRes.data?.bio || "",
     menuUrl: bioRes.data?.menu_url || "",
     phoneVerified: phoneData?.verified || false,
     secondaryPhone: phoneData?.secondary || "",
+    primaryOverride: phoneData?.primaryOverride || "",
+    primaryComment: phoneData?.primaryComment || "",
+    secondaryComment: phoneData?.secondaryComment || "",
   };
 }
 
@@ -200,6 +211,19 @@ export async function upsertClientSecondaryPhone(clientKey: string, secondaryPho
   const prev = (existing?.setting_value as { verified?: boolean; secondary?: string }) || {};
   const { error } = await supabase.from("sales_guide_settings").upsert(
     { org_id: orgId, setting_key: key, setting_value: { ...prev, secondary: secondaryPhone }, updated_at: new Date().toISOString() },
+    { onConflict: "org_id,setting_key" }
+  );
+  if (error) throw error;
+}
+
+export async function upsertClientPhoneData(clientKey: string, fields: Partial<ClientPhoneData>): Promise<void> {
+  const supabase = createClient();
+  const orgId = getOrgId();
+  const key = `client_phones_${clientKey}`;
+  const { data: existing } = await supabase.from("sales_guide_settings").select("setting_value").eq("org_id", orgId).eq("setting_key", key).single();
+  const prev = (existing?.setting_value as ClientPhoneData) || {};
+  const { error } = await supabase.from("sales_guide_settings").upsert(
+    { org_id: orgId, setting_key: key, setting_value: { ...prev, ...fields }, updated_at: new Date().toISOString() },
     { onConflict: "org_id,setting_key" }
   );
   if (error) throw error;
