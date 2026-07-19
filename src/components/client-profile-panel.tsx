@@ -7,7 +7,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { fetchClientProfile, fetchClientBio, upsertClientBio, upsertClientMenuUrl, upsertClientPhoneVerified, upsertClientSecondaryPhone, fetchDealKpiStages, upsertDealKpiStage, createDealKpiStages, fetchEmployees, fetchUserProfiles, KPI_STAGES, updateDeal, createFollowUpNote, createMentionNotification, createReminder, type ClientProfileData } from "@/lib/supabase/db";
+import { fetchClientProfile, fetchClientBio, upsertClientBio, upsertClientMenuUrl, upsertClientPhoneVerified, upsertClientSecondaryPhone, upsertClientPhoneData, fetchDealKpiStages, upsertDealKpiStage, createDealKpiStages, fetchEmployees, fetchUserProfiles, KPI_STAGES, updateDeal, createFollowUpNote, createMentionNotification, createReminder, type ClientProfileData } from "@/lib/supabase/db";
 import { getTopContributor } from "@/components/sales/SalesKPIDashboard";
 import { FollowUpLogButton } from "@/components/follow-up-log";
 import { useAuth } from "@/lib/auth-context";
@@ -371,6 +371,20 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
   const [secondaryPhoneEditing, setSecondaryPhoneEditing] = useState(false);
   const [secondaryPhoneSaving, setSecondaryPhoneSaving] = useState(false);
   const [secondaryPhoneError, setSecondaryPhoneError] = useState("");
+  /* primary phone editing */
+  const [primaryPhoneOverride, setPrimaryPhoneOverride] = useState("");
+  const [primaryPhoneOverrideDraft, setPrimaryPhoneOverrideDraft] = useState("");
+  const [primaryPhoneEditing, setPrimaryPhoneEditing] = useState(false);
+  const [primaryPhoneSaving, setPrimaryPhoneSaving] = useState(false);
+  /* phone comments */
+  const [primaryPhoneComment, setPrimaryPhoneComment] = useState("");
+  const [primaryPhoneCommentDraft, setPrimaryPhoneCommentDraft] = useState("");
+  const [primaryPhoneCommentEditing, setPrimaryPhoneCommentEditing] = useState(false);
+  const [primaryPhoneCommentSaving, setPrimaryPhoneCommentSaving] = useState(false);
+  const [secondaryPhoneComment, setSecondaryPhoneComment] = useState("");
+  const [secondaryPhoneCommentDraft, setSecondaryPhoneCommentDraft] = useState("");
+  const [secondaryPhoneCommentEditing, setSecondaryPhoneCommentEditing] = useState(false);
+  const [secondaryPhoneCommentSaving, setSecondaryPhoneCommentSaving] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [mentionNames, setMentionNames] = useState<string[]>([]);
   const [quickNote, setQuickNote] = useState("");
@@ -407,7 +421,7 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
     if (!key) return;
     setBioKey(key);
     try {
-      const { bio: b, menuUrl: m, phoneVerified: pv, secondaryPhone: sp } = await fetchClientBio(key);
+      const { bio: b, menuUrl: m, phoneVerified: pv, secondaryPhone: sp, primaryOverride: po, primaryComment: pc, secondaryComment: sc } = await fetchClientBio(key);
       setBio(b);
       setBioDraft(b);
       setMenuUrl(m);
@@ -415,6 +429,12 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
       setPhoneVerified(pv);
       setSecondaryPhone(sp);
       setSecondaryPhoneDraft(sp);
+      setPrimaryPhoneOverride(po);
+      setPrimaryPhoneOverrideDraft(po);
+      setPrimaryPhoneComment(pc);
+      setPrimaryPhoneCommentDraft(pc);
+      setSecondaryPhoneComment(sc);
+      setSecondaryPhoneCommentDraft(sc);
     } catch {
       setBio("");
       setBioDraft("");
@@ -423,6 +443,12 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
       setPhoneVerified(false);
       setSecondaryPhone("");
       setSecondaryPhoneDraft("");
+      setPrimaryPhoneOverride("");
+      setPrimaryPhoneOverrideDraft("");
+      setPrimaryPhoneComment("");
+      setPrimaryPhoneCommentDraft("");
+      setSecondaryPhoneComment("");
+      setSecondaryPhoneCommentDraft("");
     }
   }, []);
 
@@ -487,6 +513,48 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
     }
   }, [bioKey, secondaryPhoneDraft, user?.name]);
 
+  const savePrimaryPhoneOverride = useCallback(async () => {
+    if (!bioKey) return;
+    setPrimaryPhoneSaving(true);
+    try {
+      await upsertClientPhoneData(bioKey, { primaryOverride: primaryPhoneOverrideDraft.trim() });
+      setPrimaryPhoneOverride(primaryPhoneOverrideDraft.trim());
+      setPrimaryPhoneEditing(false);
+    } catch {
+      // silent
+    } finally {
+      setPrimaryPhoneSaving(false);
+    }
+  }, [bioKey, primaryPhoneOverrideDraft]);
+
+  const savePrimaryPhoneComment = useCallback(async () => {
+    if (!bioKey || primaryPhoneCommentDraft === primaryPhoneComment) { setPrimaryPhoneCommentEditing(false); return; }
+    setPrimaryPhoneCommentSaving(true);
+    try {
+      await upsertClientPhoneData(bioKey, { primaryComment: primaryPhoneCommentDraft.trim() });
+      setPrimaryPhoneComment(primaryPhoneCommentDraft.trim());
+    } catch {
+      // silent
+    } finally {
+      setPrimaryPhoneCommentSaving(false);
+      setPrimaryPhoneCommentEditing(false);
+    }
+  }, [bioKey, primaryPhoneCommentDraft, primaryPhoneComment]);
+
+  const saveSecondaryPhoneComment = useCallback(async () => {
+    if (!bioKey || secondaryPhoneCommentDraft === secondaryPhoneComment) { setSecondaryPhoneCommentEditing(false); return; }
+    setSecondaryPhoneCommentSaving(true);
+    try {
+      await upsertClientPhoneData(bioKey, { secondaryComment: secondaryPhoneCommentDraft.trim() });
+      setSecondaryPhoneComment(secondaryPhoneCommentDraft.trim());
+    } catch {
+      // silent
+    } finally {
+      setSecondaryPhoneCommentSaving(false);
+      setSecondaryPhoneCommentEditing(false);
+    }
+  }, [bioKey, secondaryPhoneCommentDraft, secondaryPhoneComment]);
+
   const doSearch = useCallback(async (q: string) => {
     if (!q.trim()) return;
     setLoading(true);
@@ -527,6 +595,15 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
       setShowReminderPicker(false);
       setReminderDate("");
       setReminderTime("");
+      setPrimaryPhoneOverride("");
+      setPrimaryPhoneOverrideDraft("");
+      setPrimaryPhoneEditing(false);
+      setPrimaryPhoneComment("");
+      setPrimaryPhoneCommentDraft("");
+      setPrimaryPhoneCommentEditing(false);
+      setSecondaryPhoneComment("");
+      setSecondaryPhoneCommentDraft("");
+      setSecondaryPhoneCommentEditing(false);
     }, 300);
   };
 
@@ -634,7 +711,8 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
   }
 
   const clientName = data?.deals[0]?.client_name || data?.renewals[0]?.customer_name || data?.tickets[0]?.client_name || "";
-  const clientPhone = data?.deals[0]?.client_phone || data?.renewals[0]?.customer_phone || data?.tickets[0]?.client_phone || "";
+  const rawClientPhone = data?.deals[0]?.client_phone || data?.renewals[0]?.customer_phone || data?.tickets[0]?.client_phone || "";
+  const clientPhone = primaryPhoneOverride || rawClientPhone;
   const currentPlan = data?.renewals?.find(r => r.status !== "ملغي بسبب")?.plan_name
     || data?.deals?.find(d => d.stage === "مكتملة")?.plan || "";
 
@@ -701,23 +779,75 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-foreground truncate">{clientName}</p>
-                    {clientPhone && (
+                    {(clientPhone || rawClientPhone) && (
                       <div className="mt-0.5 space-y-1">
-                        <div className="flex items-center gap-1.5" dir="ltr">
-                          <Phone className="w-3 h-3 text-muted-foreground shrink-0" />
-                          <span className="text-xs text-muted-foreground">{clientPhone}</span>
+                        {/* Primary phone */}
+                        {primaryPhoneEditing ? (
+                          <div className="flex items-center gap-1" dir="ltr">
+                            <Phone className="w-3 h-3 text-muted-foreground shrink-0" />
+                            <input
+                              type="tel"
+                              value={primaryPhoneOverrideDraft}
+                              onChange={(e) => setPrimaryPhoneOverrideDraft(e.target.value)}
+                              placeholder={rawClientPhone || "رقم الجوال"}
+                              className="text-xs bg-muted/30 border border-border/50 rounded px-1.5 py-0.5 w-28 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                              autoFocus
+                              onKeyDown={(e) => { if (e.key === "Enter") savePrimaryPhoneOverride(); if (e.key === "Escape") { setPrimaryPhoneEditing(false); setPrimaryPhoneOverrideDraft(primaryPhoneOverride); } }}
+                            />
+                            <button onClick={savePrimaryPhoneOverride} disabled={primaryPhoneSaving} className="text-emerald-400 hover:text-emerald-300 disabled:opacity-50">
+                              {primaryPhoneSaving ? <span className="text-[10px]">...</span> : <Check className="w-3 h-3" />}
+                            </button>
+                            <button onClick={() => { setPrimaryPhoneEditing(false); setPrimaryPhoneOverrideDraft(primaryPhoneOverride); }} className="text-muted-foreground hover:text-foreground">
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5" dir="ltr">
+                            <Phone className="w-3 h-3 text-muted-foreground shrink-0" />
+                            <span className="text-xs text-muted-foreground">{clientPhone}</span>
+                            <button
+                              onClick={togglePhoneVerified}
+                              disabled={phoneVerifiedSaving || !bioKey}
+                              title={phoneVerified ? "تم التحقق من الرقم — اضغط لإلغاء التحقق" : "اضغط للتحقق من صحة الرقم"}
+                              className={`shrink-0 transition-colors disabled:opacity-50 ${phoneVerified ? "text-emerald-400 hover:text-red-400" : "text-muted-foreground/40 hover:text-emerald-400"}`}
+                            >
+                              {phoneVerified ? <ShieldCheck className="w-3.5 h-3.5" /> : <ShieldOff className="w-3.5 h-3.5" />}
+                            </button>
+                            <button
+                              onClick={() => { setPrimaryPhoneOverrideDraft(clientPhone); setPrimaryPhoneEditing(true); }}
+                              disabled={!bioKey}
+                              className="text-muted-foreground/40 hover:text-muted-foreground transition-colors disabled:opacity-30"
+                              title="تعديل الرقم"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
+                        {/* Primary phone comment */}
+                        {primaryPhoneCommentEditing ? (
+                          <div className="flex items-center gap-1 pr-4">
+                            <input
+                              type="text"
+                              value={primaryPhoneCommentDraft}
+                              onChange={(e) => setPrimaryPhoneCommentDraft(e.target.value)}
+                              placeholder="تعليق..."
+                              className="text-[11px] bg-muted/30 border border-border/50 rounded px-1.5 py-0.5 flex-1 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                              autoFocus
+                              onBlur={savePrimaryPhoneComment}
+                              onKeyDown={(e) => { if (e.key === "Enter") savePrimaryPhoneComment(); if (e.key === "Escape") { setPrimaryPhoneCommentEditing(false); setPrimaryPhoneCommentDraft(primaryPhoneComment); } }}
+                            />
+                            {primaryPhoneCommentSaving && <span className="text-[10px] text-muted-foreground">...</span>}
+                          </div>
+                        ) : (
                           <button
-                            onClick={togglePhoneVerified}
-                            disabled={phoneVerifiedSaving || !bioKey}
-                            title={phoneVerified ? "تم التحقق من الرقم — اضغط لإلغاء التحقق" : "اضغط للتحقق من صحة الرقم"}
-                            className={`shrink-0 transition-colors disabled:opacity-50 ${phoneVerified ? "text-emerald-400 hover:text-red-400" : "text-muted-foreground/40 hover:text-emerald-400"}`}
+                            onClick={() => { setPrimaryPhoneCommentDraft(primaryPhoneComment); setPrimaryPhoneCommentEditing(true); }}
+                            className="flex items-center gap-1 pr-4 text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
                           >
-                            {phoneVerified
-                              ? <ShieldCheck className="w-3.5 h-3.5" />
-                              : <ShieldOff className="w-3.5 h-3.5" />
-                            }
+                            {primaryPhoneComment || <span className="opacity-60">+ تعليق</span>}
+                            {primaryPhoneComment && <Pencil className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100" />}
                           </button>
-                        </div>
+                        )}
+                        {/* Secondary phone */}
                         {secondaryPhoneEditing ? (
                           <div className="space-y-1">
                             <div className="flex items-center gap-1" dir="ltr">
@@ -757,6 +887,31 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
                           >
                             <Plus className="w-3 h-3" /> رقم ثانٍ
                           </button>
+                        )}
+                        {/* Secondary phone comment (shown only when secondary phone exists) */}
+                        {secondaryPhone && (
+                          secondaryPhoneCommentEditing ? (
+                            <div className="flex items-center gap-1 pr-4">
+                              <input
+                                type="text"
+                                value={secondaryPhoneCommentDraft}
+                                onChange={(e) => setSecondaryPhoneCommentDraft(e.target.value)}
+                                placeholder="تعليق..."
+                                className="text-[11px] bg-muted/30 border border-border/50 rounded px-1.5 py-0.5 flex-1 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                                autoFocus
+                                onBlur={saveSecondaryPhoneComment}
+                                onKeyDown={(e) => { if (e.key === "Enter") saveSecondaryPhoneComment(); if (e.key === "Escape") { setSecondaryPhoneCommentEditing(false); setSecondaryPhoneCommentDraft(secondaryPhoneComment); } }}
+                              />
+                              {secondaryPhoneCommentSaving && <span className="text-[10px] text-muted-foreground">...</span>}
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => { setSecondaryPhoneCommentDraft(secondaryPhoneComment); setSecondaryPhoneCommentEditing(true); }}
+                              className="flex items-center gap-1 pr-4 text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                            >
+                              {secondaryPhoneComment || <span className="opacity-60">+ تعليق</span>}
+                            </button>
+                          )
                         )}
                       </div>
                     )}
