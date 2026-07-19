@@ -170,6 +170,45 @@ function getHealthScore(renewal: { status: string; updated_at: string; renewal_d
   return { icon: "🔴", label: "خطر", color: "text-cc-red" };
 }
 
+/* ─── Global fuzzy search helpers ─── */
+function normalizeAr(s: string) {
+  return s.toLowerCase().replace(/\s+/g, "").replace(/[أإآا]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي");
+}
+function levenshtein(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, (_, i) =>
+    Array.from({ length: n + 1 }, (_, j) => i === 0 ? j : j === 0 ? i : 0)
+  );
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+  return dp[m][n];
+}
+function fuzzyMatchRenewal(raw: string, r: { customer_name: string; customer_phone?: string; client_code?: string }): boolean {
+  const q = normalizeAr(raw);
+  if (!q) return true;
+  // Phone search: digits only
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length >= 4) {
+    if ((r.customer_phone || "").replace(/\D/g, "").includes(digits)) return true;
+  }
+  // Client code exact contains
+  if (r.client_code && normalizeAr(r.client_code).includes(q)) return true;
+  const name = normalizeAr(r.customer_name);
+  // Exact substring
+  if (name.includes(q)) return true;
+  // Fuzzy: sliding window with Levenshtein ≤ floor(len/3) (min 1)
+  if (q.length >= 3) {
+    const maxDist = Math.max(1, Math.floor(q.length / 3));
+    const windowLen = Math.min(q.length + maxDist, name.length);
+    for (let i = 0; i <= name.length - q.length + maxDist && i + windowLen <= name.length + 1; i++) {
+      const sub = name.slice(i, i + q.length);
+      if (sub.length > 0 && levenshtein(q, sub) <= maxDist) return true;
+    }
+  }
+  return false;
+}
+
 function getPlanRecommendation(planName: string): { text: string; color: string; bg: string } | null {
   const p = (planName || "").toLowerCase();
   if (p.includes("تجريب") || p.includes("trial") || p.includes("مجاني"))
@@ -422,6 +461,7 @@ export default function RenewalsPage() {
   /* card filter */
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [clientSearch, setClientSearch] = useState("");
+  const [globalSearch, setGlobalSearch] = useState("");
   const [repFilter, setRepFilter] = useState<string | null>(null);
   const [showClosed, setShowClosed] = useState(false);
   const [tableDateFilter, setTableDateFilter] = useState<string | null>(null);
@@ -738,8 +778,16 @@ export default function RenewalsPage() {
     : focusFilter === "month" ? focusMonth
     : filteredRenewals_summary;
 
+  /* ─── Global search (bypasses month/year/status filters) ─── */
+  const globalSearchActive = globalSearch.trim().length > 0;
+  const globalSearchResults = globalSearchActive
+    ? renewals.filter((r) => fuzzyMatchRenewal(globalSearch.trim(), r))
+    : null;
+
+  const finalRenewals = globalSearchResults ?? filteredRenewals;
+
   // Priority sort: overdue → today → this week → rest (applied when no explicit sort active)
-  const prioritySorted = [...filteredRenewals].sort((a, b) => {
+  const prioritySorted = [...finalRenewals].sort((a, b) => {
     const getPriority = (r: typeof a) => {
       if (r.status === "مكتمل" || r.status === "ملغي بسبب") return 4;
       const rd = (r.renewal_date || "").slice(0, 10);
@@ -884,7 +932,7 @@ export default function RenewalsPage() {
   const totalPages = Math.max(1, Math.ceil(prioritySorted.length / PAGE_SIZE));
   const paginatedRenewals = prioritySorted.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  useEffect(() => { setCurrentPage(1); }, [statusFilter, clientSearch, salesTypeTab, summaryFilter, monthFilter, tableDateFilter, tableCustomFrom, tableCustomTo, focusFilter, silentFilter]);
+  useEffect(() => { setCurrentPage(1); }, [statusFilter, clientSearch, globalSearch, salesTypeTab, summaryFilter, monthFilter, tableDateFilter, tableCustomFrom, tableCustomTo, focusFilter, silentFilter]);
 
   /* ─── Excel template download ─── */
   const [uploadStatus, setUploadStatus] = useState<"idle" | "importing" | "done" | "error">("idle");
@@ -1331,8 +1379,33 @@ export default function RenewalsPage() {
             </button>
           )}
         </div>
+        {/* ─── Global Search ─── */}
+        <div className="px-4 pt-3 pb-2">
+          <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 transition-colors ${globalSearchActive ? "border-cc-purple/50 bg-cc-purple/[0.06]" : "border-border bg-white/[0.03]"}`}>
+            <svg className={`w-4 h-4 shrink-0 ${globalSearchActive ? "text-cc-purple" : "text-muted-foreground"}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input
+              value={globalSearch}
+              onChange={(e) => setGlobalSearch(e.target.value)}
+              placeholder="بحث عام — اسم العميل أو رقم الجوال (يبحث في كل الفترات)"
+              className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
+              dir="rtl"
+            />
+            {globalSearchActive && (
+              <button onClick={() => setGlobalSearch("")} className="text-muted-foreground hover:text-foreground text-xs px-1.5 py-0.5 rounded-lg hover:bg-white/[0.06] shrink-0">
+                ✕
+              </button>
+            )}
+          </div>
+          {globalSearchActive && (
+            <p className="mt-1.5 text-[12px] text-cc-purple font-medium">
+              {globalSearchResults?.length ?? 0} نتيجة من كل الفترات
+              <span className="mr-1 text-muted-foreground font-normal">— الفلاتر والشهر غير مفعّلة أثناء البحث العام</span>
+            </p>
+          )}
+        </div>
+
         {/* Year + Month filter */}
-        {availableYears.length > 1 && (
+        {!globalSearchActive && availableYears.length > 1 && (
           <div className="px-4 pt-4 pb-1 flex items-center gap-1.5 flex-wrap">
             <CalendarDays className="w-4 h-4 text-muted-foreground shrink-0" />
             {availableYears.map((y) => (
@@ -1350,7 +1423,7 @@ export default function RenewalsPage() {
             ))}
           </div>
         )}
-        <div className={`px-4 ${availableYears.length > 1 ? "pt-1" : "pt-4"} pb-2 flex items-center gap-1.5 flex-wrap`}>
+        {!globalSearchActive && <div className={`px-4 ${availableYears.length > 1 ? "pt-1" : "pt-4"} pb-2 flex items-center gap-1.5 flex-wrap`}>
           <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
           <button
             onClick={() => setMonthFilter(-1)}
@@ -1375,9 +1448,9 @@ export default function RenewalsPage() {
               {m.slice(0, 3)}
             </button>
           ))}
-        </div>
+        </div>}
         {/* Month completion summary */}
-        {monthFilter !== -1 && (() => {
+        {!globalSearchActive && monthFilter !== -1 && (() => {
           const total = monthFilteredRenewals.length;
           const completed = monthFilteredRenewals.filter(r => r.status === "مكتمل").length;
           const cancelled = monthFilteredRenewals.filter(r => r.status === "ملغي بسبب").length;
