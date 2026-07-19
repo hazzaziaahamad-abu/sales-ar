@@ -825,26 +825,33 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
                         )}
                         {/* Primary phone comment */}
                         {primaryPhoneCommentEditing ? (
-                          <div className="flex items-center gap-1 pr-4">
+                          <div className="flex items-center gap-1 mr-1">
                             <input
                               type="text"
                               value={primaryPhoneCommentDraft}
                               onChange={(e) => setPrimaryPhoneCommentDraft(e.target.value)}
-                              placeholder="تعليق..."
-                              className="text-[11px] bg-muted/30 border border-border/50 rounded px-1.5 py-0.5 flex-1 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                              placeholder="أضف تعليقاً..."
+                              className="text-[11px] bg-amber-500/10 border border-amber-500/40 text-amber-200 placeholder:text-amber-500/50 rounded-md px-2 py-1 flex-1 focus:outline-none focus:ring-1 focus:ring-amber-500/60"
                               autoFocus
                               onBlur={savePrimaryPhoneComment}
                               onKeyDown={(e) => { if (e.key === "Enter") savePrimaryPhoneComment(); if (e.key === "Escape") { setPrimaryPhoneCommentEditing(false); setPrimaryPhoneCommentDraft(primaryPhoneComment); } }}
                             />
-                            {primaryPhoneCommentSaving && <span className="text-[10px] text-muted-foreground">...</span>}
+                            {primaryPhoneCommentSaving && <span className="text-[10px] text-amber-400/70">...</span>}
                           </div>
-                        ) : (
+                        ) : primaryPhoneComment ? (
                           <button
                             onClick={() => { setPrimaryPhoneCommentDraft(primaryPhoneComment); setPrimaryPhoneCommentEditing(true); }}
-                            className="flex items-center gap-1 pr-4 text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                            className="flex items-center gap-1.5 mr-1 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/25 hover:border-amber-500/50 transition-colors text-left w-full"
                           >
-                            {primaryPhoneComment || <span className="opacity-60">+ تعليق</span>}
-                            {primaryPhoneComment && <Pencil className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100" />}
+                            <span className="text-[11px] text-amber-300 flex-1 text-right">{primaryPhoneComment}</span>
+                            <Pencil className="w-2.5 h-2.5 text-amber-500/60 shrink-0" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => { setPrimaryPhoneCommentDraft(""); setPrimaryPhoneCommentEditing(true); }}
+                            className="flex items-center gap-1 mr-1 px-2 py-0.5 rounded-md border border-dashed border-amber-500/20 hover:border-amber-500/50 hover:bg-amber-500/5 transition-colors text-[11px] text-amber-600/50 hover:text-amber-400"
+                          >
+                            <Plus className="w-2.5 h-2.5" /> تعليق
                           </button>
                         )}
                         {/* Secondary phone */}
@@ -891,25 +898,33 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
                         {/* Secondary phone comment (shown only when secondary phone exists) */}
                         {secondaryPhone && (
                           secondaryPhoneCommentEditing ? (
-                            <div className="flex items-center gap-1 pr-4">
+                            <div className="flex items-center gap-1 mr-1">
                               <input
                                 type="text"
                                 value={secondaryPhoneCommentDraft}
                                 onChange={(e) => setSecondaryPhoneCommentDraft(e.target.value)}
-                                placeholder="تعليق..."
-                                className="text-[11px] bg-muted/30 border border-border/50 rounded px-1.5 py-0.5 flex-1 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                                placeholder="أضف تعليقاً..."
+                                className="text-[11px] bg-amber-500/10 border border-amber-500/40 text-amber-200 placeholder:text-amber-500/50 rounded-md px-2 py-1 flex-1 focus:outline-none focus:ring-1 focus:ring-amber-500/60"
                                 autoFocus
                                 onBlur={saveSecondaryPhoneComment}
                                 onKeyDown={(e) => { if (e.key === "Enter") saveSecondaryPhoneComment(); if (e.key === "Escape") { setSecondaryPhoneCommentEditing(false); setSecondaryPhoneCommentDraft(secondaryPhoneComment); } }}
                               />
-                              {secondaryPhoneCommentSaving && <span className="text-[10px] text-muted-foreground">...</span>}
+                              {secondaryPhoneCommentSaving && <span className="text-[10px] text-amber-400/70">...</span>}
                             </div>
-                          ) : (
+                          ) : secondaryPhoneComment ? (
                             <button
                               onClick={() => { setSecondaryPhoneCommentDraft(secondaryPhoneComment); setSecondaryPhoneCommentEditing(true); }}
-                              className="flex items-center gap-1 pr-4 text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                              className="flex items-center gap-1.5 mr-1 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/25 hover:border-amber-500/50 transition-colors text-left w-full"
                             >
-                              {secondaryPhoneComment || <span className="opacity-60">+ تعليق</span>}
+                              <span className="text-[11px] text-amber-300 flex-1 text-right">{secondaryPhoneComment}</span>
+                              <Pencil className="w-2.5 h-2.5 text-amber-500/60 shrink-0" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => { setSecondaryPhoneCommentDraft(""); setSecondaryPhoneCommentEditing(true); }}
+                              className="flex items-center gap-1 mr-1 px-2 py-0.5 rounded-md border border-dashed border-amber-500/20 hover:border-amber-500/50 hover:bg-amber-500/5 transition-colors text-[11px] text-amber-600/50 hover:text-amber-400"
+                            >
+                              <Plus className="w-2.5 h-2.5" /> تعليق
                             </button>
                           )
                         )}
