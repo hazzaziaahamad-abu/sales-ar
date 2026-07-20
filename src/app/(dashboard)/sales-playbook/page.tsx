@@ -18,6 +18,36 @@ const ACCENT = "#2563eb";
 const uid = () => Math.random().toString(36).slice(2, 9);
 
 const defaultData = {
+  // معلومات النسخة وسجل التغييرات — عند أي تعديل مستقبلي: ارفع version وأضف سطراً في changelog،
+  // ولا تحذف أي سكربت/محتوى قائم إلا بتأكيد صريح (راجع ملف كيفية_تحديث_البلاي_بوك.md).
+  meta: {
+    version: "v1.0",
+    date: "2026-07-20",
+    lastChange: "أول إصدار: دمج مرجع مبيعات هارفارد (٧ سكربتات) + رأس النسخة وسجل التغييرات.",
+    changelog: [
+      {
+        id: uid(),
+        date: "2026-07-20",
+        section: "شامل",
+        change: "إضافة قسم «الأسس المرجعية»، و٧ سكربتات مبنية على مصادر هارفارد موزّعة داخل المراحل الأربع، ومؤشرات Leading/Lagging جديدة (زمن أول رد، تنفيذ الإيقاع، تحويل التجربة، قيمة الصفقة).",
+        reason: "دمج مصادر هارفارد (سيسبيديس، Challenger، HBR، حالة Toast) وبناء نظام تحديث خفيف للبلاي بوك.",
+        approvedBy: "القائد (حمد)",
+      },
+    ],
+  },
+
+  // الأسس المرجعية: لكل مبدأ سطر واحد + مصدره — عشان الفريق يعرف «ليش» لا «وش» فقط.
+  foundations: [
+    { id: uid(), principle: "المبيعات نظام يُقاس ويُدار، لا اجتهاد فردي — كل مرحلة لها مدخلات ومخرجات ومؤشرات.", source: "فرانك سيسبيديس، هارفارد للأعمال — Sales Management That Works (2021) و Aligning Strategy and Sales (2014)." },
+    { id: uid(), principle: "بِع الرؤية والخسارة، واستهدف «المُحرّك» صاحب القرار لا «المتكلّم» اللطيف.", source: "مقال HBR «The End of Solution Sales» (2012) — مؤلفو The Challenger Sale." },
+    { id: uid(), principle: "سرعة اللمسة الأولى تحسم التأهيل — الهدف التشغيلي: أول رد خلال أقل من ٦٠ دقيقة في الدوام.", source: "مقال HBR «The Short Life of Online Sales Leads» (2011)." },
+    { id: uid(), principle: "وظّف مَن يفهم المطاعم ليبيع لأصحابها، وبِع «نظام تشغيل واحد» (منيو + نحجز + درع) لا منتجاً مفرداً.", source: "حالة Toast الدراسية — تُدرَّس في كلية هارفارد للأعمال." },
+  ],
+
+  // تنبيه «ابدأ بتجربة صغيرة» — تُطبَّق الإضافات على ٢–٣ مندوبين وتُقاس قبل التعميم.
+  pilotNote:
+    "ابدأ بتجربة صغيرة: طبّق سكربتات هذا المرجع على ٢–٣ مندوبين لمدة أسبوعين، وقِس الأثر (زمن أول رد، ومعدل تحويل التجربة) قبل تعميمه على كامل الفريق. لا تعمّم قبل ما ترى الرقم يتحرّك.",
+
   roles: [
     {
       id: "r1",
@@ -52,6 +82,35 @@ const defaultData = {
         { id: uid(), task: "التأكد من أن جهة الاتصال هي صاحب القرار أو مؤثّر فيه (Authority).", output: "تصنيف العميل: ساخن / دافئ / بارد." },
         { id: uid(), task: "تقييم الملاءمة عبر BANT (الميزانية، الصلاحية، الحاجة، التوقيت).", output: "قرار: يُكمَّل أو يُستبعد مع السبب." },
       ],
+      scripts: [
+        {
+          id: uid(),
+          situation: "قبل ما تصرف وقتك على العميل، قِسه على معيار العميل المثالي (ICP) بالأرقام: مطاعم/كافيهات ≥ ٥٠ طلب باليوم، أو ≥ فرعين، أو تعتمد على تطبيق توصيل واحد فأكثر.",
+          rep: "قبل نكمّل، ودّي أفهم حجمكم بسرعة: كم فرع عندكم؟ وكم طلب باليوم تقريباً وقت الذروة؟ وتستخدمون كم تطبيق توصيل حالياً؟",
+          expected: "يعطيك أرقام تصنّفه فوراً: أولوية عالية (مؤهّل) أو خارج ICP.",
+          alt: "لو قال «ليش تسأل؟»: «عشان أرتّب لك الحل الصح من أول مرة وما أضيّع وقتك بعرض ما يناسب حجم مطعمك.»",
+          role: "فريق المبيعات",
+          source: "سيسبيديس — المبيعات نظام يُقاس ويُدار.",
+        },
+        {
+          id: uid(),
+          situation: "قاعدة «المُحرّك مو المتكلّم»: لا تطارد الموظف اللطيف المتجاوب اللي ما يملك قرار تغيير النظام — الصفقة تُغلق مع صاحب القدرة على التغيير.",
+          rep: "واضح إنك متحمّس ومقدّر تعاونك — مين معك اللي يقدر يعتمد تغيير نظام الكاشير عندكم؟ ودّي أضمّه معنا من البداية عشان نمشي صح.",
+          expected: "يوجّهك للمالك أو المدير صاحب القرار (المُحرّك).",
+          alt: "لو قال «أنا اللي أقرّر»: «ممتاز — يعني لو اتفقنا على القيمة والسعر، تقدر توقّع الاشتراك هالأسبوع؟»",
+          role: "فريق المبيعات",
+          source: "HBR «The End of Solution Sales» (2012).",
+        },
+        {
+          id: uid(),
+          situation: "قاعدة الساعة الأولى: سرعة أول رد تضاعف احتمال التأهيل أضعافاً. الهدف التشغيلي: أول رد خلال أقل من ٦٠ دقيقة في الدوام.",
+          rep: "هلا [الاسم]، وصلني طلبك عن نظام المنيو قبل شوي وحبيت أرد عليك على طول — متى يناسبك أتصل ٥ دقائق أفهم وضع مطعمك؟",
+          expected: "تفاعل أعلى بكثير لأنك رديت وهو لسا مهتم.",
+          alt: "لو ما رد: لمسة ثانية نفس اليوم عبر قناة مختلفة (واتساب ثم اتصال) — لا تنتظر ٢٤ ساعة.",
+          role: "فريق المبيعات (والمختص المساعد يراقب زمن أول رد ضمن Leading)",
+          source: "HBR «The Short Life of Online Sales Leads» (2011).",
+        },
+      ],
     },
     {
       id: "p2",
@@ -61,6 +120,26 @@ const defaultData = {
         { id: uid(), task: "إجراء مكالمة أو زيارة تشخيصية باستخدام دليل الاكتشاف.", output: "تقرير احتياجات موثّق ومربوط بالعميل." },
         { id: uid(), task: "تعبئة استمارة تشخيص العميل كاملة أثناء اللقاء.", output: "قائمة أولويات ونقاط ألم مرتّبة." },
         { id: uid(), task: "رصد نقاط الألم التشغيلية: الإدخال اليدوي، وقت الذروة، زحام الطلبات.", output: "تحديد المنتج الأنسب: MENU / نحجز / درع." },
+      ],
+      scripts: [
+        {
+          id: uid(),
+          situation: "«بيع الخسارة لا الميزة»: بدل ما تعدّد مزايا النظام، ورّي العميل بالأرقام كم يخسر لو ما اشترى (عمولة المنصات، طلبات تضيع ببطء الكاشير، غياب بيانات العملاء).",
+          rep: "خلينا نحسبها سوا: تطبيقات التوصيل تاخذ منك تقريباً [X]% من كل طلب، وكل طلب يضيع بزحمة الكاشير يعني فاتورة راحت — لو هذا يتكرر [عدد] مرات باليوم، كم يطلع بالشهر؟",
+          expected: "يبدأ يحسب خسارته ويحس بالألم (لا بالميزة) — وهنا يجيك مستعد.",
+          alt: "لو قال «الوضع ماشي»: «ماشي صح، بس ماشي بكم؟ درع يوريك رقم العمولة المدفوع فعلياً — أغلب الملّاك ينصدمون من الرقم.»",
+          role: "فريق المبيعات",
+          source: "HBR «The End of Solution Sales» (2012) / The Challenger Sale.",
+        },
+        {
+          id: uid(),
+          situation: "«لحظة القيمة»: أول لحظة يقول فيها صاحب المطعم «هذا وفّر عليّ وقت/فلوس». صمّم التجربة عشان يوصل لها خلال ٤٨ ساعة — أول طلب عبر المنيو، أول تقرير عمولة عبر درع، أول حجز عبر نحجز.",
+          rep: "هدفي أول ٤٨ ساعة توصل للحظة اللي تقول فيها «هذا وفّر عليّ»: أول طلب يمر عبر المنيو، أو أول تقرير عمولة من درع، أو أول حجز عبر نحجز — أي وحدة أقرب لوجعك نبدأ فيها؟",
+          expected: "يختار المنتج الأقرب لألمه، فتتركّز التجربة على قيمة يلمسها بسرعة.",
+          alt: "لو تردد: «نبدأ بالمنيو — أسرع لحظة قيمة: أول طلب يعدّي عليك اليوم وتشوف الفرق بنفسك.»",
+          role: "فريق المبيعات + المختص المساعد",
+          source: "حالة Toast — بِع «نظام تشغيل» لا منتجاً مفرداً.",
+        },
       ],
     },
     {
@@ -72,6 +151,17 @@ const defaultData = {
         { id: uid(), task: "ربط كل ميزة تُعرض بمشكلة ذُكرت في مرحلة الاكتشاف.", output: "خطة تفعيل مقترحة بمراحل واضحة." },
         { id: uid(), task: "عرض حساب عائد مبسّط (كم يوفّر من وقت / أخطاء / إيراد ضائع).", output: "محضر لقاء بالخطوات والمواعيد التالية." },
       ],
+      scripts: [
+        {
+          id: uid(),
+          situation: "«معيار القرار المكتوب»: قبل ما تبدأ التجربة، اتفق كتابياً على معيار النجاح — عشان الإغلاق يصير تلقائياً وتنزع اعتراض «أبي أفكّر» من جذوره.",
+          rep: "نتفق على معيار واضح ومكتوب: لو خلال التجربة مرّ [X] طلب ووفّرنا لك [Y] ريال، نعتمد الاشتراك السنوي — متفقين نكتبها الحين؟",
+          expected: "يوافق على المعيار، فيصير الإغلاق مجرد تنفيذ لاتفاق سابق لا نقاش جديد.",
+          alt: "لو تهرّب من الالتزام: «طيب وش الرقم اللي لو وصلناه تعتبر التجربة نجحت؟ نكتبه أنا وأنت الحين ونمشي عليه.»",
+          role: "فريق المبيعات (ويعتمد القائد صيغة المعيار)",
+          source: "سيسبيديس — القرار يُبنى على معيار مقاس لا انطباع.",
+        },
+      ],
     },
     {
       id: "p4",
@@ -81,6 +171,35 @@ const defaultData = {
         { id: uid(), task: "معالجة الاعتراضات النهائية (السعر، التوقيت، الالتزام العقدي).", output: "اتفاقية اشتراك سنوي موقّعة." },
         { id: uid(), task: "تقديم حافز محدّد بوقت لدفع القرار (Time-boxed).", output: "دفعة أولى مؤكدة." },
         { id: uid(), task: "تأكيد نطاق الخدمة وتسليم العميل لفريق التفعيل والدعم.", output: "تسليم Onboarding موثّق." },
+      ],
+      scripts: [
+        {
+          id: uid(),
+          situation: "«إيقاع المتابعة يوم ٠/١/٣/٧/١٤»: بعد العرض تابع بإيقاع ثابت، وكل لمسة تحمل قيمة مختلفة — لا تكرّر «حابب أتابع».",
+          rep: "يوم ٠: «شكراً على وقتك، حجزت لك العرض يوم [كذا].» • يوم ١: «أرسلت لك حساب التوفير المخصص لمطعمك.» • يوم ٣: «قصة مطعم بحجمكم وفّر [Z] بالشهر.» • يوم ٧: «جهزت لك رابط تفعيل سريع لو حاب نبدأ.» • يوم ١٤: رسالة إغلاق مهذّب: «أختم ملفك مؤقتاً وأنا حاضر متى ناسبك.»",
+          expected: "تفاعل أعلى لأن كل لمسة تعطي سبباً جديداً للرد، لا مجرد تذكير.",
+          alt: "لو صمت بعد يوم ٧: انتقل مباشرة لمحفّز الاسترجاع (السكربت التالي).",
+          role: "فريق المبيعات (المختص المساعد يقيس تنفيذ الإيقاع ضمن Leading)",
+          source: "سيسبيديس / HBR — المتابعة المنظّمة تحسم الصفقات.",
+        },
+        {
+          id: uid(),
+          situation: "«محفّز الاسترجاع بعد ٧٢ ساعة صمت»: إذا سكت العميل ٧٢ ساعة بعد التجربة، أرسل رسالة تحمل رقم مطعمه نفسه — الرقم الشخصي يعيد إشعال الاهتمام.",
+          rep: "مطعمك مرّ عليه [X] طلب في التجربة ≈ [Z] ريال عمولة موفّرة شهرياً — نكمّل ونثبّت التوفير؟",
+          expected: "الرقم المرتبط بمطعمه تحديداً يرجّعه للطاولة.",
+          alt: "لو ما رد: لمسة أخيرة بمعيار القرار المكتوب: «اتفقنا لو وصلنا [Y] نعتمد — وصلناه فعلاً، نوقّع؟»",
+          role: "فريق المبيعات (يُشغَّل آلياً عبر Stale Deal Detection)",
+          source: "سيسبيديس — إدارة القمع بالبيانات لا بالذاكرة.",
+        },
+        {
+          id: uid(),
+          situation: "«ربط رصد الصفقات الراكدة (Stale Deal Detection)»: أي صفقة تسكت فوق الحد المسموح تُرصد آلياً وتُذكّر المندوب بالخطوة التالية — لا تُنسى صفقة في القمع.",
+          rep: "تذكير داخلي: «صفقة [العميل] راكدة من [عدد] أيام — نفّذ لمسة الإيقاع القادمة أو محفّز الاسترجاع، وإلا صعّدها.»",
+          expected: "كل صفقة راكدة تُلتقط وتُعاد للحركة قبل ما تموت.",
+          alt: "لو تجاوزت الركود الحد الأعلى: تصعيد للمختص المساعد لمراجعتها معك.",
+          role: "المختص المساعد (يملك مؤشر Leading: تنفيذ الإيقاع/زمن الاستجابة)",
+          source: "سيسبيديس — المبيعات نظام يُقاس ويُدار.",
+        },
       ],
     },
   ],
@@ -129,11 +248,15 @@ const defaultData = {
       { id: uid(), label: "مكالمات الاكتشاف المكتملة أسبوعياً / موظف", target: 15, actual: 0, unit: "مكالمة", lower: false },
       { id: uid(), label: "الالتزام بتعبئة استمارة التشخيص", target: 95, actual: 0, unit: "%", lower: false },
       { id: uid(), label: "ساعات التدريب والمحاكاة المنفّذة شهرياً", target: 8, actual: 0, unit: "ساعة", lower: false },
+      { id: uid(), label: "متوسط زمن أول رد على اللِّيد (قاعدة الساعة الأولى)", target: 60, actual: 0, unit: "دقيقة", lower: true },
+      { id: uid(), label: "الالتزام بإيقاع المتابعة (يوم ٠/١/٣/٧/١٤)", target: 90, actual: 0, unit: "%", lower: false },
     ],
     lagging: [
       { id: uid(), label: "معدل التحويل من الاكتشاف إلى العرض", target: 40, actual: 0, unit: "%", lower: false },
       { id: uid(), label: "متوسط وقت إغلاق الصفقة", target: 21, actual: 0, unit: "يوم", lower: true },
       { id: uid(), label: "ثقة العميل بعد أول لقاء (Initial Trust)", target: 85, actual: 0, unit: "%", lower: false },
+      { id: uid(), label: "معدل تحويل التجربة إلى اشتراك سنوي", target: 50, actual: 0, unit: "%", lower: false },
+      { id: uid(), label: "متوسط قيمة الصفقة (اشتراك سنوي)", target: 3588, actual: 0, unit: "ريال", lower: false },
     ],
   },
 
@@ -533,12 +656,14 @@ export default function SalesPlaybook() {
 
   /* روابط التنقل */
   const nav = [
+    { id: "sec-foundations", label: "الأسس المرجعية" },
     { id: "sec-roles", label: "الأدوار" },
     { id: "sec-pipeline", label: "قمع المبيعات" },
     { id: "sec-discovery", label: "دليل الاكتشاف" },
     { id: "sec-training", label: "التدريب والتقييم" },
     { id: "sec-kpis", label: "المؤشرات" },
     { id: "sec-negotiation", label: "التفاوض والإغلاق" },
+    { id: "sec-changelog", label: "سجل التغييرات" },
   ];
   const go = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
@@ -588,6 +713,13 @@ export default function SalesPlaybook() {
               لوحة المبيعات التفاعلية والدليل التشغيلي
             </h1>
             <p className="mt-1 text-sm text-blue-100">من الصفر إلى الاحتراف — قابل للتعديل بالكامل ليطابق سير عملياتكم.</p>
+            <div className="mt-3 inline-flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-blue-100">
+              <span>النسخة {data.meta.version}</span>
+              <span className="text-blue-300">·</span>
+              <span>{data.meta.date}</span>
+              <span className="text-blue-300">·</span>
+              <span>آخر تحديث: {data.meta.lastChange}</span>
+            </div>
           </div>
           <div className="no-print flex items-center gap-2">
             <span className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold">
@@ -619,6 +751,51 @@ export default function SalesPlaybook() {
           ))}
         </div>
       </nav>
+
+      {/* ٠ — الأسس المرجعية */}
+      <SectionWrap id="sec-foundations">
+        <SectionHeader
+          n="٠"
+          title="الأسس المرجعية"
+          en="Reference Foundations"
+          desc="ليش نشتغل بهالطريقة — مبادئ مبنية على مصادر مبيعات من كلية هارفارد للأعمال. كل مبدأ سطر واحد ومصدره، عشان الفريق يفهم «ليش» لا «وش» فقط."
+        />
+        <div className="grid gap-4 md:grid-cols-2">
+          {data.foundations.map((f, i) => (
+            <div key={f.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="mb-3 flex items-start gap-3">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-sm font-extrabold text-white" style={{ background: NAVY }}>{i + 1}</span>
+                <AreaInput
+                  value={f.principle}
+                  rows={2}
+                  onChange={(v) => update((d) => { d.foundations.find((x) => x.id === f.id)!.principle = v; })}
+                />
+                <IconBtn tone="red" title="حذف المبدأ" onClick={() => update((d) => { d.foundations = d.foundations.filter((x) => x.id !== f.id); })}>✕</IconBtn>
+              </div>
+              <div className="rounded-lg bg-slate-50 p-3">
+                <div className="mb-1 text-[11px] font-bold text-slate-400">المصدر</div>
+                <AreaInput
+                  value={f.source}
+                  rows={2}
+                  onChange={(v) => update((d) => { d.foundations.find((x) => x.id === f.id)!.source = v; })}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4">
+          <AddBtn onClick={() => update((d) => { d.foundations.push({ id: uid(), principle: "مبدأ جديد", source: "" }); })}>إضافة مبدأ مرجعي</AddBtn>
+        </div>
+
+        {/* تنبيه ابدأ بتجربة صغيرة */}
+        <div className="mt-6 rounded-2xl border-2 border-dashed p-4" style={{ borderColor: "#fcd34d", background: "#fffbeb" }}>
+          <div className="mb-2 flex items-center gap-2">
+            <span className="text-lg">🧪</span>
+            <h3 className="text-sm font-extrabold text-amber-800">ابدأ بتجربة صغيرة قبل التعميم</h3>
+          </div>
+          <AreaInput value={data.pilotNote} rows={2} onChange={(v) => update((d) => { d.pilotNote = v; })} />
+        </div>
+      </SectionWrap>
 
       {/* ١ — الأدوار */}
       <SectionWrap id="sec-roles">
@@ -688,6 +865,50 @@ export default function SalesPlaybook() {
                 <div className="px-4 py-3">
                   <AddBtn onClick={() => update((d) => { d.pipeline.find((s) => s.id === stage.id)!.tasks.push({ id: uid(), task: "", output: "" }); })}>
                     إضافة مهمة
+                  </AddBtn>
+                </div>
+              </div>
+
+              {/* سكربتات المرحلة الجاهزة (بقالب: الموقف / نص المندوب / الرد المتوقع / البديل / الدور) */}
+              <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="h-4 w-1.5 rounded-full" style={{ background: ACCENT }} />
+                  <h4 className="text-sm font-extrabold text-slate-800">سكربتات جاهزة — نص يُقال فعلاً</h4>
+                </div>
+                <div className="space-y-3">
+                  {(stage.scripts || []).map((sc) => (
+                    <div key={sc.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                      <div className="mb-2 flex items-start justify-between gap-1">
+                        <div className="flex-1">
+                          <label className="mb-1 block text-[11px] font-bold text-slate-400">الموقف</label>
+                          <AreaInput value={sc.situation} rows={2} onChange={(v) => update((d) => { d.pipeline.find((s) => s.id === stage.id)!.scripts!.find((x) => x.id === sc.id)!.situation = v; })} />
+                        </div>
+                        <IconBtn tone="red" title="حذف السكربت" onClick={() => update((d) => { const s = d.pipeline.find((s) => s.id === stage.id)!; s.scripts = (s.scripts || []).filter((x) => x.id !== sc.id); })}>✕</IconBtn>
+                      </div>
+                      <div className="rounded-lg p-3" style={{ borderRight: "4px solid " + ACCENT, background: "#eff6ff" }}>
+                        <label className="mb-1 block text-[11px] font-bold text-blue-700">نص المندوب</label>
+                        <AreaInput value={sc.rep} rows={3} onChange={(v) => update((d) => { d.pipeline.find((s) => s.id === stage.id)!.scripts!.find((x) => x.id === sc.id)!.rep = v; })} />
+                      </div>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <label className="mb-1 block text-[11px] font-bold text-slate-400">الرد المتوقع من العميل</label>
+                          <AreaInput value={sc.expected} rows={2} onChange={(v) => update((d) => { d.pipeline.find((s) => s.id === stage.id)!.scripts!.find((x) => x.id === sc.id)!.expected = v; })} />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-[11px] font-bold text-slate-400">البديل لو اعترض</label>
+                          <AreaInput value={sc.alt} rows={2} onChange={(v) => update((d) => { d.pipeline.find((s) => s.id === stage.id)!.scripts!.find((x) => x.id === sc.id)!.alt = v; })} />
+                        </div>
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
+                        <span className="rounded-full px-2.5 py-1 font-bold text-blue-700" style={{ background: "#dbeafe" }}>الدور: {sc.role}</span>
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-500">المصدر: {sc.source}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3">
+                  <AddBtn onClick={() => update((d) => { const s = d.pipeline.find((s) => s.id === stage.id)!; s.scripts = [...(s.scripts || []), { id: uid(), situation: "", rep: "", expected: "", alt: "", role: "فريق المبيعات", source: "" }]; })}>
+                    إضافة سكربت
                   </AddBtn>
                 </div>
               </div>
@@ -1048,8 +1269,53 @@ export default function SalesPlaybook() {
         <NegotiationSimulator />
       </SectionWrap>
 
+      {/* سجل التغييرات */}
+      <SectionWrap id="sec-changelog">
+        <SectionHeader
+          n="↻"
+          title="سجل التغييرات"
+          en="Change Log"
+          desc="كل تعديل جوهري يُوثّق هنا: التاريخ، القسم، ما تغيّر، السبب، ومَن اعتمد. عند أي تحديث مستقبلي ارفع رقم النسخة وأضف سطراً — لا تحذف سكربتاً قائماً إلا بتأكيد. (المسار الكامل في ملف «كيفية_تحديث_البلاي_بوك.md».)"
+        />
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-right text-sm">
+              <thead>
+                <tr className="text-xs font-bold text-slate-500" style={{ background: "#f1f5f9" }}>
+                  <th className="px-3 py-3 font-bold">التاريخ</th>
+                  <th className="px-3 py-3 font-bold">القسم</th>
+                  <th className="px-3 py-3 font-bold">ما تغيّر</th>
+                  <th className="px-3 py-3 font-bold">السبب</th>
+                  <th className="px-3 py-3 font-bold">مَن اعتمد</th>
+                  <th className="px-2 py-3"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {data.meta.changelog.map((row) => (
+                  <tr key={row.id} className="align-top">
+                    <td className="px-2 py-2 w-28"><TextInput value={row.date} onChange={(v) => update((d) => { d.meta.changelog.find((x) => x.id === row.id)!.date = v; })} /></td>
+                    <td className="px-2 py-2 w-28"><TextInput value={row.section} onChange={(v) => update((d) => { d.meta.changelog.find((x) => x.id === row.id)!.section = v; })} /></td>
+                    <td className="px-2 py-2"><AreaInput value={row.change} rows={2} onChange={(v) => update((d) => { d.meta.changelog.find((x) => x.id === row.id)!.change = v; })} /></td>
+                    <td className="px-2 py-2"><AreaInput value={row.reason} rows={2} onChange={(v) => update((d) => { d.meta.changelog.find((x) => x.id === row.id)!.reason = v; })} /></td>
+                    <td className="px-2 py-2 w-32"><TextInput value={row.approvedBy} onChange={(v) => update((d) => { d.meta.changelog.find((x) => x.id === row.id)!.approvedBy = v; })} /></td>
+                    <td className="px-1 py-2">
+                      <IconBtn tone="red" title="حذف الصف" onClick={() => update((d) => { d.meta.changelog = d.meta.changelog.filter((x) => x.id !== row.id); })}>✕</IconBtn>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="border-t border-slate-100 px-4 py-3">
+            <AddBtn onClick={() => update((d) => { d.meta.changelog.push({ id: uid(), date: data.meta.date, section: "", change: "", reason: "", approvedBy: "القائد (حمد)" }); })}>
+              إضافة سطر تغيير
+            </AddBtn>
+          </div>
+        </div>
+      </SectionWrap>
+
       <footer className="border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-400 sm:px-8">
-        دليل تشغيلي حي — كل تعديل يُحفظ تلقائياً · منظومة MENU · قابل للطباعة كـ PDF.
+        دليل تشغيلي حي — كل تعديل يُحفظ تلقائياً · منظومة MENU · قابل للطباعة كـ PDF · النسخة {data.meta.version}.
       </footer>
     </div>
   );
