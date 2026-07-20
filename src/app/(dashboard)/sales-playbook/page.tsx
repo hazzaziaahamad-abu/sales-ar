@@ -630,6 +630,56 @@ async function savePlaybook(orgId: string, payload: typeof defaultData) {
   await sb.from("sales_playbook").upsert({ org_id: orgId, data: payload, updated_at: new Date().toISOString() }, { onConflict: "org_id" });
 }
 
+/*
+  دمج بيانات المنظمة المحفوظة مع المحتوى الافتراضي الجديد.
+  القاعدة: تعديلات المنظمة تبقى كما هي، والإضافات الجديدة (الأسس المرجعية، سكربتات المراحل،
+  سيناريوهات التكتيكات، المؤشرات الجديدة) تظهر فقط إذا كانت غائبة عن البيانات المحفوظة.
+  بدون هذا الدمج، المنظمات اللي عندها بيانات محفوظة أصلاً ما تشوف الإضافات الجديدة.
+*/
+function mergePlaybook(saved: Partial<typeof defaultData>): typeof defaultData {
+  const base = clone(defaultData);
+  const merged = { ...base, ...saved } as typeof defaultData;
+
+  // المفاتيح الجديدة كلياً: احتفظ بالافتراضي إن غابت عن المحفوظ
+  merged.meta = saved.meta ? { ...base.meta, ...saved.meta } : base.meta;
+  if (!saved.foundations) merged.foundations = base.foundations;
+  if (saved.pilotNote === undefined) merged.pilotNote = base.pilotNote;
+
+  // سكربتات المراحل: المطابقة عبر الاسم الإنجليزي الثابت (Qualification/Discovery/...)
+  if (Array.isArray(merged.pipeline)) {
+    merged.pipeline = merged.pipeline.map((stage) => {
+      if (stage.scripts && stage.scripts.length) return stage;
+      const def = base.pipeline.find((s) => s.en === stage.en);
+      return { ...stage, scripts: clone(def?.scripts ?? []) };
+    });
+  }
+
+  // سيناريوهات التكتيكات: تأكيد وجود المصفوفة + استرجاع الأمثلة المزروعة عند الغياب
+  if (merged.negotiation && Array.isArray(merged.negotiation.tactics)) {
+    merged.negotiation = {
+      ...base.negotiation,
+      ...merged.negotiation,
+      tactics: merged.negotiation.tactics.map((t) => {
+        if (t.scenarios) return t;
+        const def = base.negotiation.tactics.find((x) => x.en === t.en);
+        return { ...t, scenarios: clone(def?.scenarios ?? []) };
+      }),
+    };
+  }
+
+  // المؤشرات الجديدة: أضِفها فقط إذا كان نصّها غير موجود مسبقاً
+  if (merged.kpis) {
+    (["leading", "lagging"] as const).forEach((key) => {
+      const list = merged.kpis[key];
+      if (!Array.isArray(list)) return;
+      const labels = new Set(list.map((k) => k.label));
+      base.kpis[key].forEach((k) => { if (!labels.has(k.label)) list.push(clone(k)); });
+    });
+  }
+
+  return merged;
+}
+
 /* ---------- المكوّن الرئيسي ---------- */
 
 export default function SalesPlaybook() {
@@ -644,7 +694,7 @@ export default function SalesPlaybook() {
     if (!activeOrgId) return;
     fetchPlaybook(activeOrgId)
       .then((saved) => {
-        if (saved) setData({ ...clone(defaultData), ...saved });
+        if (saved) setData(mergePlaybook(saved));
       })
       .catch(() => {})
       .finally(() => setLoaded(true));
