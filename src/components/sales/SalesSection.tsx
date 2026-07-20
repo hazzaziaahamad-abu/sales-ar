@@ -796,8 +796,6 @@ export function SalesSection({ salesType }: SalesPageProps) {
   }, {});
 
   /* KPI calculations */
-  const closedDeals = repFilteredDeals.filter((d) => d.stage === "مكتملة").length;
-  const winRate = totalDeals > 0 ? Math.round((closedDeals / totalDeals) * 100) : 0;
   const avgCycleDays = totalDeals > 0 ? Math.round(repFilteredDeals.reduce((s, d) => s + d.cycle_days, 0) / totalDeals) : 0;
   const pipelineValue = repFilteredDeals.filter((d) => d.stage !== "مكتملة").reduce((s, d) => s + d.deal_value, 0);
 
@@ -2536,7 +2534,6 @@ export function SalesSection({ salesType }: SalesPageProps) {
                   <th className="py-3 px-4 text-center font-medium">الصفقات</th>
                   <th className="py-3 px-4 text-center font-medium">مُغلق</th>
                   <th className="py-3 px-4 text-right font-medium">الباقات</th>
-                  <th className="py-3 px-4 text-right font-medium min-w-[140px]">معدل الإغلاق</th>
                   <th className="py-3 px-4 text-center font-medium">بالأصلي</th>
                   <th className="py-3 px-4 text-center font-medium">بخصم</th>
                   <th className="py-3 px-4 text-right font-medium min-w-[100px]">نسبة الأصلي</th>
@@ -2558,7 +2555,6 @@ export function SalesSection({ salesType }: SalesPageProps) {
                   ];
                   const avatarColor = avatarColors[idx % avatarColors.length];
                   const medal = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : "—";
-                  const rateColor = rep.winRate >= 30 ? "bg-amber" : rep.winRate > 0 ? "bg-cc-red" : "bg-muted-foreground/30";
 
                   return (
                     <React.Fragment key={rep.name}>
@@ -2591,16 +2587,6 @@ export function SalesSection({ salesType }: SalesPageProps) {
                           {Object.keys(rep.plans).length === 0 && <span className="text-muted-foreground/50">—</span>}
                         </div>
                       </td>
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-sm font-bold ${rep.winRate >= 30 ? "text-amber" : rep.winRate > 0 ? "text-cc-red" : "text-muted-foreground"}`}>
-                            {rep.winRate}%
-                          </span>
-                          <div className="flex-1 h-1.5 bg-muted/20 rounded-full overflow-hidden">
-                            <div className={`h-full rounded-full ${rateColor} transition-all`} style={{ width: `${rep.winRate}%` }} />
-                          </div>
-                        </div>
-                      </td>
                       <td className="py-3.5 px-4 text-center text-emerald-400 font-medium">{rep.fullPrice}</td>
                       <td className="py-3.5 px-4 text-center text-amber-400">{rep.discounted}</td>
                       <td className="py-3.5 px-4">
@@ -2621,7 +2607,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
                     </tr>
                     {/* Recommendations row */}
                     <tr className="border-b border-border/30">
-                      <td colSpan={11} className="px-5 py-2 pb-3">
+                      <td colSpan={10} className="px-5 py-2 pb-3">
                         <div className="flex flex-wrap gap-1.5 items-center">
                           <span className="text-[12px] text-muted-foreground/70 ml-1">توصيات:</span>
                           {getRepTips(rep).map((tip, i) => (
@@ -2662,15 +2648,8 @@ export function SalesSection({ salesType }: SalesPageProps) {
 
         {/* Tab 1: Sales KPIs */}
         <TabsContent value="kpis" className="space-y-6">
-          {/* 4 KPI cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <KPICard
-              label="معدل الإغلاق"
-              value={`${winRate}%`}
-              target={`${KPI_TARGETS.win_rate}%`}
-              status={getKpiStatus(winRate, KPI_TARGETS.win_rate)}
-              icon={<Target className="w-4 h-4" />}
-            />
+          {/* KPI cards */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <KPICard
               label="متوسط دورة البيع"
               value={`${avgCycleDays} يوم`}
@@ -2812,7 +2791,6 @@ export function SalesSection({ salesType }: SalesPageProps) {
                     <th className="py-2 text-right font-medium">الصفقات</th>
                     <th className="py-2 text-right font-medium">القيمة</th>
                     <th className="py-2 text-right font-medium">فاز</th>
-                    <th className="py-2 text-right font-medium">معدل الإغلاق</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2825,14 +2803,6 @@ export function SalesSection({ salesType }: SalesPageProps) {
                       <td className="py-2.5 text-muted-foreground">{s.count}</td>
                       <td className="py-2.5 text-cyan font-medium">{formatMoney(s.value)}</td>
                       <td className="py-2.5 text-cc-green font-medium">{s.won}</td>
-                      <td className="py-2.5">
-                        <div className="flex items-center gap-2">
-                          <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
-                            <div className="h-full rounded-full bg-cyan" style={{ width: `${s.winRate}%` }} />
-                          </div>
-                          <span className="text-muted-foreground">{s.winRate}%</span>
-                        </div>
-                      </td>
                     </tr>
                   ))}
                 </tbody>

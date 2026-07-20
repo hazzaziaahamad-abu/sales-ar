@@ -121,7 +121,6 @@ export default function DashboardPage() {
   const periodDeals = deals.length;
   const periodRevenue = deals.reduce((s, d) => s + d.deal_value, 0);
   const activeProjects = projects.length;
-  const conversionRate = periodDeals > 0 ? Math.round((deals.filter((d) => d.stage === "مكتملة").length / periodDeals) * 100) : 0;
   const urgentProjects = projects.filter((project) => project.status_tag === "متأخر").length;
   const latestDeal = deals[0] ?? null;
 
@@ -258,7 +257,7 @@ export default function DashboardPage() {
                     </h1>
                     <p className="mt-3 max-w-xl text-sm leading-7 text-muted-foreground">
                       {latestDeal
-                        ? `آخر صفقة مؤثرة جاءت من ${latestDeal.client_name} بقيمة ${formatMoney(latestDeal.deal_value)}. معدل الإغلاق الحالي ${conversionRate}% مع ${openTickets} تذكرة مفتوحة تحتاج متابعة.`
+                        ? `آخر صفقة مؤثرة جاءت من ${latestDeal.client_name} بقيمة ${formatMoney(latestDeal.deal_value)} مع ${openTickets} تذكرة مفتوحة تحتاج متابعة.`
                         : "ابدأ من هذه اللوحة لبناء قراءة تشغيلية مركزة على الصفقات، الدعم، والمشاريع الجارية."}
                     </p>
                   </>
@@ -341,9 +340,9 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {isLoading ? (
-          Array.from({ length: 3 }).map((_, index) => <KpiSkeleton key={index} />)
+          Array.from({ length: 2 }).map((_, index) => <KpiSkeleton key={index} />)
         ) : (
           <>
             <StatCard
@@ -352,14 +351,6 @@ export default function DashboardPage() {
               color="cyan"
               icon={<DollarSign className="w-4 h-4 text-cyan" />}
               subtext={errors.deals ?? "المحصلة الحالية للفترة"}
-            />
-            <StatCard
-              value={`${conversionRate}%`}
-              label="معدل الإغلاق"
-              color="amber"
-              progress={conversionRate}
-              icon={<ArrowUpLeft className="w-4 h-4 text-amber" />}
-              subtext="من إجمالي الصفقات"
             />
             <StatCard
               value={String(activeProjects)}

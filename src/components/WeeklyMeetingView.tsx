@@ -403,7 +403,6 @@ function Tab1Numbers({ data, update }: { data: WeeklyData; update: (p: Partial<W
   const cards = [
     { label: "💰 الإيراد الفعلي", key: "revenue" as const, target: 17500, unit: "ريال", color: T.teal },
     { label: "📦 صفقات مغلقة", key: "closed" as const, target: 15, unit: "", color: T.green },
-    { label: "📈 نسبة الإغلاق %", key: "closeRate" as const, target: 35, unit: "%", color: T.purple },
     { label: "🔄 نسبة التجديد %", key: "renewRate" as const, target: 75, unit: "%", color: T.amber },
   ];
 
@@ -447,7 +446,6 @@ function Tab2Team({ data, updateMember, academyMap }: { data: WeeklyData; update
     { label: "العروض", field: "demos" as const },
     { label: "مغلق", field: "closed" as const },
     { label: "متوسط القيمة", field: "avgVal" as const },
-    { label: "نسبة الإغلاق", field: "rate" as const },
     { label: "الحالة", field: "status" as const },
   ];
   const targets = { calls: "75", demos: "40", closed: "15", avgVal: "700+", rate: "35%+" };

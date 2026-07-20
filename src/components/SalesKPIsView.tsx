@@ -214,7 +214,6 @@ export default function SalesKPIsView({ deals, lostDeals }: SalesKPIsViewProps) 
 
       {/* ═══ 1. KPI STATUS CARDS ═══ */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
-        <KPIStatusCard label="معدل الإغلاق" actual={metrics.winRate} target={KPI_TARGETS.winRate} unit="%" />
         <KPIStatusCard label="تحويل Demo من SQL" actual={metrics.demoConv} target={KPI_TARGETS.demoConv} unit="%" />
         <KPIStatusCard label="متوسط دورة المبيعات" actual={metrics.avgCycle} target={KPI_TARGETS.avgCycle} unit=" يوم" inverse />
         <KPIStatusCard label="قيمة الـ Pipeline" actual={metrics.pipeline} target={KPI_TARGETS.pipelineValue} unit="" isMoney />
@@ -249,11 +248,6 @@ export default function SalesKPIsView({ deals, lostDeals }: SalesKPIsViewProps) 
               </div>
             );
           })}
-        </div>
-        {/* Win rate summary */}
-        <div style={{ marginTop: 16, padding: "12px 16px", background: `${T.green}15`, borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontSize: 13, color: T.mid }}>معدل الإغلاق الكلي</span>
-          <span style={{ fontSize: 18, fontWeight: 700, color: T.green }}>{metrics.winRate}%</span>
         </div>
       </div>
 
@@ -324,7 +318,6 @@ export default function SalesKPIsView({ deals, lostDeals }: SalesKPIsViewProps) 
             </thead>
             <tbody>
               {[
-                { label: "معدل الإغلاق (Win Rate)", desc: "نسبة الصفقات المُغلقة من إجمالي الفرص", actual: metrics.winRate, target: KPI_TARGETS.winRate, unit: "%" },
                 { label: "تحويل Demo من SQL", desc: "% العملاء المؤهلين الذين وصلوا لمرحلة العرض", actual: metrics.demoConv, target: KPI_TARGETS.demoConv, unit: "%" },
                 { label: "متوسط دورة المبيعات", desc: "الهدف: إغلاق الصفقة خلال أقل من 14 يوماً", actual: metrics.avgCycle, target: KPI_TARGETS.avgCycle, unit: " يوم", inverse: true },
                 { label: "متوسط قيمة الصفقة", desc: "متوسط القيمة المالية لكل صفقة", actual: metrics.avgDealVal, target: KPI_TARGETS.avgDealValue, unit: "", isMoney: true },
@@ -375,7 +368,7 @@ export default function SalesKPIsView({ deals, lostDeals }: SalesKPIsViewProps) 
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr>
-                  {["الموظف", "الصفقات", "مُغلق", "معدل الإغلاق", "متوسط الدورة", "إجمالي القيمة", "الترتيب"].map(h => (
+                  {["الموظف", "الصفقات", "مُغلق", "متوسط الدورة", "إجمالي القيمة", "الترتيب"].map(h => (
                     <th key={h} style={{ padding: "10px 8px", textAlign: "right", fontWeight: 600, color: T.mid, borderBottom: `1px solid ${T.border}`, whiteSpace: "nowrap" }}>{h}</th>
                   ))}
                 </tr>
@@ -383,7 +376,6 @@ export default function SalesKPIsView({ deals, lostDeals }: SalesKPIsViewProps) 
               <tbody>
                 {metrics.repPerformance.map((rep, idx) => {
                   const medal = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}`;
-                  const rateColor = rep.winRate >= 35 ? T.green : rep.winRate >= 20 ? T.amber : T.red;
                   const cycleColor = rep.avgCycle <= 14 ? T.green : rep.avgCycle <= 21 ? T.amber : T.red;
                   const initial = rep.name.charAt(0);
                   return (
@@ -403,14 +395,6 @@ export default function SalesKPIsView({ deals, lostDeals }: SalesKPIsViewProps) 
                       </td>
                       <td style={{ padding: "12px 8px", color: T.mid }}>{rep.deals}</td>
                       <td style={{ padding: "12px 8px", color: T.mid }}>{rep.closed}</td>
-                      <td style={{ padding: "12px 8px", minWidth: 140 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontWeight: 700, color: rateColor, width: 35 }}>{rep.winRate}%</span>
-                          <div style={{ flex: 1 }}>
-                            <ProgressBar6 pct={Math.min((rep.winRate / 35) * 100, 100)} color={rateColor} />
-                          </div>
-                        </div>
-                      </td>
                       <td style={{ padding: "12px 8px", color: cycleColor, fontFamily: "monospace" }}>{rep.avgCycle} يوم</td>
                       <td style={{ padding: "12px 8px", fontWeight: 700, color: T.teal, fontFamily: "monospace" }}>{formatMoney(rep.value)}</td>
                       <td style={{ padding: "12px 8px", textAlign: "center", fontSize: 18 }}>{medal}</td>
@@ -443,10 +427,6 @@ export default function SalesKPIsView({ deals, lostDeals }: SalesKPIsViewProps) 
                   <div style={{ display: "flex", justifyContent: "space-between" }}>
                     <span style={{ color: T.mid }}>القيمة الإجمالية</span>
                     <span style={{ fontWeight: 700, color: T.teal, fontFamily: "monospace" }}>{formatMoney(s.value)}</span>
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span style={{ color: T.mid }}>معدل الإغلاق</span>
-                    <span style={{ fontWeight: 600, color: s.winRate >= 35 ? T.green : s.winRate > 0 ? T.amber : T.dim }}>{s.winRate}%</span>
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between" }}>
                     <span style={{ color: T.mid }}>متوسط القيمة</span>
