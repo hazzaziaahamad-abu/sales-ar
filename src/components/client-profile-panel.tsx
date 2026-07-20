@@ -341,6 +341,25 @@ function TicketCard({ ticket }: { ticket: Ticket }) {
   );
 }
 
+// نبذة العميل تُخزَّن كنص، وكل سطر = نقطة. هذه الدوال تحوّله لنقاط تحت بعض.
+function splitBioPoints(text: string): string[] {
+  return (text || "")
+    .split(/\r?\n/)
+    .map((l) => l.replace(/^\s*[•\-*]\s*/, "").trim())
+    .filter(Boolean);
+}
+
+// يجهّز مسودة التعديل: كل نقطة بسطر يبدأ بـ«• » (أو نقطة فارغة واحدة للبدء).
+function toBulletedDraft(text: string): string {
+  const pts = splitBioPoints(text);
+  return pts.length ? pts.map((p) => `• ${p}`).join("\n") : "• ";
+}
+
+// يوحّد المسودة قبل الحفظ: نقاط نظيفة بسطر لكل نقطة (يحذف الفارغ).
+function normalizeBio(text: string): string {
+  return splitBioPoints(text).map((p) => `• ${p}`).join("\n");
+}
+
 interface ClientProfilePanelProps {
   open: boolean;
   onClose: () => void;
@@ -452,12 +471,27 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
     }
   }, []);
 
+  // Enter يبدأ نقطة جديدة تلقائياً بـ«• » (Shift+Enter لسطر داخل نفس النقطة)
+  function handleBioKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      const ta = e.currentTarget;
+      const start = ta.selectionStart;
+      const end = ta.selectionEnd;
+      const next = bioDraft.slice(0, start) + "\n• " + bioDraft.slice(end);
+      setBioDraft(next);
+      const pos = start + 3;
+      requestAnimationFrame(() => { ta.selectionStart = ta.selectionEnd = pos; });
+    }
+  }
+
   const saveBio = useCallback(async () => {
     if (!bioKey) return;
     setBioSaving(true);
     try {
-      await upsertClientBio(bioKey, bioDraft.trim(), user?.name);
-      setBio(bioDraft.trim());
+      const cleaned = normalizeBio(bioDraft);
+      await upsertClientBio(bioKey, cleaned, user?.name);
+      setBio(cleaned);
       setBioEditing(false);
     } catch {
       // silent
@@ -962,7 +996,7 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
                   </div>
                   {!bioEditing ? (
                     <button
-                      onClick={() => { setBioDraft(bio); setBioEditing(true); }}
+                      onClick={() => { setBioDraft(toBulletedDraft(bio)); setBioEditing(true); }}
                       className="flex items-center gap-1 text-[12px] text-primary hover:underline"
                     >
                       <Pencil className="w-3 h-3" /> {bio ? "تعديل" : "إضافة"}
@@ -986,18 +1020,29 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
                   )}
                 </div>
                 {bioEditing ? (
-                  <textarea
-                    value={bioDraft}
-                    onChange={(e) => setBioDraft(e.target.value)}
-                    placeholder="اكتب نبذة عن العميل... (مثال: عميل قديم، يفضل التواصل عبر واتساب، مهتم بالترقية)"
-                    className="w-full text-xs bg-background/50 border border-border/50 rounded-lg p-2 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/50 resize-none"
-                    rows={3}
-                    dir="rtl"
-                  />
+                  <div>
+                    <textarea
+                      value={bioDraft}
+                      onChange={(e) => setBioDraft(e.target.value)}
+                      onKeyDown={handleBioKeyDown}
+                      placeholder="اكتب نقطة في كل سطر... (مثال: عميل قديم • يفضل التواصل عبر واتساب • مهتم بالترقية)"
+                      className="w-full text-xs bg-background/50 border border-border/50 rounded-lg p-2 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/50 resize-y leading-relaxed"
+                      rows={4}
+                      dir="rtl"
+                    />
+                    <p className="mt-1 text-[10px] text-muted-foreground/50">اضغط Enter لبدء نقطة جديدة · Shift+Enter لسطر داخل نفس النقطة</p>
+                  </div>
                 ) : bio ? (
-                  <p className="text-xs text-foreground/70 whitespace-pre-line leading-relaxed">{bio}</p>
+                  <ul className="space-y-1">
+                    {splitBioPoints(bio).map((pt, i) => (
+                      <li key={i} className="flex gap-1.5 text-xs text-foreground/70 leading-relaxed">
+                        <span className="mt-[2px] shrink-0 text-amber-400/80">•</span>
+                        <span className="whitespace-pre-line break-words">{pt}</span>
+                      </li>
+                    ))}
+                  </ul>
                 ) : (
-                  <p className="text-[12px] text-muted-foreground/50">لا توجد نبذة — اضغط "إضافة" لكتابة ملاحظات عن العميل</p>
+                  <p className="text-[12px] text-muted-foreground/50">لا توجد نبذة — اضغط "إضافة" لكتابة ملاحظات عن العميل على شكل نقاط</p>
                 )}
               </div>
 
