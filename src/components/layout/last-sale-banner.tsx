@@ -27,6 +27,21 @@ function sectionsFromPath(pathname: string): BannerMode {
   return null;
 }
 
+/**
+ * يختار تاريخ الإتمام الفعلي: أول مرشّح صالح وغير مستقبلي (بهامش دقيقة للانحراف الزمني).
+ * يحمي البانر من تواريخ مُدخلة بالغلط في المستقبل (مثل payment_date خاطئ) فلا تظهر «مضى الآن»
+ * ولا تتصدّر كأحدث صفقة.
+ */
+function pickCompletedDate(...candidates: (string | null | undefined)[]): string {
+  const nowMs = Date.now() + 60000; // تسامح دقيقة واحدة
+  const valid = candidates.filter((c): c is string => Boolean(c));
+  const past = valid.find((c) => {
+    const t = new Date(c).getTime();
+    return !Number.isNaN(t) && t <= nowMs;
+  });
+  return past ?? valid[valid.length - 1] ?? new Date().toISOString();
+}
+
 function formatElapsed(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   if (diff < 0) return "الآن";
@@ -119,7 +134,7 @@ export function LastSaleBanner() {
           if (d.stage !== "مكتملة") continue;
           const dealType: SaleType = d.sales_type === "support" ? "support" : "office";
           if (!requested.includes(dealType)) continue;
-          const saleDate = d.close_date || d.created_at;
+          const saleDate = pickCompletedDate(d.close_date, d.updated_at, d.created_at);
           const t = new Date(saleDate).getTime();
           if (t > (latestTimeByType[dealType] ?? 0)) {
             latestTimeByType[dealType] = t;
@@ -135,7 +150,7 @@ export function LastSaleBanner() {
         if (requested.includes("renewal")) {
           for (const r of renewals) {
             if (r.status !== "مكتمل") continue;
-            const saleDate = r.payment_date || r.created_at;
+            const saleDate = pickCompletedDate(r.payment_date, r.updated_at, r.created_at);
             const t = new Date(saleDate).getTime();
             if (t > (latestTimeByType.renewal ?? 0)) {
               latestTimeByType.renewal = t;
