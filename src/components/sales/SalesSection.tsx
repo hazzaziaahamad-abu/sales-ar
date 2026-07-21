@@ -900,20 +900,10 @@ export function SalesSection({ salesType }: SalesPageProps) {
   })();
 
   // Averages for relative comparisons in recommendations
-  const avgWinRate = repPerformance.length > 0 ? Math.round(repPerformance.reduce((s, r) => s + r.winRate, 0) / repPerformance.length) : 0;
   const avgCycle = repPerformance.length > 0 ? Math.round(repPerformance.reduce((s, r) => s + r.avgCycle, 0) / repPerformance.length) : 0;
 
   function getRepTips(rep: typeof repPerformance[number]): { text: string; color: string }[] {
     const tips: { text: string; color: string }[] = [];
-
-    // Win rate
-    if (rep.winRate < 20 && rep.deals >= 5) {
-      tips.push({ text: "معدل إغلاق منخفض جداً — تحسين تأهيل العملاء قبل التفاوض", color: "text-red-400 bg-red-500/10 border-red-500/20" });
-    } else if (rep.winRate < avgWinRate && rep.winRate < 35 && rep.deals >= 5) {
-      tips.push({ text: "معدل الإغلاق أقل من متوسط الفريق — التركيز على متابعة الصفقات المفتوحة", color: "text-amber-400 bg-amber-500/10 border-amber-500/20" });
-    } else if (rep.winRate >= 50 && rep.deals >= 10) {
-      tips.push({ text: "إغلاق ممتاز — يمكن رفع المستهدف أو تولّي عملاء أكثر", color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" });
-    }
 
     // Discounts
     if (rep.fullPriceRate < 40 && (rep.fullPrice + rep.discounted) >= 3) {

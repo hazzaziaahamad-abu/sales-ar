@@ -20,7 +20,6 @@ const SUGGESTED_QUESTIONS = [
   "أبي ملخص أداء الفريق هالشهر",
   "وش توقعات الربع الجاي؟",
   "مين يحتاج دعم أكثر في الفريق؟",
-  "كيف نرفع معدل الإغلاق؟",
 ];
 
 export function AIChatPanel({ isOpen, onClose }: AIChatPanelProps) {

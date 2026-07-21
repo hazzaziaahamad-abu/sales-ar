@@ -18,7 +18,7 @@ interface GeneratedAlert {
 }
 
 export function generateAlerts(input: AlertInput): GeneratedAlert[] {
-  const { deals, tickets, kpi, targetRevenue, targetCloseRate = 35 } = input;
+  const { deals, tickets, kpi, targetRevenue } = input;
   const alerts: GeneratedAlert[] = [];
 
   const activeDeals = deals.filter((d) => d.stage !== "مكتملة" && d.stage !== "مرفوض مع سبب");
@@ -76,15 +76,6 @@ export function generateAlerts(input: AlertInput): GeneratedAlert[] {
       type: "warning",
       category: "urgent_tickets",
       message: `${urgentOpen.length} تذاكر عاجلة مفتوحة تحتاج معالجة فورية`,
-    });
-  }
-
-  // WARNING: Team close rate below target
-  if (kpi && kpi.close_rate < targetCloseRate * 0.8) {
-    alerts.push({
-      type: "warning",
-      category: "low_close_rate",
-      message: `معدل الإغلاق ${(kpi.close_rate * 100).toFixed(0)}% — أقل من الهدف (${targetCloseRate}%)`,
     });
   }
 

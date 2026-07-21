@@ -117,7 +117,6 @@ ${totalTarget > 0 ? `- إجمالي الأهداف: $${totalTarget >= 1000000 ? 
 - إجمالي الصفقات: ${allDeals.length}
 - الصفقات المغلقة: ${closedDeals.length}
 - الصفقات الخاسرة: ${lostDeals.length}
-- معدل الإغلاق: ${allDeals.length > 0 ? ((closedDeals.length / allDeals.length) * 100).toFixed(0) : 0}%
 - قيمة Pipeline: $${(pipelineValue / 1000).toFixed(0)}K
 - متوسط قيمة الصفقة: $${(avgDealValue / 1000).toFixed(0)}K
 - متوسط دورة البيع: ${avgCycle.toFixed(0)} يوم

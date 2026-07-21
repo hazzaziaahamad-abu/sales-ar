@@ -119,7 +119,6 @@ async function resolveUnderperformers(
           { label: "النتيجة", value: String(score), tone: "bad" },
           { label: "المطلوب", value: String(threshold), tone: "neutral" },
           { label: "الإيراد", value: nfmt(s.revenue), tone: "neutral" },
-          { label: "نسبة الإغلاق", value: `${nfmt(s.close_rate)}%`, tone: "neutral" },
         ],
       },
     });
