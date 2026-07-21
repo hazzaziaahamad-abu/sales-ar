@@ -26,7 +26,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Employee, Deal, Ticket } from "@/types";
-import { Users, UserPlus, Pencil, Trash2, TrendingUp, Headphones, Calendar, GraduationCap, Award } from "lucide-react";
+import { Users, UserPlus, Pencil, Trash2, TrendingUp, Headphones, Calendar, GraduationCap, Award, Eye } from "lucide-react";
+import { EmployeeDetailPanel } from "@/components/employee-detail-panel";
 import { getAcademyStats, TOTAL_LESSONS } from "@/components/academy/LearningAcademy";
 import { formatMoney, saudiDateStr } from "@/lib/utils/format";
 
@@ -121,6 +122,9 @@ export default function TeamPage() {
   /* delete confirmation */
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  /* full-profile detail panel */
+  const [detailEmployee, setDetailEmployee] = useState<Employee | null>(null);
 
   /* form state */
   const [formName, setFormName] = useState("");
@@ -530,7 +534,17 @@ export default function TeamPage() {
                 })()}
 
                 {/* Actions */}
-                <div className="flex items-center gap-2 pt-2 border-t border-border">
+                <div className="flex flex-col gap-2 pt-2 border-t border-border">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full gap-1.5 text-xs"
+                    onClick={() => setDetailEmployee(emp)}
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    عرض الملف الكامل
+                  </Button>
+                  <div className="flex items-center gap-2">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -549,6 +563,7 @@ export default function TeamPage() {
                     <Trash2 className="w-3.5 h-3.5" />
                     حذف
                   </Button>
+                  </div>
                 </div>
               </div>
             );
@@ -560,6 +575,13 @@ export default function TeamPage() {
           )}
         </div>
       )}
+
+      {/* Full employee profile panel */}
+      <EmployeeDetailPanel
+        employee={detailEmployee}
+        open={!!detailEmployee}
+        onClose={() => setDetailEmployee(null)}
+      />
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>

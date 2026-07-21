@@ -10,9 +10,10 @@ import {
 } from "lucide-react";
 import {
   fetchDeals, fetchTickets, fetchRenewals, fetchRecentFollowUpNotes,
-  upsertSalesGuideSetting, fetchSalesGuideSettings,
+  upsertSalesGuideSetting, fetchSalesGuideSettings, fetchEmployees,
 } from "@/lib/supabase/db";
-import type { Deal, Ticket, Renewal } from "@/types";
+import type { Deal, Ticket, Renewal, Employee } from "@/types";
+import { EmployeeDetailPanel } from "@/components/employee-detail-panel";
 import { useAuth } from "@/lib/auth-context";
 import { formatMoney, todayLocal, dateToLocal } from "@/lib/utils/format";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -90,6 +91,8 @@ export default function OperationsPage() {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [renewals, setRenewals] = useState<Renewal[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [detailEmployee, setDetailEmployee] = useState<Employee | null>(null);
   const [notes, setNotes] = useState<{ entity_id: string; created_at: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -122,11 +125,13 @@ export default function OperationsPage() {
       fetchRenewals(),
       fetchRecentFollowUpNotes(100),
       fetchSalesGuideSettings(),
-    ]).then(([d, t, r, n, settings]) => {
+      fetchEmployees().catch(() => [] as Employee[]),
+    ]).then(([d, t, r, n, settings, emps]) => {
       setDeals(d);
       setTickets(t);
       setRenewals(r);
       setNotes(n as { entity_id: string; created_at: string }[]);
+      setEmployees(emps as Employee[]);
 
       const row = (key: string) =>
         (settings as unknown as StoredSetting[]).find(s => s.setting_key === key)?.setting_value;
@@ -539,9 +544,15 @@ export default function OperationsPage() {
               const isWeak = m.closed === 0 && m.open >= 5;
               const color = isTop ? "#10B981" : isWeak ? "#EF4444" : "#7da6ff";
               return (
-                <div
+                <button
                   key={m.name}
-                  className="flex items-center gap-3 p-3 rounded-xl"
+                  type="button"
+                  onClick={() => {
+                    const emp = employees.find((e) => e.name.trim() === m.name.trim())
+                      ?? ({ id: "", org_id: "", name: m.name, status: "نشط", created_at: new Date().toISOString() } as Employee);
+                    setDetailEmployee(emp);
+                  }}
+                  className="flex items-center gap-3 p-3 rounded-xl text-right w-full hover:brightness-125 transition"
                   style={{ background: "var(--card)", border: "1px solid var(--border)" }}
                 >
                   <div
@@ -559,7 +570,7 @@ export default function OperationsPage() {
                     {isTop && <p className="text-[10px] text-emerald-400">#1 الأسبوع</p>}
                     {isWeak && <p className="text-[10px] text-red-400">يحتاج متابعة</p>}
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -745,6 +756,13 @@ export default function OperationsPage() {
           </Link>
         ))}
       </div>
+
+      {/* Full employee profile panel */}
+      <EmployeeDetailPanel
+        employee={detailEmployee}
+        open={!!detailEmployee}
+        onClose={() => setDetailEmployee(null)}
+      />
     </div>
   );
 }
