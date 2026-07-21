@@ -55,8 +55,8 @@ export const NAV_ITEMS = [
   { label: "انضباط الإغلاق", href: "/discipline", slug: "discipline", icon: ShieldAlert, color: "amber", group: "عام" },
   { label: "التحديثات الأخيرة", href: "/recent-updates", slug: "recent-updates", icon: History, color: "cyan", group: "عام" },
   { label: "نحجز هب", href: "/requests", slug: "requests", icon: Inbox, color: "violet", group: "الإدارة التنفيذية" },
+  { label: "السكرتير التنفيذي", href: "/secretary", slug: "secretary", icon: BrainCircuit, color: "violet", group: "الإدارة التنفيذية" },
   // مخفية مؤقتاً — مدمجة في غرفة العمليات
-  // { label: "السكرتير التنفيذي", href: "/secretary", slug: "secretary", icon: BrainCircuit, color: "violet", group: "الإدارة التنفيذية" },
   // { label: "لوحة المدير", href: "/manager", slug: "manager", icon: Briefcase, color: "violet", group: "عام" },
   // { label: "الاجتماع الأسبوعي", href: "/weekly", slug: "weekly", icon: ClipboardList, color: "violet", group: "المتابعة" },
   { label: "المبيعات", href: "/sales", slug: "sales", icon: TrendingUp, color: "emerald", group: "المبيعات والدعم" },
