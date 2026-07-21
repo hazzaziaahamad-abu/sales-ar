@@ -9,6 +9,7 @@ import { NotificationPanel } from "@/components/layout/notification-panel";
 import { AIChatFAB } from "@/components/ai/ai-chat-fab";
 import { AIAlertsBanner } from "@/components/ai/ai-alerts-banner";
 import { LastSaleBanner } from "@/components/layout/last-sale-banner";
+import { ImpersonationBanner } from "@/components/layout/impersonation-banner";
 import { SaleCelebration } from "@/components/layout/sale-celebration";
 import { WelcomePopup } from "@/components/layout/welcome-popup";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
@@ -776,6 +777,7 @@ export default function DashboardLayout({
 
         {/* Content area — has margin on lg+ for sidebar, full-width on mobile/tablet */}
         <div className="lg:mr-[276px] min-h-screen overflow-x-hidden">
+          <ImpersonationBanner />
           <Topbar
             unreadCount={unreadCount}
             onBellClick={() => setNotifOpen((prev) => !prev)}

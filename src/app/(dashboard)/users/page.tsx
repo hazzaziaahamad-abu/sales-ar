@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
-import { Shield, Plus, Pencil, Trash2, ChevronDown, Link2, Share2, MessageCircle, Mail, Copy, Check } from "lucide-react";
+import { Shield, Plus, Pencil, Trash2, ChevronDown, Link2, Share2, MessageCircle, Mail, Copy, Check, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -46,8 +46,22 @@ interface UserProfile {
 }
 
 export default function UsersPage() {
-  const { user, orgs } = useAuth();
+  const { user, orgs, impersonate } = useAuth();
   const router = useRouter();
+
+  const enterAsUser = (u: UserProfile) => {
+    impersonate({
+      id: u.id,
+      email: u.email,
+      name: u.name,
+      orgId: u.org_id,
+      roleId: u.roles?.id || u.role_id,
+      roleName: u.roles?.name || "",
+      allowedPages: u.roles?.allowed_pages || [],
+      isSuperAdmin: u.is_super_admin,
+    });
+    router.push("/dashboard");
+  };
 
   // Redirect non-super-admin
   useEffect(() => {
@@ -296,6 +310,16 @@ export default function UsersPage() {
                           </div>
                         )}
                       </div>
+                      {u.id !== user?.id && (
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          title={`الدخول كـ ${u.name} (عرض)`}
+                          onClick={(e) => { e.stopPropagation(); enterAsUser(u); }}
+                        >
+                          <LogIn className="w-3.5 h-3.5 text-amber-400" />
+                        </Button>
+                      )}
                       <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); openDialog(u); }}>
                         <Pencil className="w-3.5 h-3.5" />
                       </Button>

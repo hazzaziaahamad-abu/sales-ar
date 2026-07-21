@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { todayLocal } from "@/lib/utils/format";
@@ -17,7 +17,11 @@ export interface AuthUser {
 }
 
 interface AuthContextValue {
-  user: AuthUser | null;
+  user: AuthUser | null;          // الهوية الفعّالة (المستخدَم فيها العرض إن وُجد)
+  realUser: AuthUser | null;      // المستخدم الحقيقي المسجّل دخوله
+  isImpersonating: boolean;       // هل الأدمن يشاهد كموظف الآن؟
+  impersonate: (target: AuthUser) => void;  // للسوبر أدمن فقط
+  stopImpersonating: () => void;
   loading: boolean;
   signOut: () => Promise<void>;
   activeOrgId: string;
@@ -25,21 +29,29 @@ interface AuthContextValue {
   orgs: { id: string; name: string; nameAr: string }[];
 }
 
+const VIEW_AS_KEY = "cc_view_as";
+
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [realUser, setRealUser] = useState<AuthUser | null>(null);
+  const [viewAs, setViewAs] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeOrgId, setActiveOrgId] = useState("");
   const [orgs, setOrgs] = useState<{ id: string; name: string; nameAr: string }[]>([]);
+  const preImpersonationOrg = useRef<string | null>(null);
+
+  // الهوية الفعّالة: عند العرض كموظف نستخدم بياناته، وإلا المستخدم الحقيقي.
+  const user = viewAs ?? realUser;
+  const isImpersonating = viewAs !== null;
 
   const loadUser = useCallback(async () => {
     const supabase = createClient();
 
     const { data: { user: authUser } } = await supabase.auth.getUser();
     if (!authUser) {
-      setUser(null);
+      setRealUser(null);
       setLoading(false);
       return;
     }
@@ -52,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .single();
 
     if (!profile) {
-      setUser(null);
+      setRealUser(null);
       setLoading(false);
       return;
     }
@@ -70,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isSuperAdmin: profile.is_super_admin,
     };
 
-    setUser(authUserData);
+    setRealUser(authUserData);
 
     // Log login (once per session)
     const loginKey = `login_logged_${authUser.id}_${todayLocal()}`;
@@ -111,6 +123,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    // استرجاع وضع «العرض كموظف» (للسوبر أدمن فقط) بعد ضبط المنظمة الافتراضية
+    if (authUserData.isSuperAdmin && typeof sessionStorage !== "undefined") {
+      const saved = sessionStorage.getItem(VIEW_AS_KEY);
+      if (saved) {
+        try {
+          const vu = JSON.parse(saved) as AuthUser;
+          setViewAs(vu);
+          preImpersonationOrg.current = profile.org_id;
+          setActiveOrgId(vu.orgId);
+          localStorage.setItem("cc_org_id", vu.orgId);
+        } catch { sessionStorage.removeItem(VIEW_AS_KEY); }
+      }
+    } else if (typeof sessionStorage !== "undefined") {
+      sessionStorage.removeItem(VIEW_AS_KEY);
+    }
+
     setLoading(false);
   }, []);
 
@@ -120,7 +148,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const supabase = createClient();
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) {
-        setUser(null);
+        setRealUser(null);
+        setViewAs(null);
         setLoading(false);
       }
     });
@@ -131,10 +160,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
-    setUser(null);
+    setRealUser(null);
+    setViewAs(null);
+    if (typeof sessionStorage !== "undefined") sessionStorage.removeItem(VIEW_AS_KEY);
     localStorage.removeItem("cc_org_id");
     router.push("/login");
   }, [router]);
+
+  // الدخول/العرض كموظف — متاح للسوبر أدمن فقط
+  const impersonate = useCallback((target: AuthUser) => {
+    if (!realUser?.isSuperAdmin || target.id === realUser.id) return;
+    preImpersonationOrg.current = activeOrgId;
+    setViewAs(target);
+    if (typeof sessionStorage !== "undefined") sessionStorage.setItem(VIEW_AS_KEY, JSON.stringify(target));
+    setActiveOrgId(target.orgId);
+    localStorage.setItem("cc_org_id", target.orgId);
+    window.dispatchEvent(new Event("org-switch"));
+  }, [realUser, activeOrgId]);
+
+  const stopImpersonating = useCallback(() => {
+    setViewAs(null);
+    if (typeof sessionStorage !== "undefined") sessionStorage.removeItem(VIEW_AS_KEY);
+    const backOrg = preImpersonationOrg.current || realUser?.orgId || "";
+    if (backOrg) {
+      setActiveOrgId(backOrg);
+      localStorage.setItem("cc_org_id", backOrg);
+    }
+    preImpersonationOrg.current = null;
+    window.dispatchEvent(new Event("org-switch"));
+  }, [realUser]);
 
   const switchOrg = useCallback((orgId: string) => {
     setActiveOrgId(orgId);
@@ -144,7 +198,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, signOut, activeOrgId, switchOrg, orgs }}>
+    <AuthContext.Provider value={{ user, realUser, isImpersonating, impersonate, stopImpersonating, loading, signOut, activeOrgId, switchOrg, orgs }}>
       {children}
     </AuthContext.Provider>
   );
