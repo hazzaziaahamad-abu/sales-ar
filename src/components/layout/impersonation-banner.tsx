@@ -15,7 +15,7 @@ export function ImpersonationBanner() {
     <div className="sticky top-0 z-50 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-amber-500 px-4 py-2 text-center text-[12px] sm:text-sm font-bold text-black">
       <span className="inline-flex items-center gap-1.5">
         <UserCog className="w-4 h-4" />
-        تشاهد المنصة كـ «{user.name}»
+        تشاهد المنصة كـ «{user.name}» — عرض فقط
         {user.roleName ? <span className="font-semibold opacity-80">({user.roleName})</span> : null}
       </span>
       {realUser?.name && <span className="opacity-70 font-medium hidden sm:inline">— حسابك: {realUser.name}</span>}

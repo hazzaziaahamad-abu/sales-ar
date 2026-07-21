@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { setDbReadOnly } from "@/lib/supabase/readonly-guard";
 import { todayLocal } from "@/lib/utils/format";
 
 export interface AuthUser {
@@ -45,6 +46,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // الهوية الفعّالة: عند العرض كموظف نستخدم بياناته، وإلا المستخدم الحقيقي.
   const user = viewAs ?? realUser;
   const isImpersonating = viewAs !== null;
+
+  // وضع «العرض فقط» يمنع أي كتابة على قاعدة البيانات أثناء الدخول كموظف.
+  useEffect(() => {
+    setDbReadOnly(isImpersonating);
+  }, [isImpersonating]);
 
   const loadUser = useCallback(async () => {
     const supabase = createClient();
