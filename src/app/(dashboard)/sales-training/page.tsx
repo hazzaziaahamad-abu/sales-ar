@@ -71,6 +71,7 @@ type Tier = {
   deal?: boolean;
   star?: boolean;
   cashier?: boolean;
+  gateway?: boolean; // يتطلب ربط بوابة دفع إلكتروني
 };
 const TIERS: Tier[] = [
   { name: "الأساسية", price: "349", note: "منيو رقمي كامل بكل التفاصيل" },
@@ -79,21 +80,27 @@ const TIERS: Tier[] = [
     price: "579",
     note: "طلب أونلاين + تطبيق استقبال الطلبات + تسليم ودفع + واتساب + تقييمات + كوبونات + عروض مؤقتة",
     deal: true,
+    gateway: true,
   },
   {
     name: "VIP",
     price: "879",
     note: "كل الذهبية + الطلب والدفع من الطاولة + الحجوزات + الدور + الفروع + الدومين + البيكسل",
     star: true,
+    gateway: true,
   },
-  { name: "VIP بلس", price: "1079", note: "كل VIP + بطاقات الهدايا والولاء (الأبرز) + مزامنة فودكس" },
+  { name: "VIP بلس", price: "1079", note: "كل VIP + بطاقات الهدايا والولاء (الأبرز) + مزامنة فودكس", gateway: true },
   {
     name: "باقة الكاشير",
     price: "1349",
     note: "نظام فقط بدون أجهزة · للفرع الواحد · كل فرع إضافي ٢٤٩ ريال",
     cashier: true,
+    gateway: true,
   },
 ];
+
+// مزوّدو بوابات الدفع الإلكتروني المعتمدون للربط (الباقة الذهبية وما فوق)
+const PAYMENT_GATEWAYS = ["نيوليب", "ميسر", "جيديا", "بي موب"];
 
 const SUPPORT_TEXT = "دعم فني طوال فترة الاشتراك — لجميع الباقات";
 
@@ -680,9 +687,44 @@ function PackagesPanel() {
               <p className="mt-0.5 text-xs leading-relaxed" style={{ color: "#6f6156" }}>
                 {t.note}
               </p>
+              {t.gateway && (
+                <div className="mt-1 flex justify-end">
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-bold"
+                    style={{ backgroundColor: "#E0F2FE", color: "#075985", border: "1px solid #BAE6FD", fontSize: 10 }}
+                  >
+                    <CreditCard size={11} strokeWidth={2.4} /> يتطلب ربط بوابة دفع إلكتروني
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         ))}
+      </div>
+
+      {/* بوابات الدفع الإلكتروني المعتمدة للربط */}
+      <div
+        className="mt-3 rounded-xl px-3 py-2.5 text-right"
+        style={{ backgroundColor: "#F0F9FF", border: "1px solid #BAE6FD" }}
+      >
+        <div className="mb-1.5 flex items-center justify-end gap-1.5 text-xs font-black" style={{ color: "#075985" }}>
+          بوابات الدفع الإلكتروني المعتمدة للربط
+          <CreditCard size={14} style={{ color: "#0284C7" }} />
+        </div>
+        <div className="flex flex-wrap justify-end gap-1.5">
+          {PAYMENT_GATEWAYS.map((g) => (
+            <span
+              key={g}
+              className="rounded-full px-2.5 py-0.5 text-xs font-bold"
+              style={{ backgroundColor: "#fff", color: "#075985", border: "1px solid #BAE6FD" }}
+            >
+              {g}
+            </span>
+          ))}
+        </div>
+        <p className="mt-1.5 text-[11px] leading-relaxed" style={{ color: "#0369A1" }}>
+          الباقة الذهبية وما فوق تتطلب ربط بوابة دفع إلكتروني لتفعيل الطلب والدفع الأونلاين.
+        </p>
       </div>
 
       <div
