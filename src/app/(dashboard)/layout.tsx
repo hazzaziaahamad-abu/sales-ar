@@ -48,6 +48,19 @@ const PAGE_SLUG_MAP: Record<string, string> = {
   "/discipline": "discipline",
 };
 
+// المنشن (@) والتذكير يظهران فقط في أقسام المبيعات والدعم والتجديدات — لأنهما مرتبطان
+// بمتابعة الصفقات والتذاكر والتجديدات. تُخفى في باقي الأقسام (التدريب، خريطة رحلة الطلب، ...).
+// نستخدم مطابقة مسار صريحة عمداً حتى لا تُطابق /sales صفحات مثل /sales-playbook و /sales-training.
+const FOLLOWUP_BANNER_PATHS = new Set<string>([
+  "/sales",
+  "/support-sales",
+  "/support",
+  "/renewals",
+  "/renewal-boost",
+  "/recovery-lab",
+  "/sales-guide",
+]);
+
 function MentionNotifLoader({ onLoad, onMentions }: { onLoad: (n: AppNotification[]) => void; onMentions: (m: MentionNotification[]) => void }) {
   const { user } = useAuth();
   const pathname = usePathname();
@@ -761,6 +774,7 @@ export default function DashboardLayout({
   const unreadCount = useMemo(() => notifications.filter((n) => !n.isRead).length, [notifications]);
 
   const isAgentPage = pathname === "/agent";
+  const showFollowupBanners = FOLLOWUP_BANNER_PATHS.has(pathname);
 
   return (
     <CCThemeProvider>
@@ -785,11 +799,15 @@ export default function DashboardLayout({
           />
           <main className="px-4 sm:px-6 pb-8 pt-5">
             <AuthGate>
-              <MentionAlertBanner mentions={recentMentions} onRefresh={() => {}} />
-              <RemindersBanner reminders={dueReminders} onDismiss={(id) => {
-                dismissReminder(id).catch(() => {});
-                setDueReminders((prev) => prev.filter((r) => r.id !== id));
-              }} />
+              {showFollowupBanners && (
+                <>
+                  <MentionAlertBanner mentions={recentMentions} onRefresh={() => {}} />
+                  <RemindersBanner reminders={dueReminders} onDismiss={(id) => {
+                    dismissReminder(id).catch(() => {});
+                    setDueReminders((prev) => prev.filter((r) => r.id !== id));
+                  }} />
+                </>
+              )}
               <LastSaleBanner />
               <AIAlertsBanner />
               {children}
