@@ -702,36 +702,42 @@ function PackagesPanel() {
         ))}
       </div>
 
-      {/* بوابات الدفع الإلكتروني المعتمدة للربط */}
-      <div
-        className="mt-3 rounded-xl px-3 py-2.5 text-right"
-        style={{ backgroundColor: "#F0F9FF", border: "1px solid #BAE6FD" }}
-      >
-        <div className="mb-1.5 flex items-center justify-end gap-1.5 text-xs font-black" style={{ color: "#075985" }}>
-          بوابات الدفع الإلكتروني المعتمدة للربط
-          <CreditCard size={14} style={{ color: "#0284C7" }} />
-        </div>
-        <div className="flex flex-wrap justify-end gap-1.5">
-          {PAYMENT_GATEWAYS.map((g) => (
-            <span
-              key={g}
-              className="rounded-full px-2.5 py-0.5 text-xs font-bold"
-              style={{ backgroundColor: "#fff", color: "#075985", border: "1px solid #BAE6FD" }}
-            >
-              {g}
-            </span>
-          ))}
-        </div>
-        <p className="mt-1.5 text-[11px] leading-relaxed" style={{ color: "#0369A1" }}>
-          الباقة الذهبية وما فوق تتطلب ربط بوابة دفع إلكتروني لتفعيل الطلب والدفع الأونلاين.
-        </p>
-      </div>
-
       <div
         className="mt-3 rounded-xl px-3 py-2 text-right text-xs font-bold"
         style={{ backgroundColor: "#F4ECFB", color: PURPLE_DEEP, border: "1px solid #D8C7EE" }}
       >
         نصيحة إغلاق: لو الـVIP كثير على العميل، انزل للباقة الذهبية (٥٧٩) وأغلِق — ويقدر يترقّى لاحقاً.
+      </div>
+    </div>
+  );
+}
+
+/* بوابات الدفع الإلكتروني — تظهر في الوضعين (المنتج والموظف) */
+function PaymentGatewayPanel() {
+  return (
+    <div
+      className="mx-auto mt-6 max-w-3xl rounded-3xl p-5"
+      style={{ backgroundColor: "#F0F9FF", border: "1.5px solid #BAE6FD", boxShadow: "0 12px 26px -16px rgba(3,105,161,.4)" }}
+    >
+      <div className="mb-2 flex items-center justify-end gap-2">
+        <h3 className="text-base font-black" style={{ color: "#075985" }}>
+          بوابات الدفع الإلكتروني المعتمدة للربط
+        </h3>
+        <CreditCard size={18} style={{ color: "#0284C7" }} />
+      </div>
+      <p className="mb-3 text-right text-sm font-semibold leading-relaxed" style={{ color: "#0369A1" }}>
+        الباقة الذهبية وما فوق تتطلب ربط بوابة دفع إلكتروني لتفعيل الطلب والدفع الأونلاين.
+      </p>
+      <div className="flex flex-wrap justify-end gap-2">
+        {PAYMENT_GATEWAYS.map((g) => (
+          <span
+            key={g}
+            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-bold"
+            style={{ backgroundColor: "#fff", color: "#075985", border: "1px solid #BAE6FD" }}
+          >
+            <CreditCard size={13} strokeWidth={2.2} /> {g}
+          </span>
+        ))}
       </div>
     </div>
   );
@@ -1058,6 +1064,7 @@ export default function MenuMindMap() {
 
       {rep && <MatchingPanel />}
       {rep && <PackagesPanel />}
+      <PaymentGatewayPanel />
 
       <p className="mx-auto mt-8 max-w-5xl text-center text-xs" style={{ color: "#a89c90" }}>
         {rep
