@@ -44,6 +44,7 @@ import {
   ClipboardCheck,
   MessageCircle,
   ShieldAlert,
+  Map,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
@@ -61,6 +62,7 @@ export const NAV_ITEMS = [
   // { label: "الاجتماع الأسبوعي", href: "/weekly", slug: "weekly", icon: ClipboardList, color: "violet", group: "المتابعة" },
   { label: "المبيعات", href: "/sales", slug: "sales", icon: TrendingUp, color: "emerald", group: "المبيعات والدعم" },
   { label: "تدريب المبيعات", href: "/sales-playbook", slug: "sales-playbook", icon: BookMarked, color: "emerald", group: "المبيعات والدعم" },
+  { label: "خريطة رحلة الطلب", href: "/sales-training", slug: "sales-training", icon: Map, color: "violet", group: "المبيعات والدعم" },
   { label: "مبيعات الدعم", href: "/support-sales", slug: "support-sales", icon: TrendingUp, color: "orange", group: "المبيعات والدعم" },
   { label: "الدعم", href: "/support", slug: "support", icon: Headphones, color: "orange", group: "المبيعات والدعم" },
   // Hidden: merged into "مهامي" — { label: "دليل المبيعات", href: "/sales-guide", slug: "sales-guide", icon: BookOpen, color: "amber" },
