@@ -18,6 +18,8 @@ import {
   Puzzle,
   AlertTriangle,
   Lightbulb,
+  Sparkles,
+  Zap,
   X,
 } from "lucide-react";
 
@@ -216,6 +218,45 @@ const CHALLENGES: Challenge[] = [
     challenge: "«كلّمني وقت ثاني / أنا مشغول الحين»",
     solution:
       "احترم وقته واحجز موعد محدّد (يوم وساعة) بدل «لاحقاً» المفتوح، وأرسل له رسالة واتساب مختصرة تذكّره بالفكرة. ولو يمديه، اسأله سؤال سريع يكشف اهتمامه: وش أكثر شي يزعجك في المنيو الحالي؟",
+  },
+];
+
+type Result = { impact: string; idea: string; how: string };
+const RESULTS: Result[] = [
+  {
+    impact: "رفع متوسط قيمة الطلب",
+    idea: "العميل يطلب أكثر لما يشوف الأصناف بصور شهية واقتراحات إضافات.",
+    how: "فعّل الصور المتحركة في المنيو الرقمي، وأضف الإضافات والكومبوهات وربط الأصناف المكمّلة.",
+  },
+  {
+    impact: "صفر تكلفة طباعة + تحديث لحظي",
+    idea: "بدل ما تطبع منيو جديد كل تعديل، حدّثه رقمياً في ثوانٍ.",
+    how: "عدّل الأسعار والأصناف من لوحة التحكم، والباركود يعرض النسخة المحدّثة فوراً.",
+  },
+  {
+    impact: "زيادة الطلبات الأونلاين والمبيعات",
+    idea: "كل ما زاد وصول رابط منيوك، زادت طلباتك — حتى خارج الدوام.",
+    how: "انشر رابط المنيو والباركود في الإنستقرام وسناب وقوقل ماب وعلى الطاولات.",
+  },
+  {
+    impact: "تدوير طاولات أعلى وخدمة أسرع",
+    idea: "الطلب والدفع من الطاولة يقصّر وقت الخدمة ويخلّي الطاولة تفضى أسرع.",
+    how: "فعّل الطلب والدفع من الطاولة عبر الباركود، والدور والحجوزات في باقة VIP.",
+  },
+  {
+    impact: "تكرار زيارة وولاء أعلى",
+    idea: "العميل يرجع من نفسه لو عنده حافز — مثل الكوب الخامس مجاناً.",
+    how: "فعّل بطاقات الولاء في محفظة آبل (VIP بلس)، وبطاقات الهدايا تجيب عملاء جدد.",
+  },
+  {
+    impact: "معرفة دقيقة بالدخل والأرباح",
+    idea: "ما تقدر تحسّن اللي ما تقيسه — وحّد كل قنواتك في تقرير واحد.",
+    how: "أدخل طلبات هنقرستيشن وجاهز وكيتا في الكاشير، وتابع الأصناف الأكثر ربحاً من التقارير.",
+  },
+  {
+    impact: "أخطاء أقل وتشغيل منظّم",
+    idea: "شاشة واحدة موحّدة تقلّل الفوضى وتسرّع التجهيز.",
+    how: "استقبل كل الطلبات المباشرة على شاشة الكاشير، وزامن المخزون مع فودكس (VIP بلس).",
   },
 ];
 
@@ -881,6 +922,58 @@ function PaymentGatewayPanel() {
   );
 }
 
+function ResultsPanel() {
+  return (
+    <div
+      className="mx-auto mt-6 max-w-3xl rounded-3xl p-5"
+      style={{ backgroundColor: "#fffdf7", border: "1.5px solid #ead9c9", boxShadow: "0 12px 26px -16px rgba(64,51,43,.5)" }}
+    >
+      <div className="mb-1 flex items-center justify-end gap-2">
+        <h3 className="text-base font-black" style={{ color: PURPLE_DEEP }}>
+          النتائج والأثر المتوقع
+        </h3>
+        <Sparkles size={18} style={{ color: PURPLE }} />
+      </div>
+      <p className="mb-3 text-right text-xs font-semibold" style={{ color: "#8a7c70" }}>
+        الأثر اللي يوصله العميل لما يفعّل المنتج ويستخدمه صح — مع الفكرة وكيف تطبّقها.
+      </p>
+
+      <div className="space-y-2.5">
+        {RESULTS.map((r, i) => (
+          <div key={i} className="rounded-2xl p-3" style={{ backgroundColor: "#faf4ee", border: "1px solid #efe2d5" }}>
+            <div
+              className="mb-2 flex items-center justify-end gap-2 rounded-xl px-3 py-2"
+              style={{ backgroundColor: "#EEE8FA", border: "1px solid #D8C7EE" }}
+            >
+              <p className="flex-1 text-right text-sm font-black leading-relaxed" style={{ color: PURPLE_DEEP }}>
+                {r.impact}
+              </p>
+              <TrendingUp size={16} strokeWidth={2.4} className="shrink-0" style={{ color: PURPLE }} />
+            </div>
+            <div className="mb-1.5 flex items-start justify-end gap-2 px-1">
+              <p className="flex-1 text-right text-sm leading-relaxed" style={{ color: "#5a4a40" }}>
+                <span className="font-black">الفكرة: </span>
+                {r.idea}
+              </p>
+              <Lightbulb size={15} strokeWidth={2.2} className="mt-0.5 shrink-0" style={{ color: "#B8860B" }} />
+            </div>
+            <div
+              className="flex items-start justify-end gap-2 rounded-xl px-3 py-2"
+              style={{ backgroundColor: "#EAF7EE", border: "1px solid #A7D7B9" }}
+            >
+              <p className="flex-1 text-right text-sm leading-relaxed" style={{ color: "#065F46" }}>
+                <span className="font-black">التطبيق من المنتج: </span>
+                {r.how}
+              </p>
+              <Zap size={15} strokeWidth={2.2} className="mt-0.5 shrink-0" style={{ color: "#059669" }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ChallengesPanel() {
   return (
     <div
@@ -1263,6 +1356,7 @@ export default function MenuMindMap() {
 
       {rep && <MatchingPanel />}
       {rep && <PackagesPanel />}
+      {rep && <ResultsPanel />}
       {rep && <ChallengesPanel />}
       <PaymentGatewayPanel />
 

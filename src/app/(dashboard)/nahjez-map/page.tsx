@@ -18,6 +18,8 @@ import {
   Puzzle,
   AlertTriangle,
   Lightbulb,
+  Sparkles,
+  Zap,
   X,
 } from "lucide-react";
 
@@ -175,6 +177,45 @@ const CHALLENGES: Challenge[] = [
     challenge: "المتردد: «عميلاتي تعوّدن على الاتصال أو الواتساب»",
     solution:
       "الحجز أونلاين إضافة مو إلغاء — اللي تبي تتصل تتصل، واللي تبي تحجز بنفسها تحجز ٢٤ ساعة بلا انتظار، والموظفة تقدر تضيف الحجز يدوياً. أغلب العميلات يفضّلن الحجز الذاتي.",
+  },
+];
+
+type Result = { impact: string; idea: string; how: string };
+const RESULTS: Result[] = [
+  {
+    impact: "استقبال حجوزات ٢٤/٧ بلا مكالمات",
+    idea: "٤٠٪ من الحجوزات تصير خارج الدوام — لا تخلّها تضيع.",
+    how: "انشر رابط صفحة الحجز في الإنستقرام وسناب وقوقل ماب.",
+  },
+  {
+    impact: "خفض الغياب عن المواعيد أكثر من ٥٠٪",
+    idea: "العميلة تنسى موعدها، والتذكير والعربون يحلّون المشكلة.",
+    how: "فعّل تأكيد وتذكير الواتساب، واطلب عربون وقت الحجز.",
+  },
+  {
+    impact: "سيولة مقدّمة ودخل قبل الخدمة",
+    idea: "تستلمين المبلغ قبل ما تقدّمين الخدمة، وتجيك عميلات جدد.",
+    how: "فعّل بطاقات الهدايا (نمو الأعمال) — العميلة تشتري وترسل بالواتساب.",
+  },
+  {
+    impact: "توفير ساعات من وقت الموظفات أسبوعياً",
+    idea: "بدل الرد على الجوال طول اليوم، النظام يحجز عنك.",
+    how: "فعّل الحجز الذاتي — العميلة تختار الخدمة والموظفة والوقت بنفسها.",
+  },
+  {
+    impact: "دخل إضافي فوق الحجوزات",
+    idea: "منتجات العناية دخل سهل من نفس الصفحة.",
+    how: "فعّل المتجر والمنتجات (نمو الأعمال) وتابع الطلبات والمخزون.",
+  },
+  {
+    impact: "قرارات مبنية على أرقام",
+    idea: "تعرفين أوقات ذروتك وأفضل خدماتك بدل التخمين.",
+    how: "تابعي التقارير والتحليلات ولوحة تفاصيل الحجوزات (نمو الأعمال).",
+  },
+  {
+    impact: "حضور رقمي احترافي يبني الثقة",
+    idea: "صفحة باسم مركزك بهويته ترفع ثقة العميلة.",
+    how: "جهّز موقعك بالأساسية: خدماتك وصور فريقك وروابط تواصلك وأوقاتك.",
   },
 ];
 
@@ -798,6 +839,58 @@ function PackagesPanel() {
   );
 }
 
+function ResultsPanel() {
+  return (
+    <div
+      className="mx-auto mt-6 max-w-3xl rounded-3xl p-5"
+      style={{ backgroundColor: "#fffdf7", border: "1.5px solid #ead9c9", boxShadow: "0 12px 26px -16px rgba(64,51,43,.5)" }}
+    >
+      <div className="mb-1 flex items-center justify-end gap-2">
+        <h3 className="text-base font-black" style={{ color: PURPLE_DEEP }}>
+          النتائج والأثر المتوقع
+        </h3>
+        <Sparkles size={18} style={{ color: PURPLE }} />
+      </div>
+      <p className="mb-3 text-right text-xs font-semibold" style={{ color: "#8a7c70" }}>
+        الأثر اللي يوصله العميل لما يفعّل المنتج ويستخدمه صح — مع الفكرة وكيف تطبّقها.
+      </p>
+
+      <div className="space-y-2.5">
+        {RESULTS.map((r, i) => (
+          <div key={i} className="rounded-2xl p-3" style={{ backgroundColor: "#faf4ee", border: "1px solid #efe2d5" }}>
+            <div
+              className="mb-2 flex items-center justify-end gap-2 rounded-xl px-3 py-2"
+              style={{ backgroundColor: "#EEE8FA", border: "1px solid #D8C7EE" }}
+            >
+              <p className="flex-1 text-right text-sm font-black leading-relaxed" style={{ color: PURPLE_DEEP }}>
+                {r.impact}
+              </p>
+              <TrendingUp size={16} strokeWidth={2.4} className="shrink-0" style={{ color: PURPLE }} />
+            </div>
+            <div className="mb-1.5 flex items-start justify-end gap-2 px-1">
+              <p className="flex-1 text-right text-sm leading-relaxed" style={{ color: "#5a4a40" }}>
+                <span className="font-black">الفكرة: </span>
+                {r.idea}
+              </p>
+              <Lightbulb size={15} strokeWidth={2.2} className="mt-0.5 shrink-0" style={{ color: "#B8860B" }} />
+            </div>
+            <div
+              className="flex items-start justify-end gap-2 rounded-xl px-3 py-2"
+              style={{ backgroundColor: "#EAF7EE", border: "1px solid #A7D7B9" }}
+            >
+              <p className="flex-1 text-right text-sm leading-relaxed" style={{ color: "#065F46" }}>
+                <span className="font-black">التطبيق من المنتج: </span>
+                {r.how}
+              </p>
+              <Zap size={15} strokeWidth={2.2} className="mt-0.5 shrink-0" style={{ color: "#059669" }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ChallengesPanel() {
   return (
     <div
@@ -1180,6 +1273,7 @@ export default function NahjezMindMap() {
 
       {rep && <MatchingPanel />}
       {rep && <PackagesPanel />}
+      {rep && <ResultsPanel />}
       {rep && <ChallengesPanel />}
 
       <p className="mx-auto mt-8 max-w-5xl text-center text-xs" style={{ color: "#a89c90" }}>
