@@ -15,6 +15,9 @@ import {
   Target,
   Flame,
   ShieldCheck,
+  Puzzle,
+  AlertTriangle,
+  Lightbulb,
   X,
 } from "lucide-react";
 
@@ -83,6 +86,35 @@ const TIERS: Tier[] = [
     save: "291",
     note: "كل الأساسية + نظام حجوزات وحجز أونلاين + تأكيد وتذكير واتساب + مدفوعات وعربون بدون عمولة + تقارير وتحليلات + متجر وفروع + بطاقات هدايا وولاء + لوحة تفاصيل الحجوزات + كل موظف على حجوزاته",
     recommended: true,
+  },
+];
+
+type Challenge = { challenge: string; solution: string };
+const CHALLENGES: Challenge[] = [
+  {
+    challenge: "الوصول للأونر (صاحب القرار)",
+    solution:
+      "غالباً الموظف أو الاستقبال ما يملك قرار الاشتراك. اطلب اسم الأونر وأفضل وقت للتواصل، وخلّي الاستقبال يوصّلك فيه؛ وجهّز رسالة واتساب مختصرة للأونر تعرض الفكرة والنتيجة الملموسة (٤٠٪ حجوزات خارج الدوام · غياب -٥٠٪) واطلب مكالمة قصيرة.",
+  },
+  {
+    challenge: "«عندي إنستقرام يكفيني»",
+    solution:
+      "بيّن إن رسايل الإنستقرام تضيع وتتأخّر وتتعارض المواعيد؛ نحجز يعطيه نظام حجوزات منظّم يشتغل ٢٤ ساعة بلا ما يرد بنفسه، وصفحة احترافية باسم مركزه تبني ثقة العميلة.",
+  },
+  {
+    challenge: "«السعر غالي» أو الميزانية محدودة",
+    solution:
+      "ابدأ بالأساسية (٥٩ شهرياً) كموقع يعرض خدماته وأثبت القيمة، ثم رقّه لنمو الأعمال. ذكّره: موعد ضايع واحد يكلّفه أكثر من الاشتراك، والعربون وحده يغطّي التكلفة.",
+  },
+  {
+    challenge: "الخوف من التقنية أو صعوبة الإعداد",
+    solution:
+      "طمّنه إن التجهيز بدقائق (اسم، خدمات، أوقات) والفريق يجهّز له كل شي. ثلاث خطوات فقط: سجّل، انشر رابط الحجز، استقبل وتابع.",
+  },
+  {
+    challenge: "«عندي نظام أو دفتر حالي»",
+    solution:
+      "ركّز على الفرق: تذكير تلقائي بالواتساب يقلّل الغياب +٥٠٪، مدفوعات وعربون بدون عمولة، وتقارير تفهم منها أرقامك — قيمة أكبر بجهد أقل، والانتقال سهل.",
   },
 ];
 
@@ -706,6 +738,49 @@ function PackagesPanel() {
   );
 }
 
+function ChallengesPanel() {
+  return (
+    <div
+      className="mx-auto mt-6 max-w-3xl rounded-3xl p-5"
+      style={{ backgroundColor: "#fffdf7", border: "1.5px solid #ead9c9", boxShadow: "0 12px 26px -16px rgba(64,51,43,.5)" }}
+    >
+      <div className="mb-3 flex items-center justify-end gap-2">
+        <h3 className="text-base font-black" style={{ color: PURPLE_DEEP }}>
+          التحديات وحلولها
+        </h3>
+        <Puzzle size={18} style={{ color: PURPLE }} />
+      </div>
+
+      <div className="space-y-2.5">
+        {CHALLENGES.map((c, i) => (
+          <div key={i} className="rounded-2xl p-3" style={{ backgroundColor: "#faf4ee", border: "1px solid #efe2d5" }}>
+            <div
+              className="mb-2 flex items-start justify-end gap-2 rounded-xl px-3 py-2"
+              style={{ backgroundColor: "#FBE8E1", border: "1px solid #F3C7B7" }}
+            >
+              <p className="flex-1 text-right text-sm font-bold leading-relaxed" style={{ color: "#9f1239" }}>
+                <span className="font-black">التحدي: </span>
+                {c.challenge}
+              </p>
+              <AlertTriangle size={16} strokeWidth={2.2} className="mt-0.5 shrink-0" style={{ color: "#B45309" }} />
+            </div>
+            <div
+              className="flex items-start justify-end gap-2 rounded-xl px-3 py-2"
+              style={{ backgroundColor: "#EAF7EE", border: "1px solid #A7D7B9" }}
+            >
+              <p className="flex-1 text-right text-sm leading-relaxed" style={{ color: "#065F46" }}>
+                <span className="font-black">الحل: </span>
+                {c.solution}
+              </p>
+              <Lightbulb size={16} strokeWidth={2.2} className="mt-0.5 shrink-0" style={{ color: "#059669" }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function RepSection({
   label,
   icon,
@@ -1045,6 +1120,7 @@ export default function NahjezMindMap() {
 
       {rep && <MatchingPanel />}
       {rep && <PackagesPanel />}
+      {rep && <ChallengesPanel />}
 
       <p className="mx-auto mt-8 max-w-5xl text-center text-xs" style={{ color: "#a89c90" }}>
         {rep
