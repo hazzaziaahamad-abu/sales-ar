@@ -15,6 +15,9 @@ import {
   Target,
   Flame,
   Headset,
+  Puzzle,
+  AlertTriangle,
+  Lightbulb,
   X,
 } from "lucide-react";
 
@@ -101,6 +104,65 @@ const TIERS: Tier[] = [
 
 // مزوّدو بوابات الدفع الإلكتروني المعتمدون للربط (الباقة الذهبية وما فوق)
 const PAYMENT_GATEWAYS = ["نيوليب", "ميسر", "جيديا", "بي موب"];
+
+type Challenge = { challenge: string; solution: string };
+const CHALLENGES: Challenge[] = [
+  {
+    challenge: "الوصول للأونر (صاحب القرار)",
+    solution:
+      "غالباً الكاشير أو الموظف ما يملك قرار الاشتراك. اطلب اسم صاحب المطعم ووقت مناسب، ووصّل له رسالة واتساب مختصرة تعرض الفكرة والنتيجة (منيو رقمي بلا تكلفة طباعة + طلب أونلاين يرفع المبيعات) واطلب مكالمة قصيرة.",
+  },
+  {
+    challenge: "«المنيو الورقي يكفيني»",
+    solution:
+      "كل تعديل سعر أو صنف = طباعة جديدة وتكلفة؛ الرقمي تحدّثه فوراً ومجاناً، ويعرض الصور والسعرات ومسبّبات الحساسية — تجربة أجمل لعميلك.",
+  },
+  {
+    challenge: "«الـVIP غالية عليّ»",
+    solution:
+      "انزل للباقة الذهبية (٥٧٩): طلب أونلاين ودفع وتقييمات وكوبونات — نفس قلب الفكرة بسعر أقل، ويقدر يترقّى لـVIP لاحقاً.",
+  },
+  {
+    challenge: "«تطبيقات التوصيل تكفيني»",
+    solution:
+      "التطبيقات تاخذ عمولة عالية وما تملك عميلك؛ منيوك المباشر بلا عمولة، وتقدر توحّد طلبات هنقرستيشن وجاهز وكيتا داخل كاشيرك في تقرير دخل واحد.",
+  },
+  {
+    challenge: "«عندي فودكس أو نظام كاشير حالي»",
+    solution:
+      "نكمّل نظامك لا نستبدله — VIP بلس يزامن مع فودكس مباشرة، ونضيف المنيو الرقمي والطلب الأونلاين والولاء اللي مو موجود عندك.",
+  },
+  {
+    challenge: "الخوف من التقنية أو صعوبة الإعداد",
+    solution:
+      "التجهيز سريع وفريقنا يجهّز لك المنيو والباركود؛ وموظفك يتعلّم شاشة الكاشير بدقائق.",
+  },
+  {
+    challenge: "«موظفيني ما راح يستخدمونه»",
+    solution:
+      "شاشة كاشير واحدة موحّدة تسهّل شغلهم وتقلّل الأخطاء وتسرّع التجهيز؛ الطلبات المباشرة تنزل تلقائياً بلا إدخال يدوي.",
+  },
+  {
+    challenge: "«عملائي ما يحبون الباركود»",
+    solution:
+      "المنيو يفتح بمسح بسيط بلا تطبيق ولا تسجيل، ويقدر يطلب من الموظف عادي؛ الرقمي خيار إضافي وأغلب العملاء يفضّلونه.",
+  },
+  {
+    challenge: "«أنا فرع واحد وما أحتاج طاولات وحجوزات»",
+    solution:
+      "حتى بفرع واحد، الطلب والدفع من الطاولة والحجوزات والدور يرفعون تدوير الطاولات والرضا؛ ولو كبرت، الفروع جاهزة معك.",
+  },
+  {
+    challenge: "«ما أحتاج نظام ولاء أو بطاقات هدايا»",
+    solution:
+      "جذب عميل جديد أغلى بكثير من إرجاع حالي؛ الولاء يرفع تكرار الزيارة، وبطاقات الهدايا سيولة مقدّمة تجيب عملاء جدد.",
+  },
+  {
+    challenge: "«أفكّر فيها / أرجع لك لاحقاً»",
+    solution:
+      "اتفق على خطوة صغيرة الحين (تجهيز منيو تجريبي بالباركود)؛ كل يوم تأخير = تكلفة طباعة وطلبات أونلاين ضايعة.",
+  },
+];
 
 const SUPPORT_TEXT = "دعم فني طوال فترة الاشتراك — لجميع الباقات";
 
@@ -764,6 +826,49 @@ function PaymentGatewayPanel() {
   );
 }
 
+function ChallengesPanel() {
+  return (
+    <div
+      className="mx-auto mt-6 max-w-3xl rounded-3xl p-5"
+      style={{ backgroundColor: "#fffdf7", border: "1.5px solid #ead9c9", boxShadow: "0 12px 26px -16px rgba(64,51,43,.5)" }}
+    >
+      <div className="mb-3 flex items-center justify-end gap-2">
+        <h3 className="text-base font-black" style={{ color: PURPLE_DEEP }}>
+          التحديات وحلولها
+        </h3>
+        <Puzzle size={18} style={{ color: PURPLE }} />
+      </div>
+
+      <div className="space-y-2.5">
+        {CHALLENGES.map((c, i) => (
+          <div key={i} className="rounded-2xl p-3" style={{ backgroundColor: "#faf4ee", border: "1px solid #efe2d5" }}>
+            <div
+              className="mb-2 flex items-start justify-end gap-2 rounded-xl px-3 py-2"
+              style={{ backgroundColor: "#FBE8E1", border: "1px solid #F3C7B7" }}
+            >
+              <p className="flex-1 text-right text-sm font-bold leading-relaxed" style={{ color: "#9f1239" }}>
+                <span className="font-black">التحدي: </span>
+                {c.challenge}
+              </p>
+              <AlertTriangle size={16} strokeWidth={2.2} className="mt-0.5 shrink-0" style={{ color: "#B45309" }} />
+            </div>
+            <div
+              className="flex items-start justify-end gap-2 rounded-xl px-3 py-2"
+              style={{ backgroundColor: "#EAF7EE", border: "1px solid #A7D7B9" }}
+            >
+              <p className="flex-1 text-right text-sm leading-relaxed" style={{ color: "#065F46" }}>
+                <span className="font-black">الحل: </span>
+                {c.solution}
+              </p>
+              <Lightbulb size={16} strokeWidth={2.2} className="mt-0.5 shrink-0" style={{ color: "#059669" }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function RepSection({
   label,
   icon,
@@ -1103,6 +1208,7 @@ export default function MenuMindMap() {
 
       {rep && <MatchingPanel />}
       {rep && <PackagesPanel />}
+      {rep && <ChallengesPanel />}
       <PaymentGatewayPanel />
 
       <p className="mx-auto mt-8 max-w-5xl text-center text-xs" style={{ color: "#a89c90" }}>
