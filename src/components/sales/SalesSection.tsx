@@ -200,6 +200,36 @@ async function autoCreateRenewalFromDeal(
   }
 }
 
+/* حدود فترة بلوك «نجم الفترة + لوحة المتصدرين» — مطابقة تماماً لمنطق «ملخص الإنجازات» (تُفلتر حسب updated_at) */
+function starPeriodBounds(filter: string, from?: string, to?: string): [Date, Date] | null {
+  const now = new Date();
+  let start: Date;
+  let end = new Date(now);
+  end.setHours(23, 59, 59, 999);
+  if (filter === "اليوم") {
+    start = new Date(now);
+    start.setHours(0, 0, 0, 0);
+  } else if (filter === "الأسبوع") {
+    start = new Date(now);
+    start.setDate(now.getDate() - now.getDay());
+    start.setHours(0, 0, 0, 0);
+  } else if (filter === "الشهر") {
+    start = new Date(now.getFullYear(), now.getMonth(), 1);
+  } else if (filter === "الشهر الماضي") {
+    start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    end = new Date(now.getFullYear(), now.getMonth(), 0);
+    end.setHours(23, 59, 59, 999);
+  } else if (filter === "مخصص") {
+    if (!from || !to) return null;
+    start = new Date(from);
+    start.setHours(0, 0, 0, 0);
+    end = new Date(to + "T23:59:59");
+  } else {
+    return null;
+  }
+  return [start, end];
+}
+
 export function SalesSection({ salesType }: SalesPageProps) {
   const isOffice = salesType === "office";
   const pageTitle = isOffice ? "مبيعات المكتب" : "مبيعات الدعم";
@@ -691,14 +721,15 @@ export function SalesSection({ salesType }: SalesPageProps) {
         return s >= _dateBounds[0] && s <= _dateBounds[1];
       })
     : baseFilteredDeals;
-  // فلترة صفقات «نجم الفترة + لوحة المتصدرين» حسب الفترة المختارة
-  const _starBounds = tableDateBounds(starFilter, starCustomFrom, starCustomTo);
+  // فلترة صفقات «نجم الفترة + لوحة المتصدرين» — نفس أساس «ملخص الإنجازات» بالضبط:
+  // على كامل صفقات الموظف (repOnlyDeals، بلا تبويب الشهر) وحسب updated_at وبنفس حدود الفترات
+  const _starBounds = starPeriodBounds(starFilter, starCustomFrom, starCustomTo);
   const starLeaderDeals = _starBounds
-    ? repFilteredDeals.filter(d => {
-        const s = (d.deal_date || d.created_at || "").slice(0, 10);
-        return s >= _starBounds[0] && s <= _starBounds[1];
+    ? repOnlyDeals.filter(d => {
+        const u = new Date(d.updated_at);
+        return u >= _starBounds[0] && u <= _starBounds[1];
       })
-    : repFilteredDeals;
+    : repOnlyDeals;
   const trialFilteredDeals = trialDaysFilter !== null
     ? dateFilteredDeals.filter(d => {
         if (d.stage !== "تجريبي") return false;
@@ -2631,7 +2662,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
       )}
 
       {/* ─── Star Employee + Leaderboard ─── */}
-      {!loading && repFilteredDeals.length > 0 && (
+      {!loading && repOnlyDeals.length > 0 && (
         <div className="space-y-3">
           {/* فلتر الفترة */}
           <div className="flex items-center gap-1.5 flex-wrap">
