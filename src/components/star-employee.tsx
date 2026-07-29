@@ -83,8 +83,10 @@ export function StarEmployeeCard({ deals, salesType }: { deals: Deal[]; salesTyp
         {hideScore ? (
           <div className="grid grid-cols-3 gap-2 mb-4">
             <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3 text-center">
-              <p className="text-xl font-extrabold text-cc-green">{star.totalDeals}</p>
-              <p className="text-[12px] text-muted-foreground mt-0.5">عدد الصفقات</p>
+              <p className="text-xl font-extrabold text-cc-green" dir="ltr">
+                {star.closedDeals}<span className="text-muted-foreground font-bold"> / {star.totalDeals}</span>
+              </p>
+              <p className="text-[12px] text-muted-foreground mt-0.5">المنجزة من الإجمالي</p>
             </div>
             <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3 text-center">
               <p className="text-xl font-extrabold text-cc-purple">{formatMoney(star.totalValue)}</p>
@@ -200,7 +202,9 @@ export function Leaderboard({ deals, salesType }: { deals: Deal[]; salesType?: s
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   {hideScore ? (
                     <>
-                      <span className="text-[12px] text-muted-foreground">{entry.totalDeals} صفقة</span>
+                      <span className="text-[12px] text-muted-foreground">
+                        <span className="text-cc-green font-medium">{entry.closedDeals}</span> من {entry.totalDeals} صفقة
+                      </span>
                       <span className="text-[12px] text-muted-foreground">
                         الإجمالي: <span className="text-foreground font-medium">{formatMoney(entry.totalValue)}</span>
                       </span>
