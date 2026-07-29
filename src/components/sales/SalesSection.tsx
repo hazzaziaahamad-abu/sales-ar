@@ -565,6 +565,10 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const [tableDateFilter, setTableDateFilter] = useState<string | null>("الشهر");
   const [tableCustomFrom, setTableCustomFrom] = useState("");
   const [tableCustomTo, setTableCustomTo] = useState("");
+  /* فلتر فترة «نجم الفترة + لوحة المتصدرين» */
+  const [starFilter, setStarFilter] = useState<string>("الشهر");
+  const [starCustomFrom, setStarCustomFrom] = useState("");
+  const [starCustomTo, setStarCustomTo] = useState("");
   /* trial age filter: show only تجريبي deals older than N days */
   const [trialDaysFilter, setTrialDaysFilter] = useState<number | null>(null);
 
@@ -687,6 +691,14 @@ export function SalesSection({ salesType }: SalesPageProps) {
         return s >= _dateBounds[0] && s <= _dateBounds[1];
       })
     : baseFilteredDeals;
+  // فلترة صفقات «نجم الفترة + لوحة المتصدرين» حسب الفترة المختارة
+  const _starBounds = tableDateBounds(starFilter, starCustomFrom, starCustomTo);
+  const starLeaderDeals = _starBounds
+    ? repFilteredDeals.filter(d => {
+        const s = (d.deal_date || d.created_at || "").slice(0, 10);
+        return s >= _starBounds[0] && s <= _starBounds[1];
+      })
+    : repFilteredDeals;
   const trialFilteredDeals = trialDaysFilter !== null
     ? dateFilteredDeals.filter(d => {
         if (d.stage !== "تجريبي") return false;
@@ -2620,9 +2632,48 @@ export function SalesSection({ salesType }: SalesPageProps) {
 
       {/* ─── Star Employee + Leaderboard ─── */}
       {!loading && repFilteredDeals.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <StarEmployeeCard deals={repFilteredDeals} salesType={salesType} />
-          <Leaderboard deals={repFilteredDeals} salesType={salesType} />
+        <div className="space-y-3">
+          {/* فلتر الفترة */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs text-muted-foreground shrink-0">الفترة:</span>
+            {([
+              { label: "يوم", key: "اليوم" },
+              { label: "أسبوع", key: "الأسبوع" },
+              { label: "الشهر الحالي", key: "الشهر" },
+              { label: "الشهر الماضي", key: "الشهر الماضي" },
+              { label: "مخصص", key: "مخصص" },
+            ] as const).map((f) => (
+              <button
+                key={f.key}
+                onClick={() => setStarFilter(f.key)}
+                className={`px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-colors border ${
+                  starFilter === f.key
+                    ? "bg-cyan/15 text-cyan border-cyan/30"
+                    : "text-muted-foreground border-transparent hover:text-foreground hover:bg-white/[0.06]"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+            {starFilter === "مخصص" && (
+              <div className="flex items-center gap-1.5">
+                <input type="date" value={starCustomFrom} onChange={e => setStarCustomFrom(e.target.value)}
+                  className="text-[12px] bg-card border border-border rounded-lg px-2 py-1 text-foreground" />
+                <span className="text-xs text-muted-foreground">—</span>
+                <input type="date" value={starCustomTo} onChange={e => setStarCustomTo(e.target.value)}
+                  className="text-[12px] bg-card border border-border rounded-lg px-2 py-1 text-foreground" />
+              </div>
+            )}
+          </div>
+
+          {starLeaderDeals.length === 0 ? (
+            <p className="cc-card rounded-2xl text-center text-xs text-muted-foreground py-8">لا يوجد بيانات للفترة المحددة</p>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <StarEmployeeCard deals={starLeaderDeals} salesType={salesType} />
+              <Leaderboard deals={starLeaderDeals} salesType={salesType} />
+            </div>
+          )}
         </div>
       )}
 
