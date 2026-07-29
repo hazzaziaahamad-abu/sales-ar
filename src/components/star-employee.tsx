@@ -27,9 +27,14 @@ const RANK_STYLES = [
 ];
 
 /* ─── Star Employee Card (Hero Card) ─── */
-export function StarEmployeeCard({ deals }: { deals: Deal[] }) {
+export function StarEmployeeCard({ deals, salesType }: { deals: Deal[]; salesType?: string }) {
   const leaderboard = useMemo(() => buildLeaderboard(deals), [deals]);
-  const star = leaderboard[0];
+  const hideScore = salesType === "support";
+  // مبيعات الدعم: النجم حسب قيمة المنجز بدل النقاط
+  const star = useMemo(() => {
+    if (!hideScore) return leaderboard[0];
+    return [...leaderboard].sort((a, b) => b.revenue - a.revenue || b.totalDeals - a.totalDeals)[0];
+  }, [leaderboard, hideScore]);
 
   if (!star || star.closedDeals === 0) return null;
 
@@ -59,9 +64,11 @@ export function StarEmployeeCard({ deals }: { deals: Deal[] }) {
           <div className="flex-1">
             <h4 className="text-lg font-extrabold text-foreground">{star.name}</h4>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="text-xs font-bold text-amber px-2 py-0.5 rounded-full bg-amber/10 border border-amber/20">
-                نقاط: {star.score}
-              </span>
+              {!hideScore && (
+                <span className="text-xs font-bold text-amber px-2 py-0.5 rounded-full bg-amber/10 border border-amber/20">
+                  نقاط: {star.score}
+                </span>
+              )}
               {star.streak > 0 && (
                 <span className="text-xs font-bold text-orange-400 px-2 py-0.5 rounded-full bg-orange-400/10 border border-orange-400/20 flex items-center gap-1">
                   <Flame className="w-3 h-3" />
@@ -73,20 +80,37 @@ export function StarEmployeeCard({ deals }: { deals: Deal[] }) {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-3 gap-2 mb-4">
-          <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3 text-center">
-            <p className="text-xl font-extrabold text-cc-green">{star.closedDeals}</p>
-            <p className="text-[12px] text-muted-foreground mt-0.5">صفقة مغلقة</p>
+        {hideScore ? (
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3 text-center">
+              <p className="text-xl font-extrabold text-cc-green">{star.totalDeals}</p>
+              <p className="text-[12px] text-muted-foreground mt-0.5">عدد الصفقات</p>
+            </div>
+            <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3 text-center">
+              <p className="text-xl font-extrabold text-cc-purple">{formatMoney(star.totalValue)}</p>
+              <p className="text-[12px] text-muted-foreground mt-0.5">الإجمالي</p>
+            </div>
+            <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3 text-center">
+              <p className="text-xl font-extrabold text-cyan">{formatMoney(star.revenue)}</p>
+              <p className="text-[12px] text-muted-foreground mt-0.5">إجمالي المنجز</p>
+            </div>
           </div>
-          <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3 text-center">
-            <p className="text-xl font-extrabold text-cyan">{formatMoney(star.revenue)}</p>
-            <p className="text-[12px] text-muted-foreground mt-0.5">إيرادات</p>
+        ) : (
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3 text-center">
+              <p className="text-xl font-extrabold text-cc-green">{star.closedDeals}</p>
+              <p className="text-[12px] text-muted-foreground mt-0.5">صفقة مغلقة</p>
+            </div>
+            <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3 text-center">
+              <p className="text-xl font-extrabold text-cyan">{formatMoney(star.revenue)}</p>
+              <p className="text-[12px] text-muted-foreground mt-0.5">إيرادات</p>
+            </div>
+            <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3 text-center">
+              <p className="text-xl font-extrabold text-cc-purple">{star.winRate}%</p>
+              <p className="text-[12px] text-muted-foreground mt-0.5">نسبة إغلاق</p>
+            </div>
           </div>
-          <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3 text-center">
-            <p className="text-xl font-extrabold text-cc-purple">{star.winRate}%</p>
-            <p className="text-[12px] text-muted-foreground mt-0.5">نسبة إغلاق</p>
-          </div>
-        </div>
+        )}
 
         {/* Badges */}
         {star.badges.length > 0 && (
@@ -111,8 +135,16 @@ export function StarEmployeeCard({ deals }: { deals: Deal[] }) {
 }
 
 /* ─── Leaderboard Component ─── */
-export function Leaderboard({ deals }: { deals: Deal[] }) {
-  const leaderboard = useMemo(() => buildLeaderboard(deals), [deals]);
+export function Leaderboard({ deals, salesType }: { deals: Deal[]; salesType?: string }) {
+  const raw = useMemo(() => buildLeaderboard(deals), [deals]);
+  // مبيعات الدعم: نخفي النقاط ونرتّب حسب قيمة المنجز بدل النقاط
+  const hideScore = salesType === "support";
+  const leaderboard = useMemo(() => {
+    if (!hideScore) return raw;
+    return [...raw]
+      .sort((a, b) => b.revenue - a.revenue || b.totalDeals - a.totalDeals)
+      .map((e, i) => ({ ...e, rank: i + 1 }));
+  }, [raw, hideScore]);
 
   if (leaderboard.length === 0) return null;
 
@@ -165,42 +197,61 @@ export function Leaderboard({ deals }: { deals: Deal[] }) {
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-[12px] text-muted-foreground">{entry.closedDeals} صفقة</span>
-                  <span className="text-[12px] text-cyan font-medium">{formatMoney(entry.revenue)}</span>
-                  {entry.badges.length > 0 && (
-                    <span className="text-[12px]" title={entry.badges.map(b => b.label).join("، ")}>
-                      {entry.badges.slice(0, 3).map(b => b.emoji).join("")}
-                      {entry.badges.length > 3 && `+${entry.badges.length - 3}`}
-                    </span>
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                  {hideScore ? (
+                    <>
+                      <span className="text-[12px] text-muted-foreground">{entry.totalDeals} صفقة</span>
+                      <span className="text-[12px] text-muted-foreground">
+                        الإجمالي: <span className="text-foreground font-medium">{formatMoney(entry.totalValue)}</span>
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-[12px] text-muted-foreground">{entry.closedDeals} صفقة</span>
+                      <span className="text-[12px] text-cyan font-medium">{formatMoney(entry.revenue)}</span>
+                      {entry.badges.length > 0 && (
+                        <span className="text-[12px]" title={entry.badges.map(b => b.label).join("، ")}>
+                          {entry.badges.slice(0, 3).map(b => b.emoji).join("")}
+                          {entry.badges.length > 3 && `+${entry.badges.length - 3}`}
+                        </span>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
 
-              {/* Score */}
-              <div className="text-left shrink-0">
-                <div className="flex items-center gap-1">
-                  <span className={`text-sm font-extrabold font-mono ${
-                    entry.score >= 70 ? "text-cc-green" :
-                    entry.score >= 40 ? "text-amber" :
-                    "text-cc-red"
-                  }`}>
-                    {entry.score}
-                  </span>
-                  <span className="text-[11px] text-muted-foreground">نقطة</span>
+              {hideScore ? (
+                /* مبيعات الدعم: إجمالي المنجز بدل النقاط (وهو أساس الترتيب) */
+                <div className="text-left shrink-0">
+                  <p className="text-sm font-extrabold text-cc-green">{formatMoney(entry.revenue)}</p>
+                  <p className="text-[11px] text-muted-foreground text-left">المنجز</p>
                 </div>
-                {/* Score bar */}
-                <div className="w-16 h-1.5 bg-white/[0.06] rounded-full overflow-hidden mt-1">
-                  <div
-                    className={`h-full rounded-full transition-all duration-700 ${
-                      entry.score >= 70 ? "bg-cc-green" :
-                      entry.score >= 40 ? "bg-amber" :
-                      "bg-cc-red"
-                    }`}
-                    style={{ width: `${entry.score}%` }}
-                  />
+              ) : (
+                /* Score */
+                <div className="text-left shrink-0">
+                  <div className="flex items-center gap-1">
+                    <span className={`text-sm font-extrabold font-mono ${
+                      entry.score >= 70 ? "text-cc-green" :
+                      entry.score >= 40 ? "text-amber" :
+                      "text-cc-red"
+                    }`}>
+                      {entry.score}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">نقطة</span>
+                  </div>
+                  {/* Score bar */}
+                  <div className="w-16 h-1.5 bg-white/[0.06] rounded-full overflow-hidden mt-1">
+                    <div
+                      className={`h-full rounded-full transition-all duration-700 ${
+                        entry.score >= 70 ? "bg-cc-green" :
+                        entry.score >= 40 ? "bg-amber" :
+                        "bg-cc-red"
+                      }`}
+                      style={{ width: `${entry.score}%` }}
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           );
         })}

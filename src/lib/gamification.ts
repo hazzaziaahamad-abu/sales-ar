@@ -40,6 +40,8 @@ export interface StarEmployee {
 export interface LeaderboardEntry {
   name: string;
   score: number;
+  totalDeals: number;
+  totalValue: number;
   closedDeals: number;
   revenue: number;
   winRate: number;
@@ -234,6 +236,7 @@ export function buildLeaderboard(
 ): LeaderboardEntry[] {
   const repMap: Record<string, {
     totalDeals: number;
+    totalValue: number;
     closedDeals: number;
     revenue: number;
     cycleDays: number;
@@ -251,10 +254,11 @@ export function buildLeaderboard(
     if (!rep) continue;
 
     if (!repMap[rep]) {
-      repMap[rep] = { totalDeals: 0, closedDeals: 0, revenue: 0, cycleDays: 0, biggestDeal: 0, dealsToday: 0, fullPriceCount: 0 };
+      repMap[rep] = { totalDeals: 0, totalValue: 0, closedDeals: 0, revenue: 0, cycleDays: 0, biggestDeal: 0, dealsToday: 0, fullPriceCount: 0 };
     }
     const r = repMap[rep];
     r.totalDeals++;
+    r.totalValue += deal.deal_value;
     r.cycleDays += deal.cycle_days || 0;
 
     if (deal.stage === "مكتملة") {
@@ -295,6 +299,8 @@ export function buildLeaderboard(
     return {
       name,
       score,
+      totalDeals: r.totalDeals,
+      totalValue: r.totalValue,
       closedDeals: r.closedDeals,
       revenue: r.revenue,
       winRate: stats.winRate,

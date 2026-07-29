@@ -2621,8 +2621,8 @@ export function SalesSection({ salesType }: SalesPageProps) {
       {/* ─── Star Employee + Leaderboard ─── */}
       {!loading && repFilteredDeals.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <StarEmployeeCard deals={repFilteredDeals} />
-          <Leaderboard deals={repFilteredDeals} />
+          <StarEmployeeCard deals={repFilteredDeals} salesType={salesType} />
+          <Leaderboard deals={repFilteredDeals} salesType={salesType} />
         </div>
       )}
 
