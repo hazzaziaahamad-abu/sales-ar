@@ -383,6 +383,8 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
   const [menuUrlEditing, setMenuUrlEditing] = useState(false);
   const [menuUrlSaving, setMenuUrlSaving] = useState(false);
   const [menuUrlCopied, setMenuUrlCopied] = useState(false);
+  const [subStart, setSubStart] = useState("");
+  const [subEnd, setSubEnd] = useState("");
   const [phoneVerified, setPhoneVerified] = useState(false);
   const [phoneVerifiedSaving, setPhoneVerifiedSaving] = useState(false);
   const [secondaryPhone, setSecondaryPhone] = useState("");
@@ -440,7 +442,7 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
     if (!key) return;
     setBioKey(key);
     try {
-      const { bio: b, menuUrl: m, phoneVerified: pv, secondaryPhone: sp, primaryOverride: po, primaryComment: pc, secondaryComment: sc } = await fetchClientBio(key);
+      const { bio: b, menuUrl: m, phoneVerified: pv, secondaryPhone: sp, primaryOverride: po, primaryComment: pc, secondaryComment: sc, subscriptionStart: ss, subscriptionEnd: se } = await fetchClientBio(key);
       setBio(b);
       setBioDraft(b);
       setMenuUrl(m);
@@ -454,6 +456,8 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
       setPrimaryPhoneCommentDraft(pc);
       setSecondaryPhoneComment(sc);
       setSecondaryPhoneCommentDraft(sc);
+      setSubStart(ss);
+      setSubEnd(se);
     } catch {
       setBio("");
       setBioDraft("");
@@ -513,6 +517,18 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
       setMenuUrlSaving(false);
     }
   }, [bioKey, menuUrlDraft, user?.name]);
+
+  const saveSubStart = useCallback(async (val: string) => {
+    setSubStart(val);
+    if (!bioKey) return;
+    try { await upsertClientPhoneData(bioKey, { subscriptionStart: val }); } catch { /* silent */ }
+  }, [bioKey]);
+
+  const saveSubEnd = useCallback(async (val: string) => {
+    setSubEnd(val);
+    if (!bioKey) return;
+    try { await upsertClientPhoneData(bioKey, { subscriptionEnd: val }); } catch { /* silent */ }
+  }, [bioKey]);
 
   const togglePhoneVerified = useCallback(async () => {
     if (!bioKey) return;
@@ -969,6 +985,47 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
                 {currentPlan && (
                   <p className="text-[12px] text-primary">الباقة: {currentPlan}</p>
                 )}
+
+                {/* Subscription dates */}
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div className="rounded-lg bg-background/50 p-2">
+                    <label className="flex items-center gap-1 text-[11px] text-muted-foreground mb-1">
+                      <CalendarClock className="w-3 h-3 text-cyan-400" /> بداية الاشتراك
+                    </label>
+                    <input
+                      type="date"
+                      value={subStart}
+                      onChange={(e) => saveSubStart(e.target.value)}
+                      className="w-full bg-transparent text-xs font-medium text-foreground outline-none [color-scheme:dark]"
+                    />
+                  </div>
+                  <div className="rounded-lg bg-background/50 p-2">
+                    <label className="flex items-center gap-1 text-[11px] text-muted-foreground mb-1">
+                      <CalendarClock className="w-3 h-3 text-amber-400" /> نهاية الاشتراك
+                    </label>
+                    <input
+                      type="date"
+                      value={subEnd}
+                      onChange={(e) => saveSubEnd(e.target.value)}
+                      className="w-full bg-transparent text-xs font-medium text-foreground outline-none [color-scheme:dark]"
+                    />
+                  </div>
+                </div>
+                {subEnd && (() => {
+                  const days = Math.ceil((new Date(subEnd + "T00:00:00").getTime() - Date.now()) / 86400000);
+                  const expired = days < 0;
+                  return (
+                    <div className="flex justify-end">
+                      <span className={`text-[11px] px-2 py-0.5 rounded-full border ${
+                        expired ? "text-red-400 border-red-500/30 bg-red-500/10"
+                        : days <= 30 ? "text-amber-400 border-amber-500/30 bg-amber-500/10"
+                        : "text-emerald-400 border-emerald-500/30 bg-emerald-500/10"
+                      }`}>
+                        {expired ? `منتهي منذ ${Math.abs(days)} يوم` : `متبقٍ ${days} يوم على الانتهاء`}
+                      </span>
+                    </div>
+                  );
+                })()}
 
                 {/* Quick Stats */}
                 <div className="grid grid-cols-3 gap-2 pt-1">

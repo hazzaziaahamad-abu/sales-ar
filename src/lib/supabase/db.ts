@@ -169,9 +169,11 @@ type ClientPhoneData = {
   primaryOverride?: string;
   primaryComment?: string;
   secondaryComment?: string;
+  subscriptionStart?: string;
+  subscriptionEnd?: string;
 };
 
-export async function fetchClientBio(clientKey: string): Promise<{ bio: string; menuUrl: string; phoneVerified: boolean; secondaryPhone: string; primaryOverride: string; primaryComment: string; secondaryComment: string }> {
+export async function fetchClientBio(clientKey: string): Promise<{ bio: string; menuUrl: string; phoneVerified: boolean; secondaryPhone: string; primaryOverride: string; primaryComment: string; secondaryComment: string; subscriptionStart: string; subscriptionEnd: string }> {
   const supabase = createClient();
   const orgId = getOrgId();
   const [bioRes, phoneRes] = await Promise.all([
@@ -187,6 +189,8 @@ export async function fetchClientBio(clientKey: string): Promise<{ bio: string; 
     primaryOverride: phoneData?.primaryOverride || "",
     primaryComment: phoneData?.primaryComment || "",
     secondaryComment: phoneData?.secondaryComment || "",
+    subscriptionStart: phoneData?.subscriptionStart || "",
+    subscriptionEnd: phoneData?.subscriptionEnd || "",
   };
 }
 
