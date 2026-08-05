@@ -766,9 +766,15 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
   const currentPlan = data?.renewals?.find(r => r.status !== "ملغي بسبب")?.plan_name
     || data?.deals?.find(d => d.stage === "مكتملة")?.plan || "";
 
-  // نهاية الاشتراك تُشتق تلقائياً من موعد تجديد العميل الفعّال (أبعد تاريخ تجديد غير ملغي)
-  const renewalDerivedEnd = (data?.renewals || [])
-    .filter(r => r.status !== "ملغي بسبب" && r.renewal_date)
+  // بداية الاشتراك ← تاريخ الدفع، ونهاية الاشتراك ← موعد التجديد (من تجديدات العميل غير الملغاة)
+  const _nonCancelledRenewals = (data?.renewals || []).filter(r => r.status !== "ملغي بسبب");
+  const renewalDerivedStart = _nonCancelledRenewals
+    .filter(r => r.payment_date)
+    .map(r => r.payment_date!.slice(0, 10))
+    .sort()
+    .pop() || "";
+  const renewalDerivedEnd = _nonCancelledRenewals
+    .filter(r => r.renewal_date)
     .map(r => r.renewal_date.slice(0, 10))
     .sort()
     .pop() || "";
@@ -1000,12 +1006,19 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
                     <label className="flex items-center gap-1 text-[11px] text-muted-foreground mb-1">
                       <CalendarClock className="w-3 h-3 text-cyan-400" /> بداية الاشتراك
                     </label>
-                    <input
-                      type="date"
-                      value={subStart}
-                      onChange={(e) => saveSubStart(e.target.value)}
-                      className="w-full bg-transparent text-xs font-medium text-foreground outline-none [color-scheme:dark]"
-                    />
+                    {renewalDerivedStart ? (
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-xs font-medium text-foreground" dir="ltr">{formatDate(renewalDerivedStart)}</span>
+                        <span className="text-[9px] text-cyan-400/80 whitespace-nowrap">من تاريخ الدفع</span>
+                      </div>
+                    ) : (
+                      <input
+                        type="date"
+                        value={subStart}
+                        onChange={(e) => saveSubStart(e.target.value)}
+                        className="w-full bg-transparent text-xs font-medium text-foreground outline-none [color-scheme:dark]"
+                      />
+                    )}
                   </div>
                   <div className="rounded-lg bg-background/50 p-2">
                     <label className="flex items-center gap-1 text-[11px] text-muted-foreground mb-1">
