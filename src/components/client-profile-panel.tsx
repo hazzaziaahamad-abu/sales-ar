@@ -766,6 +766,14 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
   const currentPlan = data?.renewals?.find(r => r.status !== "ملغي بسبب")?.plan_name
     || data?.deals?.find(d => d.stage === "مكتملة")?.plan || "";
 
+  // نهاية الاشتراك تُشتق تلقائياً من موعد تجديد العميل الفعّال (أبعد تاريخ تجديد غير ملغي)
+  const renewalDerivedEnd = (data?.renewals || [])
+    .filter(r => r.status !== "ملغي بسبب" && r.renewal_date)
+    .map(r => r.renewal_date.slice(0, 10))
+    .sort()
+    .pop() || "";
+  const effectiveSubEnd = renewalDerivedEnd || subEnd;
+
   const totalDeals = data?.deals.length || 0;
   const closedDeals = data?.deals.filter(d => d.stage === "مكتملة").length || 0;
   const totalRevenue = data?.deals.filter(d => d.stage === "مكتملة").reduce((s, d) => s + d.deal_value, 0) || 0;
@@ -1003,16 +1011,23 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
                     <label className="flex items-center gap-1 text-[11px] text-muted-foreground mb-1">
                       <CalendarClock className="w-3 h-3 text-amber-400" /> نهاية الاشتراك
                     </label>
-                    <input
-                      type="date"
-                      value={subEnd}
-                      onChange={(e) => saveSubEnd(e.target.value)}
-                      className="w-full bg-transparent text-xs font-medium text-foreground outline-none [color-scheme:dark]"
-                    />
+                    {renewalDerivedEnd ? (
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-xs font-medium text-foreground" dir="ltr">{formatDate(renewalDerivedEnd)}</span>
+                        <span className="text-[9px] text-cyan-400/80 whitespace-nowrap">من موعد التجديد</span>
+                      </div>
+                    ) : (
+                      <input
+                        type="date"
+                        value={subEnd}
+                        onChange={(e) => saveSubEnd(e.target.value)}
+                        className="w-full bg-transparent text-xs font-medium text-foreground outline-none [color-scheme:dark]"
+                      />
+                    )}
                   </div>
                 </div>
-                {subEnd && (() => {
-                  const days = Math.ceil((new Date(subEnd + "T00:00:00").getTime() - Date.now()) / 86400000);
+                {effectiveSubEnd && (() => {
+                  const days = Math.ceil((new Date(effectiveSubEnd + "T00:00:00").getTime() - Date.now()) / 86400000);
                   const expired = days < 0;
                   return (
                     <div className="flex justify-end">
