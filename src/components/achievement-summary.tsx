@@ -43,6 +43,7 @@ interface AchievementSummaryProps {
   activeFilter?: string | null;
   filteredCount?: number;
   tableAnchorId?: string;
+  hideSuccessRate?: boolean;
 }
 
 export function AchievementSummary({
@@ -53,6 +54,7 @@ export function AchievementSummary({
   activeFilter,
   filteredCount,
   tableAnchorId,
+  hideSuccessRate,
 }: AchievementSummaryProps) {
   const [period, setPeriod] = useState<SummaryPeriod>("month");
   const [customRange, setCustomRange] = useState({ from: "", to: "" });
@@ -312,7 +314,7 @@ export function AchievementSummary({
       )}
 
       {/* Achievement cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 mb-4">
+      <div className={`grid grid-cols-2 md:grid-cols-4 ${hideSuccessRate ? "lg:grid-cols-4" : "lg:grid-cols-5"} gap-3 mb-4`}>
         <button
           onClick={() => handleFilter("completed")}
           className={`p-3 rounded-[14px] text-center transition-all cursor-pointer ${
@@ -343,16 +345,18 @@ export function AchievementSummary({
           <p className="text-2xl font-bold text-cc-purple">{summary.contacted}</p>
           <p className="text-[12px] text-muted-foreground mt-0.5">{l.contacted}</p>
         </button>
-        <button
-          onClick={() => handleFilter("success")}
-          className={`p-3 rounded-[14px] text-center transition-all cursor-pointer ${
-            activeFilter === "success" ? "bg-amber/20 border-2 border-amber/50 ring-2 ring-amber/20" : "bg-amber/10 border border-amber/20 hover:bg-amber/15 hover:scale-[1.02]"
-          }`}
-        >
-          <Zap className="w-5 h-5 text-amber mx-auto mb-1" />
-          <p className="text-2xl font-bold text-amber">{summary.successRate}%</p>
-          <p className="text-[12px] text-muted-foreground mt-0.5">{l.successRate}</p>
-        </button>
+        {!hideSuccessRate && (
+          <button
+            onClick={() => handleFilter("success")}
+            className={`p-3 rounded-[14px] text-center transition-all cursor-pointer ${
+              activeFilter === "success" ? "bg-amber/20 border-2 border-amber/50 ring-2 ring-amber/20" : "bg-amber/10 border border-amber/20 hover:bg-amber/15 hover:scale-[1.02]"
+            }`}
+          >
+            <Zap className="w-5 h-5 text-amber mx-auto mb-1" />
+            <p className="text-2xl font-bold text-amber">{summary.successRate}%</p>
+            <p className="text-[12px] text-muted-foreground mt-0.5">{l.successRate}</p>
+          </button>
+        )}
         <button
           onClick={() => handleFilter("lost")}
           className={`p-3 rounded-[14px] text-center transition-all cursor-pointer col-span-2 md:col-span-1 ${
@@ -367,25 +371,27 @@ export function AchievementSummary({
 
       {/* Progress bar + extra info */}
       <div className="flex items-center gap-4 flex-wrap">
-        <div className="flex-1 min-w-[200px]">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[13px] text-muted-foreground">معدل الإنجاز</span>
-            <span className={`text-xs font-bold ${
-              summary.successRate >= 70 ? "text-cc-green" :
-              summary.successRate >= 40 ? "text-amber" : "text-cc-red"
-            }`}>{summary.successRate}%</span>
+        {!hideSuccessRate && (
+          <div className="flex-1 min-w-[200px]">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[13px] text-muted-foreground">معدل الإنجاز</span>
+              <span className={`text-xs font-bold ${
+                summary.successRate >= 70 ? "text-cc-green" :
+                summary.successRate >= 40 ? "text-amber" : "text-cc-red"
+              }`}>{summary.successRate}%</span>
+            </div>
+            <div className="h-2.5 bg-white/[0.04] rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-700 ${
+                  summary.successRate >= 70 ? "bg-gradient-to-l from-emerald-400 to-emerald-600" :
+                  summary.successRate >= 40 ? "bg-gradient-to-l from-amber-400 to-amber-600" :
+                  "bg-gradient-to-l from-red-400 to-red-600"
+                }`}
+                style={{ width: `${summary.successRate}%` }}
+              />
+            </div>
           </div>
-          <div className="h-2.5 bg-white/[0.04] rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-700 ${
-                summary.successRate >= 70 ? "bg-gradient-to-l from-emerald-400 to-emerald-600" :
-                summary.successRate >= 40 ? "bg-gradient-to-l from-amber-400 to-amber-600" :
-                "bg-gradient-to-l from-red-400 to-red-600"
-              }`}
-              style={{ width: `${summary.successRate}%` }}
-            />
-          </div>
-        </div>
+        )}
 
         {summary.avgValue > 0 && (
           <div className="text-center px-3 py-1.5 rounded-lg bg-white/[0.05] border border-white/[0.06]">

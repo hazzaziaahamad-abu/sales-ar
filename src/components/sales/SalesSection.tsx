@@ -2253,6 +2253,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
         <AchievementSummary
           items={achievementItems}
           allPlans={[...PLANS]}
+          hideSuccessRate
           labels={{
             completed: "صفقة مكتملة",
             revenue: "إيرادات محققة",
