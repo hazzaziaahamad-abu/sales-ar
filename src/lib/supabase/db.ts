@@ -3064,6 +3064,7 @@ export async function logPageVisit(page: string, userName?: string): Promise<voi
 export type OfferVisit = {
   id: string;
   page: string;
+  kind: string | null;
   ref: string | null;
   referrer: string | null;
   device: string | null;
@@ -3085,7 +3086,7 @@ export async function fetchOfferVisits(limit = 300): Promise<OfferVisit[]> {
   const supabase = createClient();
   const { data } = await supabase
     .from("offer_visits")
-    .select("id, page, ref, referrer, device, created_at")
+    .select("id, page, kind, ref, referrer, device, created_at")
     .order("created_at", { ascending: false })
     .limit(limit);
   return (data as OfferVisit[]) || [];

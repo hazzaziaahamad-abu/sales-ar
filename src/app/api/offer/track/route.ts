@@ -36,8 +36,11 @@ export async function POST(req: NextRequest) {
         note: str(body.note, 500),
       });
     } else {
+      const allowedKinds = ["visit", "whatsapp", "call", "quote"];
+      const kind = allowedKinds.includes(body.kind) ? body.kind : "visit";
       await supabaseAdmin.from("offer_visits").insert({
         page,
+        kind,
         ref,
         referrer: str(body.referrer, 300) || str(referer, 300),
         device: detectDevice(ua),

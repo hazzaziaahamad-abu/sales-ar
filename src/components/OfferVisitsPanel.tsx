@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchOfferVisits, fetchOfferLeads, updateOfferLeadStatus, type OfferVisit, type OfferLead } from "@/lib/supabase/db";
-import { Eye, UserCheck, RefreshCw, Phone, MessageCircle } from "lucide-react";
+import { Eye, RefreshCw, Phone, MessageCircle } from "lucide-react";
 
 const PAGE_LABEL: Record<string, string> = { menu: "المنيو", nahjez: "نحجز" };
 const DEVICE_ICON: Record<string, string> = { mobile: "📱", tablet: "📲", desktop: "💻" };
 const LEAD_STATUSES = ["جديد", "تم التواصل", "مهتم", "مغلق"];
+const KIND_LABEL: Record<string, string> = { whatsapp: "تواصل واتساب", call: "اتصال", quote: "طلب عرض" };
+const isIntent = (v: OfferVisit) => !!v.kind && v.kind !== "visit";
 
 function fmt(ts: string) {
   const d = new Date(ts);
@@ -24,7 +26,10 @@ export function OfferVisitsPanel() {
   const [visits, setVisits] = useState<OfferVisit[]>([]);
   const [leads, setLeads] = useState<OfferLead[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"leads" | "visits">("leads");
+  const [tab, setTab] = useState<"leads" | "intents" | "visits">("leads");
+
+  const intents = useMemo(() => visits.filter(isIntent), [visits]);
+  const pageViews = useMemo(() => visits.filter((v) => !isIntent(v)), [visits]);
 
   const load = useCallback(async () => {
     try {
@@ -38,11 +43,11 @@ export function OfferVisitsPanel() {
   useEffect(() => { load(); }, [load]);
 
   const stats = useMemo(() => ({
-    visits: visits.length,
-    visitsToday: visits.filter((v) => isToday(v.created_at)).length,
+    views: pageViews.length,
+    intents: intents.length,
     leads: leads.length,
     leadsToday: leads.filter((l) => isToday(l.created_at)).length,
-  }), [visits, leads]);
+  }), [pageViews, intents, leads]);
 
   async function setStatus(id: string, status: string) {
     setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, status } : l)));
@@ -69,10 +74,10 @@ export function OfferVisitsPanel() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-4">
         {[
-          { v: stats.visits, l: "إجمالي الزيارات", c: "text-cyan" },
-          { v: stats.visitsToday, l: "زيارات اليوم", c: "text-cc-green" },
+          { v: stats.views, l: "إجمالي الزيارات", c: "text-cyan" },
+          { v: stats.intents, l: "طلبات اهتمام", c: "text-amber" },
           { v: stats.leads, l: "عملاء محتملون", c: "text-cc-purple" },
-          { v: stats.leadsToday, l: "منهم اليوم", c: "text-amber" },
+          { v: stats.leadsToday, l: "عملاء اليوم", c: "text-cc-green" },
         ].map((s, i) => (
           <div key={i} className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3 text-center">
             <p className={`text-2xl font-extrabold ${s.c}`}>{loading ? "—" : s.v.toLocaleString()}</p>
@@ -82,8 +87,8 @@ export function OfferVisitsPanel() {
       </div>
 
       {/* Tabs */}
-      <div className="px-4 flex items-center gap-1">
-        {([["leads", `عملاء محتملون (${leads.length})`], ["visits", `سجل الزيارات (${visits.length})`]] as const).map(([k, label]) => (
+      <div className="px-4 flex items-center gap-1 flex-wrap">
+        {([["leads", `عملاء محتملون (${leads.length})`], ["intents", `طلبات اهتمام (${intents.length})`], ["visits", `سجل الزيارات (${pageViews.length})`]] as const).map(([k, label]) => (
           <button
             key={k}
             onClick={() => setTab(k)}
@@ -91,7 +96,6 @@ export function OfferVisitsPanel() {
               tab === k ? "bg-cyan/15 text-cyan border-cyan/30" : "text-muted-foreground border-transparent hover:text-foreground hover:bg-white/[0.06]"
             }`}
           >
-            {tab === k ? (k === "leads" ? <UserCheck className="w-3.5 h-3.5 inline ml-1" /> : <Eye className="w-3.5 h-3.5 inline ml-1" />) : null}
             {label}
           </button>
         ))}
@@ -144,11 +148,29 @@ export function OfferVisitsPanel() {
               })}
             </div>
           )
-        ) : visits.length === 0 ? (
+        ) : tab === "intents" ? (
+          intents.length === 0 ? (
+            <p className="text-center text-xs text-muted-foreground py-8">لا توجد طلبات اهتمام بعد — تُسجّل عند ضغط الزائر على «واتساب» أو «اطلب عرض».</p>
+          ) : (
+            <div className="space-y-1.5">
+              {intents.map((v) => (
+                <div key={v.id} className="flex items-center justify-between gap-2 rounded-lg border border-amber/20 bg-amber/[0.04] px-3 py-2 text-[12px]">
+                  <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                    <span className="px-1.5 py-0.5 rounded-full bg-amber/15 text-amber border border-amber/30 shrink-0 font-bold">{KIND_LABEL[v.kind || ""] || "اهتمام"}</span>
+                    <span className="px-1.5 py-0.5 rounded-full bg-cyan/10 text-cyan border border-cyan/20 shrink-0">{PAGE_LABEL[v.page] || v.page}</span>
+                    {v.ref && <span className="px-1.5 py-0.5 rounded-full bg-white/5 text-muted-foreground border border-border/40 shrink-0">رابط: {v.ref}</span>}
+                    <span>{DEVICE_ICON[v.device || ""] || "🌐"}</span>
+                  </div>
+                  <span className="text-muted-foreground shrink-0">{fmt(v.created_at)}</span>
+                </div>
+              ))}
+            </div>
+          )
+        ) : pageViews.length === 0 ? (
           <p className="text-center text-xs text-muted-foreground py-8">لا توجد زيارات مسجّلة بعد</p>
         ) : (
           <div className="space-y-1.5">
-            {visits.map((v) => (
+            {pageViews.map((v) => (
               <div key={v.id} className="flex items-center justify-between gap-2 rounded-lg border border-border/30 bg-white/[0.02] px-3 py-2 text-[12px]">
                 <div className="flex items-center gap-2 min-w-0">
                   <span>{DEVICE_ICON[v.device || ""] || "🌐"}</span>

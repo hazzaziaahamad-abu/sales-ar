@@ -1,12 +1,10 @@
 import React from "react";
 import type { LucideIcon } from "lucide-react";
-import { MessageCircle, Check, ArrowLeft, ShieldCheck, Star } from "lucide-react";
+import { Check, ArrowLeft, ShieldCheck, Star } from "lucide-react";
 import BannerCarousel, { type OfferBanner } from "@/components/offer/BannerCarousel";
 import OfferTracker from "@/components/offer/OfferTracker";
 import OfferContactForm from "@/components/offer/OfferContactForm";
-
-/* رقم واتساب المبيعات (صيغة دولية بدون + أو أصفار) */
-export const WHATSAPP_NUMBER = "966591166861";
+import { WhatsAppButton, SubscribeButton } from "@/components/offer/OfferCta";
 
 export type OfferPain = { icon: LucideIcon; text: string };
 export type OfferBenefit = { icon: LucideIcon; title: string; text: string };
@@ -70,27 +68,6 @@ function Logo({ kind, accent, accentDeep }: { kind: "menu" | "calendar"; accent:
   );
 }
 
-function waLink(msg: string) {
-  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
-}
-
-function WhatsAppButton({ msg, large = false }: { msg: string; large?: boolean }) {
-  return (
-    <a
-      href={waLink(msg)}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={`inline-flex items-center justify-center gap-2 rounded-full font-extrabold text-white shadow-lg transition-transform hover:-translate-y-0.5 ${
-        large ? "px-7 py-3.5 text-base" : "px-4 py-2 text-sm"
-      }`}
-      style={{ backgroundColor: "#25D366", boxShadow: "0 12px 26px -10px rgba(37,211,102,.6)" }}
-    >
-      <MessageCircle size={large ? 20 : 16} fill="#fff" stroke="#25D366" />
-      تواصل معنا واتساب
-    </a>
-  );
-}
-
 export default function OfferLanding({ config }: { config: OfferConfig }) {
   const { accent, accentDeep, gold } = config;
   return (
@@ -109,7 +86,7 @@ export default function OfferLanding({ config }: { config: OfferConfig }) {
             <Logo kind={config.logo} accent={accent} accentDeep={accentDeep} />
             <span className="text-lg font-black" style={{ color: accentDeep }}>{config.brand}</span>
           </div>
-          <WhatsAppButton msg={config.whatsappMsg} />
+          <WhatsAppButton page={config.page} msg={config.whatsappMsg} />
         </div>
       </header>
 
@@ -139,7 +116,7 @@ export default function OfferLanding({ config }: { config: OfferConfig }) {
             {config.heroSubtitle}
           </p>
           <div className="mt-7 flex flex-col items-center justify-center gap-3">
-            <WhatsAppButton msg={config.whatsappMsg} large />
+            <WhatsAppButton page={config.page} msg={config.whatsappMsg} large />
             <span className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: "#8a7c70" }}>
               <ShieldCheck size={14} style={{ color: accent }} /> {config.trustLine}
             </span>
@@ -235,16 +212,12 @@ export default function OfferLanding({ config }: { config: OfferConfig }) {
                     </li>
                   ))}
                 </ul>
-                <a
-                  href={waLink(`${config.whatsappMsg} — مهتم بـ${t.name}`)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-5 inline-flex items-center justify-center gap-2 rounded-full py-2.5 text-sm font-extrabold text-white transition-transform hover:-translate-y-0.5"
-                  style={{ backgroundColor: t.highlight ? accent : "#25D366" }}
-                >
-                  <MessageCircle size={16} fill="#fff" stroke={t.highlight ? accent : "#25D366"} />
-                  اشترك الآن
-                </a>
+                <SubscribeButton
+                  page={config.page}
+                  msg={`${config.whatsappMsg} — مهتم بـ${t.name}`}
+                  accent={accent}
+                  filled={t.highlight}
+                />
               </div>
             ))}
           </div>
@@ -260,7 +233,7 @@ export default function OfferLanding({ config }: { config: OfferConfig }) {
           <h2 className="text-2xl font-black">{config.closingTitle}</h2>
           <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed" style={{ color: "#ffffffcc" }}>{config.closingText}</p>
           <div className="mt-6 flex justify-center">
-            <WhatsAppButton msg={config.whatsappMsg} large />
+            <WhatsAppButton page={config.page} msg={config.whatsappMsg} large />
           </div>
         </div>
       </section>

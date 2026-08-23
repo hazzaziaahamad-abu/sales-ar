@@ -5,12 +5,15 @@
 create table if not exists public.offer_visits (
   id uuid primary key default gen_random_uuid(),
   page text not null,           -- 'menu' | 'nahjez'
+  kind text not null default 'visit', -- 'visit' | 'whatsapp' | 'call' | 'quote'
   ref text,                     -- وسم الرابط المخصّص (?ref=)
   referrer text,                -- مصدر الزيارة
   device text,                  -- 'mobile' | 'tablet' | 'desktop'
   user_agent text,
   created_at timestamptz not null default now()
 );
+-- لو الجدول موجود مسبقاً بدون العمود
+alter table public.offer_visits add column if not exists kind text not null default 'visit';
 create index if not exists offer_visits_created_idx on public.offer_visits (created_at desc);
 
 create table if not exists public.offer_leads (
