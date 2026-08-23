@@ -11,6 +11,7 @@ const PUBLIC_PATHS = [
   "/auth/callback",
   "/gift",
   "/submit",
+  "/offer",
   "/api/wa/webhook",
   "/api/cron/",
   "/api/render/task-card",
