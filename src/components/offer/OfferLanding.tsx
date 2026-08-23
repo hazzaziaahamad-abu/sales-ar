@@ -2,8 +2,8 @@ import React from "react";
 import type { LucideIcon } from "lucide-react";
 import { MessageCircle, Check, ArrowLeft, ShieldCheck, Star } from "lucide-react";
 
-/* رقم واتساب المبيعات — بدّله بالرقم الحقيقي (صيغة دولية بدون + أو أصفار) */
-export const WHATSAPP_NUMBER = "966500000000";
+/* رقم واتساب المبيعات (صيغة دولية بدون + أو أصفار) */
+export const WHATSAPP_NUMBER = "966591166861";
 
 export type OfferPain = { icon: LucideIcon; text: string };
 export type OfferBenefit = { icon: LucideIcon; title: string; text: string };
