@@ -2,6 +2,8 @@ import React from "react";
 import type { LucideIcon } from "lucide-react";
 import { MessageCircle, Check, ArrowLeft, ShieldCheck, Star } from "lucide-react";
 import BannerCarousel, { type OfferBanner } from "@/components/offer/BannerCarousel";
+import OfferTracker from "@/components/offer/OfferTracker";
+import OfferContactForm from "@/components/offer/OfferContactForm";
 
 /* رقم واتساب المبيعات (صيغة دولية بدون + أو أصفار) */
 export const WHATSAPP_NUMBER = "966591166861";
@@ -22,6 +24,7 @@ export type OfferTier = {
 export type OfferConfig = {
   brand: string;
   logo: "menu" | "calendar";
+  page: string; // معرّف الصفحة للتتبّع: 'menu' | 'nahjez'
   banners?: OfferBanner[];
   accent: string;
   accentDeep: string;
@@ -97,6 +100,7 @@ export default function OfferLanding({ config }: { config: OfferConfig }) {
       style={{ fontFamily: "'Tajawal', system-ui, sans-serif", backgroundColor: "#fbfaf5", color: "#2b2620" }}
     >
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');`}</style>
+      <OfferTracker page={config.page} />
 
       {/* Top bar */}
       <header className="sticky top-0 z-30 border-b" style={{ backgroundColor: "rgba(251,250,245,.85)", borderColor: "#eee3d6", backdropFilter: "blur(8px)" }}>
@@ -246,6 +250,9 @@ export default function OfferLanding({ config }: { config: OfferConfig }) {
           </div>
         </div>
       </section>
+
+      {/* Contact form (lead capture) */}
+      <OfferContactForm page={config.page} accent={accent} accentDeep={accentDeep} />
 
       {/* Closing CTA */}
       <section className="mx-auto max-w-5xl px-4 py-14">

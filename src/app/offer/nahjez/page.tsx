@@ -22,6 +22,7 @@ export const metadata: Metadata = {
 const CONFIG: OfferConfig = {
   brand: "نحجز",
   logo: "calendar",
+  page: "nahjez",
   accent: "#0D9488",
   accentDeep: "#0F766E",
   gold: "#F5B301",

@@ -9,9 +9,10 @@ import {
   Users, Banknote, BarChart3, Phone, ArrowLeft, ArrowRight,
   MessageCircle, Bell, ExternalLink, Zap, CloudSun, Thermometer,
   Headphones, UserX, Timer, Share2, LogIn, Smartphone, Monitor, Activity,
-  Copy, Image,
+  Copy, Image, Eye,
 } from "lucide-react";
 import { fetchDeals, fetchRenewals, fetchEmployees, fetchRecentFollowUpNotes, upsertSalesGuideSetting, fetchSalesGuideSettings, fetchTickets, fetchUserLoginLogs, fetchActivityLogs, type UserLoginLog } from "@/lib/supabase/db";
+import { OfferVisitsPanel } from "@/components/OfferVisitsPanel";
 import type { ActivityLog } from "@/types";
 import { useAuth } from "@/lib/auth-context";
 import { formatMoneyFull, todayLocal, dateToLocal, saudiDateStr } from "@/lib/utils/format";
@@ -1268,6 +1269,11 @@ export default function SecretaryPage() {
           تحليل ذكي شامل
         </Button>
       </div>
+
+      {/* ─── زيارات صفحة العرض ─── */}
+      <Section id="offerVisits" title="زيارات صفحة العرض" icon={<Eye className="w-5 h-5 text-cyan-400" />} isOpen={expandedSections.offerVisits !== false} onToggle={toggleSection}>
+        <OfferVisitsPanel />
+      </Section>
 
       {/* ─── 1. Briefing with Month Filter ─── */}
       <Section id="briefing" title="الملخص والإحصائيات" icon={<Sun className="w-5 h-5 text-amber-400" />} isOpen={expandedSections.briefing !== false} onToggle={toggleSection}>

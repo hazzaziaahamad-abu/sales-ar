@@ -46,6 +46,7 @@ const LOYALTY_FAQ = [
 const CONFIG: OfferConfig = {
   brand: "قائمة الطلبات",
   logo: "menu",
+  page: "menu",
   banners: [
     { src: "/banners/menu-loyalty.jpg", alt: "برنامج الولاء — بطاقات ولاء رقمية في محفظة آبل وقوقل", faq: LOYALTY_FAQ },
     { src: "/banners/menu-loyalty-2.jpg", alt: "برنامج الولاء من قائمة الطلبات — تصميم آخر", faq: LOYALTY_FAQ },

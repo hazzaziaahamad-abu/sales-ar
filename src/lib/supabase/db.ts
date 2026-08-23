@@ -3060,6 +3060,52 @@ export async function logPageVisit(page: string, userName?: string): Promise<voi
   }
 }
 
+/* ─── Offer landing page tracking (public visits + leads) ─── */
+export type OfferVisit = {
+  id: string;
+  page: string;
+  ref: string | null;
+  referrer: string | null;
+  device: string | null;
+  created_at: string;
+};
+export type OfferLead = {
+  id: string;
+  name: string | null;
+  phone: string | null;
+  business_type: string | null;
+  page: string | null;
+  ref: string | null;
+  note: string | null;
+  status: string;
+  created_at: string;
+};
+
+export async function fetchOfferVisits(limit = 300): Promise<OfferVisit[]> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("offer_visits")
+    .select("id, page, ref, referrer, device, created_at")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  return (data as OfferVisit[]) || [];
+}
+
+export async function fetchOfferLeads(limit = 300): Promise<OfferLead[]> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("offer_leads")
+    .select("id, name, phone, business_type, page, ref, note, status, created_at")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  return (data as OfferLead[]) || [];
+}
+
+export async function updateOfferLeadStatus(id: string, status: string): Promise<void> {
+  const supabase = createClient();
+  await supabase.from("offer_leads").update({ status }).eq("id", id);
+}
+
 export async function fetchPageVisits(days = 30): Promise<{ page: string; user_name: string; visited_at: string }[]> {
   const supabase = createClient();
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
