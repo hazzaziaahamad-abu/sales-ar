@@ -1,6 +1,7 @@
 import React from "react";
 import type { LucideIcon } from "lucide-react";
 import { MessageCircle, Check, ArrowLeft, ShieldCheck, Star } from "lucide-react";
+import BannerCarousel, { type OfferBanner } from "@/components/offer/BannerCarousel";
 
 /* رقم واتساب المبيعات (صيغة دولية بدون + أو أصفار) */
 export const WHATSAPP_NUMBER = "966591166861";
@@ -21,6 +22,7 @@ export type OfferTier = {
 export type OfferConfig = {
   brand: string;
   logo: "menu" | "calendar";
+  banners?: OfferBanner[];
   accent: string;
   accentDeep: string;
   gold: string;
@@ -106,6 +108,11 @@ export default function OfferLanding({ config }: { config: OfferConfig }) {
           <WhatsAppButton msg={config.whatsappMsg} />
         </div>
       </header>
+
+      {/* Ad banners (carousel) */}
+      {config.banners && config.banners.length > 0 && (
+        <BannerCarousel banners={config.banners} accent={accent} />
+      )}
 
       {/* Hero */}
       <section className="relative overflow-hidden">

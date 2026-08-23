@@ -23,6 +23,9 @@ export const metadata: Metadata = {
 const CONFIG: OfferConfig = {
   brand: "قائمة الطلبات",
   logo: "menu",
+  banners: [
+    { src: "/banners/menu-loyalty.jpg", alt: "برنامج الولاء — بطاقات ولاء رقمية في محفظة آبل وقوقل" },
+  ],
   accent: "#6D28D9",
   accentDeep: "#5B21B6",
   gold: "#F5B301",
