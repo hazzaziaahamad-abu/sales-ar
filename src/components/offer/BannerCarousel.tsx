@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, HelpCircle } from "lucide-react";
 
-export type OfferBanner = { src: string; alt?: string; href?: string };
+export type OfferFaq = { q: string; a: string };
+export type OfferBanner = { src: string; alt?: string; href?: string; faq?: OfferFaq[] };
 
 export default function BannerCarousel({ banners, accent = "#6D28D9" }: { banners: OfferBanner[]; accent?: string }) {
   const count = banners.length;
@@ -71,6 +72,32 @@ export default function BannerCarousel({ banners, accent = "#6D28D9" }: { banner
               style={{ width: i === idx ? 24 : 8, backgroundColor: i === idx ? accent : "#d9ccbf" }}
             />
           ))}
+        </div>
+      )}
+
+      {/* نبذة سؤال وجواب عن الميزة وفائدتها لصاحب المحل */}
+      {b.faq && b.faq.length > 0 && (
+        <div className="mx-auto mt-6 max-w-2xl">
+          <div className="mb-3 flex items-center justify-center gap-2">
+            <HelpCircle size={18} style={{ color: accent }} />
+            <h3 className="text-base font-black" style={{ color: "#2b2620" }}>نبذة سريعة — سؤال وجواب</h3>
+          </div>
+          <div className="space-y-2.5">
+            {b.faq.map((f, i) => (
+              <div key={i} className="rounded-2xl p-4 text-right" style={{ backgroundColor: "#fff", border: "1px solid #ece1d3", boxShadow: "0 8px 20px -18px rgba(64,51,43,.4)" }}>
+                <p className="mb-1.5 flex items-start gap-2 text-sm font-black leading-relaxed" style={{ color: accent }}>
+                  <span
+                    className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-black text-white"
+                    style={{ backgroundColor: accent }}
+                  >
+                    س
+                  </span>
+                  {f.q}
+                </p>
+                <p className="pr-7 text-sm leading-relaxed" style={{ color: "#5a4a40" }}>{f.a}</p>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </section>
