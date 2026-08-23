@@ -46,6 +46,7 @@ import {
   ShieldAlert,
   Map,
   CalendarCheck,
+  Share2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
@@ -65,6 +66,8 @@ export const NAV_ITEMS = [
   { label: "تدريب المبيعات", href: "/sales-playbook", slug: "sales-playbook", icon: BookMarked, color: "emerald", group: "المبيعات والدعم" },
   { label: "خريطة رحلة الطلب", href: "/sales-training", slug: "sales-training", icon: Map, color: "violet", group: "المبيعات والدعم" },
   { label: "خريطة منصة نحجز", href: "/nahjez-map", slug: "nahjez-map", icon: CalendarCheck, color: "teal", group: "المبيعات والدعم" },
+  { label: "عرض للعميل — المنيو", href: "/offer/menu", slug: "offer-menu", icon: Share2, color: "violet", group: "المبيعات والدعم", external: true },
+  { label: "عرض للعميل — نحجز", href: "/offer/nahjez", slug: "offer-nahjez", icon: Share2, color: "teal", group: "المبيعات والدعم", external: true },
   { label: "مبيعات الدعم", href: "/support-sales", slug: "support-sales", icon: TrendingUp, color: "orange", group: "المبيعات والدعم" },
   { label: "الدعم", href: "/support", slug: "support", icon: Headphones, color: "orange", group: "المبيعات والدعم" },
   // Hidden: merged into "مهامي" — { label: "دليل المبيعات", href: "/sales-guide", slug: "sales-guide", icon: BookOpen, color: "amber" },
@@ -297,12 +300,15 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                       (item.href !== "/dashboard" && pathname.startsWith(item.href));
                     const Icon = item.icon;
                     const c = COLOR_MAP[item.color] || COLOR_MAP.cyan;
+                    const isExternal = (item as { external?: boolean }).external === true;
 
                     return (
                       <Link
                         key={item.href}
                         href={item.href}
                         onClick={onClose}
+                        target={isExternal ? "_blank" : undefined}
+                        rel={isExternal ? "noopener noreferrer" : undefined}
                         className={cn(
                           "group relative flex items-center gap-3.5 overflow-hidden rounded-[12px] px-3.5 py-3 text-[14px] transition-all duration-200",
                           isActive

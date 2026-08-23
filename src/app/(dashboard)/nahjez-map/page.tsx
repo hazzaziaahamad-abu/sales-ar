@@ -20,6 +20,7 @@ import {
   Lightbulb,
   Sparkles,
   Zap,
+  Share2,
   X,
 } from "lucide-react";
 
@@ -1194,6 +1195,19 @@ export default function NahjezMindMap() {
           })}
         </div>
       </header>
+
+      {/* share offer link with the prospect */}
+      <div className="mx-auto mb-6 flex max-w-5xl justify-center">
+        <a
+          href="/offer/nahjez"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold text-white transition-transform hover:-translate-y-0.5"
+          style={{ backgroundColor: PURPLE, boxShadow: "0 10px 22px -10px rgba(109,40,217,.6)" }}
+        >
+          <Share2 size={16} /> شارك صفحة العرض مع العميل
+        </a>
+      </div>
 
       {/* rep-mode sell path OR product-mode legend */}
       {rep ? (
