@@ -152,11 +152,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadUser();
 
     const supabase = createClient();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // نمسح المستخدم فقط عند تسجيل خروج صريح. سابقاً كنّا نمسحه عند أي حدث
+      // بجلسة فاضية (مثل فشل تحديث التوكن مؤقتاً على شبكة متقطّعة) فتنفرغ
+      // القائمة والصفحة فجأة رغم أن المستخدم لا يزال مسجَّلاً.
+      if (event === "SIGNED_OUT") {
         setRealUser(null);
         setViewAs(null);
         setLoading(false);
+      } else if (event === "SIGNED_IN" && session) {
+        loadUser();
       }
     });
 
