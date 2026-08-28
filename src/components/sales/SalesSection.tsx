@@ -127,6 +127,42 @@ const STAGE_SUMMARY = [
   { stage: "مرفوض مع سبب", color: "red" as const, icon: <XCircle className="w-4 h-4 text-cc-red" /> },
 ];
 
+/* ─── Daily focus / stage boxes ─── */
+const STAGE_BOX_COLORS = {
+  cyan:   { card: "hover:border-cyan/30 hover:bg-cyan/[0.06]",           active: "bg-cyan/15 border-cyan/40 ring-1 ring-cyan/30",               num: "text-cyan" },
+  purple: { card: "hover:border-cc-purple/30 hover:bg-cc-purple/[0.06]", active: "bg-cc-purple/15 border-cc-purple/40 ring-1 ring-cc-purple/30", num: "text-cc-purple" },
+  blue:   { card: "hover:border-cc-blue/30 hover:bg-cc-blue/[0.06]",     active: "bg-cc-blue/15 border-cc-blue/40 ring-1 ring-cc-blue/30",       num: "text-cc-blue" },
+  amber:  { card: "hover:border-amber/30 hover:bg-amber/[0.06]",         active: "bg-amber/15 border-amber/40 ring-1 ring-amber/30",             num: "text-amber" },
+  green:  { card: "hover:border-cc-green/30 hover:bg-cc-green/[0.06]",   active: "bg-cc-green/15 border-cc-green/40 ring-1 ring-cc-green/30",     num: "text-cc-green" },
+  red:    { card: "hover:border-cc-red/30 hover:bg-cc-red/[0.06]",       active: "bg-cc-red/15 border-cc-red/40 ring-1 ring-cc-red/30",           num: "text-cc-red" },
+};
+
+type StageBox = { key: string; icon: string; label: string; color: keyof typeof STAGE_BOX_COLORS; sublabel: string };
+
+// المبيعات المكتبية: نبقي على الصناديق الثلاثة الأساسية.
+const OFFICE_STAGE_BOXES: StageBox[] = [
+  { key: "انتظار الدفع", icon: "💳", label: "ينتظر الدفع", color: "amber", sublabel: "اجمع الفلوس اليوم!" },
+  { key: "تفاوض", icon: "🤝", label: "قيد التفاوض", color: "purple", sublabel: "أقنعهم اليوم!" },
+  { key: "تجريبي", icon: "🧪", label: "في التجربة", color: "blue", sublabel: "تابع رضا العميل" },
+];
+
+// مبيعات الدعم: نعرض كل مراحل الصفقة كصناديق قابلة للفلترة.
+const SUPPORT_STAGE_BOXES: StageBox[] = [
+  { key: "قيد التواصل", icon: "📞", label: "قيد التواصل", color: "cyan", sublabel: "تابع معهم" },
+  { key: "عميل جديد", icon: "🆕", label: "عميل جديد", color: "blue", sublabel: "ابدأ التواصل" },
+  { key: "تم إرسال العرض", icon: "📤", label: "تم إرسال العرض", color: "purple", sublabel: "تابع الرد" },
+  { key: "تفاوض", icon: "🤝", label: "قيد التفاوض", color: "purple", sublabel: "أقنعهم اليوم!" },
+  { key: "تجهيز", icon: "⚙️", label: "تجهيز", color: "cyan", sublabel: "جهّز وسلّم" },
+  { key: "انتظار الدفع", icon: "💳", label: "ينتظر الدفع", color: "amber", sublabel: "اجمع الفلوس اليوم!" },
+  { key: "تجريبي", icon: "🧪", label: "في التجربة", color: "blue", sublabel: "تابع رضا العميل" },
+  { key: "اعادة الاتصال في وقت اخر", icon: "🔁", label: "إعادة اتصال", color: "amber", sublabel: "لا تنساهم" },
+  { key: "تاجيل", icon: "⏸️", label: "مؤجلة", color: "blue", sublabel: "راجعها لاحقاً" },
+  { key: "مكتملة", icon: "✅", label: "مكتملة", color: "green", sublabel: "مبروك! 🎉" },
+  { key: "كنسل التجربة", icon: "❌", label: "كنسل التجربة", color: "red", sublabel: "افهم السبب" },
+  { key: "مرفوض مع سبب", icon: "🚫", label: "مرفوض", color: "red", sublabel: "حلّل الخسارة" },
+  { key: "استهداف خاطئ", icon: "🎯", label: "استهداف خاطئ", color: "red", sublabel: "" },
+];
+
 /* ─── Empty deal form shape ─── */
 const EMPTY_FORM = {
   client_name: "",
@@ -1594,52 +1630,29 @@ export function SalesSection({ salesType }: SalesPageProps) {
         </div>
       )}
 
-      {/* ─── Daily Focus Boxes ─── */}
+      {/* ─── Daily Focus / Stage Boxes ─── */}
       {!loading && (() => {
-        const waitingDeals = dateFilteredDeals.filter(d => d.stage === "انتظار الدفع");
-        const negotiationDeals = dateFilteredDeals.filter(d => d.stage === "تفاوض");
         const trialDeals = dateFilteredDeals.filter(d => d.stage === "تجريبي");
         const oldTrials = trialDeals.filter(d => Math.floor((Date.now() - new Date(d.deal_date || d.created_at).getTime()) / 86400000) >= 7);
 
-        const waitingValue = waitingDeals.reduce((s, d) => s + d.deal_value, 0);
-        const negotiationValue = negotiationDeals.reduce((s, d) => s + d.deal_value, 0);
-        const trialValue = trialDeals.reduce((s, d) => s + d.deal_value, 0);
+        // مبيعات الدعم: كل المراحل. المكتبية: الصناديق الثلاثة الأساسية.
+        const configs = isOffice ? OFFICE_STAGE_BOXES : SUPPORT_STAGE_BOXES;
+        const boxes = configs.map(cfg => {
+          const stageDeals = dateFilteredDeals.filter(d => d.stage === cfg.key);
+          const value = stageDeals.reduce((s, d) => s + d.deal_value, 0);
+          let sublabel = cfg.sublabel;
+          let badge: number | null = null;
+          if (cfg.key === "تجريبي") {
+            sublabel = oldTrials.length > 0 ? `${oldTrials.length} منهم +7 أيام ⚠️` : cfg.sublabel;
+            badge = oldTrials.length > 0 ? oldTrials.length : null;
+          }
+          return { key: cfg.key, icon: cfg.icon, label: cfg.label, sublabel, badge, count: stageDeals.length, value, color: STAGE_BOX_COLORS[cfg.color] };
+        });
 
-        const boxes = [
-          {
-            key: "انتظار الدفع",
-            icon: "💳",
-            label: "ينتظر الدفع",
-            sublabel: "اجمع الفلوس اليوم!",
-            count: waitingDeals.length,
-            value: waitingValue,
-            badge: null,
-            color: { card: "hover:border-amber/30 hover:bg-amber/[0.06]", active: "bg-amber/15 border-amber/40 ring-1 ring-amber/30", num: "text-amber", dot: "🟡" },
-          },
-          {
-            key: "تفاوض",
-            icon: "🤝",
-            label: "قيد التفاوض",
-            sublabel: "أقنعهم اليوم!",
-            count: negotiationDeals.length,
-            value: negotiationValue,
-            badge: null,
-            color: { card: "hover:border-cc-purple/30 hover:bg-cc-purple/[0.06]", active: "bg-cc-purple/15 border-cc-purple/40 ring-1 ring-cc-purple/30", num: "text-cc-purple", dot: "🟣" },
-          },
-          {
-            key: "تجريبي",
-            icon: "🧪",
-            label: "في التجربة",
-            sublabel: oldTrials.length > 0 ? `${oldTrials.length} منهم +7 أيام ⚠️` : "تابع رضا العميل",
-            count: trialDeals.length,
-            value: trialValue,
-            badge: oldTrials.length > 0 ? oldTrials.length : null,
-            color: { card: "hover:border-cc-blue/30 hover:bg-cc-blue/[0.06]", active: "bg-cc-blue/15 border-cc-blue/40 ring-1 ring-cc-blue/30", num: "text-cc-blue", dot: "🔵" },
-          },
-        ];
+        const gridCols = isOffice ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4";
 
         return (
-          <div className="grid grid-cols-3 gap-3">
+          <div className={`grid ${gridCols} gap-3`}>
             {boxes.map(b => (
               <button
                 key={b.key}
