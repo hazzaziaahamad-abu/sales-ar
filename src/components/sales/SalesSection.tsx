@@ -1647,7 +1647,11 @@ export function SalesSection({ salesType }: SalesPageProps) {
             badge = oldTrials.length > 0 ? oldTrials.length : null;
           }
           return { key: cfg.key, icon: cfg.icon, label: cfg.label, sublabel, badge, count: stageDeals.length, value, color: STAGE_BOX_COLORS[cfg.color] };
-        });
+        })
+        // في الدعم: نخفي المراحل الفارغة (العدد 0). المكتبية تبقى ثابتة.
+        .filter(b => isOffice || b.count > 0);
+
+        if (boxes.length === 0) return null;
 
         const gridCols = isOffice ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4";
 
