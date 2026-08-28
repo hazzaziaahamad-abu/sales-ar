@@ -42,9 +42,9 @@ export async function middleware(request: NextRequest) {
 
   const { supabase, response } = createMiddlewareClient(request);
 
-  // المسارات العامة (صفحة العرض، تسجيل الدخول، الويبهوكس…) لا تحتاج فحص جلسة،
-  // ولا يصح أن تنتظر Supabase. الاستثناء الوحيد /login: نفحص الجلسة لتحويل
-  // المسجَّل دخوله إلى لوحة التحكم — ومع ذلك بمهلة قصوى حتى لا يتعطّل.
+  // المسارات العامة (صفحة العرض، الويبهوكس…) لا تحتاج فحص جلسة إطلاقاً.
+  // الاستثناء /login: نحاول تحويل المسجَّل دخوله إلى لوحة التحكم — لكن فقط إذا
+  // رجّع Supabase مستخدماً فعلياً خلال المهلة؛ عند التأخّر نعرض صفحة الدخول.
   if (isPublicPath) {
     if (pathname === "/login") {
       const user = await getUserWithTimeout(supabase);
@@ -57,15 +57,12 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  // مسار محميّ: افحص الجلسة (مع مهلة). عند غياب المستخدم أو تأخّر Supabase
-  // نحوّل لتسجيل الدخول بدل تعليق الطلب.
-  const user = await getUserWithTimeout(supabase);
-  if (!user) {
-    const loginUrl = request.nextUrl.clone();
-    loginUrl.pathname = "/login";
-    return NextResponse.redirect(loginUrl);
-  }
-
+  // مسار محميّ: نحدّث كوكيز الجلسة فقط (تدوير التوكن) بدون أي تحويل.
+  // حماية الصفحات تتم من طرف العميل عبر AuthGate الذي يحوّل غير المسجَّل إلى
+  // /login. لذلك يجب ألّا يحوّل الـmiddleware هنا — فحصٌ بطيء أو فاشل على الحافة
+  // كان يقذف المستخدم المسجَّل إلى /login فتنشأ حلقة /dashboard ⇄ /login،
+  // كما أن انتظار Supabase كان يُسقط الموقع بخطأ 504.
+  await getUserWithTimeout(supabase);
   return response;
 }
 
