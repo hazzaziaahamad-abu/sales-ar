@@ -10,6 +10,7 @@ import {
 import { fetchClientProfile, fetchClientBio, upsertClientBio, upsertClientMenuUrl, upsertClientPhoneVerified, upsertClientSecondaryPhone, upsertClientPhoneData, fetchDealKpiStages, upsertDealKpiStage, createDealKpiStages, fetchEmployees, fetchUserProfiles, KPI_STAGES, updateDeal, createFollowUpNote, createMentionNotification, createReminder, type ClientProfileData } from "@/lib/supabase/db";
 import { getTopContributor } from "@/components/sales/SalesKPIDashboard";
 import { FollowUpLogButton } from "@/components/follow-up-log";
+import { DealCloserCoach } from "@/components/DealCloserCoach";
 import { useAuth } from "@/lib/auth-context";
 import { Search, Phone, User, ShoppingBag, RefreshCw, Headphones, FileText, ChevronDown, ChevronUp, Clock, X, Pencil, Check, StickyNote, BarChart2, Trophy, MessageSquarePlus, Send, AtSign, Bell, BellOff, CalendarClock, ShieldCheck, ShieldOff, Plus, PhoneCall } from "lucide-react";
 import type { Deal, Renewal, Ticket, FollowUpNote, DealKpiStage, Employee } from "@/types";
@@ -766,6 +767,19 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
   const currentPlan = data?.renewals?.find(r => r.status !== "ملغي بسبب")?.plan_name
     || data?.deals?.find(d => d.stage === "مكتملة")?.plan || "";
 
+  // سياق الصفقة لمساعد الإغلاق الذكي
+  const coachActiveDeal = data?.deals?.find(d => d.stage !== "مكتملة" && d.stage !== "مرفوض مع سبب") || data?.deals?.[0];
+  const coachContext: Record<string, unknown> = {
+    العميل: data?.deals?.[0]?.client_name || data?.renewals?.[0]?.customer_name || data?.tickets?.[0]?.client_name || "",
+    الباقة_الحالية: currentPlan || undefined,
+    نوع_المبيعات: coachActiveDeal?.sales_type,
+    المرحلة: coachActiveDeal?.stage,
+    قيمة_الصفقة: coachActiveDeal?.deal_value,
+    عمر_الصفقة_أيام: coachActiveDeal?.cycle_days,
+    آخر_تواصل: coachActiveDeal?.last_contact,
+    ملاحظات: coachActiveDeal?.notes,
+  };
+
   // بداية الاشتراك ← تاريخ الدفع، ونهاية الاشتراك ← موعد التجديد (من تجديدات العميل غير الملغاة)
   const _nonCancelledRenewals = (data?.renewals || []).filter(r => r.status !== "ملغي بسبب");
   const renewalDerivedStart = _nonCancelledRenewals
@@ -1071,6 +1085,9 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
                   </div>
                 </div>
               </div>
+
+              {/* AI Deal-closer coach */}
+              <DealCloserCoach context={coachContext} />
 
               {/* Bio */}
               <div className="rounded-xl border border-border/50 bg-muted/20 p-3">
