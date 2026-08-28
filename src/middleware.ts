@@ -18,29 +18,52 @@ const PUBLIC_PATHS = [
   "/api/render/task-card",
 ];
 
+// أقصى مهلة لفحص الجلسة عبر Supabase. لو تأخّر Supabase (مثلاً تأخير بين
+// منطقتين) نرجع بدون تعليق الـmiddleware كي لا يسقط الموقع بخطأ 504.
+const AUTH_TIMEOUT_MS = 3000;
+
+async function getUserWithTimeout(
+  supabase: ReturnType<typeof createMiddlewareClient>["supabase"]
+) {
+  try {
+    const result = await Promise.race([
+      supabase.auth.getUser(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), AUTH_TIMEOUT_MS)),
+    ]);
+    return result?.data?.user ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function middleware(request: NextRequest) {
-  const { supabase, response } = createMiddlewareClient(request);
   const { pathname } = request.nextUrl;
-
-  // Refresh session (important for token rotation)
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
   const isPublicPath = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 
-  // Not logged in → redirect to login (unless already on a public path)
-  if (!user && !isPublicPath) {
+  const { supabase, response } = createMiddlewareClient(request);
+
+  // المسارات العامة (صفحة العرض، تسجيل الدخول، الويبهوكس…) لا تحتاج فحص جلسة،
+  // ولا يصح أن تنتظر Supabase. الاستثناء الوحيد /login: نفحص الجلسة لتحويل
+  // المسجَّل دخوله إلى لوحة التحكم — ومع ذلك بمهلة قصوى حتى لا يتعطّل.
+  if (isPublicPath) {
+    if (pathname === "/login") {
+      const user = await getUserWithTimeout(supabase);
+      if (user) {
+        const dashUrl = request.nextUrl.clone();
+        dashUrl.pathname = "/dashboard";
+        return NextResponse.redirect(dashUrl);
+      }
+    }
+    return response;
+  }
+
+  // مسار محميّ: افحص الجلسة (مع مهلة). عند غياب المستخدم أو تأخّر Supabase
+  // نحوّل لتسجيل الدخول بدل تعليق الطلب.
+  const user = await getUserWithTimeout(supabase);
+  if (!user) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     return NextResponse.redirect(loginUrl);
-  }
-
-  // Logged in → redirect away from login
-  if (user && pathname === "/login") {
-    const dashUrl = request.nextUrl.clone();
-    dashUrl.pathname = "/dashboard";
-    return NextResponse.redirect(dashUrl);
   }
 
   return response;
