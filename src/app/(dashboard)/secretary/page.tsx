@@ -593,6 +593,15 @@ function DealMiniAction({ deal: d }: { deal: Deal }) {
   );
 }
 
+function SourceBadge({ deal: d }: { deal: Deal }) {
+  const support = d.sales_type === "support";
+  return (
+    <span className={`text-[10px] px-1.5 py-0.5 rounded-full border shrink-0 ${support ? "bg-orange-500/10 text-orange-300 border-orange-500/20" : "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"}`}>
+      {support ? "مبيعات الدعم" : "مبيعات المكتب"}
+    </span>
+  );
+}
+
 function DailyResultsSystem({
   hotDeals, warmDeals, ownerAttention, todayStats, onRemind,
 }: {
@@ -649,7 +658,10 @@ function DailyResultsSystem({
           <div className="rounded-xl bg-violet-500/[0.08] border border-violet-500/25 p-3">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-sm font-bold text-foreground truncate">{oneTarget.deal.client_name}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-sm font-bold text-foreground truncate">{oneTarget.deal.client_name}</p>
+                  <SourceBadge deal={oneTarget.deal} />
+                </div>
                 <p className="text-[12px] text-muted-foreground mt-0.5">{oneTarget.deal.stage} · {oneTarget.deal.assigned_rep_name || "بلا مسؤول"}</p>
               </div>
               <p className="text-base font-extrabold text-amber-400 shrink-0">{formatMoneyFull(oneTarget.deal.deal_value)}</p>
@@ -678,8 +690,9 @@ function DailyResultsSystem({
             {moveForward.map(({ deal: d }) => (
               <div key={d.id} className="flex items-center gap-2 rounded-lg bg-white/[0.02] border border-white/[0.06] px-3 py-2">
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-[13px] font-bold text-foreground truncate">{d.client_name}</p>
+                    <SourceBadge deal={d} />
                     <span className="text-[11px] text-amber-300 font-bold shrink-0">{formatMoneyFull(d.deal_value)}</span>
                   </div>
                   <p className="text-[12px] text-muted-foreground truncate">↪ {microStep(d.stage)}</p>
@@ -699,8 +712,9 @@ function DailyResultsSystem({
             {dontLose.map(({ deal: d, intel }) => (
               <div key={d.id} className="flex items-center gap-2 rounded-lg bg-red-500/[0.05] border border-red-500/20 px-3 py-2">
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-[13px] font-bold text-foreground truncate">{d.client_name}</p>
+                    <SourceBadge deal={d} />
                     <span className="text-[11px] text-red-300 font-bold shrink-0">{formatMoneyFull(d.deal_value)}</span>
                   </div>
                   {intel.attentionReason && <p className="text-[12px] text-red-300/90 truncate">⚠ {intel.attentionReason}</p>}
