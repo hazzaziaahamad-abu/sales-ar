@@ -1124,7 +1124,8 @@ export default function SecretaryPage() {
         let g = map.get(st);
         if (!g) { g = { state: st, icon: ui.icon, text: ui.text, border: ui.border, count: 0, value: 0, items: [] }; map.set(st, g); }
         g.count++; g.value += x.deal.deal_value;
-        g.items.push({ id: x.deal.id, name: x.deal.client_name, query: x.deal.client_phone || x.deal.client_name, meta: `${x.deal.assigned_rep_name || "بلا مسؤول"} · آخر تفاعل ${dayLabel(x.intel.lastActivityDate)}`, value: x.deal.deal_value, sourceLabel });
+        const dCreated = (x.deal.deal_date || x.deal.created_at) ? new Date(x.deal.deal_date || x.deal.created_at).toLocaleDateString("en-GB") : "";
+        g.items.push({ id: x.deal.id, name: x.deal.client_name, query: x.deal.client_phone || x.deal.client_name, meta: `${x.deal.assigned_rep_name || "بلا مسؤول"} · آخر تفاعل ${dayLabel(x.intel.lastActivityDate)}${dCreated ? ` · أُنشئت ${dCreated}` : ""}`, value: x.deal.deal_value, sourceLabel });
       }
       return STAGE_ORDER.filter(s => map.has(s)).map(s => map.get(s)!);
     };
@@ -1137,7 +1138,8 @@ export default function SecretaryPage() {
         let g = map.get(st);
         if (!g) { g = { state: st, icon: "🔄", text: "text-sky-400", border: "border-sky-500/25 hover:border-sky-500/50", count: 0, value: 0, items: [] }; map.set(st, g); }
         g.count++; g.value += r.plan_price;
-        g.items.push({ id: r.id, name: r.customer_name, query: r.customer_phone || r.customer_name, meta: `${r.plan_name} · تجديد ${r.renewal_date}`, value: r.plan_price, sourceLabel: "تجديد" });
+        const rCreated = r.created_at ? new Date(r.created_at).toLocaleDateString("en-GB") : "";
+        g.items.push({ id: r.id, name: r.customer_name, query: r.customer_phone || r.customer_name, meta: `${r.plan_name} · تجديد ${r.renewal_date}${rCreated ? ` · أُنشئت ${rCreated}` : ""}`, value: r.plan_price, sourceLabel: "تجديد" });
       }
       return Array.from(map.values()).sort((a, b) => b.count - a.count);
     };
