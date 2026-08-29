@@ -147,6 +147,22 @@ const NEXT_STEP_HINT: Record<string, string> = {
   "اعادة الاتصال في وقت اخر": "تحديد موعد محدد للاتصال",
 };
 
+// أصغر خطوة تالية لكل مرحلة — مبدأ «تقليل طاقة التنشيط»: خطوة صغيرة تبدأ فوراً.
+const MICRO_STEP: Record<string, string> = {
+  "انتظار الدفع": "أرسل رابط الدفع + رسالة تأكيد الآن",
+  "تفاوض": "ابعث رسالة واحدة تحسم السعر",
+  "تم إرسال العرض": "اسأله: وش رأيك بالعرض؟",
+  "تجهيز": "أكّد موعد التسليم برسالة",
+  "تجريبي": "اتصال دقيقتين تتابع التجربة",
+  "قيد التواصل": "حدّد احتياجه بسؤال واحد",
+  "عميل جديد": "اقترح له الخطة الأنسب برسالة",
+  "اعادة الاتصال في وقت اخر": "حدّد موعد اتصال دقيق الآن",
+  "تاجيل": "أعد الجدولة بتاريخ محدد",
+};
+function microStep(stage: string): string {
+  return MICRO_STEP[stage] || "ابعث رسالة متابعة قصيرة";
+}
+
 type DealTier = "hot" | "warm" | "cold" | "stale";
 
 interface DealIntel {
@@ -559,6 +575,144 @@ interface QuickTask {
   id: string;
   text: string;
   done: boolean;
+}
+
+/* ─── بوصلة اليوم: نظام إنتاجية موجّه للنتائج (مستوحى من مبادئ التعلّم/الإنتاجية) ─── */
+function DealMiniAction({ deal: d }: { deal: Deal }) {
+  const phone = sanitizePhone(d.client_phone);
+  if (!phone) return <span className="text-[11px] text-muted-foreground/60 px-2 py-1">بلا رقم</span>;
+  return (
+    <div className="flex items-center gap-1 shrink-0">
+      <a href={`tel:${phone}`} title="اتصل" className="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20">
+        <Phone className="w-3.5 h-3.5" />
+      </a>
+      <a href={whatsappLink(phone, whatsappMessageForStage(d.stage, d.client_name))} target="_blank" rel="noreferrer" title="واتساب" className="flex h-7 w-7 items-center justify-center rounded-md bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20">
+        <MessageCircle className="w-3.5 h-3.5" />
+      </a>
+    </div>
+  );
+}
+
+function DailyResultsSystem({
+  hotDeals, warmDeals, ownerAttention, todayStats, onRemind,
+}: {
+  hotDeals: { deal: Deal; intel: DealIntel }[];
+  warmDeals: { deal: Deal; intel: DealIntel }[];
+  ownerAttention: { deal: Deal; intel: DealIntel }[];
+  todayStats: { closed: number; revenue: number; renewals: number };
+  onRemind: (d: Deal) => void;
+}) {
+  // ① الهدف الأوحد: أعلى صفقة بانتظار الدفع، وإلا أقوى صفقة ساخنة.
+  const waiting = hotDeals.filter(x => x.deal.stage === "انتظار الدفع").sort((a, b) => b.deal.deal_value - a.deal.deal_value);
+  const oneTarget = waiting[0] || hotDeals[0] || warmDeals[0] || null;
+
+  // ② حرّك ٣ للأمام: أعلى صفقات رافعة (قيمة × درجة) عدا الهدف الأوحد.
+  const moveForward = [...hotDeals, ...warmDeals]
+    .filter(x => x.deal.id !== oneTarget?.deal.id)
+    .sort((a, b) => (b.deal.deal_value * b.intel.score) - (a.deal.deal_value * a.intel.score))
+    .slice(0, 3);
+
+  // ③ لا تخسرها: أهم صفقتين تحتاجان تدخّلك.
+  const dontLose = ownerAttention.slice(0, 2);
+
+  return (
+    <div className="rounded-2xl border border-violet-500/25 bg-gradient-to-bl from-violet-500/[0.08] via-transparent to-amber-500/[0.05] p-4 space-y-4">
+      {/* Header */}
+      <div className="flex items-center gap-2.5">
+        <div className="w-9 h-9 rounded-xl bg-violet-500/15 border border-violet-500/20 flex items-center justify-center">
+          <Target className="w-5 h-5 text-violet-300" />
+        </div>
+        <div>
+          <h3 className="text-sm font-extrabold text-foreground">بوصلة اليوم — نظام النتائج</h3>
+          <p className="text-[12px] text-muted-foreground">ابدأ بالنتيجة · صغّر أول خطوة · لا تدع صفقة تُنسى</p>
+        </div>
+      </div>
+
+      {/* نتيجة اليوم (نتائج فعلية لا مهام) */}
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          { v: String(todayStats.closed), l: "أغلقت اليوم", c: "text-cc-green" },
+          { v: formatMoneyFull(todayStats.revenue), l: "حصّلت اليوم", c: "text-amber-400" },
+          { v: String(todayStats.renewals), l: "تجديدات اليوم", c: "text-cyan-400" },
+        ].map((s, i) => (
+          <div key={i} className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-2.5 text-center">
+            <p className={`text-lg font-extrabold ${s.c}`}>{s.v}</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">{s.l}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* ① الهدف الأوحد */}
+      <div>
+        <p className="text-[12px] font-bold text-violet-300 mb-1.5">① هدف اليوم الأوحد</p>
+        {oneTarget ? (
+          <div className="rounded-xl bg-violet-500/[0.08] border border-violet-500/25 p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-foreground truncate">{oneTarget.deal.client_name}</p>
+                <p className="text-[12px] text-muted-foreground mt-0.5">{oneTarget.deal.stage} · {oneTarget.deal.assigned_rep_name || "بلا مسؤول"}</p>
+              </div>
+              <p className="text-base font-extrabold text-amber-400 shrink-0">{formatMoneyFull(oneTarget.deal.deal_value)}</p>
+            </div>
+            <p className="text-[13px] text-foreground mt-2 flex items-center gap-1.5">
+              <Zap className="w-3.5 h-3.5 text-violet-300 shrink-0" />
+              <span><span className="text-violet-300 font-bold">أصغر خطوة الآن:</span> {microStep(oneTarget.deal.stage)}</span>
+            </p>
+            <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-white/[0.05]">
+              <DealMiniAction deal={oneTarget.deal} />
+              <button onClick={() => onRemind(oneTarget.deal)} className="flex items-center gap-1 text-[12px] px-2 py-1 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20" title="ذكّرني غداً">
+                <Bell className="w-3 h-3" /> ذكّرني
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-[12px] text-muted-foreground py-2 text-center rounded-xl bg-white/[0.02] border border-white/[0.05]">ما فيه صفقة ساخنة الآن — ركّز على إحياء الصفقات الباردة.</p>
+        )}
+      </div>
+
+      {/* ② حرّك ٣ للأمام */}
+      {moveForward.length > 0 && (
+        <div>
+          <p className="text-[12px] font-bold text-amber-300 mb-1.5">② حرّك ٣ صفقات للأمام</p>
+          <div className="space-y-1.5">
+            {moveForward.map(({ deal: d }) => (
+              <div key={d.id} className="flex items-center gap-2 rounded-lg bg-white/[0.02] border border-white/[0.06] px-3 py-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-[13px] font-bold text-foreground truncate">{d.client_name}</p>
+                    <span className="text-[11px] text-amber-300 font-bold shrink-0">{formatMoneyFull(d.deal_value)}</span>
+                  </div>
+                  <p className="text-[12px] text-muted-foreground truncate">↪ {microStep(d.stage)}</p>
+                </div>
+                <DealMiniAction deal={d} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ③ لا تخسرها */}
+      {dontLose.length > 0 && (
+        <div>
+          <p className="text-[12px] font-bold text-red-300 mb-1.5">③ لا تخسرها — تحتاج تدخّلك</p>
+          <div className="space-y-1.5">
+            {dontLose.map(({ deal: d, intel }) => (
+              <div key={d.id} className="flex items-center gap-2 rounded-lg bg-red-500/[0.05] border border-red-500/20 px-3 py-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-[13px] font-bold text-foreground truncate">{d.client_name}</p>
+                    <span className="text-[11px] text-red-300 font-bold shrink-0">{formatMoneyFull(d.deal_value)}</span>
+                  </div>
+                  {intel.attentionReason && <p className="text-[12px] text-red-300/90 truncate">⚠ {intel.attentionReason}</p>}
+                </div>
+                <DealMiniAction deal={d} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function SecretaryPage() {
@@ -1269,6 +1423,21 @@ export default function SecretaryPage() {
           تحليل ذكي شامل
         </Button>
       </div>
+
+      {/* ─── بوصلة اليوم: نظام النتائج (الأهم — فوق) ─── */}
+      {!loading && (
+        <DailyResultsSystem
+          hotDeals={hotDeals}
+          warmDeals={warmDeals}
+          ownerAttention={ownerAttention}
+          todayStats={{
+            closed: briefingStats.todayOffice + briefingStats.todaySupport,
+            revenue: briefingStats.todayTotalRev,
+            renewals: briefingStats.todayRenewals,
+          }}
+          onRemind={remindTomorrow}
+        />
+      )}
 
       {/* ─── زيارات صفحة العرض ─── */}
       <Section id="offerVisits" title="زيارات صفحة العرض" icon={<Eye className="w-5 h-5 text-cyan-400" />} isOpen={expandedSections.offerVisits !== false} onToggle={toggleSection}>
