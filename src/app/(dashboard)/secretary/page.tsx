@@ -1439,11 +1439,6 @@ export default function SecretaryPage() {
         />
       )}
 
-      {/* ─── زيارات صفحة العرض ─── */}
-      <Section id="offerVisits" title="زيارات صفحة العرض" icon={<Eye className="w-5 h-5 text-cyan-400" />} isOpen={expandedSections.offerVisits !== false} onToggle={toggleSection}>
-        <OfferVisitsPanel />
-      </Section>
-
       {/* ─── 1. Briefing with Month Filter ─── */}
       <Section id="briefing" title="الملخص والإحصائيات" icon={<Sun className="w-5 h-5 text-amber-400" />} isOpen={expandedSections.briefing !== false} onToggle={toggleSection}>
         {loading ? (
@@ -2441,6 +2436,11 @@ export default function SecretaryPage() {
             </div>
           );
         })()}
+      </Section>
+
+      {/* ─── زيارات صفحة العرض (تتبّع — أسفل) ─── */}
+      <Section id="offerVisits" title="زيارات صفحة العرض" icon={<Eye className="w-5 h-5 text-cyan-400" />} isOpen={expandedSections.offerVisits === true} onToggle={toggleSection}>
+        <OfferVisitsPanel />
       </Section>
 
       {/* ─── 7. AI Analysis Result ─── */}
