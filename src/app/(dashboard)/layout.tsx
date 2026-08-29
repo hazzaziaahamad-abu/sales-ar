@@ -148,6 +148,41 @@ function MentionNotifLoader({ onLoad, onMentions }: { onLoad: (n: AppNotificatio
   return null;
 }
 
+/* ─── محادثات الإدارة: إشعار لحظي للطرف المستقبِل ─── */
+function ManagementChatNotifLoader({ onLoad }: { onLoad: (n: AppNotification[]) => void }) {
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (!user?.name) return;
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`mgmt-chat-notif-${user.name}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "management_messages", filter: `recipient_name=eq.${user.name}` },
+        (payload) => {
+          const m = payload.new as { id: string; sender_name: string; entity_type: string; entity_id: string; entity_name?: string; body: string; created_at: string };
+          if (m.sender_name === user.name) return;
+          const section = m.entity_type === "renewal" ? "renewals" : m.entity_type === "deal" ? "sales" : "secretary";
+          onLoad([{
+            id: `mgmt-${m.id}`,
+            type: "crud_action",
+            icon: "💬",
+            message: `${m.sender_name} راسلك في محادثة الإدارة${m.entity_name ? ` — ${m.entity_name}` : ""}: ${m.body.slice(0, 70)}${m.body.length > 70 ? "..." : ""}`,
+            section,
+            timestamp: m.created_at,
+            isRead: false,
+            metadata: { entityId: m.entity_id, entityName: m.entity_name },
+          }]);
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.name, onLoad]);
+
+  return null;
+}
+
 const MENTION_SECTION_PATH: Record<string, string> = {
   deal: "/sales",
   ticket: "/support",
@@ -782,6 +817,7 @@ export default function DashboardLayout({
     <AuthProvider>
     <TopbarProvider>
       <MentionNotifLoader onLoad={addNotifications} onMentions={setRecentMentions} />
+      <ManagementChatNotifLoader onLoad={addNotifications} />
       <LiveNotifSubscriptions onLoad={addNotifications} />
       <PageTracker />
       <SaleCelebration />

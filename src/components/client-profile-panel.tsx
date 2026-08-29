@@ -1098,6 +1098,7 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
                     entityType="client"
                     entityId={bioKey}
                     entityName={data?.deals[0]?.client_name || data?.renewals[0]?.customer_name || data?.tickets[0]?.client_name || bioKey}
+                    counterpartName={data?.deals[0]?.assigned_rep_name || data?.renewals[0]?.assigned_rep || undefined}
                     compact
                   />
                 </div>

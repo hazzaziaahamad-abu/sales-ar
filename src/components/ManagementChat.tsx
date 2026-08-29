@@ -15,11 +15,13 @@ export function ManagementChat({
   entityType,
   entityId,
   entityName,
+  counterpartName,
   compact = false,
 }: {
   entityType: "deal" | "renewal" | "client";
   entityId: string;
   entityName?: string;
+  counterpartName?: string;
   compact?: boolean;
 }) {
   const { user } = useAuth();
@@ -87,7 +89,7 @@ export function ManagementChat({
     setMessages((prev) => [...prev, optimistic]);
     scrollToBottom();
     try {
-      const saved = await sendManagementMessage({ entityType, entityId, entityName, body, senderId: user?.id, senderName });
+      const saved = await sendManagementMessage({ entityType, entityId, entityName, body, senderId: user?.id, senderName, recipientName: counterpartName });
       if (saved) setMessages((prev) => prev.map((m) => (m.id === optimistic.id ? saved : m)));
     } catch {
       setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));

@@ -7,12 +7,15 @@ create table if not exists public.management_messages (
   entity_name text,
   sender_id uuid,
   sender_name text not null,
+  recipient_name text,
   body text not null,
   created_at timestamptz not null default now()
 );
 
 create index if not exists management_messages_entity_idx
   on public.management_messages (org_id, entity_type, entity_id, created_at);
+create index if not exists management_messages_recipient_idx
+  on public.management_messages (org_id, recipient_name, created_at);
 
 alter table public.management_messages enable row level security;
 

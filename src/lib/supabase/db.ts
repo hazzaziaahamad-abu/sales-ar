@@ -172,6 +172,7 @@ export type ManagementMessage = {
   entity_name?: string;
   sender_id?: string;
   sender_name: string;
+  recipient_name?: string;
   body: string;
   created_at: string;
 };
@@ -195,8 +196,13 @@ export async function sendManagementMessage(input: {
   body: string;
   senderId?: string;
   senderName: string;
+  recipientName?: string;
 }): Promise<ManagementMessage | null> {
   const supabase = createClient();
+  // لا نُشعِر المُرسِل نفسه.
+  const recipient = input.recipientName && input.recipientName.trim() && input.recipientName.trim() !== input.senderName.trim()
+    ? input.recipientName.trim()
+    : null;
   const { data } = await supabase
     .from("management_messages")
     .insert({
@@ -206,6 +212,7 @@ export async function sendManagementMessage(input: {
       entity_name: input.entityName ?? null,
       sender_id: input.senderId ?? null,
       sender_name: input.senderName,
+      recipient_name: recipient,
       body: input.body,
     })
     .select("*")

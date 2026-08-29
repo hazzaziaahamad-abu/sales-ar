@@ -620,7 +620,7 @@ function ChatBtn({ onClick }: { onClick: () => void }) {
   );
 }
 
-type ChatTarget = { type: "deal" | "renewal" | "client"; id: string; name: string };
+type ChatTarget = { type: "deal" | "renewal" | "client"; id: string; name: string; counterpart?: string };
 
 function DailyResultsSystem({
   hotDeals, warmDeals, ownerAttention, quickActionDeals, renewalActions, repPhoneByName, todayStats, onRemind,
@@ -697,7 +697,7 @@ function DailyResultsSystem({
             </p>
             <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-white/[0.05]">
               <RepAction repName={oneTarget.deal.assigned_rep_name} phoneMap={repPhoneByName} message={repMsgForDeal(oneTarget.deal)} />
-              <ChatBtn onClick={() => setChat({ type: "deal", id: oneTarget.deal.id, name: oneTarget.deal.client_name })} />
+              <ChatBtn onClick={() => setChat({ type: "deal", id: oneTarget.deal.id, name: oneTarget.deal.client_name, counterpart: oneTarget.deal.assigned_rep_name })} />
               <button onClick={() => onRemind(oneTarget.deal)} className="flex items-center gap-1 text-[12px] px-2 py-1 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 mr-auto" title="ذكّرني غداً">
                 <Bell className="w-3 h-3" /> ذكّرني
               </button>
@@ -728,7 +728,7 @@ function DailyResultsSystem({
                   <p className="text-[12px] text-muted-foreground truncate">↪ {microStep(d.stage)}</p>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <ChatBtn onClick={() => setChat({ type: "deal", id: d.id, name: d.client_name })} />
+                  <ChatBtn onClick={() => setChat({ type: "deal", id: d.id, name: d.client_name, counterpart: d.assigned_rep_name })} />
                   <RepAction repName={d.assigned_rep_name} phoneMap={repPhoneByName} message={repMsgForDeal(d)} />
                 </div>
               </div>
@@ -754,7 +754,7 @@ function DailyResultsSystem({
                   {intel.attentionReason && <p className="text-[12px] text-red-300/90 truncate">⚠ {intel.attentionReason}</p>}
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <ChatBtn onClick={() => setChat({ type: "deal", id: d.id, name: d.client_name })} />
+                  <ChatBtn onClick={() => setChat({ type: "deal", id: d.id, name: d.client_name, counterpart: d.assigned_rep_name })} />
                   <RepAction repName={d.assigned_rep_name} phoneMap={repPhoneByName} message={repMsgForDeal(d)} />
                 </div>
               </div>
@@ -783,7 +783,7 @@ function DailyResultsSystem({
                     <p className="text-[12px] text-muted-foreground truncate">↪ {r.plan_name} — كلّف الموظف بالتجديد</p>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <ChatBtn onClick={() => setChat({ type: "renewal", id: r.id, name: r.customer_name })} />
+                    <ChatBtn onClick={() => setChat({ type: "renewal", id: r.id, name: r.customer_name, counterpart: r.assigned_rep })} />
                     <RepAction repName={r.assigned_rep} phoneMap={repPhoneByName} message={repMsg} />
                   </div>
                 </div>
@@ -806,7 +806,7 @@ function DailyResultsSystem({
                 <XIcon className="w-4 h-4" />
               </button>
             </div>
-            <ManagementChat entityType={chat.type} entityId={chat.id} entityName={chat.name} />
+            <ManagementChat entityType={chat.type} entityId={chat.id} entityName={chat.name} counterpartName={chat.counterpart} />
           </div>
         </div>
       )}
