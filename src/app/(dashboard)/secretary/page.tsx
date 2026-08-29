@@ -9,10 +9,11 @@ import {
   Users, Banknote, BarChart3, Phone, ArrowLeft, ArrowRight,
   MessageCircle, Bell, ExternalLink, Zap, CloudSun, Thermometer,
   Headphones, UserX, Timer, Share2, LogIn, Smartphone, Monitor, Activity,
-  Copy, Image, Eye,
+  Copy, Image, Eye, MessagesSquare, X as XIcon,
 } from "lucide-react";
 import { fetchDeals, fetchRenewals, fetchEmployees, fetchRecentFollowUpNotes, upsertSalesGuideSetting, fetchSalesGuideSettings, fetchTickets, fetchUserLoginLogs, fetchActivityLogs, type UserLoginLog } from "@/lib/supabase/db";
 import { OfferVisitsPanel } from "@/components/OfferVisitsPanel";
+import { ManagementChat } from "@/components/ManagementChat";
 import type { ActivityLog } from "@/types";
 import { useAuth } from "@/lib/auth-context";
 import { formatMoneyFull, todayLocal, dateToLocal, saudiDateStr } from "@/lib/utils/format";
@@ -611,6 +612,16 @@ function SourceBadge({ deal: d }: { deal: Deal }) {
   );
 }
 
+function ChatBtn({ onClick }: { onClick: () => void }) {
+  return (
+    <button onClick={onClick} title="محادثات الإدارة" className="flex h-7 w-7 items-center justify-center rounded-md bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500/20 shrink-0">
+      <MessagesSquare className="w-3.5 h-3.5" />
+    </button>
+  );
+}
+
+type ChatTarget = { type: "deal" | "renewal" | "client"; id: string; name: string };
+
 function DailyResultsSystem({
   hotDeals, warmDeals, ownerAttention, quickActionDeals, renewalActions, repPhoneByName, todayStats, onRemind,
 }: {
@@ -623,6 +634,7 @@ function DailyResultsSystem({
   todayStats: { closed: number; revenue: number; renewals: number };
   onRemind: (d: Deal) => void;
 }) {
+  const [chat, setChat] = useState<ChatTarget | null>(null);
   const repMsgForDeal = (d: Deal) =>
     `السلام عليكم ${(d.assigned_rep_name || "").trim()}،\nمتابعة صفقة: ${d.client_name} — ${d.stage} — ${formatMoneyFull(d.deal_value)}\nالمطلوب: ${microStep(d.stage)}\nتكفى تابعها اليوم وحدّثني بالنتيجة.`;
   // ① الهدف الأوحد: أعلى صفقة بانتظار الدفع، وإلا أقوى صفقة ساخنة.
@@ -685,6 +697,7 @@ function DailyResultsSystem({
             </p>
             <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-white/[0.05]">
               <RepAction repName={oneTarget.deal.assigned_rep_name} phoneMap={repPhoneByName} message={repMsgForDeal(oneTarget.deal)} />
+              <ChatBtn onClick={() => setChat({ type: "deal", id: oneTarget.deal.id, name: oneTarget.deal.client_name })} />
               <button onClick={() => onRemind(oneTarget.deal)} className="flex items-center gap-1 text-[12px] px-2 py-1 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 mr-auto" title="ذكّرني غداً">
                 <Bell className="w-3 h-3" /> ذكّرني
               </button>
@@ -714,7 +727,10 @@ function DailyResultsSystem({
                   </div>
                   <p className="text-[12px] text-muted-foreground truncate">↪ {microStep(d.stage)}</p>
                 </div>
-                <RepAction repName={d.assigned_rep_name} phoneMap={repPhoneByName} message={repMsgForDeal(d)} />
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <ChatBtn onClick={() => setChat({ type: "deal", id: d.id, name: d.client_name })} />
+                  <RepAction repName={d.assigned_rep_name} phoneMap={repPhoneByName} message={repMsgForDeal(d)} />
+                </div>
               </div>
               );
             })}
@@ -737,7 +753,10 @@ function DailyResultsSystem({
                   </div>
                   {intel.attentionReason && <p className="text-[12px] text-red-300/90 truncate">⚠ {intel.attentionReason}</p>}
                 </div>
-                <RepAction repName={d.assigned_rep_name} phoneMap={repPhoneByName} message={repMsgForDeal(d)} />
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <ChatBtn onClick={() => setChat({ type: "deal", id: d.id, name: d.client_name })} />
+                  <RepAction repName={d.assigned_rep_name} phoneMap={repPhoneByName} message={repMsgForDeal(d)} />
+                </div>
               </div>
             ))}
           </div>
@@ -763,10 +782,31 @@ function DailyResultsSystem({
                     </div>
                     <p className="text-[12px] text-muted-foreground truncate">↪ {r.plan_name} — كلّف الموظف بالتجديد</p>
                   </div>
-                  <RepAction repName={r.assigned_rep} phoneMap={repPhoneByName} message={repMsg} />
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <ChatBtn onClick={() => setChat({ type: "renewal", id: r.id, name: r.customer_name })} />
+                    <RepAction repName={r.assigned_rep} phoneMap={repPhoneByName} message={repMsg} />
+                  </div>
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* نافذة محادثات الإدارة */}
+      {chat && (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-3" onClick={() => setChat(null)}>
+          <div className="w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <MessagesSquare className="w-4 h-4 text-cyan-400" />
+                <span className="text-sm font-bold text-foreground">محادثات الإدارة — {chat.name}</span>
+              </div>
+              <button onClick={() => setChat(null)} className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.06] text-muted-foreground hover:text-foreground" title="إغلاق">
+                <XIcon className="w-4 h-4" />
+              </button>
+            </div>
+            <ManagementChat entityType={chat.type} entityId={chat.id} entityName={chat.name} />
           </div>
         </div>
       )}

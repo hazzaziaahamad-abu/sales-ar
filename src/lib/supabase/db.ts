@@ -163,6 +163,56 @@ export async function fetchClientProfile(query: string): Promise<ClientProfileDa
   return { deals, renewals, tickets, notes };
 }
 
+// ─── MANAGEMENT CHAT (محادثات الإدارة) ──────────────────────────────────────
+export type ManagementMessage = {
+  id: string;
+  org_id: string;
+  entity_type: "deal" | "renewal" | "client";
+  entity_id: string;
+  entity_name?: string;
+  sender_id?: string;
+  sender_name: string;
+  body: string;
+  created_at: string;
+};
+
+export async function fetchManagementMessages(entityType: string, entityId: string): Promise<ManagementMessage[]> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("management_messages")
+    .select("*")
+    .eq("org_id", getOrgId())
+    .eq("entity_type", entityType)
+    .eq("entity_id", entityId)
+    .order("created_at", { ascending: true });
+  return (data ?? []) as ManagementMessage[];
+}
+
+export async function sendManagementMessage(input: {
+  entityType: "deal" | "renewal" | "client";
+  entityId: string;
+  entityName?: string;
+  body: string;
+  senderId?: string;
+  senderName: string;
+}): Promise<ManagementMessage | null> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("management_messages")
+    .insert({
+      org_id: getOrgId(),
+      entity_type: input.entityType,
+      entity_id: input.entityId,
+      entity_name: input.entityName ?? null,
+      sender_id: input.senderId ?? null,
+      sender_name: input.senderName,
+      body: input.body,
+    })
+    .select("*")
+    .single();
+  return (data as ManagementMessage) ?? null;
+}
+
 type ClientPhoneData = {
   verified?: boolean;
   secondary?: string;

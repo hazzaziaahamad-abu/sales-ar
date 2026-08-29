@@ -11,6 +11,7 @@ import { fetchClientProfile, fetchClientBio, upsertClientBio, upsertClientMenuUr
 import { getTopContributor } from "@/components/sales/SalesKPIDashboard";
 import { FollowUpLogButton } from "@/components/follow-up-log";
 import { DealCloserCoach } from "@/components/DealCloserCoach";
+import { ManagementChat } from "@/components/ManagementChat";
 import { useAuth } from "@/lib/auth-context";
 import { Search, Phone, User, ShoppingBag, RefreshCw, Headphones, FileText, ChevronDown, ChevronUp, Clock, X, Pencil, Check, StickyNote, BarChart2, Trophy, MessageSquarePlus, Send, AtSign, Bell, BellOff, CalendarClock, ShieldCheck, ShieldOff, Plus, PhoneCall } from "lucide-react";
 import type { Deal, Renewal, Ticket, FollowUpNote, DealKpiStage, Employee } from "@/types";
@@ -1088,6 +1089,19 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
 
               {/* AI Deal-closer coach */}
               <DealCloserCoach context={coachContext} />
+
+              {/* محادثات الإدارة — مربوطة بالعميل */}
+              {bioKey && (
+                <div>
+                  <p className="text-xs font-bold text-cyan-400 mb-1.5 flex items-center gap-1.5">💬 محادثات الإدارة</p>
+                  <ManagementChat
+                    entityType="client"
+                    entityId={bioKey}
+                    entityName={data?.deals[0]?.client_name || data?.renewals[0]?.customer_name || data?.tickets[0]?.client_name || bioKey}
+                    compact
+                  />
+                </div>
+              )}
 
               {/* Bio */}
               <div className="rounded-xl border border-border/50 bg-muted/20 p-3">
