@@ -1150,7 +1150,8 @@ export default function SecretaryPage() {
         let g = map.get(st);
         if (!g) { g = { state: st, icon: "🎫", text: "text-orange-400", border: "border-orange-500/25 hover:border-orange-500/50", count: 0, value: 0, items: [] }; map.set(st, g); }
         g.count++;
-        g.items.push({ id: t.id, name: t.client_name, query: t.client_phone || t.client_name, meta: `${(t.issue || "").slice(0, 45)}${t.priority ? ` · ${t.priority}` : ""}`, value: 0, sourceLabel: "تذكرة" });
+        const created = t.created_at ? new Date(t.created_at).toLocaleDateString("en-GB") : "";
+        g.items.push({ id: t.id, name: t.client_name, query: t.client_phone || t.client_name, meta: `${(t.issue || "").slice(0, 40)}${t.priority ? ` · ${t.priority}` : ""}${created ? ` · أُنشئت ${created}` : ""}`, value: 0, sourceLabel: "تذكرة" });
       }
       return Array.from(map.values()).sort((a, b) => b.count - a.count);
     };
