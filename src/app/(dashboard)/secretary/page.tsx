@@ -732,8 +732,8 @@ export default function SecretaryPage() {
   const [selectedPeriod, setSelectedPeriod] = useState<"today" | "yesterday" | "week" | "month">("today");
   const [attendancePeriod, setAttendancePeriod] = useState<"today" | "yesterday" | "week" | "month">("today");
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    briefing: true, meetings: true, hotCold: true, supportHealth: true, renewalHealth: true, priorities: true,
-    goal90: true, quickTasks: true, tasks: true, attendance: true,
+    briefing: true, meetings: false, hotCold: true, supportHealth: true, renewalHealth: true, priorities: true,
+    goal90: true, quickTasks: true, tasks: true, attendance: false,
   });
 
   const todayKey = todayLocal();
