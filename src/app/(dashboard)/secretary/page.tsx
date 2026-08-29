@@ -637,17 +637,22 @@ function DailyResultsSystem({
   const [chat, setChat] = useState<ChatTarget | null>(null);
   const repMsgForDeal = (d: Deal) =>
     `السلام عليكم ${(d.assigned_rep_name || "").trim()}،\nمتابعة صفقة: ${d.client_name} — ${d.stage} — ${formatMoneyFull(d.deal_value)}\nالمطلوب: ${microStep(d.stage)}\nتكفى تابعها اليوم وحدّثني بالنتيجة.`;
+  // نخفي الصفقات المتجاوزة ٣٠ يوماً بلا تفاعل (تركيز).
+  const STALE_LIMIT = 30;
+  const freshHot = hotDeals.filter(x => x.intel.daysSinceActivity <= STALE_LIMIT);
+  const freshWarm = warmDeals.filter(x => x.intel.daysSinceActivity <= STALE_LIMIT);
+
   // ① الهدف الأوحد: أعلى صفقة بانتظار الدفع، وإلا أقوى صفقة ساخنة.
-  const waiting = hotDeals.filter(x => x.deal.stage === "انتظار الدفع").sort((a, b) => b.deal.deal_value - a.deal.deal_value);
-  const oneTarget = waiting[0] || hotDeals[0] || warmDeals[0] || null;
+  const waiting = freshHot.filter(x => x.deal.stage === "انتظار الدفع").sort((a, b) => b.deal.deal_value - a.deal.deal_value);
+  const oneTarget = waiting[0] || freshHot[0] || freshWarm[0] || null;
 
   // ② تحتاج إجراء سريع: مرحلة فعّالة + آخر تفاعل خلال ٣ أيام، الأحدث أولاً.
   const moveForward = quickActionDeals
     .filter(x => x.deal.id !== oneTarget?.deal.id)
     .slice(0, 6);
 
-  // ③ لا تخسرها: أهم صفقتين تحتاجان تدخّلك.
-  const dontLose = ownerAttention.slice(0, 2);
+  // ③ لا تخسرها: أهم صفقتين تحتاجان تدخّلك (بلا المتجاوزة ٣٠ يوماً).
+  const dontLose = ownerAttention.filter(x => x.intel.daysSinceActivity <= STALE_LIMIT).slice(0, 2);
 
   return (
     <div className="rounded-2xl border border-violet-500/25 bg-gradient-to-bl from-violet-500/[0.08] via-transparent to-amber-500/[0.05] p-4 space-y-4">
@@ -984,7 +989,8 @@ export default function SecretaryPage() {
     return renewals
       .filter(r => r.status !== "مكتمل" && r.status !== "ملغي بسبب")
       .map(r => ({ r, days: Math.floor((new Date(r.renewal_date).getTime() - now) / 86400000) }))
-      .filter(x => x.days <= 3)
+      // مستحق خلال ٣ أيام أو متأخر — لكن ليس متأخراً أكثر من ٣٠ يوماً (تركيز).
+      .filter(x => x.days <= 3 && x.days >= -30)
       .sort((a, b) => a.days - b.days)
       .slice(0, 6);
   }, [renewals]);
