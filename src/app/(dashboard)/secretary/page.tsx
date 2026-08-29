@@ -603,11 +603,12 @@ function SourceBadge({ deal: d }: { deal: Deal }) {
 }
 
 function DailyResultsSystem({
-  hotDeals, warmDeals, ownerAttention, todayStats, onRemind,
+  hotDeals, warmDeals, ownerAttention, quickActionDeals, todayStats, onRemind,
 }: {
   hotDeals: { deal: Deal; intel: DealIntel }[];
   warmDeals: { deal: Deal; intel: DealIntel }[];
   ownerAttention: { deal: Deal; intel: DealIntel }[];
+  quickActionDeals: { deal: Deal; intel: DealIntel }[];
   todayStats: { closed: number; revenue: number; renewals: number };
   onRemind: (d: Deal) => void;
 }) {
@@ -615,11 +616,10 @@ function DailyResultsSystem({
   const waiting = hotDeals.filter(x => x.deal.stage === "انتظار الدفع").sort((a, b) => b.deal.deal_value - a.deal.deal_value);
   const oneTarget = waiting[0] || hotDeals[0] || warmDeals[0] || null;
 
-  // ② حرّك ٣ للأمام: أعلى صفقات رافعة (قيمة × درجة) عدا الهدف الأوحد.
-  const moveForward = [...hotDeals, ...warmDeals]
+  // ② تحتاج إجراء سريع: مرحلة فعّالة + آخر تفاعل خلال ٣ أيام، الأحدث أولاً.
+  const moveForward = quickActionDeals
     .filter(x => x.deal.id !== oneTarget?.deal.id)
-    .sort((a, b) => (b.deal.deal_value * b.intel.score) - (a.deal.deal_value * a.intel.score))
-    .slice(0, 3);
+    .slice(0, 6);
 
   // ③ لا تخسرها: أهم صفقتين تحتاجان تدخّلك.
   const dontLose = ownerAttention.slice(0, 2);
@@ -685,21 +685,26 @@ function DailyResultsSystem({
       {/* ② حرّك ٣ للأمام */}
       {moveForward.length > 0 && (
         <div>
-          <p className="text-[12px] font-bold text-amber-300 mb-1.5">② حرّك ٣ صفقات للأمام</p>
+          <p className="text-[12px] font-bold text-amber-300 mb-1.5">② تحتاج إجراء سريع — آخر ٣ أيام</p>
           <div className="space-y-1.5">
-            {moveForward.map(({ deal: d }) => (
+            {moveForward.map(({ deal: d, intel }) => {
+              const last = intel.daysSinceActivity === 0 ? "اليوم" : intel.daysSinceActivity === 1 ? "أمس" : `قبل ${intel.daysSinceActivity}ي`;
+              return (
               <div key={d.id} className="flex items-center gap-2 rounded-lg bg-white/[0.02] border border-white/[0.06] px-3 py-2">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-[13px] font-bold text-foreground truncate">{d.client_name}</p>
                     <SourceBadge deal={d} />
                     <span className="text-[11px] text-amber-300 font-bold shrink-0">{formatMoneyFull(d.deal_value)}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/[0.05] text-muted-foreground shrink-0">{d.stage}</span>
+                    <span className="text-[10px] text-muted-foreground shrink-0">· آخر تفاعل {last}</span>
                   </div>
                   <p className="text-[12px] text-muted-foreground truncate">↪ {microStep(d.stage)}</p>
                 </div>
                 <DealMiniAction deal={d} />
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -883,6 +888,15 @@ export default function SecretaryPage() {
       .sort((a, b) => b.deal.deal_value - a.deal.deal_value),
     [dealsWithIntel]
   );
+
+  // صفقات تحتاج إجراء سريع: في الوسط (تفاوض/عرض/تجهيز) أو على وشك الإغلاق
+  // (انتظار الدفع)، آخر تفاعل خلال ٣ أيام، مرتّبة من الأحدث للأقدم.
+  const quickActionDeals = useMemo(() => {
+    const ACTIONABLE = new Set(["تفاوض", "تم إرسال العرض", "تجهيز", "انتظار الدفع"]);
+    return dealsWithIntel
+      .filter(x => ACTIONABLE.has(x.deal.stage) && x.intel.daysSinceActivity <= 3)
+      .sort((a, b) => new Date(b.intel.lastActivityDate).getTime() - new Date(a.intel.lastActivityDate).getTime());
+  }, [dealsWithIntel]);
 
   // Rep escalation: reps with 3+ stale/cold deals
   const repEscalation = useMemo(() => {
@@ -1444,6 +1458,7 @@ export default function SecretaryPage() {
           hotDeals={hotDeals}
           warmDeals={warmDeals}
           ownerAttention={ownerAttention}
+          quickActionDeals={quickActionDeals}
           todayStats={{
             closed: briefingStats.todayOffice + briefingStats.todaySupport,
             revenue: briefingStats.todayTotalRev,
