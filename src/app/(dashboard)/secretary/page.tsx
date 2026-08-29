@@ -578,17 +578,26 @@ interface QuickTask {
 }
 
 /* ─── بوصلة اليوم: نظام إنتاجية موجّه للنتائج (مستوحى من مبادئ التعلّم/الإنتاجية) ─── */
-function DealMiniAction({ deal: d }: { deal: Deal }) {
-  const phone = sanitizePhone(d.client_phone);
-  if (!phone) return <span className="text-[11px] text-muted-foreground/60 px-2 py-1">بلا رقم</span>;
+// الإجراء موجّه للموظف المسؤول (لا للعميل): المؤسس يتابع ويكلّف، والموظف ينفّذ.
+function RepAction({ repName, phoneMap, message }: { repName?: string; phoneMap: Map<string, string>; message: string }) {
+  const name = (repName || "").trim();
+  if (!name) return <span className="text-[11px] text-muted-foreground/50 px-2 py-1 shrink-0">بلا مسؤول</span>;
+  const phone = sanitizePhone(phoneMap.get(name.toLowerCase()) || "");
   return (
-    <div className="flex items-center gap-1 shrink-0">
-      <a href={`tel:${phone}`} title="اتصل" className="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20">
-        <Phone className="w-3.5 h-3.5" />
-      </a>
-      <a href={whatsappLink(phone, whatsappMessageForStage(d.stage, d.client_name))} target="_blank" rel="noreferrer" title="واتساب" className="flex h-7 w-7 items-center justify-center rounded-md bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20">
-        <MessageCircle className="w-3.5 h-3.5" />
-      </a>
+    <div className="flex items-center gap-1.5 shrink-0">
+      <span className="text-[11px] font-semibold text-muted-foreground max-w-[64px] truncate">{name}</span>
+      {phone ? (
+        <>
+          <a href={`tel:${phone}`} title={`اتصل بـ${name}`} className="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20">
+            <Phone className="w-3.5 h-3.5" />
+          </a>
+          <a href={whatsappLink(phone, message)} target="_blank" rel="noreferrer" title={`واتساب ${name}`} className="flex h-7 w-7 items-center justify-center rounded-md bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20">
+            <MessageCircle className="w-3.5 h-3.5" />
+          </a>
+        </>
+      ) : (
+        <span className="text-[10px] text-muted-foreground/50">لا رقم</span>
+      )}
     </div>
   );
 }
@@ -603,16 +612,19 @@ function SourceBadge({ deal: d }: { deal: Deal }) {
 }
 
 function DailyResultsSystem({
-  hotDeals, warmDeals, ownerAttention, quickActionDeals, renewalActions, todayStats, onRemind,
+  hotDeals, warmDeals, ownerAttention, quickActionDeals, renewalActions, repPhoneByName, todayStats, onRemind,
 }: {
   hotDeals: { deal: Deal; intel: DealIntel }[];
   warmDeals: { deal: Deal; intel: DealIntel }[];
   ownerAttention: { deal: Deal; intel: DealIntel }[];
   quickActionDeals: { deal: Deal; intel: DealIntel }[];
   renewalActions: { r: Renewal; days: number }[];
+  repPhoneByName: Map<string, string>;
   todayStats: { closed: number; revenue: number; renewals: number };
   onRemind: (d: Deal) => void;
 }) {
+  const repMsgForDeal = (d: Deal) =>
+    `السلام عليكم ${(d.assigned_rep_name || "").trim()}،\nمتابعة صفقة: ${d.client_name} — ${d.stage} — ${formatMoneyFull(d.deal_value)}\nالمطلوب: ${microStep(d.stage)}\nتكفى تابعها اليوم وحدّثني بالنتيجة.`;
   // ① الهدف الأوحد: أعلى صفقة بانتظار الدفع، وإلا أقوى صفقة ساخنة.
   const waiting = hotDeals.filter(x => x.deal.stage === "انتظار الدفع").sort((a, b) => b.deal.deal_value - a.deal.deal_value);
   const oneTarget = waiting[0] || hotDeals[0] || warmDeals[0] || null;
@@ -672,8 +684,8 @@ function DailyResultsSystem({
               <span><span className="text-violet-300 font-bold">أصغر خطوة الآن:</span> {microStep(oneTarget.deal.stage)}</span>
             </p>
             <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-white/[0.05]">
-              <DealMiniAction deal={oneTarget.deal} />
-              <button onClick={() => onRemind(oneTarget.deal)} className="flex items-center gap-1 text-[12px] px-2 py-1 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20" title="ذكّرني غداً">
+              <RepAction repName={oneTarget.deal.assigned_rep_name} phoneMap={repPhoneByName} message={repMsgForDeal(oneTarget.deal)} />
+              <button onClick={() => onRemind(oneTarget.deal)} className="flex items-center gap-1 text-[12px] px-2 py-1 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 mr-auto" title="ذكّرني غداً">
                 <Bell className="w-3 h-3" /> ذكّرني
               </button>
             </div>
@@ -702,7 +714,7 @@ function DailyResultsSystem({
                   </div>
                   <p className="text-[12px] text-muted-foreground truncate">↪ {microStep(d.stage)}</p>
                 </div>
-                <DealMiniAction deal={d} />
+                <RepAction repName={d.assigned_rep_name} phoneMap={repPhoneByName} message={repMsgForDeal(d)} />
               </div>
               );
             })}
@@ -725,7 +737,7 @@ function DailyResultsSystem({
                   </div>
                   {intel.attentionReason && <p className="text-[12px] text-red-300/90 truncate">⚠ {intel.attentionReason}</p>}
                 </div>
-                <DealMiniAction deal={d} />
+                <RepAction repName={d.assigned_rep_name} phoneMap={repPhoneByName} message={repMsgForDeal(d)} />
               </div>
             ))}
           </div>
@@ -739,7 +751,7 @@ function DailyResultsSystem({
           <div className="space-y-1.5">
             {renewalActions.map(({ r, days }) => {
               const label = days < 0 ? `متأخر ${Math.abs(days)} يوم` : days === 0 ? "يستحق اليوم" : `بعد ${days} يوم`;
-              const phone = sanitizePhone(r.customer_phone);
+              const repMsg = `السلام عليكم ${(r.assigned_rep || "").trim()}،\nتجديد: ${r.customer_name} (${r.plan_name}) — ${formatMoneyFull(r.plan_price)} — ${label}\nتكفى تواصل معه اليوم وأكمل التجديد وحدّثني.`;
               return (
                 <div key={r.id} className="flex items-center gap-2 rounded-lg bg-sky-500/[0.04] border border-sky-500/20 px-3 py-2">
                   <div className="min-w-0 flex-1">
@@ -749,20 +761,9 @@ function DailyResultsSystem({
                       <span className="text-[11px] text-sky-300 font-bold shrink-0">{formatMoneyFull(r.plan_price)}</span>
                       <span className={`text-[10px] shrink-0 ${days < 0 ? "text-red-300" : "text-muted-foreground"}`}>· {label}</span>
                     </div>
-                    <p className="text-[12px] text-muted-foreground truncate">↪ {r.plan_name} — ذكّره بالتجديد الآن</p>
+                    <p className="text-[12px] text-muted-foreground truncate">↪ {r.plan_name} — كلّف الموظف بالتجديد</p>
                   </div>
-                  {phone ? (
-                    <div className="flex items-center gap-1 shrink-0">
-                      <a href={`tel:${phone}`} title="اتصل" className="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20">
-                        <Phone className="w-3.5 h-3.5" />
-                      </a>
-                      <a href={whatsappLink(phone, `مرحبًا ${r.customer_name}، نذكّركم باقتراب موعد تجديد اشتراك ${r.plan_name}. هل نكمل إجراء التجديد؟`)} target="_blank" rel="noreferrer" title="واتساب" className="flex h-7 w-7 items-center justify-center rounded-md bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20">
-                        <MessageCircle className="w-3.5 h-3.5" />
-                      </a>
-                    </div>
-                  ) : (
-                    <span className="text-[11px] text-muted-foreground/60 px-2 py-1 shrink-0">بلا رقم</span>
-                  )}
+                  <RepAction repName={r.assigned_rep} phoneMap={repPhoneByName} message={repMsg} />
                 </div>
               );
             })}
@@ -947,6 +948,15 @@ export default function SecretaryPage() {
       .sort((a, b) => a.days - b.days)
       .slice(0, 6);
   }, [renewals]);
+
+  // خريطة اسم الموظف → جواله (للتواصل مع المسؤول عن الصفقة/التجديد).
+  const repPhoneByName = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const e of employees) {
+      if (e.name && e.phone) m.set(e.name.trim().toLowerCase(), e.phone);
+    }
+    return m;
+  }, [employees]);
 
   // Rep escalation: reps with 3+ stale/cold deals
   const repEscalation = useMemo(() => {
@@ -1510,6 +1520,7 @@ export default function SecretaryPage() {
           ownerAttention={ownerAttention}
           quickActionDeals={quickActionDeals}
           renewalActions={renewalActions}
+          repPhoneByName={repPhoneByName}
           todayStats={{
             closed: briefingStats.todayOffice + briefingStats.todaySupport,
             revenue: briefingStats.todayTotalRev,
