@@ -613,6 +613,20 @@ function SourceBadge({ deal: d }: { deal: Deal }) {
   );
 }
 
+// ترتيب وألوان بوكسات الحالات (آخر ٧ أيام)
+const STAGE_ORDER = ["انتظار الدفع", "تفاوض", "تم إرسال العرض", "تجهيز", "تجريبي", "قيد التواصل", "عميل جديد", "اعادة الاتصال في وقت اخر", "تاجيل"];
+const STAGE_UI: Record<string, { icon: string; text: string; border: string }> = {
+  "انتظار الدفع": { icon: "💳", text: "text-amber-400", border: "border-amber-500/25 hover:border-amber-500/50" },
+  "تفاوض": { icon: "🤝", text: "text-violet-400", border: "border-violet-500/25 hover:border-violet-500/50" },
+  "تم إرسال العرض": { icon: "📤", text: "text-fuchsia-400", border: "border-fuchsia-500/25 hover:border-fuchsia-500/50" },
+  "تجهيز": { icon: "⚙️", text: "text-cyan-400", border: "border-cyan-500/25 hover:border-cyan-500/50" },
+  "تجريبي": { icon: "🧪", text: "text-blue-400", border: "border-blue-500/25 hover:border-blue-500/50" },
+  "قيد التواصل": { icon: "📞", text: "text-sky-400", border: "border-sky-500/25 hover:border-sky-500/50" },
+  "عميل جديد": { icon: "🆕", text: "text-teal-400", border: "border-teal-500/25 hover:border-teal-500/50" },
+  "اعادة الاتصال في وقت اخر": { icon: "🔁", text: "text-orange-400", border: "border-orange-500/25 hover:border-orange-500/50" },
+  "تاجيل": { icon: "⏸️", text: "text-slate-400", border: "border-slate-500/25 hover:border-slate-500/50" },
+};
+
 function ChatBtn({ onClick }: { onClick: () => void }) {
   return (
     <button onClick={onClick} title="محادثات الإدارة" className="flex h-7 w-7 items-center justify-center rounded-md bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500/20 shrink-0">
@@ -624,19 +638,32 @@ function ChatBtn({ onClick }: { onClick: () => void }) {
 type ChatTarget = { type: "deal" | "renewal" | "client"; id: string; name: string; counterpart?: string };
 
 function DailyResultsSystem({
-  hotDeals, warmDeals, ownerAttention, quickActionDeals, renewalActions, repPhoneByName, todayStats, onRemind, onOpenProfile,
+  hotDeals, warmDeals, ownerAttention, quickActionDeals, renewalActions, recentStageDeals, repPhoneByName, todayStats, onRemind, onOpenProfile,
 }: {
   hotDeals: { deal: Deal; intel: DealIntel }[];
   warmDeals: { deal: Deal; intel: DealIntel }[];
   ownerAttention: { deal: Deal; intel: DealIntel }[];
   quickActionDeals: { deal: Deal; intel: DealIntel }[];
   renewalActions: { r: Renewal; days: number }[];
+  recentStageDeals: { deal: Deal; intel: DealIntel }[];
   repPhoneByName: Map<string, string>;
   todayStats: { closed: number; revenue: number; renewals: number };
   onRemind: (d: Deal) => void;
   onOpenProfile: (query: string) => void;
 }) {
   const [chat, setChat] = useState<ChatTarget | null>(null);
+  const [stageDetail, setStageDetail] = useState<string | null>(null);
+
+  // تجميع صفقات آخر ٧ أيام حسب الحالة (recentStageDeals مرتّبة من الأحدث للأقدم).
+  const byStage: Record<string, { count: number; value: number; items: { deal: Deal; intel: DealIntel }[] }> = {};
+  for (const x of recentStageDeals) {
+    (byStage[x.deal.stage] ||= { count: 0, value: 0, items: [] });
+    byStage[x.deal.stage].count++;
+    byStage[x.deal.stage].value += x.deal.deal_value;
+    byStage[x.deal.stage].items.push(x);
+  }
+  const stageBoxes = STAGE_ORDER.filter((s) => byStage[s]?.count);
+  const detailItems = stageDetail ? byStage[stageDetail]?.items ?? [] : [];
   const repMsgForDeal = (d: Deal) =>
     `السلام عليكم ${(d.assigned_rep_name || "").trim()}،\nمتابعة صفقة: ${d.client_name} — ${d.stage} — ${formatMoneyFull(d.deal_value)}\nالمطلوب: ${microStep(d.stage)}\nتكفى تابعها اليوم وحدّثني بالنتيجة.`;
   // نخفي الصفقات المتجاوزة ٣٠ يوماً بلا تفاعل (تركيز).
@@ -682,6 +709,28 @@ function DailyResultsSystem({
           </div>
         ))}
       </div>
+
+      {/* حالات آخر ٧ أيام — بوكسات فلترة */}
+      {stageBoxes.length > 0 && (
+        <div>
+          <p className="text-[12px] font-bold text-muted-foreground mb-1.5">حالات آخر ٧ أيام · اضغط للتفاصيل</p>
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+            {stageBoxes.map((s) => {
+              const g = byStage[s];
+              const ui = STAGE_UI[s] || { icon: "•", text: "text-foreground", border: "border-white/[0.08] hover:border-white/20" };
+              return (
+                <button key={s} onClick={() => setStageDetail(s)} className={`rounded-xl bg-white/[0.03] border ${ui.border} p-2.5 text-center transition-colors`}>
+                  <div className="flex items-center justify-center gap-1">
+                    <span className={`text-xl font-extrabold ${ui.text}`}>{g.count}</span>
+                    <span className="text-sm">{ui.icon}</span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{s}</p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ① الهدف الأوحد */}
       <div>
@@ -814,6 +863,41 @@ function DailyResultsSystem({
               </button>
             </div>
             <ManagementChat entityType={chat.type} entityId={chat.id} entityName={chat.name} counterpartName={chat.counterpart} />
+          </div>
+        </div>
+      )}
+
+      {/* تفاصيل الحالة — صفقات آخر ٧ أيام */}
+      {stageDetail && (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-3" onClick={() => setStageDetail(null)}>
+          <div className="w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-bold text-foreground">{STAGE_UI[stageDetail]?.icon} {stageDetail} — آخر ٧ أيام ({detailItems.length})</span>
+              <button onClick={() => setStageDetail(null)} className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.06] text-muted-foreground hover:text-foreground" title="إغلاق">
+                <XIcon className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="rounded-xl border border-border/50 bg-card max-h-[70vh] overflow-y-auto p-2 space-y-1.5">
+              {detailItems.length === 0 ? (
+                <p className="text-center text-[12px] text-muted-foreground py-6">لا توجد صفقات</p>
+              ) : detailItems.map(({ deal: d, intel }) => {
+                const last = intel.daysSinceActivity === 0 ? "اليوم" : intel.daysSinceActivity === 1 ? "أمس" : `قبل ${intel.daysSinceActivity}ي`;
+                return (
+                  <button key={d.id} onClick={() => { onOpenProfile(d.client_phone || d.client_name); setStageDetail(null); }} className="w-full text-right rounded-lg bg-white/[0.02] border border-white/[0.06] hover:border-cyan-500/30 hover:bg-white/[0.04] px-3 py-2 transition-colors">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[13px] font-bold text-foreground truncate">{d.client_name}</span>
+                          <SourceBadge deal={d} />
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">{d.assigned_rep_name || "بلا مسؤول"} · آخر تفاعل {last}</p>
+                      </div>
+                      <span className="text-[12px] font-bold text-amber-300 shrink-0">{formatMoneyFull(d.deal_value)}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
@@ -998,6 +1082,14 @@ export default function SecretaryPage() {
       .sort((a, b) => a.days - b.days)
       .slice(0, 6);
   }, [renewals]);
+
+  // صفقات آخر ٧ أيام (نشاط) لبوكسات الحالات — الأحدث أولاً.
+  const recentStageDeals = useMemo(() =>
+    dealsWithIntel
+      .filter(x => x.intel.daysSinceActivity <= 7)
+      .sort((a, b) => new Date(b.intel.lastActivityDate).getTime() - new Date(a.intel.lastActivityDate).getTime()),
+    [dealsWithIntel]
+  );
 
   // خريطة اسم الموظف → جواله (للتواصل مع المسؤول عن الصفقة/التجديد).
   const repPhoneByName = useMemo(() => {
@@ -1570,6 +1662,7 @@ export default function SecretaryPage() {
           ownerAttention={ownerAttention}
           quickActionDeals={quickActionDeals}
           renewalActions={renewalActions}
+          recentStageDeals={recentStageDeals}
           repPhoneByName={repPhoneByName}
           todayStats={{
             closed: briefingStats.todayOffice + briefingStats.todaySupport,
