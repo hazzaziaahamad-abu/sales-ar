@@ -14,6 +14,7 @@ import {
 import { fetchDeals, fetchRenewals, fetchEmployees, fetchRecentFollowUpNotes, upsertSalesGuideSetting, fetchSalesGuideSettings, fetchTickets, fetchUserLoginLogs, fetchActivityLogs, type UserLoginLog } from "@/lib/supabase/db";
 import { OfferVisitsPanel } from "@/components/OfferVisitsPanel";
 import { ManagementChat } from "@/components/ManagementChat";
+import { ClientProfilePanel } from "@/components/client-profile-panel";
 import type { ActivityLog } from "@/types";
 import { useAuth } from "@/lib/auth-context";
 import { formatMoneyFull, todayLocal, dateToLocal, saudiDateStr } from "@/lib/utils/format";
@@ -623,7 +624,7 @@ function ChatBtn({ onClick }: { onClick: () => void }) {
 type ChatTarget = { type: "deal" | "renewal" | "client"; id: string; name: string; counterpart?: string };
 
 function DailyResultsSystem({
-  hotDeals, warmDeals, ownerAttention, quickActionDeals, renewalActions, repPhoneByName, todayStats, onRemind,
+  hotDeals, warmDeals, ownerAttention, quickActionDeals, renewalActions, repPhoneByName, todayStats, onRemind, onOpenProfile,
 }: {
   hotDeals: { deal: Deal; intel: DealIntel }[];
   warmDeals: { deal: Deal; intel: DealIntel }[];
@@ -633,6 +634,7 @@ function DailyResultsSystem({
   repPhoneByName: Map<string, string>;
   todayStats: { closed: number; revenue: number; renewals: number };
   onRemind: (d: Deal) => void;
+  onOpenProfile: (query: string) => void;
 }) {
   const [chat, setChat] = useState<ChatTarget | null>(null);
   const repMsgForDeal = (d: Deal) =>
@@ -689,7 +691,7 @@ function DailyResultsSystem({
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <p className="text-sm font-bold text-foreground truncate">{oneTarget.deal.client_name}</p>
+                  <button onClick={() => onOpenProfile(oneTarget.deal.client_phone || oneTarget.deal.client_name)} className="text-sm font-bold text-foreground truncate hover:text-cyan-400 hover:underline transition-colors" title="فتح ملخص العميل">{oneTarget.deal.client_name}</button>
                   <SourceBadge deal={oneTarget.deal} />
                 </div>
                 <p className="text-[12px] text-muted-foreground mt-0.5">{oneTarget.deal.stage} · {oneTarget.deal.assigned_rep_name || "بلا مسؤول"}</p>
@@ -724,7 +726,7 @@ function DailyResultsSystem({
               <div key={d.id} className="flex items-center gap-2 rounded-lg bg-white/[0.02] border border-white/[0.06] px-3 py-2">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-[13px] font-bold text-foreground truncate">{d.client_name}</p>
+                    <button onClick={() => onOpenProfile(d.client_phone || d.client_name)} className="text-[13px] font-bold text-foreground truncate hover:text-cyan-400 hover:underline transition-colors" title="فتح ملخص العميل">{d.client_name}</button>
                     <SourceBadge deal={d} />
                     <span className="text-[11px] text-amber-300 font-bold shrink-0">{formatMoneyFull(d.deal_value)}</span>
                     <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/[0.05] text-muted-foreground shrink-0">{d.stage}</span>
@@ -752,7 +754,7 @@ function DailyResultsSystem({
               <div key={d.id} className="flex items-center gap-2 rounded-lg bg-red-500/[0.05] border border-red-500/20 px-3 py-2">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-[13px] font-bold text-foreground truncate">{d.client_name}</p>
+                    <button onClick={() => onOpenProfile(d.client_phone || d.client_name)} className="text-[13px] font-bold text-foreground truncate hover:text-cyan-400 hover:underline transition-colors" title="فتح ملخص العميل">{d.client_name}</button>
                     <SourceBadge deal={d} />
                     <span className="text-[11px] text-red-300 font-bold shrink-0">{formatMoneyFull(d.deal_value)}</span>
                   </div>
@@ -780,7 +782,7 @@ function DailyResultsSystem({
                 <div key={r.id} className="flex items-center gap-2 rounded-lg bg-sky-500/[0.04] border border-sky-500/20 px-3 py-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-[13px] font-bold text-foreground truncate">{r.customer_name}</p>
+                      <button onClick={() => onOpenProfile(r.customer_phone || r.customer_name)} className="text-[13px] font-bold text-foreground truncate hover:text-cyan-400 hover:underline transition-colors" title="فتح ملخص العميل">{r.customer_name}</button>
                       <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-sky-500/10 text-sky-300 border border-sky-500/20 shrink-0">تجديدات</span>
                       <span className="text-[11px] text-sky-300 font-bold shrink-0">{formatMoneyFull(r.plan_price)}</span>
                       <span className={`text-[10px] shrink-0 ${days < 0 ? "text-red-300" : "text-muted-foreground"}`}>· {label}</span>
@@ -839,6 +841,8 @@ export default function SecretaryPage() {
     briefing: true, meetings: false, hotCold: true, supportHealth: true, renewalHealth: true, priorities: true,
     goal90: true, quickTasks: true, tasks: true, attendance: false,
   });
+
+  const [profileQuery, setProfileQuery] = useState<string | null>(null);
 
   const todayKey = todayLocal();
 
@@ -1573,6 +1577,7 @@ export default function SecretaryPage() {
             renewals: briefingStats.todayRenewals,
           }}
           onRemind={remindTomorrow}
+          onOpenProfile={(q) => setProfileQuery(q)}
         />
       )}
 
@@ -2593,6 +2598,13 @@ export default function SecretaryPage() {
           </div>
         </div>
       )}
+
+      {/* ملخص العميل — يُفتح من البوصلة */}
+      <ClientProfilePanel
+        open={!!profileQuery}
+        initialQuery={profileQuery ?? undefined}
+        onClose={() => setProfileQuery(null)}
+      />
     </div>
   );
 }
