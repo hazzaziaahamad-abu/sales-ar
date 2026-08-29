@@ -9,6 +9,7 @@ import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createF
 import { checkDealsForFollowUp, buildFollowUpTask, type FollowUpAction } from "@/lib/auto-followup";
 import { StarEmployeeCard, Leaderboard } from "@/components/star-employee";
 import { AssignTaskModal } from "@/components/tasks/AssignTaskModal";
+import { MyCallRequests } from "@/components/tasks/MyCallRequests";
 import { useAuth } from "@/lib/auth-context";
 import { useTopbarControls } from "@/components/layout/topbar-context";
 import { STAGES, SOURCES, SOURCE_COLORS, PLANS } from "@/lib/utils/constants";
@@ -316,6 +317,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
 
   /* assign task modal */
   const [assignDeal, setAssignDeal] = useState<Deal | null>(null);
+  const [assignType, setAssignType] = useState<string | undefined>(undefined);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileQuery, setProfileQuery] = useState("");
   const searchParams = useSearchParams();
@@ -1592,6 +1594,9 @@ export function SalesSection({ salesType }: SalesPageProps) {
         );
       })()}
 
+      {/* ─── طابور «مطلوب مني اتصال» ─── */}
+      <MyCallRequests />
+
       {/* ─── Stage Summary Cards ─── */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
         {loading
@@ -1997,11 +2002,20 @@ export function SalesSection({ salesType }: SalesPageProps) {
                       <Button
                         variant="ghost"
                         size="icon-xs"
-                        onClick={() => setAssignDeal(deal)}
+                        onClick={() => { setAssignType(undefined); setAssignDeal(deal); }}
                         title="تعيين لموظف"
                         className="text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10"
                       >
                         <UserPlus className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        onClick={() => { setAssignType("call"); setAssignDeal(deal); }}
+                        title="اطلب اتصال من موظف"
+                        className="text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
+                      >
+                        <PhoneCall className="w-3.5 h-3.5" />
                       </Button>
                       <Button
                         variant="ghost"
@@ -3227,12 +3241,13 @@ export function SalesSection({ salesType }: SalesPageProps) {
       {assignDeal && (
         <AssignTaskModal
           open={!!assignDeal}
-          onClose={() => setAssignDeal(null)}
+          onClose={() => { setAssignDeal(null); setAssignType(undefined); }}
           clientName={assignDeal.client_name}
           clientPhone={assignDeal.client_phone}
           entityType="deal"
           entityId={assignDeal.id}
-          defaultTitle={`متابعة ${assignDeal.client_name} — ${assignDeal.stage}`}
+          defaultTaskType={assignType}
+          defaultTitle={assignType === "call" ? `اتصال بالعميل ${assignDeal.client_name}` : `متابعة ${assignDeal.client_name} — ${assignDeal.stage}`}
         />
       )}
       <ClientProfilePanel
