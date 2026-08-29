@@ -603,12 +603,13 @@ function SourceBadge({ deal: d }: { deal: Deal }) {
 }
 
 function DailyResultsSystem({
-  hotDeals, warmDeals, ownerAttention, quickActionDeals, todayStats, onRemind,
+  hotDeals, warmDeals, ownerAttention, quickActionDeals, renewalActions, todayStats, onRemind,
 }: {
   hotDeals: { deal: Deal; intel: DealIntel }[];
   warmDeals: { deal: Deal; intel: DealIntel }[];
   ownerAttention: { deal: Deal; intel: DealIntel }[];
   quickActionDeals: { deal: Deal; intel: DealIntel }[];
+  renewalActions: { r: Renewal; days: number }[];
   todayStats: { closed: number; revenue: number; renewals: number };
   onRemind: (d: Deal) => void;
 }) {
@@ -727,6 +728,44 @@ function DailyResultsSystem({
                 <DealMiniAction deal={d} />
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ④ تجديدات تحتاج متابعة */}
+      {renewalActions.length > 0 && (
+        <div>
+          <p className="text-[12px] font-bold text-sky-300 mb-1.5">④ تجديدات تحتاج متابعة</p>
+          <div className="space-y-1.5">
+            {renewalActions.map(({ r, days }) => {
+              const label = days < 0 ? `متأخر ${Math.abs(days)} يوم` : days === 0 ? "يستحق اليوم" : `بعد ${days} يوم`;
+              const phone = sanitizePhone(r.customer_phone);
+              return (
+                <div key={r.id} className="flex items-center gap-2 rounded-lg bg-sky-500/[0.04] border border-sky-500/20 px-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-[13px] font-bold text-foreground truncate">{r.customer_name}</p>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-sky-500/10 text-sky-300 border border-sky-500/20 shrink-0">تجديدات</span>
+                      <span className="text-[11px] text-sky-300 font-bold shrink-0">{formatMoneyFull(r.plan_price)}</span>
+                      <span className={`text-[10px] shrink-0 ${days < 0 ? "text-red-300" : "text-muted-foreground"}`}>· {label}</span>
+                    </div>
+                    <p className="text-[12px] text-muted-foreground truncate">↪ {r.plan_name} — ذكّره بالتجديد الآن</p>
+                  </div>
+                  {phone ? (
+                    <div className="flex items-center gap-1 shrink-0">
+                      <a href={`tel:${phone}`} title="اتصل" className="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20">
+                        <Phone className="w-3.5 h-3.5" />
+                      </a>
+                      <a href={whatsappLink(phone, `مرحبًا ${r.customer_name}، نذكّركم باقتراب موعد تجديد اشتراك ${r.plan_name}. هل نكمل إجراء التجديد؟`)} target="_blank" rel="noreferrer" title="واتساب" className="flex h-7 w-7 items-center justify-center rounded-md bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20">
+                        <MessageCircle className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
+                  ) : (
+                    <span className="text-[11px] text-muted-foreground/60 px-2 py-1 shrink-0">بلا رقم</span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -897,6 +936,17 @@ export default function SecretaryPage() {
       .filter(x => ACTIONABLE.has(x.deal.stage) && x.intel.daysSinceActivity <= 3)
       .sort((a, b) => new Date(b.intel.lastActivityDate).getTime() - new Date(a.intel.lastActivityDate).getTime());
   }, [dealsWithIntel]);
+
+  // تجديدات تحتاج متابعة سريعة: متأخرة أو مستحقة خلال ٣ أيام، الأكثر إلحاحاً أولاً.
+  const renewalActions = useMemo(() => {
+    const now = Date.now();
+    return renewals
+      .filter(r => r.status !== "مكتمل" && r.status !== "ملغي بسبب")
+      .map(r => ({ r, days: Math.floor((new Date(r.renewal_date).getTime() - now) / 86400000) }))
+      .filter(x => x.days <= 3)
+      .sort((a, b) => a.days - b.days)
+      .slice(0, 6);
+  }, [renewals]);
 
   // Rep escalation: reps with 3+ stale/cold deals
   const repEscalation = useMemo(() => {
@@ -1459,6 +1509,7 @@ export default function SecretaryPage() {
           warmDeals={warmDeals}
           ownerAttention={ownerAttention}
           quickActionDeals={quickActionDeals}
+          renewalActions={renewalActions}
           todayStats={{
             closed: briefingStats.todayOffice + briefingStats.todaySupport,
             revenue: briefingStats.todayTotalRev,
