@@ -164,6 +164,18 @@ export function Topbar({ unreadCount = 0, onBellClick, onMenuClick }: TopbarProp
             </Button>
           </div>
 
+          {/* تحديث كامل للصفحة — احتياطي في كل الصفحات */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-[14px] sm:rounded-2xl bg-white/[0.05] hover:bg-white/[0.10]"
+            onClick={() => { if (typeof window !== "undefined") window.location.reload(); }}
+            title="تحديث الصفحة بالكامل"
+            aria-label="تحديث الصفحة"
+          >
+            <RefreshCw className="w-4 h-4 text-cyan" />
+          </Button>
+
           {/* Notifications */}
           <Button variant="ghost" size="icon" className="relative rounded-[14px] sm:rounded-2xl bg-white/[0.05] hover:bg-white/[0.10]" onClick={onBellClick}>
             <Bell className="w-4 h-4 text-amber" />
