@@ -31,6 +31,7 @@ import {
   CheckCircle2,
   Rocket,
   Heart,
+  Send,
 } from "lucide-react";
 
 /* ---------- brand tokens ---------- */
@@ -875,7 +876,37 @@ function SellPathStrip() {
 function ContactFlowPanel() {
   const [channel, setChannel] = useState<"call" | "wa">("call");
   const [copied, setCopied] = useState<number | null>(null);
+  const [pkg, setPkg] = useState<Tier | null>(null); // الباقة المختارة لتعبئة السكربتات تلقائياً
+  const [phone, setPhone] = useState(""); // رقم واتساب العميل لفتح المحادثة مباشرة
   const isWa = channel === "wa";
+
+  // تعبئة القيم المتغيّرة في السكربت من الباقة المختارة
+  const fill = useCallback(
+    (t: string) => {
+      if (!pkg) return t;
+      return t.split("{الباقة}").join(pkg.name).split("{السعر}").join(pkg.price);
+    },
+    [pkg]
+  );
+
+  // تطبيع رقم الجوال السعودي إلى صيغة واتساب الدولية (بدون + أو مسافات)
+  const waNumber = useCallback(() => {
+    const d = phone.replace(/\D/g, "");
+    if (!d) return "";
+    if (d.startsWith("966")) return d;
+    if (d.startsWith("0")) return "966" + d.slice(1);
+    if (d.startsWith("5") && d.length === 9) return "966" + d;
+    return d;
+  }, [phone]);
+
+  const openWa = useCallback(
+    (text: string) => {
+      const num = waNumber();
+      const url = `https://wa.me/${num}?text=${encodeURIComponent(text)}`;
+      window.open(url, "_blank", "noopener,noreferrer");
+    },
+    [waNumber]
+  );
 
   const copy = useCallback(async (idx: number, text: string) => {
     try {
@@ -925,10 +956,59 @@ function ContactFlowPanel() {
         </div>
       </div>
 
-      <p className="mb-4 text-right text-xs font-semibold leading-relaxed" style={{ color: "#8a7c70" }}>
+      <p className="mb-3 text-right text-xs font-semibold leading-relaxed" style={{ color: "#8a7c70" }}>
         تسلسل جاهز يمشي عليه الموظف من التحية حتى تأكيد موعد التنفيذ — بدّل بين «مكالمة» و«واتساب» ليتغيّر السكربت، وانسخ الرسالة بضغطة.
         استبدل ما بين الأقواس {"{ }"} بمعلومات العميل.
       </p>
+
+      {/* أدوات: اختيار الباقة (يعبّئ الاسم والسعر تلقائياً) + رقم واتساب العميل */}
+      <div className="mb-4 rounded-2xl p-3" style={{ backgroundColor: "#faf4ee", border: "1px solid #efe2d5" }}>
+        <div className="mb-2 flex items-center justify-end gap-1.5 text-xs font-black" style={{ color: PURPLE_DEEP }}>
+          اختر الباقة لتعبئتها تلقائياً في السكربت
+          <Target size={13} strokeWidth={2.3} style={{ color: PURPLE }} />
+        </div>
+        <div className="flex flex-wrap justify-end gap-1.5">
+          {TIERS.map((t) => {
+            const on = pkg?.name === t.name;
+            return (
+              <button
+                key={t.name}
+                onClick={() => setPkg(on ? null : t)}
+                className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold outline-none transition hover:opacity-90 focus-visible:ring-4 focus-visible:ring-violet-300 motion-reduce:transition-none"
+                style={{
+                  backgroundColor: on ? PURPLE : "#fff",
+                  color: on ? "#fff" : INK,
+                  border: `1px solid ${on ? PURPLE : "#e2d3c3"}`,
+                }}
+                aria-pressed={on}
+              >
+                {on && <Check size={11} strokeWidth={2.8} />}
+                {t.name} · {t.price}
+              </button>
+            );
+          })}
+        </div>
+
+        {isWa && (
+          <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+            <input
+              type="tel"
+              inputMode="numeric"
+              dir="ltr"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="05xxxxxxxx"
+              className="w-40 rounded-lg px-2.5 py-1.5 text-left text-sm font-semibold outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
+              style={{ backgroundColor: "#fff", border: "1px solid #A7D7B9", color: INK }}
+              aria-label="رقم واتساب العميل"
+            />
+            <span className="flex items-center gap-1 text-xs font-black" style={{ color: "#065F46" }}>
+              رقم واتساب العميل (اختياري)
+              <MessageCircle size={13} strokeWidth={2.4} />
+            </span>
+          </div>
+        )}
+      </div>
 
       {/* الخطوات كسلسلة عمودية مرقّمة */}
       <div className="relative space-y-2.5">
@@ -941,7 +1021,7 @@ function ContactFlowPanel() {
 
         {CONTACT_FLOW.map((s, i) => {
           const Icon = s.icon;
-          const script = isWa ? s.wa : s.call;
+          const script = fill(isWa ? s.wa : s.call);
           const isCopied = copied === i;
           return (
             <div
@@ -991,18 +1071,31 @@ function ContactFlowPanel() {
                 style={{ backgroundColor: isWa ? "#EAF7EE" : "#fffdf7", border: `1px solid ${isWa ? "#A7D7B9" : "#ead9c9"}` }}
               >
                 <div className="mb-1.5 flex items-center justify-between gap-2">
-                  <button
-                    onClick={() => copy(i, script)}
-                    className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold outline-none transition hover:opacity-80 focus-visible:ring-4 focus-visible:ring-violet-300 motion-reduce:transition-none"
-                    style={{
-                      backgroundColor: isCopied ? "#DCFCE7" : "rgba(64,51,43,.06)",
-                      color: isCopied ? "#065F46" : INK,
-                    }}
-                    aria-label={`نسخ ${isWa ? "رسالة الواتساب" : "جملة المكالمة"}`}
-                  >
-                    {isCopied ? <Check size={12} strokeWidth={2.6} /> : <Copy size={12} strokeWidth={2.4} />}
-                    {isCopied ? "تم النسخ" : "نسخ"}
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => copy(i, script)}
+                      className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold outline-none transition hover:opacity-80 focus-visible:ring-4 focus-visible:ring-violet-300 motion-reduce:transition-none"
+                      style={{
+                        backgroundColor: isCopied ? "#DCFCE7" : "rgba(64,51,43,.06)",
+                        color: isCopied ? "#065F46" : INK,
+                      }}
+                      aria-label={`نسخ ${isWa ? "رسالة الواتساب" : "جملة المكالمة"}`}
+                    >
+                      {isCopied ? <Check size={12} strokeWidth={2.6} /> : <Copy size={12} strokeWidth={2.4} />}
+                      {isCopied ? "تم النسخ" : "نسخ"}
+                    </button>
+                    {isWa && (
+                      <button
+                        onClick={() => openWa(script)}
+                        className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold text-white outline-none transition hover:opacity-90 focus-visible:ring-4 focus-visible:ring-emerald-200 motion-reduce:transition-none"
+                        style={{ backgroundColor: "#059669" }}
+                        aria-label="افتح واتساب برسالة جاهزة"
+                      >
+                        <Send size={12} strokeWidth={2.4} />
+                        افتح واتساب
+                      </button>
+                    )}
+                  </div>
                   <span className="flex items-center gap-1 text-[11px] font-black" style={{ color: isWa ? "#065F46" : PURPLE_DEEP }}>
                     {isWa ? "أرسل في الواتساب" : "قل في المكالمة"}
                     {isWa ? <MessageCircle size={12} strokeWidth={2.4} /> : <Phone size={12} strokeWidth={2.4} />}
