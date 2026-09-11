@@ -22,6 +22,16 @@ import {
   Zap,
   Share2,
   X,
+  Phone,
+  Copy,
+  Check,
+  CalendarClock,
+  Handshake,
+  CheckCircle2,
+  Rocket,
+  Heart,
+  Headset,
+  Send,
 } from "lucide-react";
 
 /* ---------- brand tokens ---------- */
@@ -55,6 +65,109 @@ const SELL_PATH: SellStep[] = [
   { n: "٢", t: "طابِق", d: "اربط حاجة الصالون بالباقة الأنسب له." },
   { n: "٣", t: "أثبِت", d: "اعرض النتيجة الملموسة (٤٠٪ حجوزات خارج الدوام · غياب -٥٠٪) ومؤشّر القيمة." },
   { n: "٤", t: "أغلِق", d: "اطرح الاعتراض بردّ جاهز واطلب القرار." },
+];
+
+/* ---------- تسلسل الاتصال / الواتساب للمبيعات ----------
+   خطوات متسلسلة وواضحة يتبعها موظف الاتصال أو الواتساب من التحية حتى تأكيد موعد التنفيذ.
+   لكل خطوة: هدف مختصر + سكربت جاهز للمكالمة + رسالة جاهزة للواتساب + نصيحة سريعة. */
+type ContactStep = {
+  n: string;
+  icon: LucideIcon;
+  title: string;
+  goal: string;
+  call: string; // ما تقوله في المكالمة
+  wa: string; // ما ترسله في الواتساب
+  tip: string;
+  callBadge?: boolean; // خطوة أهم في المكالمة (تأكيد الوقت)
+};
+const CONTACT_FLOW: ContactStep[] = [
+  {
+    n: "١",
+    icon: Handshake,
+    title: "التحية والترحيب",
+    goal: "اكسر الحاجز في أول ٥ ثوانٍ بنبرة دافئة ومرحّبة.",
+    call: "السلام عليكم ورحمة الله، حيّاك الله! معك {اسمك}… كيف حالك اليوم؟",
+    wa: "السلام عليكم ورحمة الله 🌿\nحيّاك الله، معك {اسمك} 👋",
+    tip: "ابتسم وأنت تتكلم — الابتسامة تُسمع في صوتك. وفي الواتساب اجعل التحية مختصرة ومرتّبة.",
+  },
+  {
+    n: "٢",
+    icon: Headset,
+    title: "التعريف بالموظف والشركة",
+    goal: "عرّف نفسك و«نحجز» في جملة واحدة واضحة مع سبب تواصلك.",
+    call:
+      "أنا {اسمك} من «نحجز» — منصة إدارة الحجوزات المتكاملة للصالونات ومراكز التجميل والسبا، وأتواصل معك عشان نوفّر لك نظام حجوزات يستقبل حجوزاتك ٢٤ ساعة ويقلّل الغياب.",
+    wa:
+      "أنا {اسمك} من «نحجز» 💜\nمنصة إدارة الحجوزات المتكاملة للصالونات ومراكز التجميل والسبا — حجز أونلاين ٢٤ ساعة + تذكير واتساب + مدفوعات وعربون بلا عمولة.",
+    tip: "لا تُطِل: اسم + منصّة + قيمة واحدة تكفي، وخلّ فضوله هو من يطلب التفاصيل.",
+  },
+  {
+    n: "٣",
+    icon: MessageCircle,
+    title: "الاستفسار عن نشاط الصالون أو المركز",
+    goal: "افهم نشاطه وطريقة استقبال حجوزاته الحالية بأسئلة مفتوحة قبل أي عرض.",
+    call:
+      "نشاطكم صالون ولا مركز تجميل/سبا؟ وكيف تستقبلون حجوزاتكم حالياً — جوال وإنستقرام، ولا عندكم نظام حجوزات؟",
+    wa:
+      "حاب أفهم نشاطكم أكثر عشان أرشّح لكم الأنسب:\n• صالون ولا مركز تجميل/سبا؟\n• تستقبلون الحجوزات كيف حالياً (جوال/إنستقرام/نظام)؟\n• يواجهكم غياب عن المواعيد؟",
+    tip: "استمع أكثر مما تتكلم — كل معلومة تعطيك مفتاح الباقة المناسبة والاعتراض المتوقّع.",
+  },
+  {
+    n: "٤",
+    icon: CalendarClock,
+    title: "التأكد من مناسبة الوقت / تحديد موعد",
+    goal: "احترم وقته: إمّا يكمل الآن أو احجز موعداً محدّداً (لا «لاحقاً» مفتوحة).",
+    call:
+      "وقتك يسمح بدقيقتين أشرح لك الفكرة باختصار؟ أو أرتّب لك اتصال بوقت أنسب — صباحاً ولا مساءً؟",
+    wa:
+      "متى يناسبك أتواصل معك باتصال سريع (دقيقتين)؟ صباحاً ولا مساءً؟ وأنا جاهز بالوقت اللي يريحك 📞",
+    tip: "لو مشغول، اتفق على يوم وساعة محدّدين وأرسل تذكير واتساب — الموعد المفتوح يضيّع الصفقة.",
+    callBadge: true,
+  },
+  {
+    n: "٥",
+    icon: Puzzle,
+    title: "التركيز على احتياج العميل وترشيح الباقة",
+    goal: "طابِق حاجته بباقة واحدة موصى بها — لا تُغرقه بالخيارات.",
+    call:
+      "من كلامك، أنسب شي لك «{الباقة}» لأنها تعطيك {أهم فائدة تخصّه}… وتقدر تترقّى لاحقاً لو كبرت.",
+    wa:
+      "بناءً على وضعكم، أنسب باقة لكم «{الباقة}»:\n• {ميزة تخصّه ١}\n• {ميزة تخصّه ٢}\nوتقدرون تترقّون لاحقاً بسهولة.",
+    tip: "رشّح باقة واحدة بثقة (الأساسية ٥٩ لموقع يعرض الخدمات، أو نمو الأعمال ١٢٠ لنظام حجوزات كامل) وطابِق الفائدة بحاجته.",
+  },
+  {
+    n: "٦",
+    icon: Heart,
+    title: "بناء علاقة جيدة في المحادثة",
+    goal: "اصنع ألفة صادقة — الناس يشترون ممن يرتاحون له.",
+    call:
+      "ماشاء الله، من متى صالونكم شغّال؟ سمعته حلوة وأكيد تعبتوا عليه — خلّني أساعدك يوصل لعميلات أكثر.",
+    wa:
+      "ماشاء الله على مشروعكم 🌟 حاب فعلاً أساعدكم يكبر ويوصل لعميلات أكثر — مو بس أبيع لكم نظام.",
+    tip: "نادِه باسمه، واثنِ على مشروعه بصدق، وتكلّم بلغته البسيطة — الثقة تُغلق قبل السعر.",
+  },
+  {
+    n: "٧",
+    icon: CheckCircle2,
+    title: "التأكيد على اختيار الباقة",
+    goal: "لخّص القيمة ثم اطلب القرار بسؤال إغلاق مباشر.",
+    call:
+      "إذاً نمشي على «{الباقة}» — تعطيك {٣ مزايا}، والاشتراك {السعر}، ومعها دعم طوال الاشتراك. نعتمدها؟",
+    wa:
+      "نعتمد «{الباقة}» ✅\n• {ميزة ١}\n• {ميزة ٢}\n• {ميزة ٣}\n💰 {السعر}\nودعم طوال الاشتراك. نكمّل التجهيز؟",
+    tip: "لا تترك النهاية مفتوحة — اسأل سؤال إغلاق واضح («نعتمدها؟») ثم اصمت وانتظر رده بهدوء.",
+  },
+  {
+    n: "٨",
+    icon: Rocket,
+    title: "التأكيد على موعد البدء في التنفيذ",
+    goal: "حوّل الموافقة إلى تاريخ تنفيذ محدّد واطلب متطلّبات التجهيز فوراً.",
+    call:
+      "ممتاز! نبدأ التجهيز متى يناسبك — اليوم ولا بكرة؟ أحتاج منك اسم المركز والخدمات والأوقات، ونجهّز لك صفحة الحجز ورابطها ونسلّمك جاهز.",
+    wa:
+      "تمام، نبدأ التجهيز 🚀\nأرسل لي:\n• اسم المركز والشعار\n• قائمة الخدمات والأسعار\n• أوقات العمل وأسماء الموظفات\nونجهّز لك صفحة الحجز ورابطها ونسلّمك جاهز خلال {المدة}.",
+    tip: "اربط القرار بتاريخ بدء محدّد واطلب المتطلّبات فوراً — كل يوم تأخير = حجوزات ومواعيد ضايعة.",
+  },
 ];
 
 type MatchRow = { type: string; pkg: string };
@@ -726,6 +839,268 @@ function SellPathStrip() {
   );
 }
 
+/* ---------- مسار الاتصال / الواتساب — تسلسل خطوات جاهز للموظف ---------- */
+function ContactFlowPanel() {
+  const [channel, setChannel] = useState<"call" | "wa">("call");
+  const [copied, setCopied] = useState<number | null>(null);
+  const [pkg, setPkg] = useState<Tier | null>(null); // الباقة المختارة لتعبئة السكربتات تلقائياً
+  const [phone, setPhone] = useState(""); // رقم واتساب العميل لفتح المحادثة مباشرة
+  const isWa = channel === "wa";
+
+  // تعبئة القيم المتغيّرة في السكربت من الباقة المختارة
+  const fill = useCallback(
+    (t: string) => {
+      if (!pkg) return t;
+      const price = `${pkg.monthly} ريال شهرياً · أو ${pkg.yearly} سنوياً`;
+      return t.split("{الباقة}").join(pkg.name).split("{السعر}").join(price);
+    },
+    [pkg]
+  );
+
+  // تطبيع رقم الجوال السعودي إلى صيغة واتساب الدولية (بدون + أو مسافات)
+  const waNumber = useCallback(() => {
+    const d = phone.replace(/\D/g, "");
+    if (!d) return "";
+    if (d.startsWith("966")) return d;
+    if (d.startsWith("0")) return "966" + d.slice(1);
+    if (d.startsWith("5") && d.length === 9) return "966" + d;
+    return d;
+  }, [phone]);
+
+  const openWa = useCallback(
+    (text: string) => {
+      const num = waNumber();
+      const url = `https://wa.me/${num}?text=${encodeURIComponent(text)}`;
+      window.open(url, "_blank", "noopener,noreferrer");
+    },
+    [waNumber]
+  );
+
+  const copy = useCallback(async (idx: number, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(idx);
+      setTimeout(() => setCopied((c) => (c === idx ? null : c)), 1600);
+    } catch {
+      /* المتصفح ما يدعم النسخ — تجاهل بهدوء */
+    }
+  }, []);
+
+  return (
+    <div
+      className="mx-auto mt-8 max-w-3xl rounded-3xl p-5"
+      style={{ backgroundColor: "#fffdf7", border: "1.5px solid #ead9c9", boxShadow: "0 12px 26px -16px rgba(64,51,43,.5)" }}
+    >
+      {/* رأس اللوحة + مبدّل القناة */}
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl text-white" style={{ backgroundColor: PURPLE }}>
+            <Phone size={17} strokeWidth={2.3} />
+          </span>
+          <h3 className="text-base font-black" style={{ color: PURPLE_DEEP }}>
+            مسار الاتصال والواتساب — خطوة بخطوة
+          </h3>
+        </div>
+
+        <div className="flex rounded-full p-1" style={{ backgroundColor: "#efe6dd" }}>
+          {[
+            { k: "call", t: "مكالمة", icon: <Phone size={13} strokeWidth={2.4} /> },
+            { k: "wa", t: "واتساب", icon: <MessageCircle size={13} strokeWidth={2.4} /> },
+          ].map((o) => {
+            const on = channel === o.k;
+            return (
+              <button
+                key={o.k}
+                onClick={() => setChannel(o.k as "call" | "wa")}
+                className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold outline-none transition focus-visible:ring-4 focus-visible:ring-violet-300 motion-reduce:transition-none"
+                style={{ backgroundColor: on ? PURPLE : "transparent", color: on ? "#fff" : "#7a6b5e" }}
+                aria-pressed={on}
+              >
+                {o.icon}
+                {o.t}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <p className="mb-3 text-right text-xs font-semibold leading-relaxed" style={{ color: "#8a7c70" }}>
+        تسلسل جاهز يمشي عليه الموظف من التحية حتى تأكيد موعد التنفيذ — بدّل بين «مكالمة» و«واتساب» ليتغيّر السكربت، وانسخ الرسالة بضغطة.
+        استبدل ما بين الأقواس {"{ }"} بمعلومات العميل.
+      </p>
+
+      {/* أدوات: اختيار الباقة (يعبّئ الاسم والسعر تلقائياً) + رقم واتساب العميل */}
+      <div className="mb-4 rounded-2xl p-3" style={{ backgroundColor: "#faf4ee", border: "1px solid #efe2d5" }}>
+        <div className="mb-2 flex items-center justify-end gap-1.5 text-xs font-black" style={{ color: PURPLE_DEEP }}>
+          اختر الباقة لتعبئتها تلقائياً في السكربت
+          <Target size={13} strokeWidth={2.3} style={{ color: PURPLE }} />
+        </div>
+        <div className="flex flex-wrap justify-end gap-1.5">
+          {TIERS.map((t) => {
+            const on = pkg?.name === t.name;
+            return (
+              <button
+                key={t.name}
+                onClick={() => setPkg(on ? null : t)}
+                className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold outline-none transition hover:opacity-90 focus-visible:ring-4 focus-visible:ring-violet-300 motion-reduce:transition-none"
+                style={{
+                  backgroundColor: on ? PURPLE : "#fff",
+                  color: on ? "#fff" : INK,
+                  border: `1px solid ${on ? PURPLE : "#e2d3c3"}`,
+                }}
+                aria-pressed={on}
+              >
+                {on && <Check size={11} strokeWidth={2.8} />}
+                {t.name} · {t.monthly}/شهر
+              </button>
+            );
+          })}
+        </div>
+
+        {isWa && (
+          <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+            <input
+              type="tel"
+              inputMode="numeric"
+              dir="ltr"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="05xxxxxxxx"
+              className="w-40 rounded-lg px-2.5 py-1.5 text-left text-sm font-semibold outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
+              style={{ backgroundColor: "#fff", border: "1px solid #A7D7B9", color: INK }}
+              aria-label="رقم واتساب العميل"
+            />
+            <span className="flex items-center gap-1 text-xs font-black" style={{ color: "#065F46" }}>
+              رقم واتساب العميل (اختياري)
+              <MessageCircle size={13} strokeWidth={2.4} />
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* الخطوات كسلسلة عمودية مرقّمة */}
+      <div className="relative space-y-2.5">
+        {/* خط السلسلة الرأسي */}
+        <span
+          className="pointer-events-none absolute bottom-6 top-6 w-0.5"
+          style={{ right: 18, backgroundColor: "#ecd9c7" }}
+          aria-hidden="true"
+        />
+
+        {CONTACT_FLOW.map((s, i) => {
+          const Icon = s.icon;
+          const script = fill(isWa ? s.wa : s.call);
+          const isCopied = copied === i;
+          return (
+            <div
+              key={s.n}
+              className="relative rounded-2xl p-3 pr-4"
+              style={{ backgroundColor: "#faf4ee", border: "1px solid #efe2d5" }}
+            >
+              {/* رقم الخطوة على خط السلسلة */}
+              <div className="mb-2 flex items-center justify-end gap-2">
+                <span className="text-sm font-black" style={{ color: INK }}>
+                  {s.title}
+                </span>
+                {s.callBadge && (
+                  <span
+                    className="rounded-full px-2 py-0.5 text-[10px] font-black"
+                    style={{ backgroundColor: "#E0F2FE", color: "#075985", border: "1px solid #BAE6FD" }}
+                  >
+                    مهم في المكالمة
+                  </span>
+                )}
+                <span
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-white"
+                  style={{ backgroundColor: PURPLE }}
+                >
+                  <Icon size={16} strokeWidth={2.3} />
+                </span>
+                <span
+                  className="z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-black text-white"
+                  style={{ backgroundColor: PURPLE_DEEP, boxShadow: "0 0 0 3px #fffdf7" }}
+                >
+                  {s.n}
+                </span>
+              </div>
+
+              {/* الهدف */}
+              <div className="mb-2 flex items-start justify-end gap-2 px-1">
+                <p className="flex-1 text-right text-xs font-bold leading-relaxed" style={{ color: PURPLE_DEEP }}>
+                  <span className="font-black">الهدف: </span>
+                  {s.goal}
+                </p>
+                <Target size={13} strokeWidth={2.3} className="mt-0.5 shrink-0" style={{ color: PURPLE }} />
+              </div>
+
+              {/* السكربت الجاهز + زر النسخ */}
+              <div
+                className="rounded-xl p-3 text-right"
+                style={{ backgroundColor: isWa ? "#EAF7EE" : "#fffdf7", border: `1px solid ${isWa ? "#A7D7B9" : "#ead9c9"}` }}
+              >
+                <div className="mb-1.5 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => copy(i, script)}
+                      className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold outline-none transition hover:opacity-80 focus-visible:ring-4 focus-visible:ring-violet-300 motion-reduce:transition-none"
+                      style={{
+                        backgroundColor: isCopied ? "#DCFCE7" : "rgba(64,51,43,.06)",
+                        color: isCopied ? "#065F46" : INK,
+                      }}
+                      aria-label={`نسخ ${isWa ? "رسالة الواتساب" : "جملة المكالمة"}`}
+                    >
+                      {isCopied ? <Check size={12} strokeWidth={2.6} /> : <Copy size={12} strokeWidth={2.4} />}
+                      {isCopied ? "تم النسخ" : "نسخ"}
+                    </button>
+                    {isWa && (
+                      <button
+                        onClick={() => openWa(script)}
+                        className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold text-white outline-none transition hover:opacity-90 focus-visible:ring-4 focus-visible:ring-emerald-200 motion-reduce:transition-none"
+                        style={{ backgroundColor: "#059669" }}
+                        aria-label="افتح واتساب برسالة جاهزة"
+                      >
+                        <Send size={12} strokeWidth={2.4} />
+                        افتح واتساب
+                      </button>
+                    )}
+                  </div>
+                  <span className="flex items-center gap-1 text-[11px] font-black" style={{ color: isWa ? "#065F46" : PURPLE_DEEP }}>
+                    {isWa ? "أرسل في الواتساب" : "قل في المكالمة"}
+                    {isWa ? <MessageCircle size={12} strokeWidth={2.4} /> : <Phone size={12} strokeWidth={2.4} />}
+                  </span>
+                </div>
+                <p className="whitespace-pre-line text-sm font-semibold leading-relaxed" style={{ color: INK }}>
+                  {script}
+                </p>
+              </div>
+
+              {/* نصيحة سريعة */}
+              <div className="mt-2 flex items-start justify-end gap-2 px-1">
+                <p className="flex-1 text-right text-xs leading-relaxed" style={{ color: "#6f6156" }}>
+                  <span className="font-black" style={{ color: "#B8860B" }}>نصيحة: </span>
+                  {s.tip}
+                </p>
+                <Lightbulb size={13} strokeWidth={2.2} className="mt-0.5 shrink-0" style={{ color: "#B8860B" }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* تذييل: خطوة ما بعد المكالمة */}
+      <div
+        className="mt-3 flex items-start justify-end gap-2 rounded-xl px-3 py-2 text-right"
+        style={{ backgroundColor: "#F4ECFB", border: "1px solid #D8C7EE" }}
+      >
+        <p className="flex-1 text-xs font-bold leading-relaxed" style={{ color: PURPLE_DEEP }}>
+          بعد كل مكالمة: أرسل رسالة واتساب تلخّص الاتفاق (الباقة + السعر + موعد التنفيذ) مع «شارك صفحة العرض» بالأعلى — يثبّت القرار ويسهّل المتابعة.
+        </p>
+        <Sparkles size={14} strokeWidth={2.3} className="mt-0.5 shrink-0" style={{ color: PURPLE }} />
+      </div>
+    </div>
+  );
+}
+
 function MatchingPanel() {
   return (
     <div
@@ -1285,6 +1660,7 @@ export default function NahjezMindMap() {
         </div>
       )}
 
+      {rep && <ContactFlowPanel />}
       {rep && <MatchingPanel />}
       {rep && <PackagesPanel />}
       {rep && <ResultsPanel />}
