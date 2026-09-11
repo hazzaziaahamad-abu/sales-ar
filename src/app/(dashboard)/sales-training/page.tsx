@@ -174,6 +174,37 @@ const CONTACT_FLOW: ContactStep[] = [
   },
 ];
 
+/* ---------- ميزة تسويقية بارزة يركّز عليها الموظف: بطاقات الولاء والهدايا ---------- */
+type LoyaltySpot = {
+  title: string;
+  tagline: string;
+  pkg: string;
+  why: string;
+  bullets: string[];
+  call: string;
+  wa: string;
+  objection: { q: string; a: string };
+};
+const LOYALTY: LoyaltySpot = {
+  title: "بطاقات الولاء والهدايا",
+  tagline: "الميزة التسويقية اللي تفرّق — ركّز عليها",
+  pkg: "VIP بلس",
+  why: "تحافظ على عملائك الحاليين (تكرار زيارة وولاء) وتجيب لك عملاء جدد — بلا تكلفة إعلانات.",
+  bullets: [
+    "عميلك يرجع من نفسه عشان الكوب الخامس المجاني — ولاء وتكرار زيارة بلا إعلانات.",
+    "بطاقات هدايا رقمية يهديها عملاؤك لأصدقائهم — عملاء جدد + مبلغ يوصلك مقدّم.",
+    "البطاقة في محفظة آبل/قوقل مع إشعار تلقائي عند الاقتراب من المكافأة.",
+  ],
+  call:
+    "خلّني أركّز لك على أقوى ميزة تسويقية عندنا — بطاقات الولاء والهدايا: بطاقة ولاء في جوال عميلك يجمع فيها ختم كل زيارة والخامس مجاناً فيرجع لك من نفسه بلا إعلانات؛ وبطاقات هدايا عملاؤك يهدونها لأصحابهم فيجونك عملاء جدد ويوصلك المبلغ مقدّم. متوفرة في باقة VIP بلس.",
+  wa:
+    "🎁 أقوى ميزة تسويقية في «قائمة الطلبات» — بطاقات الولاء والهدايا:\n• عميلك يرجع من نفسه عشان الكوب الخامس المجاني (ولاء بلا إعلانات)\n• بطاقات هدايا يهديها عملاؤك لأصحابهم = عملاء جدد + مبلغ مقدّم\n• البطاقة في محفظة الجوال مع إشعارات تلقائية\n✨ متوفرة في باقة VIP بلس",
+  objection: {
+    q: "ما أحتاج نظام ولاء أو بطاقات هدايا.",
+    a: "جذب عميل جديد أغلى بكثير من إرجاع عميل حالي — الولاء يرفع تكرار الزيارة، وبطاقات الهدايا تجيب عملاء جدد وسيولة مقدّمة بلا تكلفة إعلانات.",
+  },
+};
+
 type MatchRow = { type: string; pkg: string };
 const MATCHING: MatchRow[] = [
   { type: "كوفي أو مطعم صغير", pkg: "الأساسية / الذهبية" },
@@ -1008,6 +1039,94 @@ function ContactFlowPanel() {
             </span>
           </div>
         )}
+      </div>
+
+      {/* ميزة تسويقية بارزة — بطاقات الولاء/الهدايا (ركّز عليها) */}
+      <div
+        className="mb-4 rounded-2xl p-4"
+        style={{ backgroundColor: "#FEF6DD", border: `1.5px solid ${GOLD}`, boxShadow: "0 10px 22px -14px rgba(245,179,1,.6)" }}
+      >
+        <div className="mb-2 flex items-start justify-end gap-2">
+          <div className="text-right">
+            <div className="flex items-center justify-end gap-1.5">
+              <span className="text-sm font-black" style={{ color: INK }}>
+                {LOYALTY.title}
+              </span>
+              <span className="rounded-full px-2 py-0.5 text-[10px] font-black" style={{ backgroundColor: GOLD, color: "#4a3410" }}>
+                {LOYALTY.pkg}
+              </span>
+            </div>
+            <div className="mt-0.5 flex items-center justify-end gap-1 text-[11px] font-black" style={{ color: "#92400E" }}>
+              {LOYALTY.tagline}
+              <Star size={11} fill={GOLD} stroke={GOLD} />
+            </div>
+          </div>
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-white" style={{ backgroundColor: "#B45309" }}>
+            <Gift size={22} strokeWidth={2.2} />
+          </span>
+        </div>
+
+        <p className="mb-2 text-right text-xs font-bold leading-relaxed" style={{ color: "#7c2d12" }}>
+          <span className="font-black">لماذا تركّز عليها: </span>
+          {LOYALTY.why}
+        </p>
+
+        <ul className="mb-2.5 space-y-1.5">
+          {LOYALTY.bullets.map((b, i) => (
+            <li key={i} className="flex items-start justify-end gap-2 text-right text-xs leading-relaxed" style={{ color: "#5a4a40" }}>
+              <span>{b}</span>
+              <Star size={10} fill={GOLD} stroke={GOLD} className="mt-1 shrink-0" />
+            </li>
+          ))}
+        </ul>
+
+        {/* السكربت الجاهز لإبراز الميزة */}
+        <div
+          className="rounded-xl p-3 text-right"
+          style={{ backgroundColor: isWa ? "#EAF7EE" : "#fffdf7", border: `1px solid ${isWa ? "#A7D7B9" : "#f0d9a8"}` }}
+        >
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => copy(999, isWa ? LOYALTY.wa : LOYALTY.call)}
+                className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold outline-none transition hover:opacity-80 focus-visible:ring-4 focus-visible:ring-violet-300 motion-reduce:transition-none"
+                style={{ backgroundColor: copied === 999 ? "#DCFCE7" : "rgba(64,51,43,.06)", color: copied === 999 ? "#065F46" : INK }}
+                aria-label={`نسخ ${isWa ? "رسالة الواتساب" : "جملة المكالمة"}`}
+              >
+                {copied === 999 ? <Check size={12} strokeWidth={2.6} /> : <Copy size={12} strokeWidth={2.4} />}
+                {copied === 999 ? "تم النسخ" : "نسخ"}
+              </button>
+              {isWa && (
+                <button
+                  onClick={() => openWa(LOYALTY.wa)}
+                  className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold text-white outline-none transition hover:opacity-90 focus-visible:ring-4 focus-visible:ring-emerald-200 motion-reduce:transition-none"
+                  style={{ backgroundColor: "#059669" }}
+                  aria-label="افتح واتساب برسالة جاهزة"
+                >
+                  <Send size={12} strokeWidth={2.4} />
+                  افتح واتساب
+                </button>
+              )}
+            </div>
+            <span className="flex items-center gap-1 text-[11px] font-black" style={{ color: isWa ? "#065F46" : "#92400E" }}>
+              {isWa ? "أرسل في الواتساب" : "قل في المكالمة"}
+              {isWa ? <MessageCircle size={12} strokeWidth={2.4} /> : <Phone size={12} strokeWidth={2.4} />}
+            </span>
+          </div>
+          <p className="whitespace-pre-line text-sm font-semibold leading-relaxed" style={{ color: INK }}>
+            {isWa ? LOYALTY.wa : LOYALTY.call}
+          </p>
+        </div>
+
+        {/* اعتراض شائع + الرد */}
+        <div className="mt-2 rounded-xl px-3 py-2 text-right" style={{ backgroundColor: "#fff", border: "1px solid #f0d9a8" }}>
+          <p className="mb-0.5 text-xs font-bold" style={{ color: "#9f1239" }}>
+            «{LOYALTY.objection.q}»
+          </p>
+          <p className="text-xs leading-relaxed" style={{ color: "#4a3f36" }}>
+            {LOYALTY.objection.a}
+          </p>
+        </div>
       </div>
 
       {/* الخطوات كسلسلة عمودية مرقّمة */}
