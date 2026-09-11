@@ -22,6 +22,17 @@ export function formatDate(date: string | Date): string {
   return `${s.getUTCDate().toString().padStart(2, "0")}/${(s.getUTCMonth() + 1).toString().padStart(2, "0")}/${s.getUTCFullYear()}`;
 }
 
+/** التاريخ + الوقت بتوقيت السعودية بصيغة مختصرة: DD/MM · HH:MM */
+export function formatDateTime(date: string | Date): string {
+  const d = new Date(date);
+  const s = new Date(d.getTime() + SAUDI_OFFSET_MS);
+  const dd = s.getUTCDate().toString().padStart(2, "0");
+  const mm = (s.getUTCMonth() + 1).toString().padStart(2, "0");
+  const hh = s.getUTCHours().toString().padStart(2, "0");
+  const mi = s.getUTCMinutes().toString().padStart(2, "0");
+  return `${dd}/${mm} · ${hh}:${mi}`;
+}
+
 // ─── Saudi Arabia Timezone (UTC+3) — single source of truth ───
 const SAUDI_OFFSET_MS = 3 * 60 * 60 * 1000;
 

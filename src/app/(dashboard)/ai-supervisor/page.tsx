@@ -11,7 +11,7 @@ import {
   fetchSupervisorTeams, saveSupervisorTeams, type SupervisorTeams,
 } from "@/lib/supabase/db";
 import { useAuth } from "@/lib/auth-context";
-import { formatMoneyFull } from "@/lib/utils/format";
+import { formatMoneyFull, formatDateTime } from "@/lib/utils/format";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -43,6 +43,16 @@ function daysUntil(iso?: string | null): number | null {
   const d = new Date(iso).getTime();
   if (Number.isNaN(d)) return null;
   return Math.floor((d - Date.now()) / 86_400_000);
+}
+function durationLabel(start?: string | null, end?: string | null): string {
+  if (!start || !end) return "";
+  const ms = new Date(end).getTime() - new Date(start).getTime();
+  if (Number.isNaN(ms) || ms < 0) return "";
+  const mins = Math.round(ms / 60000);
+  if (mins < 60) return `${mins} د`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} س${mins % 60 ? ` ${mins % 60} د` : ""}`;
+  return `${Math.floor(hrs / 24)} ي ${hrs % 24} س`;
 }
 function sanitizePhone(phone?: string): string {
   if (!phone) return "";
@@ -452,6 +462,13 @@ function CallRow({ t, closed }: { t: EmployeeTask; closed?: boolean }) {
           {t.client_phone && <span className="font-mono text-foreground" dir="ltr">{t.client_phone}</span>}
           {t.assigned_by_name && <span>· صاحب الذكرة: <b className="text-orange-300">{t.assigned_by_name}</b></span>}
           {t.assigned_to_name && <span>· {accepted || closed ? "لدى" : "مُسندة لـ"}: <b className="text-cyan-300">{t.assigned_to_name}</b></span>}
+        </div>
+        <div className="text-[11px] mt-1.5 flex gap-1.5 flex-wrap items-center font-mono">
+          {t.time_started_at
+            ? <span className="px-1.5 py-0.5 rounded-md bg-cyan-500/10 text-cyan-300">✔ قُبِل: {formatDateTime(t.time_started_at)}</span>
+            : !closed && <span className="px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-300">لم يُقبَل بعد</span>}
+          {closed && t.completed_at && <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-300">✓ أُغلق: {formatDateTime(t.completed_at)}</span>}
+          {t.time_started_at && t.completed_at && <span className="px-1.5 py-0.5 rounded-md bg-white/[0.05] text-muted-foreground">مدة المعالجة: {durationLabel(t.time_started_at, t.completed_at)}</span>}
         </div>
         {closed && t.completion_notes && (
           <div className="text-[11.5px] mt-1.5 rounded-md px-2.5 py-1.5 bg-emerald-500/[0.06] border border-emerald-500/15 text-foreground/85">

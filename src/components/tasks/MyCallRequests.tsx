@@ -5,6 +5,7 @@ import { Phone, MessageCircle, Check, PhoneCall, Loader2, PlusCircle, CheckCircl
 import { fetchEmployeeTasks, updateEmployeeTask, createFollowUpNote, createMentionNotification } from "@/lib/supabase/db";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth-context";
+import { formatDateTime } from "@/lib/utils/format";
 import type { EmployeeTask } from "@/types";
 
 const PRIORITY_RANK: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
@@ -178,6 +179,7 @@ export function MyCallRequests() {
                     {t.client_phone && <span dir="ltr">{t.client_phone}</span>}
                     {t.assigned_by_name && <span>· صاحب الذكرة: {t.assigned_by_name}</span>}
                     {t.due_date && <span>· الموعد: {t.due_date}</span>}
+                    {accepted && t.time_started_at && <span className="text-cyan-300">· قُبِل: {formatDateTime(t.time_started_at)}</span>}
                   </div>
                   {(t.description || t.notes) && (
                     <p className="text-[12px] text-foreground/80 mt-1">{t.description || t.notes}</p>
