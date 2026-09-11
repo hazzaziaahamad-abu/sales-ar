@@ -9,6 +9,32 @@ export function getOrgId(): string {
   return localStorage.getItem("cc_org_id") || DEFAULT_ORG;
 }
 
+// ─── محتوى قابل للتحرير (مفتاح/قيمة عام) ─────────────────────────────────────
+// يخزّن محتوى الصفحات القابل لتعديل الأدمن في جدول sales_guide_settings (KV).
+// القراءة متاحة لكل الفريق؛ الكتابة يحرسها وضع «العرض فقط» + التحقق من الأدمن في الواجهة.
+
+export async function getEditableContent<T = unknown>(key: string): Promise<T | null> {
+  const supabase = createClient();
+  const orgId = getOrgId();
+  const { data } = await supabase
+    .from("sales_guide_settings")
+    .select("setting_value")
+    .eq("org_id", orgId)
+    .eq("setting_key", key)
+    .single();
+  return (data?.setting_value as T) ?? null;
+}
+
+export async function saveEditableContent(key: string, value: unknown): Promise<void> {
+  const supabase = createClient();
+  const orgId = getOrgId();
+  const { error } = await supabase.from("sales_guide_settings").upsert(
+    { org_id: orgId, setting_key: key, setting_value: value, updated_at: new Date().toISOString() },
+    { onConflict: "org_id,setting_key" }
+  );
+  if (error) throw error;
+}
+
 // ─── ACTIVITY LOG ───────────────────────────────────────────────────────────
 
 export async function logActivity(entry: {
