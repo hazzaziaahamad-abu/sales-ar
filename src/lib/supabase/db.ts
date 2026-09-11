@@ -314,6 +314,47 @@ export async function upsertClientMenuUrl(clientKey: string, menuUrl: string, us
   if (error) throw error;
 }
 
+// ─── SUPERVISOR TEAMS (مشرف AI) ─────────────────────────────────────────────
+// أسماء فريق الواتساب (متابعة) وفريق الاتصال (مساعدو الإغلاق) — قابلة للتعديل من صفحة مشرف AI.
+export type SupervisorTeams = { wa: string[]; call: string[] };
+
+const DEFAULT_SUPERVISOR_TEAMS: SupervisorTeams = {
+  wa: ["علي", "مريم", "عواطف"],
+  call: ["منال", "تغريد"],
+};
+
+export async function fetchSupervisorTeams(): Promise<SupervisorTeams> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("sales_guide_settings")
+    .select("setting_value")
+    .eq("org_id", getOrgId())
+    .eq("setting_key", "supervisor_teams")
+    .single();
+  const v = data?.setting_value as Partial<SupervisorTeams> | null;
+  return {
+    wa: Array.isArray(v?.wa) ? v!.wa.filter(Boolean) : DEFAULT_SUPERVISOR_TEAMS.wa,
+    call: Array.isArray(v?.call) ? v!.call.filter(Boolean) : DEFAULT_SUPERVISOR_TEAMS.call,
+  };
+}
+
+export async function saveSupervisorTeams(teams: SupervisorTeams): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from("sales_guide_settings").upsert(
+    {
+      org_id: getOrgId(),
+      setting_key: "supervisor_teams",
+      setting_value: {
+        wa: teams.wa.map((s) => s.trim()).filter(Boolean),
+        call: teams.call.map((s) => s.trim()).filter(Boolean),
+      },
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "org_id,setting_key" }
+  );
+  if (error) throw error;
+}
+
 // ─── DEALS ───────────────────────────────────────────────────────────────────
 
 export async function fetchDeals(salesType?: "office" | "support"): Promise<Deal[]> {
