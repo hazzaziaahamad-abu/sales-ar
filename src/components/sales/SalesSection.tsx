@@ -82,6 +82,8 @@ import {
   AlertTriangle,
   PhoneCall,
   ChevronDown,
+  Tag,
+  Layers,
 } from "lucide-react";
 
 /* ─── Deal health score ─── */
@@ -176,6 +178,7 @@ const EMPTY_FORM = {
   deal_date: todayLocal(),
   probability: 50,
   marketer_name: "",
+  category: "",
   notes: "",
   last_contact: todayLocal(),
   callback_date: "",
@@ -619,6 +622,8 @@ export function SalesSection({ salesType }: SalesPageProps) {
 
   /* card filter */
   const [stageFilter, setStageFilter] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [targetOnly, setTargetOnly] = useState(false);
   const [clientSearch, setClientSearch] = useState("");
   const [searchAllTime, setSearchAllTime] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -775,7 +780,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
         return age >= trialDaysFilter;
       })
     : dateFilteredDeals;
-  const filteredDeals = clientSearch
+  const searchedDeals = clientSearch
     ? (searchAllTime ? baseFilteredDeals : trialFilteredDeals).filter(
         (d) =>
           d.client_name.toLowerCase().includes(clientSearch.toLowerCase()) ||
@@ -783,11 +788,28 @@ export function SalesSection({ salesType }: SalesPageProps) {
           (d.client_phone && d.client_phone.includes(clientSearch))
       )
     : trialFilteredDeals;
+  /* category (تصنيف) + daily-target (الهدف) filters */
+  const filteredDeals = searchedDeals.filter((d) => {
+    if (categoryFilter && (d.category || "") !== categoryFilter) return false;
+    if (targetOnly && !dailyTargetIds.has(d.id)) return false;
+    return true;
+  });
+
+  /* distinct categories present across all deals (for filter + form suggestions) */
+  const categoryOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          deals.map((d) => (d.category || "").trim()).filter((c) => c.length > 0)
+        )
+      ).sort((a, b) => a.localeCompare(b, "ar")),
+    [deals]
+  );
 
   const totalPages = Math.max(1, Math.ceil(filteredDeals.length / DEALS_PER_PAGE));
   const paginatedDeals = filteredDeals.slice((currentPage - 1) * DEALS_PER_PAGE, currentPage * DEALS_PER_PAGE);
 
-  useEffect(() => { setCurrentPage(1); }, [clientSearch, stageFilter, achieveFilter, repFilter, tableDateFilter, tableCustomFrom, tableCustomTo, trialDaysFilter]);
+  useEffect(() => { setCurrentPage(1); }, [clientSearch, stageFilter, categoryFilter, targetOnly, achieveFilter, repFilter, tableDateFilter, tableCustomFrom, tableCustomTo, trialDaysFilter]);
 
   /* Deep-link from قائمة الاستهداف: ?deal=<id> reveals & flashes the row. */
   useEffect(() => {
@@ -1079,6 +1101,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
       deal_date: deal.deal_date || todayLocal(),
       probability: deal.probability,
       marketer_name: deal.marketer_name || "",
+      category: deal.category || "",
       notes: deal.notes || "",
       last_contact: deal.last_contact || deal.deal_date || todayLocal(),
       callback_date: deal.callback_date ? deal.callback_date.slice(0, 16) : "",
@@ -1111,6 +1134,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
           deal_date: form.deal_date,
           probability: form.probability,
           marketer_name: marketerName || undefined,
+          category: form.category?.trim() || undefined,
           notes: form.notes || undefined,
           last_contact: form.last_contact || undefined,
           callback_date: form.stage === "اعادة الاتصال في وقت اخر" && form.callback_date ? new Date(form.callback_date).toISOString() : undefined,
@@ -1163,6 +1187,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
           deal_date: form.deal_date,
           probability: form.probability,
           marketer_name: marketerName,
+          category: form.category?.trim() || undefined,
           notes: form.notes || undefined,
           last_contact: form.last_contact || undefined,
           callback_date: form.stage === "اعادة الاتصال في وقت اخر" && form.callback_date ? new Date(form.callback_date).toISOString() : undefined,
@@ -1803,6 +1828,60 @@ export function SalesSection({ salesType }: SalesPageProps) {
             </button>
           )}
         </div>
+        {/* ─── Stage / Category / Target filters ─── */}
+        <div className="p-4 pt-3 pb-0 flex items-center gap-2 flex-wrap">
+          {/* Stage filter */}
+          <div className="flex items-center gap-1.5">
+            <Layers className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+            <select
+              value={stageFilter ?? ""}
+              onChange={(e) => setStageFilter(e.target.value || null)}
+              className="text-[12px] bg-card border border-border rounded-lg px-2 py-1.5 text-foreground focus:outline-none focus:border-cyan/50"
+            >
+              <option value="">كل المراحل</option>
+              {STAGES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+          {/* Category filter */}
+          <div className="flex items-center gap-1.5">
+            <Tag className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+            <select
+              value={categoryFilter ?? ""}
+              onChange={(e) => setCategoryFilter(e.target.value || null)}
+              disabled={categoryOptions.length === 0}
+              className="text-[12px] bg-card border border-border rounded-lg px-2 py-1.5 text-foreground focus:outline-none focus:border-cyan/50 disabled:opacity-50 disabled:cursor-not-allowed"
+              title={categoryOptions.length === 0 ? "لا توجد تصنيفات مضافة بعد" : undefined}
+            >
+              <option value="">كل التصنيفات</option>
+              {categoryOptions.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+          {/* Target-only toggle */}
+          <button
+            onClick={() => setTargetOnly((v) => !v)}
+            className={`flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded-lg border font-semibold transition-all whitespace-nowrap ${
+              targetOnly
+                ? "bg-cyan/20 border-cyan/50 text-cyan ring-1 ring-cyan/30"
+                : "border-border text-muted-foreground hover:text-foreground hover:bg-white/[0.06]"
+            }`}
+            title="عرض صفقات قائمة الاستهداف فقط"
+          >
+            <Target className="w-3.5 h-3.5" />
+            الهدف
+          </button>
+          {(stageFilter || categoryFilter || targetOnly) && (
+            <button
+              onClick={() => { setStageFilter(null); setCategoryFilter(null); setTargetOnly(false); }}
+              className="text-[12px] px-2.5 py-1.5 rounded-lg border border-transparent text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-colors whitespace-nowrap"
+            >
+              ✕ مسح الفلاتر
+            </button>
+          )}
+        </div>
         <Table>
           <TableHeader>
             <TableRow>
@@ -1811,6 +1890,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
               <TableHead>العميل</TableHead>
               <TableHead>رقم الجوال</TableHead>
               <TableHead>المصدر</TableHead>
+              <TableHead>التصنيف</TableHead>
               <TableHead>الباقة</TableHead>
               <TableHead>المرحلة</TableHead>
               <TableHead>النبضة</TableHead>
@@ -1846,8 +1926,8 @@ export function SalesSection({ salesType }: SalesPageProps) {
               ))
             ) : filteredDeals.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={16} className="text-center text-muted-foreground py-8">
-                  {stageFilter ? `لا توجد مبيعات في مرحلة "${stageFilter}"` : trialDaysFilter ? `لا يوجد تجريبي مضى عليه أكثر من ${trialDaysFilter} يوم` : "لا توجد مبيعات"}
+                <TableCell colSpan={17} className="text-center text-muted-foreground py-8">
+                  {targetOnly ? "لا توجد صفقات في قائمة الاستهداف ضمن هذه الفلاتر" : categoryFilter ? `لا توجد مبيعات ضمن التصنيف "${categoryFilter}"` : stageFilter ? `لا توجد مبيعات في مرحلة "${stageFilter}"` : trialDaysFilter ? `لا يوجد تجريبي مضى عليه أكثر من ${trialDaysFilter} يوم` : "لا توجد مبيعات"}
                 </TableCell>
               </TableRow>
             ) : (
@@ -1914,6 +1994,15 @@ export function SalesSection({ salesType }: SalesPageProps) {
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs">
                     {deal.source || "—"}
+                  </TableCell>
+                  <TableCell>
+                    {deal.category ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-fuchsia-500/10 text-fuchsia-400 border border-fuchsia-500/20 whitespace-nowrap">
+                        <Tag className="w-3 h-3" />{deal.category}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <span className="text-xs text-muted-foreground">{deal.plan || "—"}</span>
@@ -3189,6 +3278,25 @@ export function SalesSection({ salesType }: SalesPageProps) {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Category (optional free text) */}
+            <div className="grid gap-1.5">
+              <Label htmlFor="category">التصنيف <span className="text-muted-foreground font-normal">(اختياري)</span></Label>
+              <Input
+                id="category"
+                value={form.category}
+                onChange={(e) => setForm({ ...form, category: e.target.value })}
+                placeholder="مثال: مطاعم، عيادات، متاجر..."
+                list="deal-category-suggestions"
+              />
+              {categoryOptions.length > 0 && (
+                <datalist id="deal-category-suggestions">
+                  {categoryOptions.map((c) => (
+                    <option key={c} value={c} />
+                  ))}
+                </datalist>
+              )}
             </div>
 
             {/* Notes */}
