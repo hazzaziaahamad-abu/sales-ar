@@ -241,8 +241,8 @@ function MentionAlertBanner({ mentions, onRefresh }: { mentions: MentionNotifica
           </button>
         )}
       </div>
-      <div className="divide-y divide-border/20 max-h-[240px] overflow-y-auto">
-        {mentions.slice(0, 12).map((m) => {
+      <div className="divide-y divide-border/20 max-h-[420px] overflow-y-auto">
+        {mentions.map((m) => {
           const isNew = !m.is_read && !markedIds.has(m.id);
           return (
             <button
@@ -283,11 +283,6 @@ function MentionAlertBanner({ mentions, onRefresh }: { mentions: MentionNotifica
           );
         })}
       </div>
-      {mentions.length > 12 && (
-        <div className="px-4 py-2 text-center border-t border-border/20">
-          <span className="text-[12px] text-muted-foreground">و {mentions.length - 12} منشن آخر...</span>
-        </div>
-      )}
     </div>
   );
 }
