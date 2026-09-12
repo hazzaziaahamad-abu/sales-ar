@@ -17,6 +17,7 @@ export interface Deal {
   plan?: string;
   marketer_name?: string;
   loss_reason?: string;
+  category?: string;
   notes?: string;
   last_contact?: string;
   callback_date?: string;
