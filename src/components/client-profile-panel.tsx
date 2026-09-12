@@ -418,6 +418,8 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
   const [mentionFilter, setMentionFilter] = useState("");
   const [mentionIndex, setMentionIndex] = useState(0);
   const [mentionStart, setMentionStart] = useState(-1);
+  /* one-time scroll guard for the highlighted (mentioned) note */
+  const scrolledHighlightRef = useRef<string | null>(null);
   /* reminder */
   const [showReminderPicker, setShowReminderPicker] = useState(false);
   const [reminderDate, setReminderDate] = useState("");
@@ -439,6 +441,27 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
       doSearch(initialQuery);
     }
   }, [initialQuery, open]);
+
+  // Scroll to the mentioned note ONCE per open. Doing this via an inline ref
+  // callback re-fired scrollIntoView on every render, which kept yanking the
+  // panel down to the timeline and made it impossible to scroll back up.
+  useEffect(() => {
+    if (!open) {
+      scrolledHighlightRef.current = null;
+      return;
+    }
+    if (!highlightNoteId || !data) return;
+    if (scrolledHighlightRef.current === highlightNoteId) return;
+    if (!data.notes.some((n) => n.id === highlightNoteId)) return;
+    const raf = requestAnimationFrame(() => {
+      const el = document.getElementById(`note-${highlightNoteId}`);
+      if (el) {
+        scrolledHighlightRef.current = highlightNoteId;
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [open, highlightNoteId, data]);
 
   const loadBio = useCallback(async (key: string) => {
     if (!key) return;
@@ -1341,7 +1364,6 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
                         <div
                           key={n.id}
                           id={`note-${n.id}`}
-                          ref={isHighlighted ? (el) => { el?.scrollIntoView({ behavior: "smooth", block: "center" }); } : undefined}
                           className={`flex gap-2 text-[12px] p-1.5 rounded-lg transition-colors ${
                             isHighlighted
                               ? "bg-amber-500/15 border border-amber-500/30 ring-1 ring-amber-500/20"
