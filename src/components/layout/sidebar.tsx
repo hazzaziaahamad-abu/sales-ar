@@ -46,6 +46,7 @@ import {
   Map,
   CalendarCheck,
   Share2,
+  AtSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
@@ -58,6 +59,7 @@ export const NAV_ITEMS = [
   // { label: "انضباط الإغلاق", href: "/discipline", slug: "discipline", icon: ShieldAlert, color: "amber", group: "عام" },
   { label: "التحديثات الأخيرة", href: "/recent-updates", slug: "recent-updates", icon: History, color: "cyan", group: "عام" },
   { label: "مشرف AI", href: "/ai-supervisor", slug: "ai-supervisor", icon: ShieldCheck, color: "cyan", group: "الإدارة التنفيذية" },
+  { label: "منشنات الفريق", href: "/mentions", slug: "mentions", icon: AtSign, color: "amber", group: "الإدارة التنفيذية" },
   { label: "نحجز هب", href: "/requests", slug: "requests", icon: Inbox, color: "violet", group: "الإدارة التنفيذية" },
   { label: "السكرتير التنفيذي", href: "/secretary", slug: "secretary", icon: BrainCircuit, color: "violet", group: "الإدارة التنفيذية" },
   // مخفية مؤقتاً — مدمجة في غرفة العمليات

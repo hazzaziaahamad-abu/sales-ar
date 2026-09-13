@@ -1660,6 +1660,21 @@ export async function fetchMentionNotifications(userName: string): Promise<Menti
   return (data || []) as MentionNotification[];
 }
 
+/** كل منشنات الفريق (لكل الأعضاء) خلال آخر عدد ساعات — لصفحة نظرة عامة إشرافية */
+export async function fetchRecentMentions(hours = 24): Promise<MentionNotification[]> {
+  const supabase = createClient();
+  const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from("mention_notifications")
+    .select("*")
+    .eq("org_id", getOrgId())
+    .gte("created_at", since)
+    .order("created_at", { ascending: false })
+    .limit(500);
+  if (error) throw error;
+  return (data || []) as MentionNotification[];
+}
+
 export async function markMentionNotificationsRead(ids: string[]): Promise<void> {
   if (ids.length === 0) return;
   const supabase = createClient();
