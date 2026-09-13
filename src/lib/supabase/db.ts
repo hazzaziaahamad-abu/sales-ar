@@ -1675,6 +1675,20 @@ export async function fetchRecentMentions(hours = 24): Promise<MentionNotificati
   return (data || []) as MentionNotification[];
 }
 
+/** عدد المنشنات غير المقروءة على مستوى الفريق خلال آخر عدد ساعات — لشارة القائمة الجانبية */
+export async function countRecentUnreadMentions(hours = 24): Promise<number> {
+  const supabase = createClient();
+  const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+  const { count, error } = await supabase
+    .from("mention_notifications")
+    .select("*", { count: "exact", head: true })
+    .eq("org_id", getOrgId())
+    .eq("is_read", false)
+    .gte("created_at", since);
+  if (error) return 0;
+  return count ?? 0;
+}
+
 export async function markMentionNotificationsRead(ids: string[]): Promise<void> {
   if (ids.length === 0) return;
   const supabase = createClient();

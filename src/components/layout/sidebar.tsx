@@ -50,7 +50,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
-import { countPendingDeals } from "@/lib/supabase/db";
+import { countPendingDeals, countRecentUnreadMentions } from "@/lib/supabase/db";
 
 export const NAV_ITEMS = [
   { label: "نظرة عامة", href: "/dashboard", slug: "dashboard", icon: LayoutDashboard, color: "cyan", group: "عام" },
@@ -134,6 +134,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const { user, loading, signOut, activeOrgId, switchOrg, orgs } = useAuth();
   const [orgMenuOpen, setOrgMenuOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
+  const [mentionCount, setMentionCount] = useState(0);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
 
   const toggleGroup = (group: string) => {
@@ -141,8 +142,12 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   };
 
   useEffect(() => {
-    countPendingDeals().then(setPendingCount).catch(() => {});
-    const id = setInterval(() => { countPendingDeals().then(setPendingCount).catch(() => {}); }, 30000);
+    const refresh = () => {
+      countPendingDeals().then(setPendingCount).catch(() => {});
+      countRecentUnreadMentions().then(setMentionCount).catch(() => {});
+    };
+    refresh();
+    const id = setInterval(refresh, 30000);
     return () => clearInterval(id);
   }, [activeOrgId]);
 
@@ -335,6 +340,11 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                         {item.slug === "requests" && pendingCount > 0 && (
                           <span className="min-w-[22px] h-[22px] flex items-center justify-center rounded-full bg-red-500 text-white text-[13px] font-bold px-1.5 animate-pulse">
                             {pendingCount}
+                          </span>
+                        )}
+                        {item.slug === "mentions" && mentionCount > 0 && (
+                          <span className="min-w-[22px] h-[22px] flex items-center justify-center rounded-full bg-amber-500 text-white text-[13px] font-bold px-1.5 animate-pulse">
+                            {mentionCount}
                           </span>
                         )}
                       </Link>
