@@ -46,6 +46,8 @@ const PAGE_SLUG_MAP: Record<string, string> = {
   "/marketing-plans": "marketing-plans",
   "/whatsapp": "whatsapp",
   "/discipline": "discipline",
+  "/challenges": "challenges",
+  "/my-challenges": "my-challenges",
 };
 
 // المنشن (@) والتذكير يظهران فقط في أقسام المبيعات والدعم والتجديدات — لأنهما مرتبطان
