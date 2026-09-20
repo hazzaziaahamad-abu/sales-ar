@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { getAuthUser } from "@/lib/permissions";
+import { getAuthUser, isSuperAdmin, hasPermission } from "@/lib/permissions";
 import { getManagerContext, getChallengeProfile } from "@/lib/api/challenge-access";
 
 export const runtime = "nodejs";
@@ -55,19 +55,27 @@ export async function POST(req: NextRequest) {
   const orgId = profile?.org_id;
   if (!orgId) return NextResponse.json({ error: "تعذّر تحديد المنظمة" }, { status: 400 });
 
+  // origin = 'manager' مسموح فقط لمن يملك صلاحية إدارة التحديات (وإلا يبقى employee).
+  let origin: "employee" | "manager" = "employee";
+  if (body.origin === "manager") {
+    const isManager = (await isSuperAdmin(user.id)) || (await hasPermission(user.id, "challenges_manage"));
+    if (isManager) origin = "manager";
+  }
+
   const { data: challenge, error } = await supabaseAdmin
     .from("employee_challenges")
     .insert({
       org_id: orgId,
       submitted_by: user.id,
       submitter_name: profile?.name ?? null,
-      is_anonymous: isAnonymous,
+      is_anonymous: origin === "manager" ? false : isAnonymous,
       category,
       against_party: againstParty,
       title,
       description,
       severity,
       status: "new",
+      origin,
     })
     .select("*")
     .single();
@@ -78,8 +86,8 @@ export async function POST(req: NextRequest) {
     challenge_id: challenge.id,
     org_id: orgId,
     event_type: "submitted",
-    description: "تم رفع التحدي",
-    actor_name: isAnonymous ? "موظف (بدون اسم)" : profile?.name ?? null,
+    description: origin === "manager" ? "رفع المدير تحديًا" : "تم رفع التحدي",
+    actor_name: origin === "manager" ? profile?.name ?? "المدير" : isAnonymous ? "موظف (بدون اسم)" : profile?.name ?? null,
   });
 
   return NextResponse.json({ id: challenge.id, challenge_number: challenge.challenge_number });

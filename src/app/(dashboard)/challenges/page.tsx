@@ -18,6 +18,8 @@ import {
   User,
   MessageSquareWarning,
   ClipboardCheck,
+  Crown,
+  Send,
 } from "lucide-react";
 import {
   CATEGORY_LABELS,
@@ -58,6 +60,7 @@ type Challenge = {
   description: string;
   severity: ChallengeSeverity;
   status: ChallengeStatus;
+  origin: "employee" | "manager";
   created_at: string;
   resolved_at: string | null;
 };
@@ -95,6 +98,7 @@ export default function ChallengesPage() {
   const [list, setList] = useState<Challenge[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showNew, setShowNew] = useState(false);
 
   const [fCategory, setFCategory] = useState<string>("all");
   const [fStatus, setFStatus] = useState<string>("all");
@@ -131,16 +135,25 @@ export default function ChallengesPage() {
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-16">
       {/* Header */}
-      <div className="flex items-start gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-500/15 text-red-400 ring-1 ring-red-500/20 shrink-0">
-          <ShieldAlert className="w-6 h-6" />
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="flex items-start gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-500/15 text-red-400 ring-1 ring-red-500/20 shrink-0">
+            <ShieldAlert className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-extrabold text-foreground">مركز معالجة التحديات</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              التحديات التي يرفعها الموظفون — للمدير فقط. حلّلها، اقترح حلولاً، وقِس نجاحها.
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-extrabold text-foreground">مركز معالجة التحديات</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            التحديات التي يرفعها الموظفون — للمدير فقط. حلّلها، اقترح حلولاً، وقِس نجاحها.
-          </p>
-        </div>
+        <button
+          onClick={() => setShowNew(true)}
+          className="flex items-center gap-2 rounded-[12px] bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/20 px-4 py-2.5 text-sm font-bold transition-colors"
+        >
+          <Sparkles className="w-4 h-4" />
+          رفع تحدٍّ للذكاء الاصطناعي
+        </button>
       </div>
 
       {/* Stats */}
@@ -177,6 +190,9 @@ export default function ChallengesPage() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs font-mono text-muted-foreground">#{c.challenge_number}</span>
                   <span className="cc-badge bg-white/[0.06] text-muted-foreground">{CATEGORY_LABELS[c.category]}</span>
+                  {c.origin === "manager" && (
+                    <span className="cc-badge bg-cyan-500/15 text-cyan-400 flex items-center gap-1"><Crown className="w-3 h-3" /> من المدير</span>
+                  )}
                 </div>
                 <span className={`cc-badge ring-1 ${SEVERITY_COLORS[c.severity]}`}>{SEVERITY_LABELS[c.severity]}</span>
               </div>
@@ -191,6 +207,13 @@ export default function ChallengesPage() {
             </button>
           ))}
         </div>
+      )}
+
+      {showNew && (
+        <NewChallengeModal
+          onClose={() => setShowNew(false)}
+          onCreated={(newId) => { setShowNew(false); loadList(); setSelectedId(newId); }}
+        />
       )}
 
       {selectedId && (
@@ -277,6 +300,9 @@ function DetailModal({ id, onClose, onChanged }: { id: string; onClose: () => vo
                   <span className="text-xs font-mono text-muted-foreground">#{detail.challenge.challenge_number}</span>
                   <span className="cc-badge bg-white/[0.06] text-muted-foreground">{CATEGORY_LABELS[detail.challenge.category]}</span>
                   <span className={`cc-badge ring-1 ${SEVERITY_COLORS[detail.challenge.severity]}`}>{SEVERITY_LABELS[detail.challenge.severity]}</span>
+                  {detail.challenge.origin === "manager" && (
+                    <span className="cc-badge bg-cyan-500/15 text-cyan-400 flex items-center gap-1"><Crown className="w-3 h-3" /> من المدير</span>
+                  )}
                 </div>
                 <h2 className="mt-2 text-lg font-extrabold text-foreground">{detail.challenge.title}</h2>
               </div>
@@ -291,7 +317,11 @@ function DetailModal({ id, onClose, onChanged }: { id: string; onClose: () => vo
                 <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{detail.challenge.description}</p>
                 <div className="mt-3 flex flex-wrap gap-3 text-[11px] text-muted-foreground">
                   <span className="flex items-center gap-1">
-                    {detail.challenge.is_anonymous ? <><EyeOff className="w-3 h-3" /> مقدّم بدون اسم</> : <><User className="w-3 h-3" /> {detail.challenge.submitter_name || "—"}</>}
+                    {detail.challenge.origin === "manager"
+                      ? <><Crown className="w-3 h-3" /> رفعه المدير</>
+                      : detail.challenge.is_anonymous
+                        ? <><EyeOff className="w-3 h-3" /> مقدّم بدون اسم</>
+                        : <><User className="w-3 h-3" /> {detail.challenge.submitter_name || "—"}</>}
                   </span>
                   {detail.challenge.against_party && (
                     <span className="flex items-center gap-1"><MessageSquareWarning className="w-3 h-3" /> الطرف المعني: {detail.challenge.against_party}</span>
@@ -568,6 +598,104 @@ function MeasurementCard({ m, onUpdate, onRemove }: {
           className="rounded-[8px] bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-200 border border-indigo-500/30 px-3 py-1.5 text-sm font-bold transition-colors">
           تسجيل
         </button>
+      </div>
+    </div>
+  );
+}
+
+/* ─── New challenge (raised by manager) ─── */
+function NewChallengeModal({ onClose, onCreated }: { onClose: () => void; onCreated: (id: string) => void }) {
+  const [category, setCategory] = useState<ChallengeCategory>("other");
+  const [severity, setSeverity] = useState<ChallengeSeverity>("medium");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [againstParty, setAgainstParty] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const submit = async () => {
+    if (!title.trim() || !description.trim() || saving) return;
+    setSaving(true); setErr(null);
+    try {
+      const res = await fetch("/api/challenges", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          origin: "manager",
+          category,
+          severity,
+          title: title.trim(),
+          description: description.trim(),
+          against_party: againstParty.trim() || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "فشل الإنشاء");
+      onCreated(data.id);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "حدث خطأ");
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-black/60 backdrop-blur-sm p-3 sm:p-6" onClick={onClose}>
+      <div className="w-full max-w-xl rounded-[16px] bg-card border border-border shadow-2xl my-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-cyan-400" />
+            <h2 className="text-lg font-extrabold text-foreground">رفع تحدٍّ للذكاء الاصطناعي</h2>
+          </div>
+          <button onClick={onClose} className="flex items-center justify-center w-9 h-9 rounded-[10px] bg-white/[0.06] hover:bg-white/[0.12] text-muted-foreground hover:text-foreground transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <p className="text-xs text-muted-foreground">
+            اكتب التحدي الذي تواجهه كمدير، ثم افتحه واضغط «توليد حلول AI» للحصول على تحليل وحلول ومؤشر قياس.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-muted-foreground mb-1.5">التصنيف</label>
+              <select value={category} onChange={(e) => setCategory(e.target.value as ChallengeCategory)}
+                className="w-full rounded-[10px] bg-white/[0.04] border border-border px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-cyan-500/40">
+                {(Object.entries(CATEGORY_LABELS) as [ChallengeCategory, string][]).map(([k, v]) => <option key={k} value={k} className="bg-card">{v}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-muted-foreground mb-1.5">الشدة</label>
+              <select value={severity} onChange={(e) => setSeverity(e.target.value as ChallengeSeverity)}
+                className="w-full rounded-[10px] bg-white/[0.04] border border-border px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-cyan-500/40">
+                {(Object.entries(SEVERITY_LABELS) as [ChallengeSeverity, string][]).map(([k, v]) => <option key={k} value={k} className="bg-card">{v}</option>)}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-muted-foreground mb-1.5">عنوان مختصر</label>
+            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="مثال: بطء التنسيق بين المبيعات والدعم"
+              className="w-full rounded-[10px] bg-white/[0.04] border border-border px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/40" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-muted-foreground mb-1.5">تفاصيل التحدي</label>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="اشرح التحدي وسياقه وأثره..."
+              className="w-full rounded-[10px] bg-white/[0.04] border border-border px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/40 resize-y" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-muted-foreground mb-1.5">الطرف/القسم المعني <span className="font-normal">(اختياري)</span></label>
+            <input value={againstParty} onChange={(e) => setAgainstParty(e.target.value)} placeholder="مثال: قسم الدعم الإداري"
+              className="w-full rounded-[10px] bg-white/[0.04] border border-border px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/40" />
+          </div>
+
+          {err && <p className="text-sm text-red-400">{err}</p>}
+
+          <div className="flex items-center justify-end gap-2 pt-1">
+            <button onClick={onClose} className="rounded-[10px] px-4 py-2.5 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors">إلغاء</button>
+            <button onClick={submit} disabled={saving || !title.trim() || !description.trim()}
+              className="flex items-center gap-2 rounded-[10px] bg-cyan-500/20 hover:bg-cyan-500/30 disabled:opacity-40 disabled:cursor-not-allowed text-cyan-200 border border-cyan-500/30 px-5 py-2.5 text-sm font-bold transition-colors">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              إنشاء وفتح
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
