@@ -25,6 +25,9 @@ import {
   Save,
   RotateCcw,
   X,
+  ThumbsUp,
+  ShieldCheck,
+  UserCheck,
 } from "lucide-react";
 
 /* ---------- brand tokens (مطابقة للخرائط) ---------- */
@@ -55,10 +58,15 @@ export type CFLoyalty = {
 };
 export type CFTier = { name: string; chip: string; priceText: string };
 
-type Stored = { steps?: CFStep[]; loyalty?: CFLoyalty };
+type Stored = { steps?: CFStep[]; loyalty?: CFLoyalty; interestedSteps?: CFStep[] };
 
-// أيقونات الخطوات بالترتيب الثابت (٨ خطوات) — لا تُخزَّن، تُطابَق بالفهرس.
+type Scenario = "first" | "interested";
+
+// أيقونات خطوات «أول تواصل» بالترتيب الثابت (٨ خطوات) — لا تُخزَّن، تُطابَق بالفهرس.
 const STEP_ICONS = [Handshake, Headset, MessageCircle, CalendarClock, Puzzle, Heart, CheckCircle2, Rocket];
+
+// أيقونات خطوات «عميل مهتم» بالترتيب الثابت (٧ خطوات) — تُطابَق بالفهرس.
+const STEP_ICONS_INTEREST = [ThumbsUp, Target, Puzzle, Gift, ShieldCheck, CheckCircle2, Rocket];
 
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x)) as T;
 
@@ -102,15 +110,20 @@ export default function ContactFlowPanel({
   tiers,
   defaultSteps,
   defaultLoyalty,
+  defaultInterestedSteps,
 }: {
   storageKey: string;
   tiers: CFTier[];
   defaultSteps: CFStep[];
   defaultLoyalty: CFLoyalty;
+  /** مسار «العميل المهتم» (اختياري) — يظهر مبدّل السيناريو عند تمريره. */
+  defaultInterestedSteps?: CFStep[];
 }) {
   const { user, isImpersonating } = useAuth();
   const canEdit = !!user?.isSuperAdmin && !isImpersonating;
+  const hasInterested = Array.isArray(defaultInterestedSteps) && defaultInterestedSteps.length > 0;
 
+  const [scenario, setScenario] = useState<Scenario>("first");
   const [channel, setChannel] = useState<"call" | "wa">("call");
   const [copied, setCopied] = useState<number | null>(null);
   const [pkg, setPkg] = useState<CFTier | null>(null);
@@ -119,11 +132,13 @@ export default function ContactFlowPanel({
 
   // المحتوى المعروض (افتراضي ثم يُستبدل بالمحفوظ عند التحميل)
   const [steps, setSteps] = useState<CFStep[]>(defaultSteps);
+  const [iSteps, setISteps] = useState<CFStep[]>(defaultInterestedSteps || []);
   const [loyalty, setLoyalty] = useState<CFLoyalty>(defaultLoyalty);
 
   // وضع التحرير (نسخة مسودّة)
   const [editing, setEditing] = useState(false);
   const [dSteps, setDSteps] = useState<CFStep[]>(defaultSteps);
+  const [dISteps, setDISteps] = useState<CFStep[]>(defaultInterestedSteps || []);
   const [dLoyalty, setDLoyalty] = useState<CFLoyalty>(defaultLoyalty);
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
@@ -135,6 +150,8 @@ export default function ContactFlowPanel({
       .then((data) => {
         if (!alive || !data) return;
         if (Array.isArray(data.steps) && data.steps.length) setSteps(mergeSteps(defaultSteps, data.steps));
+        if (hasInterested && Array.isArray(data.interestedSteps) && data.interestedSteps.length)
+          setISteps(mergeSteps(defaultInterestedSteps!, data.interestedSteps));
         if (data.loyalty)
           setLoyalty({
             ...defaultLoyalty,
@@ -186,6 +203,7 @@ export default function ContactFlowPanel({
 
   const startEdit = () => {
     setDSteps(clone(steps));
+    setDISteps(clone(iSteps));
     setDLoyalty(clone(loyalty));
     setSavedMsg(null);
     setEditing(true);
@@ -195,8 +213,11 @@ export default function ContactFlowPanel({
     setSaving(true);
     setSavedMsg(null);
     try {
-      await saveEditableContent(storageKey, { steps: dSteps, loyalty: dLoyalty });
+      const payload: Stored = { steps: dSteps, loyalty: dLoyalty };
+      if (hasInterested) payload.interestedSteps = dISteps;
+      await saveEditableContent(storageKey, payload);
       setSteps(dSteps);
+      setISteps(dISteps);
       setLoyalty(dLoyalty);
       setEditing(false);
       setSavedMsg("تم الحفظ ✓");
@@ -208,8 +229,16 @@ export default function ContactFlowPanel({
     }
   };
 
-  const updStep = (i: number, patch: Partial<CFStep>) =>
-    setDSteps((prev) => prev.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
+  // تحرير الخطوة في السيناريو النشط (أول تواصل / عميل مهتم).
+  const updStep = (i: number, patch: Partial<CFStep>) => {
+    const setter = scenario === "interested" ? setDISteps : setDSteps;
+    setter((prev) => prev.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
+  };
+
+  // الخطوات والأيقونات حسب السيناريو النشط.
+  const viewSteps = scenario === "interested" ? iSteps : steps;
+  const draftSteps = scenario === "interested" ? dISteps : dSteps;
+  const activeIcons = scenario === "interested" ? STEP_ICONS_INTEREST : STEP_ICONS;
 
   return (
     <div
@@ -257,6 +286,7 @@ export default function ContactFlowPanel({
               <button
                 onClick={() => {
                   setDSteps(clone(defaultSteps));
+                  if (hasInterested) setDISteps(clone(defaultInterestedSteps!));
                   setDLoyalty(clone(defaultLoyalty));
                 }}
                 className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold outline-none transition hover:opacity-80"
@@ -292,6 +322,37 @@ export default function ContactFlowPanel({
           )}
         </div>
       </div>
+
+      {/* مبدّل السيناريو: أول تواصل / عميل مهتم — يظهر عند توفّر مسار العميل المهتم */}
+      {hasInterested && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex rounded-full p-1" style={{ backgroundColor: "#efe6dd" }}>
+            {[
+              { k: "first", t: "أول تواصل", icon: <Phone size={13} strokeWidth={2.4} /> },
+              { k: "interested", t: "عميل مهتم", icon: <UserCheck size={13} strokeWidth={2.4} /> },
+            ].map((o) => {
+              const on = scenario === o.k;
+              return (
+                <button
+                  key={o.k}
+                  onClick={() => setScenario(o.k as Scenario)}
+                  className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold outline-none transition focus-visible:ring-4 focus-visible:ring-violet-300"
+                  style={{ backgroundColor: on ? PURPLE_DEEP : "transparent", color: on ? "#fff" : "#7a6b5e" }}
+                  aria-pressed={on}
+                >
+                  {o.icon}
+                  {o.t}
+                </button>
+              );
+            })}
+          </div>
+          <span className="text-[11px] font-bold" style={{ color: "#8a7c70" }}>
+            {scenario === "interested"
+              ? "مسار سريع: العميل أبدى اهتمامه (بمكالمة أو رسالة) — حوّل حماسه إلى قرار."
+              : "المسار الكامل من التحية حتى تأكيد موعد التنفيذ."}
+          </span>
+        </div>
+      )}
 
       {savedMsg && (
         <div
@@ -344,8 +405,13 @@ export default function ContactFlowPanel({
             </div>
           </div>
 
-          {/* تحرير الخطوات */}
-          {dSteps.map((s, i) => (
+          {/* تحرير الخطوات — للسيناريو النشط (بدّل من مبدّل «أول تواصل / عميل مهتم» بالأعلى) */}
+          {hasInterested && (
+            <p className="text-right text-xs font-black" style={{ color: PURPLE_DEEP }}>
+              تُحرّر الآن خطوات: {scenario === "interested" ? "«عميل مهتم»" : "«أول تواصل»"}
+            </p>
+          )}
+          {draftSteps.map((s, i) => (
             <div key={i} className="rounded-2xl p-3" style={{ backgroundColor: "#faf4ee", border: "1px solid #efe2d5" }}>
               <div className="mb-2 flex items-center justify-end gap-2 text-sm font-black" style={{ color: INK }}>
                 الخطوة {s.n}
@@ -375,8 +441,10 @@ export default function ContactFlowPanel({
         /* ============ وضع العرض (للموظف) ============ */
         <>
           <p className="mb-3 text-right text-xs font-semibold leading-relaxed" style={{ color: "#8a7c70" }}>
-            تسلسل جاهز يمشي عليه الموظف من التحية حتى تأكيد موعد التنفيذ — بدّل بين «مكالمة» و«واتساب» ليتغيّر السكربت، وانسخ الرسالة بضغطة.
-            استبدل ما بين الأقواس {"{ }"} بمعلومات العميل.
+            {scenario === "interested"
+              ? "العميل ردّ وأبدى اهتمامه — امشِ على هذا التسلسل السريع لتثبيت اهتمامه وإغلاق الصفقة، سواء كان عبر مكالمة أو رسالة."
+              : "تسلسل جاهز يمشي عليه الموظف من التحية حتى تأكيد موعد التنفيذ."}{" "}
+            بدّل بين «مكالمة» و«واتساب» ليتغيّر السكربت، وانسخ الرسالة بضغطة. استبدل ما بين الأقواس {"{ }"} بمعلومات العميل.
           </p>
 
           {/* أدوات: اختيار الباقة + رقم واتساب العميل */}
@@ -512,8 +580,8 @@ export default function ContactFlowPanel({
           <div className="relative space-y-2.5">
             <span className="pointer-events-none absolute bottom-6 top-6 w-0.5" style={{ right: 18, backgroundColor: "#ecd9c7" }} aria-hidden="true" />
 
-            {steps.map((s, i) => {
-              const Icon = STEP_ICONS[i] || Sparkles;
+            {viewSteps.map((s, i) => {
+              const Icon = activeIcons[i] || Sparkles;
               const script = fill(isWa ? s.wa : s.call);
               const isCopied = copied === i;
               return (
