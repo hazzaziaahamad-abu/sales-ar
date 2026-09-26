@@ -385,14 +385,24 @@ export async function saveSupervisorTeams(teams: SupervisorTeams): Promise<void>
 
 export async function fetchDeals(salesType?: "office" | "support"): Promise<Deal[]> {
   const supabase = createClient();
-  let query = supabase
-    .from("deals")
-    .select("*")
-    .eq("org_id", getOrgId());
-  if (salesType) query = query.eq("sales_type", salesType);
-  const { data, error } = await query.order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data ?? []).map((d) => ({ ...d, cycle_days: computeCycleDays(d) })) as Deal[];
+  // Supabase يرجّع 1000 صف كحد أقصى لكل طلب — نجلب على صفحات حتى لا تسقط الصفقات الأقدم
+  const PAGE = 1000;
+  const rows: Record<string, unknown>[] = [];
+  for (let from = 0; ; from += PAGE) {
+    let query = supabase
+      .from("deals")
+      .select("*")
+      .eq("org_id", getOrgId());
+    if (salesType) query = query.eq("sales_type", salesType);
+    const { data, error } = await query
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    rows.push(...(data ?? []));
+    if (!data || data.length < PAGE) break;
+  }
+  return rows.map((d) => ({ ...d, cycle_days: computeCycleDays(d as { created_at?: string; close_date?: string }) })) as Deal[];
 }
 
 function computeCycleDays(d: { created_at?: string; close_date?: string }): number {
