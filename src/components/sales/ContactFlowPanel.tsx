@@ -106,12 +106,15 @@ function Field({
 
 /* ---------- المكوّن الرئيسي ---------- */
 export default function ContactFlowPanel({
+  id,
   storageKey,
   tiers,
   defaultSteps,
   defaultLoyalty,
   defaultInterestedSteps,
 }: {
+  /** معرّف HTML للوصول المباشر عبر رابط (‎#…‎) */
+  id?: string;
   storageKey: string;
   tiers: CFTier[];
   defaultSteps: CFStep[];
@@ -242,7 +245,8 @@ export default function ContactFlowPanel({
 
   return (
     <div
-      className="mx-auto mt-8 max-w-3xl rounded-3xl p-5"
+      id={id}
+      className="mx-auto mt-8 max-w-3xl scroll-mt-4 rounded-3xl p-5"
       style={{ backgroundColor: "#fffdf7", border: "1.5px solid #ead9c9", boxShadow: "0 12px 26px -16px rgba(64,51,43,.5)" }}
     >
       {/* رأس اللوحة + مبدّل القناة + زر التحرير */}

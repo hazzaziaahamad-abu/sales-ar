@@ -83,7 +83,7 @@ function Field({ label, value, onChange, rows = 2 }: { label: string; value: str
 }
 
 /* ---------- المكوّن الرئيسي: بنك ردود سريعة على أسئلة العملاء ---------- */
-export default function CustomerFAQPanel({ storageKey, defaultItems }: { storageKey: string; defaultItems: FAQItem[] }) {
+export default function CustomerFAQPanel({ id, storageKey, defaultItems }: { id?: string; storageKey: string; defaultItems: FAQItem[] }) {
   const { user, isImpersonating } = useAuth();
   // الإضافة والتعديل للمدير فقط (المشرف العام أو دور «مدير»/admin) — الموظف يعرض وينسخ فقط.
   const isManager = !!user && (user.isSuperAdmin || user.roleName === "مدير" || user.roleName === "admin");
@@ -163,7 +163,8 @@ export default function CustomerFAQPanel({ storageKey, defaultItems }: { storage
 
   return (
     <div
-      className="mx-auto mt-8 max-w-3xl rounded-3xl p-5"
+      id={id}
+      className="mx-auto mt-8 max-w-3xl scroll-mt-4 rounded-3xl p-5"
       style={{ backgroundColor: "#fffdf7", border: "1.5px solid #ead9c9", boxShadow: "0 12px 26px -16px rgba(64,51,43,.5)" }}
     >
       {/* الرأس */}

@@ -1577,6 +1577,22 @@ export default function MenuMindMap() {
   const close = useCallback(() => setActive(null), []);
   const rep = mode === "rep";
 
+  // رابط مباشر للموظفين: ‎?mode=rep‎ يفتح «وضع الموظف»، و‎#contact-flow‎ أو ‎#customer-faq‎ ينزل للوحة مباشرة.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const hash = window.location.hash.slice(1);
+    // قراءة الرابط بعد التحميل فقط (window غير متاح أثناء العرض على الخادم)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (params.get("mode") === "rep" || hash === "contact-flow" || hash === "customer-faq") setMode("rep");
+  }, []);
+  useEffect(() => {
+    if (!rep) return;
+    const hash = window.location.hash.slice(1);
+    if (hash !== "contact-flow" && hash !== "customer-faq") return;
+    const t = setTimeout(() => document.getElementById(hash)?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
+    return () => clearTimeout(t);
+  }, [rep]);
+
   return (
     <div
       dir="rtl"
@@ -1732,6 +1748,7 @@ export default function MenuMindMap() {
 
       {rep && (
         <ContactFlowPanel
+          id="contact-flow"
           storageKey="contact_flow_menu"
           tiers={CF_TIERS}
           defaultSteps={CONTACT_FLOW}
@@ -1739,7 +1756,7 @@ export default function MenuMindMap() {
           defaultInterestedSteps={INTERESTED_FLOW}
         />
       )}
-      {rep && <CustomerFAQPanel storageKey="customer_faq_menu" defaultItems={CUSTOMER_FAQ} />}
+      {rep && <CustomerFAQPanel id="customer-faq" storageKey="customer_faq_menu" defaultItems={CUSTOMER_FAQ} />}
       {rep && <MatchingPanel />}
       {rep && <PackagesPanel />}
       {rep && <ResultsPanel />}
