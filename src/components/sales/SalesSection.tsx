@@ -240,6 +240,18 @@ async function autoCreateRenewalFromDeal(
   }
 }
 
+/* تاريخ احتساب الصفقة: المكتملة تُحتسب بتاريخ الدفع (close_date) — مثل الترقية التي أُضيفت سابقاً وأُكملت اليوم — وغيرها بتاريخ الصفقة */
+function dealSaleDate(d: { stage: string; deal_date?: string | null; close_date?: string | null; created_at: string }): Date {
+  if (d.stage === "مكتملة" && d.close_date) return new Date(d.close_date);
+  return new Date(d.deal_date || d.created_at);
+}
+function dealSaleDateStr(d: { stage: string; deal_date?: string | null; close_date?: string | null; created_at: string }): string {
+  if (d.stage === "مكتملة" && d.close_date) {
+    try { return dateToLocal(new Date(d.close_date)); } catch { /* fall through */ }
+  }
+  return (d.deal_date || d.created_at || "").slice(0, 10);
+}
+
 /* حدود فترة بلوك «نجم الفترة + لوحة المتصدرين» — مطابقة تماماً لمنطق «ملخص الإنجازات» (تُفلتر حسب updated_at) */
 function starPeriodBounds(filter: string, from?: string, to?: string): [Date, Date] | null {
   const now = new Date();
@@ -727,10 +739,10 @@ export function SalesSection({ salesType }: SalesPageProps) {
 
   /* time/month-filtered deals (used for all analytics + table) */
   const monthDeals = filterCutoff
-    ? deals.filter((d) => new Date(d.deal_date || d.created_at) >= filterCutoff)
+    ? deals.filter((d) => dealSaleDate(d) >= filterCutoff)
     : activeMonthIndex
       ? deals.filter((d) => {
-          const dt = new Date(d.deal_date || d.created_at);
+          const dt = dealSaleDate(d);
           return dt.getMonth() + 1 === activeMonthIndex.month && dt.getFullYear() === activeMonthIndex.year;
         })
       : deals;
@@ -760,7 +772,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const _dateBounds = tableDateBounds(tableDateFilter || "", tableCustomFrom, tableCustomTo);
   const dateFilteredDeals = _dateBounds
     ? baseFilteredDeals.filter(d => {
-        const s = (d.deal_date || d.created_at || "").slice(0, 10);
+        const s = dealSaleDateStr(d);
         return s >= _dateBounds[0] && s <= _dateBounds[1];
       })
     : baseFilteredDeals;
@@ -935,20 +947,20 @@ export function SalesSection({ salesType }: SalesPageProps) {
     const now = new Date();
     if (teamPerfFilter === "اليوم") {
       const start = new Date(now); start.setHours(0, 0, 0, 0);
-      return repFilteredDeals.filter((d) => new Date(d.deal_date || d.created_at) >= start);
+      return repFilteredDeals.filter((d) => dealSaleDate(d) >= start);
     }
     if (teamPerfFilter === "الأسبوع") {
       const start = new Date(now); start.setDate(start.getDate() - 6); start.setHours(0, 0, 0, 0);
-      return repFilteredDeals.filter((d) => new Date(d.deal_date || d.created_at) >= start);
+      return repFilteredDeals.filter((d) => dealSaleDate(d) >= start);
     }
     if (teamPerfFilter === "الشهر") {
       const start = new Date(now.getFullYear(), now.getMonth(), 1);
-      return repFilteredDeals.filter((d) => new Date(d.deal_date || d.created_at) >= start);
+      return repFilteredDeals.filter((d) => dealSaleDate(d) >= start);
     }
     if (teamPerfFilter === "الشهر الماضي") {
       const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const end = new Date(now.getFullYear(), now.getMonth(), 1);
-      return repFilteredDeals.filter((d) => { const dt = new Date(d.deal_date || d.created_at); return dt >= start && dt < end; });
+      return repFilteredDeals.filter((d) => { const dt = dealSaleDate(d); return dt >= start && dt < end; });
     }
     return repFilteredDeals;
   })();
