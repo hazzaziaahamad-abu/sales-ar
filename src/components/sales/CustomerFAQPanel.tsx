@@ -85,7 +85,9 @@ function Field({ label, value, onChange, rows = 2 }: { label: string; value: str
 /* ---------- المكوّن الرئيسي: بنك ردود سريعة على أسئلة العملاء ---------- */
 export default function CustomerFAQPanel({ storageKey, defaultItems }: { storageKey: string; defaultItems: FAQItem[] }) {
   const { user, isImpersonating } = useAuth();
-  const canEdit = !!user?.isSuperAdmin && !isImpersonating;
+  // الإضافة والتعديل للمدير فقط (المشرف العام أو دور «مدير»/admin) — الموظف يعرض وينسخ فقط.
+  const isManager = !!user && (user.isSuperAdmin || user.roleName === "مدير" || user.roleName === "admin");
+  const canEdit = isManager && !isImpersonating;
 
   const [items, setItems] = useState<FAQItem[]>(defaultItems);
   const [cat, setCat] = useState<FAQCat | "all">("all");
@@ -132,8 +134,10 @@ export default function CustomerFAQPanel({ storageKey, defaultItems }: { storage
     });
   }, [items, cat, query]);
 
-  const startEdit = () => {
-    setDraft(clone(items));
+  const blankItem = (): FAQItem => ({ id: uid(), cat: cat === "all" ? "cashier" : cat, q: "", call: "", wa: "" });
+
+  const startEdit = (withNew = false) => {
+    setDraft(withNew ? [blankItem(), ...clone(items)] : clone(items));
     setSavedMsg(null);
     setEditing(true);
   };
@@ -176,7 +180,16 @@ export default function CustomerFAQPanel({ storageKey, defaultItems }: { storage
         <div className="flex items-center gap-2">
           {canEdit && !editing && (
             <button
-              onClick={startEdit}
+              onClick={() => startEdit(true)}
+              className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold text-white outline-none transition hover:opacity-90 focus-visible:ring-4 focus-visible:ring-emerald-200"
+              style={{ backgroundColor: "#059669" }}
+            >
+              <Plus size={13} strokeWidth={2.6} /> إضافة سؤال
+            </button>
+          )}
+          {canEdit && !editing && (
+            <button
+              onClick={() => startEdit()}
               className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold text-white outline-none transition hover:opacity-90 focus-visible:ring-4 focus-visible:ring-violet-300"
               style={{ backgroundColor: PURPLE_DEEP }}
             >
@@ -286,7 +299,7 @@ export default function CustomerFAQPanel({ storageKey, defaultItems }: { storage
             </div>
           ))}
           <button
-            onClick={() => setDraft((prev) => [...prev, { id: uid(), cat: cat === "all" ? "cashier" : cat, q: "", call: "", wa: "" }])}
+            onClick={() => setDraft((prev) => [...prev, blankItem()])}
             className="flex w-full items-center justify-center gap-1 rounded-2xl py-2 text-xs font-black outline-none transition hover:opacity-80"
             style={{ backgroundColor: "#F4ECFB", border: "1px dashed #C4B5FD", color: PURPLE_DEEP }}
           >
@@ -338,7 +351,7 @@ export default function CustomerFAQPanel({ storageKey, defaultItems }: { storage
           <div className="space-y-2">
             {visible.length === 0 && (
               <p className="rounded-xl px-3 py-4 text-center text-xs font-bold" style={{ backgroundColor: "#faf4ee", color: "#8a7c70" }}>
-                ما لقينا سؤال مطابق — ارفعه لمديرك ليُضاف رده هنا.
+                {canEdit ? "ما لقينا سؤال مطابق — اضغط «إضافة سؤال» بالأعلى لإضافة رده." : "ما لقينا سؤال مطابق — ارفعه لمديرك ليُضاف رده هنا."}
               </p>
             )}
             {visible.map((it) => {
