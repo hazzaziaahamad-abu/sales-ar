@@ -16,6 +16,7 @@ import {
   fetchTargetClientLogs,
   addTargetClientLog,
   transferTargetClient,
+  fetchTodayUpgrades,
 } from "@/lib/supabase/db";
 import {
   diffAgainstExisting,
@@ -70,6 +71,8 @@ import {
   History,
   ArrowLeftRight,
   StickyNote,
+  Trophy,
+  Wand2,
 } from "lucide-react";
 
 /* ---------- constants ---------- */
@@ -131,6 +134,11 @@ function formatLogTime(iso: string) {
   const d = new Date(iso);
   return d.toLocaleString("ar-SA-u-nu-latn", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 }
+
+/** الهدف اليومي: عدد الترقيات الناجحة لكل موظف. */
+const DAILY_UPGRADE_GOAL = 3;
+/** عدد العملاء المقترح اختيارهم يومياً لتحقيق الهدف. */
+const SUGGESTED_DAILY_PICK = 10;
 
 const PRIORITY = {
   high: { label: "أولوية عالية", color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
@@ -253,6 +261,9 @@ export default function TargetingPage() {
   const [transferForm, setTransferForm] = useState(EMPTY_TRANSFER);
   const [transferError, setTransferError] = useState("");
 
+  // Today's successful upgrades (all months), for the daily goal
+  const [todayUpgrades, setTodayUpgrades] = useState<{ transferred_by: string | null }[]>([]);
+
   // Daily quote
   const quote = getDailyQuote();
 
@@ -264,6 +275,10 @@ export default function TargetingPage() {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [activeOrgId, month, year]);
+
+  useEffect(() => {
+    fetchTodayUpgrades().then(setTodayUpgrades).catch(console.error);
+  }, [activeOrgId]);
 
   /* ---------- computed ---------- */
   const filtered = useMemo(() => {
@@ -300,6 +315,11 @@ export default function TargetingPage() {
   const pendingCount = clients.filter((c) => c.contact_status === "pending").length;
 
   const subscribersCount = clients.filter((c) => c.recommendation).length;
+  const myUpgradesToday = todayUpgrades.filter((u) => u.transferred_by === authorName).length;
+  const teamUpgradesToday = todayUpgrades.length;
+  const myDaily = clients.filter((c) => c.target_date === todayStr && c.target_by === authorName);
+  const myDailyContacted = myDaily.filter((c) => c.contact_status !== "pending").length;
+  const goalPct = Math.min(100, Math.round((myUpgradesToday / DAILY_UPGRADE_GOAL) * 100));
   const transferredCount = clients.filter((c) => c.transferred_to).length;
   const expiringCount = clients.filter((c) => c.expiry_date && daysUntil(c.expiry_date, todayStr) <= 30).length;
 
@@ -502,6 +522,7 @@ export default function TargetingPage() {
         author: authorName,
       });
       setClients((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+      setTodayUpgrades((prev) => [...prev, { transferred_by: authorName }]);
       setTransferOpen(false);
     } catch (err) {
       console.error(err);
@@ -519,6 +540,20 @@ export default function TargetingPage() {
     }
   }
 
+  /** Pick the best not-yet-contacted clients from the current view. */
+  function selectSuggested() {
+    const order = { high: 0, medium: 1, low: 2 } as const;
+    const picks = filtered
+      .filter((c) => !c.transferred_to && c.contact_status === "pending" && c.target_date !== todayStr)
+      .sort(
+        (a, b) =>
+          order[a.recommendation_priority ?? "medium"] - order[b.recommendation_priority ?? "medium"] ||
+          (a.expiry_date ?? "9999").localeCompare(b.expiry_date ?? "9999")
+      )
+      .slice(0, SUGGESTED_DAILY_PICK);
+    setSelectedIds(new Set(picks.map((c) => c.id)));
+  }
+
   function toggleSelect(id: string) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -531,9 +566,9 @@ export default function TargetingPage() {
   async function handleSetDailyTargets() {
     if (selectedIds.size === 0) return;
     try {
-      await setDailyTargets(Array.from(selectedIds), todayStr);
+      await setDailyTargets(Array.from(selectedIds), todayStr, authorName);
       setClients((prev) =>
-        prev.map((c) => (selectedIds.has(c.id) ? { ...c, target_date: todayStr } : c))
+        prev.map((c) => (selectedIds.has(c.id) ? { ...c, target_date: todayStr, target_by: authorName } : c))
       );
       setSelectedIds(new Set());
       setSelectMode(false);
@@ -546,7 +581,7 @@ export default function TargetingPage() {
     try {
       await clearDailyTarget(id);
       setClients((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, target_date: undefined } : c))
+        prev.map((c) => (c.id === id ? { ...c, target_date: undefined, target_by: null } : c))
       );
     } catch (err) {
       console.error(err);
@@ -607,6 +642,42 @@ export default function TargetingPage() {
               <span className="text-xs text-fuchsia-400 font-medium">{quote.author}</span>
               <span className="text-[12px] text-muted-foreground">— {quote.book}</span>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Daily upgrade goal */}
+      <div className="cc-card rounded-[14px] p-5 border border-emerald-500/15">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="w-11 h-11 rounded-xl bg-emerald-500/15 flex items-center justify-center shrink-0">
+            <Trophy className="w-5 h-5 text-emerald-400" />
+          </div>
+          <div className="flex-1 min-w-[200px] space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-bold text-foreground">
+                هدفك اليوم: {DAILY_UPGRADE_GOAL} ترقيات ناجحة
+              </p>
+              <p className={`text-sm font-extrabold ${myUpgradesToday >= DAILY_UPGRADE_GOAL ? "text-emerald-400" : "text-foreground"}`}>
+                {myUpgradesToday} / {DAILY_UPGRADE_GOAL}
+              </p>
+            </div>
+            <div className="h-2 rounded-full bg-white/5 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${myUpgradesToday >= DAILY_UPGRADE_GOAL ? "bg-emerald-500" : "bg-emerald-500/70"}`}
+                style={{ width: `${goalPct}%` }}
+              />
+            </div>
+            <p className="text-[12px] text-muted-foreground">
+              {myUpgradesToday >= DAILY_UPGRADE_GOAL
+                ? "🎉 حققت هدف اليوم — كل ترقية إضافية مكسب!"
+                : myDaily.length === 0
+                  ? `ابدأ بـ «تحديد هدف يومي» واختر ${SUGGESTED_DAILY_PICK} عملاء تقريباً للتواصل معهم`
+                  : `تواصلت مع ${myDailyContacted} من ${myDaily.length} في قائمتك اليوم — باقي ${DAILY_UPGRADE_GOAL - myUpgradesToday} ترقيات`}
+            </p>
+          </div>
+          <div className="text-center px-4 border-r border-border">
+            <p className="text-xl font-extrabold text-foreground">{teamUpgradesToday}</p>
+            <p className="text-[12px] text-muted-foreground">ترقيات الفريق اليوم</p>
           </div>
         </div>
       </div>
@@ -686,6 +757,10 @@ export default function TargetingPage() {
               >
                 <CalendarCheck className="w-4 h-4" />
                 تحديد كهدف اليوم ({selectedIds.size})
+              </Button>
+              <Button variant="outline" onClick={selectSuggested} className="gap-1.5" title="أعلى أولوية ولم يُتواصل معهم بعد، الأقرب انتهاءً أولاً">
+                <Wand2 className="w-4 h-4" />
+                اختيار أفضل {SUGGESTED_DAILY_PICK}
               </Button>
               <Button variant="outline" onClick={() => { setSelectMode(false); setSelectedIds(new Set()); }}>
                 إلغاء
@@ -831,7 +906,7 @@ export default function TargetingPage() {
                   {isDaily && (
                     <span className="px-2 py-1 rounded-full bg-amber-500/15 text-amber-400 text-[12px] font-medium flex items-center gap-1">
                       <CalendarCheck className="w-3 h-3" />
-                      هدف اليوم
+                      {client.target_by === authorName ? "هدفي اليوم" : client.target_by ? `هدف ${client.target_by}` : "هدف اليوم"}
                     </span>
                   )}
                 </div>

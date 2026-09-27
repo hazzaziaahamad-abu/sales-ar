@@ -495,6 +495,10 @@ export interface TargetClient {
   transferred_at?: string;
   /** deals.id (support) or renewals.id (renewals) created by the transfer. */
   transferred_ref?: string;
+  /** Employee who performed the transfer (a successful upgrade). */
+  transferred_by?: string;
+  /** Employee who picked this client as their daily target. */
+  target_by?: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -1835,11 +1835,11 @@ export async function deleteTargetClient(id: string): Promise<void> {
   if (error) throw error;
 }
 
-export async function setDailyTargets(ids: string[], date: string): Promise<void> {
+export async function setDailyTargets(ids: string[], date: string, targetBy?: string): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase
     .from("targeting_clients")
-    .update({ target_date: date, updated_at: new Date().toISOString() })
+    .update({ target_date: date, target_by: targetBy ?? null, updated_at: new Date().toISOString() })
     .in("id", ids);
   if (error) throw error;
 }
@@ -1848,7 +1848,7 @@ export async function clearDailyTarget(id: string): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase
     .from("targeting_clients")
-    .update({ target_date: null, updated_at: new Date().toISOString() })
+    .update({ target_date: null, target_by: null, updated_at: new Date().toISOString() })
     .eq("id", id);
   if (error) throw error;
 }
@@ -2045,6 +2045,18 @@ export async function addTargetClientLog(
   return data as TargetClientLog;
 }
 
+/** Successful upgrades (transfers) made today across all months, by employee. */
+export async function fetchTodayUpgrades(): Promise<{ transferred_by: string | null }[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("targeting_clients")
+    .select("transferred_by")
+    .eq("org_id", getOrgId())
+    .gte("transferred_at", `${todayLocal()}T00:00:00+03:00`);
+  if (error) throw error;
+  return (data ?? []) as { transferred_by: string | null }[];
+}
+
 export interface TargetTransferInput {
   destination: "support" | "renewals";
   plan: string;
@@ -2104,6 +2116,7 @@ export async function transferTargetClient(
     transferred_to: input.destination,
     transferred_at: new Date().toISOString(),
     transferred_ref: ref,
+    transferred_by: input.author,
     contact_status: "contacted",
   });
 
