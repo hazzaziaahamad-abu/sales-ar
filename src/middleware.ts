@@ -6,12 +6,15 @@ import { createMiddlewareClient } from "@/lib/supabase/middleware";
 //   /api/wa/webhook        — OpenWA gateway, HMAC-signed
 //   /api/cron/*            — Supabase pg_cron, guarded by CRON_SECRET
 //   /api/render/task-card  — public image, payload HMAC-signed in the token
+// /flow + /api/public/contact-flow — مسار الاتصال للموظفين، عرض فقط (مفاتيح محدّدة)
 const PUBLIC_PATHS = [
   "/login",
   "/auth/callback",
   "/gift",
   "/submit",
   "/offer",
+  "/flow",
+  "/api/public/contact-flow",
   "/api/offer/track",
   "/api/wa/webhook",
   "/api/cron/",
