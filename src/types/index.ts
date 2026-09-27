@@ -485,6 +485,9 @@ export interface TargetClient {
   deal_id?: string;
   /** Sales section the linked deal belongs to (used to open it in place). */
   sales_type?: "office" | "support";
+  /** Suggested pitch (loyalty cards / cashier) for imported subscribers. */
+  recommendation?: string;
+  recommendation_priority?: "high" | "medium" | "low";
   created_at: string;
   updated_at: string;
 }

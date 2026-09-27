@@ -1,5 +1,6 @@
 import { createClient } from "./client";
 import { todayLocal, saudiDateStr } from "@/lib/utils/format";
+import { buildSubscriberCandidates, diffAgainstExisting, type SubscriberCandidate } from "@/lib/targeting-subscribers";
 import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, MonthlyBudget, StartupCost, Marketer, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating, FollowUpNote, MentionNotification, PendingDeal, TargetClient, GiftOffer, EmployeeTask, Package, AcademyContent, LearningStage, LearningLesson, LearningQuiz, ActivityLog, TrainingKnowledge, ProductFeature, TrainingSessionLog, MarketingPlan, PlanAxis, PlanIdea, DealKpiStage } from "@/types";
 
 const DEFAULT_ORG = "00000000-0000-0000-0000-000000000001";
@@ -1936,6 +1937,79 @@ export async function removeDealFromTargeting(
     .eq("month", month)
     .eq("year", year);
   if (error) throw error;
+}
+
+// ─── SUBSCRIBERS → TARGETING ──────────────────────────────────────────────
+// Pull subscribed customers (basic-plan renewals + closed support sales) into
+// قائمة الاستهداف with a per-client recommendation, for the loyalty-cards /
+// cashier campaign. Re-running is safe: existing rows only get their
+// recommendation refreshed, never their contact progress.
+
+async function fetchAllRows<T>(table: string, apply?: (q: any) => any): Promise<T[]> { // eslint-disable-line @typescript-eslint/no-explicit-any
+  const supabase = createClient();
+  const PAGE = 1000;
+  const rows: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    let query = supabase.from(table).select("*").eq("org_id", getOrgId());
+    if (apply) query = apply(query);
+    const { data, error } = await query.order("id", { ascending: true }).range(from, from + PAGE - 1);
+    if (error) throw error;
+    rows.push(...((data ?? []) as T[]));
+    if (!data || data.length < PAGE) break;
+  }
+  return rows;
+}
+
+export async function fetchSubscriberCandidates(): Promise<SubscriberCandidate[]> {
+  const [renewals, supportDeals, openTickets] = await Promise.all([
+    fetchAllRows<Renewal>("renewals"),
+    fetchAllRows<Deal>("deals", (q) => q.eq("sales_type", "support").eq("stage", "مكتملة")),
+    fetchAllRows<Ticket>("tickets", (q) => q.neq("status", "محلول")),
+  ]);
+  return buildSubscriberCandidates(renewals, supportDeals, openTickets);
+}
+
+export async function importSubscribersToTargeting(
+  candidates: SubscriberCandidate[],
+  existing: TargetClient[],
+  month: number,
+  year: number
+): Promise<{ inserted: number; refreshed: number }> {
+  const supabase = createClient();
+  const org = getOrgId();
+  const { toInsert, toRefresh } = diffAgainstExisting(candidates, existing);
+
+  if (toInsert.length > 0) {
+    const { error } = await supabase.from("targeting_clients").insert(
+      toInsert.map((c) => ({
+        org_id: org,
+        client_name: c.client_name,
+        client_phone: c.client_phone || null,
+        plan: c.plan || null,
+        source: c.source,
+        assigned_rep: c.assigned_rep || null,
+        deal_id: c.deal_id || null,
+        sales_type: c.sales_type || null,
+        recommendation: c.recommendation,
+        recommendation_priority: c.recommendation_priority,
+        month,
+        year,
+        contact_status: "pending",
+      }))
+    );
+    if (error) throw error;
+  }
+
+  const now = new Date().toISOString();
+  for (const { id, c } of toRefresh) {
+    const { error } = await supabase
+      .from("targeting_clients")
+      .update({ recommendation: c.recommendation, recommendation_priority: c.recommendation_priority, updated_at: now })
+      .eq("id", id);
+    if (error) throw error;
+  }
+
+  return { inserted: toInsert.length, refreshed: toRefresh.length };
 }
 
 // ─── GIFT OFFERS ──────────────────────────────────────────────────────────

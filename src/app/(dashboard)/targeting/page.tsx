@@ -11,7 +11,15 @@ import {
   deleteTargetClient,
   setDailyTargets,
   clearDailyTarget,
+  fetchSubscriberCandidates,
+  importSubscribersToTargeting,
 } from "@/lib/supabase/db";
+import {
+  diffAgainstExisting,
+  SOURCE_RENEWALS,
+  SOURCE_SUPPORT,
+  type SubscriberCandidate,
+} from "@/lib/targeting-subscribers";
 import { PLANS } from "@/lib/utils/constants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,6 +62,8 @@ import {
   Quote,
   Sparkles,
   ExternalLink,
+  UserPlus,
+  Lightbulb,
 } from "lucide-react";
 
 /* ---------- constants ---------- */
@@ -80,7 +90,13 @@ const SATISFACTION = {
 
 type ContactStatus = keyof typeof CONTACT_STATUS;
 type SatisfactionResult = keyof typeof SATISFACTION;
-type ViewFilter = "all" | "daily" | "pending" | "contacted" | "no_answer" | "postponed";
+type ViewFilter = "all" | "daily" | "subscribers" | "pending" | "contacted" | "no_answer" | "postponed";
+
+const PRIORITY = {
+  high: { label: "أولوية عالية", color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
+  medium: { label: "أولوية متوسطة", color: "text-sky-400", bg: "bg-sky-500/10", border: "border-sky-500/20" },
+  low: { label: "حل المشكلة أولاً", color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20" },
+} as const;
 
 const DAILY_QUOTES = [
   { text: "أنت لا تبيع منتجاً فقط، أنت تصنع تجربة — اجعلها تجربة لا تُنسى!", author: "توني هسيه", book: "توصيل السعادة" },
@@ -175,6 +191,13 @@ export default function TargetingPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
+  // Import subscribers (renewals basic plan + support sales)
+  const [importOpen, setImportOpen] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [candidates, setCandidates] = useState<SubscriberCandidate[]>([]);
+  const [importError, setImportError] = useState("");
+
   // Daily quote
   const quote = getDailyQuote();
 
@@ -197,6 +220,12 @@ export default function TargetingPage() {
       );
     }
     if (viewFilter === "daily") list = list.filter((c) => c.target_date === todayStr);
+    else if (viewFilter === "subscribers") {
+      const order = { high: 0, medium: 1, low: 2 } as const;
+      list = list
+        .filter((c) => c.recommendation)
+        .sort((a, b) => order[a.recommendation_priority ?? "medium"] - order[b.recommendation_priority ?? "medium"]);
+    }
     else if (viewFilter === "pending") list = list.filter((c) => c.contact_status === "pending");
     else if (viewFilter === "contacted") list = list.filter((c) => c.contact_status === "contacted");
     else if (viewFilter === "no_answer") list = list.filter((c) => c.contact_status === "no_answer");
@@ -209,7 +238,50 @@ export default function TargetingPage() {
   const contactedCount = clients.filter((c) => c.contact_status === "contacted").length;
   const pendingCount = clients.filter((c) => c.contact_status === "pending").length;
 
+  const subscribersCount = clients.filter((c) => c.recommendation).length;
+
+  const importPreview = useMemo(() => {
+    const { toInsert, toRefresh } = diffAgainstExisting(candidates, clients);
+    return {
+      toInsert,
+      refresh: toRefresh.length,
+      fromRenewals: candidates.filter((c) => c.source.includes(SOURCE_RENEWALS)).length,
+      fromSupport: candidates.filter((c) => c.source.includes(SOURCE_SUPPORT)).length,
+      high: candidates.filter((c) => c.recommendation_priority === "high").length,
+    };
+  }, [candidates, clients]);
+
   /* ---------- handlers ---------- */
+  async function openImport() {
+    setImportOpen(true);
+    setImportError("");
+    setImportLoading(true);
+    try {
+      setCandidates(await fetchSubscriberCandidates());
+    } catch (err) {
+      console.error(err);
+      setImportError("تعذّر جلب العملاء المشتركين");
+    } finally {
+      setImportLoading(false);
+    }
+  }
+
+  async function handleImport() {
+    setImporting(true);
+    setImportError("");
+    try {
+      await importSubscribersToTargeting(candidates, clients, month, year);
+      setClients(await fetchTargetClients(month, year));
+      setImportOpen(false);
+      setViewFilter("subscribers");
+    } catch (err) {
+      console.error(err);
+      setImportError("تعذّر نقل العملاء، حاول مرة أخرى");
+    } finally {
+      setImporting(false);
+    }
+  }
+
   function openAdd() {
     setEditingId(null);
     setForm(EMPTY_FORM);
@@ -341,6 +413,7 @@ export default function TargetingPage() {
   const FILTERS: { key: ViewFilter; label: string }[] = [
     { key: "all", label: "الكل" },
     { key: "daily", label: "هدف اليوم" },
+    { key: "subscribers", label: "المشتركين (ولاء + كاشير)" },
     { key: "pending", label: "لم يتم التواصل" },
     { key: "contacted", label: "تم التواصل" },
     { key: "no_answer", label: "لم يرد" },
@@ -466,6 +539,10 @@ export default function TargetingPage() {
                 <CalendarDays className="w-4 h-4" />
                 تحديد هدف يومي
               </Button>
+              <Button variant="outline" onClick={openImport} className="gap-1.5 border-fuchsia-500/30 text-fuchsia-400 hover:text-fuchsia-300">
+                <UserPlus className="w-4 h-4" />
+                نقل المشتركين
+              </Button>
               <Button onClick={openAdd} className="gap-1.5">
                 <Plus className="w-4 h-4" />
                 إضافة عميل
@@ -488,6 +565,11 @@ export default function TargetingPage() {
             }`}
           >
             {f.label}
+            {f.key === "subscribers" && subscribersCount > 0 && (
+              <span className="mr-1.5 px-1.5 py-0.5 rounded-full bg-fuchsia-500/20 text-fuchsia-400 text-[12px]">
+                {subscribersCount}
+              </span>
+            )}
             {f.key === "daily" && dailyCount > 0 && (
               <span className="mr-1.5 px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[12px]">
                 {dailyCount}
@@ -608,12 +690,30 @@ export default function TargetingPage() {
                       {client.assigned_rep}
                     </span>
                   )}
-                  {client.deal_id && (
+                  {client.deal_id && !client.recommendation && (
                     <span className="px-2 py-0.5 rounded-full bg-fuchsia-500/10 text-[12px] text-fuchsia-400 font-medium">
                       من الصفقات
                     </span>
                   )}
+                  {client.recommendation && client.source && (
+                    <span className="px-2 py-0.5 rounded-full bg-fuchsia-500/10 text-[12px] text-fuchsia-400 font-medium">
+                      {client.source}
+                    </span>
+                  )}
                 </div>
+
+                {client.recommendation && (() => {
+                  const pr = PRIORITY[client.recommendation_priority ?? "medium"];
+                  return (
+                    <div className={`rounded-lg border ${pr.border} ${pr.bg} p-3 space-y-1`}>
+                      <div className={`flex items-center gap-1.5 text-[12px] font-bold ${pr.color}`}>
+                        <Lightbulb className="w-3.5 h-3.5" />
+                        التوصية · {pr.label}
+                      </div>
+                      <p className="text-[13px] text-foreground/90 leading-relaxed">{client.recommendation}</p>
+                    </div>
+                  );
+                })()}
 
                 {client.notes && (
                   <p className="text-[13px] text-muted-foreground leading-relaxed line-clamp-2">
@@ -835,6 +935,79 @@ export default function TargetingPage() {
             <Button variant="outline" onClick={() => setContactOpen(false)}>إلغاء</Button>
             <Button onClick={handleContactSave} disabled={saving}>
               {saving ? "جاري الحفظ..." : "حفظ النتيجة"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Import Subscribers ─── */}
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>نقل العملاء المشتركين</DialogTitle>
+            <DialogDescription>
+              عملاء الباقة الأساسية المجدِّدين من التجديدات + العملاء المكتملين من مبيعات الدعم — لاستهدافهم ببطاقات الولاء والكاشير في قائمة {MONTHS_AR[month - 1]} {year}
+            </DialogDescription>
+          </DialogHeader>
+          {importLoading ? (
+            <div className="space-y-2 py-2">
+              {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+            </div>
+          ) : (
+            <div className="space-y-4 py-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                <div className="rounded-lg bg-white/5 p-2">
+                  <p className="text-lg font-extrabold text-foreground">{importPreview.fromRenewals}</p>
+                  <p className="text-[12px] text-muted-foreground">من التجديدات (أساسية)</p>
+                </div>
+                <div className="rounded-lg bg-white/5 p-2">
+                  <p className="text-lg font-extrabold text-foreground">{importPreview.fromSupport}</p>
+                  <p className="text-[12px] text-muted-foreground">من مبيعات الدعم</p>
+                </div>
+                <div className="rounded-lg bg-emerald-500/10 p-2">
+                  <p className="text-lg font-extrabold text-emerald-400">{importPreview.high}</p>
+                  <p className="text-[12px] text-muted-foreground">أولوية عالية</p>
+                </div>
+                <div className="rounded-lg bg-fuchsia-500/10 p-2">
+                  <p className="text-lg font-extrabold text-fuchsia-400">{importPreview.toInsert.length}</p>
+                  <p className="text-[12px] text-muted-foreground">جديد سيُضاف</p>
+                </div>
+              </div>
+              {importPreview.refresh > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {importPreview.refresh} عميل موجود مسبقاً في القائمة — ستُحدَّث توصيته فقط دون المساس بحالة التواصل.
+                </p>
+              )}
+              <div className="max-h-[45vh] overflow-y-auto space-y-2 pl-1">
+                {importPreview.toInsert.length === 0 ? (
+                  <p className="text-center text-sm text-muted-foreground py-6">كل العملاء المشتركين موجودون في القائمة مسبقاً</p>
+                ) : (
+                  importPreview.toInsert.map((c) => {
+                    const pr = PRIORITY[c.recommendation_priority];
+                    return (
+                      <div key={c.key} className="rounded-lg border border-border p-3 space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-bold text-foreground">{c.client_name}</span>
+                          {c.client_phone && <span className="text-[12px] text-muted-foreground">{c.client_phone}</span>}
+                          <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${pr.bg} ${pr.color}`}>{pr.label}</span>
+                          <span className="px-2 py-0.5 rounded-full bg-white/5 text-[11px] text-muted-foreground">{c.source}</span>
+                        </div>
+                        <p className="text-[12px] text-muted-foreground leading-relaxed">{c.recommendation}</p>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+          {importError && <p className="text-xs text-red-400">{importError}</p>}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImportOpen(false)}>إلغاء</Button>
+            <Button
+              onClick={handleImport}
+              disabled={importLoading || importing || (importPreview.toInsert.length === 0 && importPreview.refresh === 0)}
+            >
+              {importing ? "جاري النقل..." : `نقل ${importPreview.toInsert.length} عميل`}
             </Button>
           </DialogFooter>
         </DialogContent>
