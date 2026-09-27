@@ -1,7 +1,7 @@
 import { createClient } from "./client";
 import { todayLocal, saudiDateStr } from "@/lib/utils/format";
 import { buildSubscriberCandidates, diffAgainstExisting, type SubscriberCandidate } from "@/lib/targeting-subscribers";
-import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, MonthlyBudget, StartupCost, Marketer, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating, FollowUpNote, MentionNotification, PendingDeal, TargetClient, GiftOffer, EmployeeTask, Package, AcademyContent, LearningStage, LearningLesson, LearningQuiz, ActivityLog, TrainingKnowledge, ProductFeature, TrainingSessionLog, MarketingPlan, PlanAxis, PlanIdea, DealKpiStage } from "@/types";
+import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, MonthlyBudget, StartupCost, Marketer, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating, FollowUpNote, MentionNotification, PendingDeal, TargetClient, TargetClientLog, GiftOffer, EmployeeTask, Package, AcademyContent, LearningStage, LearningLesson, LearningQuiz, ActivityLog, TrainingKnowledge, ProductFeature, TrainingSessionLog, MarketingPlan, PlanAxis, PlanIdea, DealKpiStage } from "@/types";
 
 const DEFAULT_ORG = "00000000-0000-0000-0000-000000000001";
 
@@ -2010,6 +2010,105 @@ export async function importSubscribersToTargeting(
   }
 
   return { inserted: toInsert.length, refreshed: toRefresh.length };
+}
+
+// ─── TARGETING: CLIENT LOG + TRANSFER ─────────────────────────────────────
+
+export async function fetchTargetClientLogs(clientId: string): Promise<TargetClientLog[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("targeting_client_logs")
+    .select("*")
+    .eq("org_id", getOrgId())
+    .eq("client_id", clientId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as TargetClientLog[];
+}
+
+export async function addTargetClientLog(
+  log: Omit<TargetClientLog, "id" | "org_id" | "created_at">
+): Promise<TargetClientLog> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("targeting_client_logs")
+    .insert({ ...log, org_id: getOrgId() })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as TargetClientLog;
+}
+
+export interface TargetTransferInput {
+  destination: "support" | "renewals";
+  plan: string;
+  value: number;
+  assignedRep?: string;
+  note?: string;
+  author: string;
+}
+
+/**
+ * The client agreed: create a deal in مبيعات الدعم (awaiting payment) or a
+ * renewal in التجديدات, then mark the targeting row as transferred and log it.
+ */
+export async function transferTargetClient(
+  client: TargetClient,
+  input: TargetTransferInput
+): Promise<TargetClient> {
+  const today = todayLocal();
+  const [y, m] = today.split("-").map(Number);
+  const noteText = `من قائمة الاستهداف — وافق العميل على ${input.plan}${input.note ? ` — ${input.note}` : ""} (${input.author})`;
+
+  let ref: string;
+  if (input.destination === "support") {
+    const deal = await createDeal({
+      client_name: client.client_name,
+      client_phone: client.client_phone,
+      deal_value: input.value,
+      assigned_rep_name: input.assignedRep,
+      source: "قائمة الاستهداف",
+      stage: "انتظار الدفع",
+      plan: input.plan,
+      deal_date: today,
+      probability: 90,
+      notes: noteText,
+      last_contact: today,
+      cycle_days: 0,
+      month: m,
+      year: y,
+      sales_type: "support",
+    });
+    ref = deal.id;
+  } else {
+    const renewal = await createRenewal({
+      customer_name: client.client_name,
+      customer_phone: client.client_phone,
+      plan_name: input.plan,
+      plan_price: input.value,
+      renewal_date: today,
+      status: "انتظار الدفع",
+      assigned_rep: input.assignedRep,
+      notes: noteText,
+    });
+    ref = renewal.id;
+  }
+
+  const updated = await updateTargetClient(client.id, {
+    transferred_to: input.destination,
+    transferred_at: new Date().toISOString(),
+    transferred_ref: ref,
+    contact_status: "contacted",
+  });
+
+  await addTargetClientLog({
+    client_id: client.id,
+    kind: "transfer",
+    note: `وافق العميل — نُقل إلى ${input.destination === "support" ? "مبيعات الدعم" : "التجديدات"}: ${input.plan} بقيمة ${input.value}${input.note ? ` — ${input.note}` : ""}`,
+    author_name: input.author,
+  }).catch(console.error);
+
+  return updated;
 }
 
 // ─── GIFT OFFERS ──────────────────────────────────────────────────────────

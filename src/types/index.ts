@@ -488,8 +488,25 @@ export interface TargetClient {
   /** Suggested pitch (loyalty cards / cashier) for imported subscribers. */
   recommendation?: string;
   recommendation_priority?: "high" | "medium" | "low";
+  /** Set once the client agreed and was moved to مبيعات الدعم / التجديدات. */
+  transferred_to?: "support" | "renewals";
+  transferred_at?: string;
+  /** deals.id (support) or renewals.id (renewals) created by the transfer. */
+  transferred_ref?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface TargetClientLog {
+  id: string;
+  org_id: string;
+  client_id: string;
+  kind: "note" | "contact" | "transfer";
+  contact_status?: string;
+  satisfaction_result?: string;
+  note?: string;
+  author_name?: string;
+  created_at: string;
 }
 
 export interface PendingDeal {

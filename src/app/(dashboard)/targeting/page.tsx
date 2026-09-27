@@ -13,6 +13,9 @@ import {
   clearDailyTarget,
   fetchSubscriberCandidates,
   importSubscribersToTargeting,
+  fetchTargetClientLogs,
+  addTargetClientLog,
+  transferTargetClient,
 } from "@/lib/supabase/db";
 import {
   diffAgainstExisting,
@@ -40,7 +43,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { TargetClient } from "@/types";
+import type { TargetClient, TargetClientLog } from "@/types";
 import {
   Target,
   Plus,
@@ -64,6 +67,9 @@ import {
   ExternalLink,
   UserPlus,
   Lightbulb,
+  History,
+  ArrowLeftRight,
+  StickyNote,
 } from "lucide-react";
 
 /* ---------- constants ---------- */
@@ -90,7 +96,27 @@ const SATISFACTION = {
 
 type ContactStatus = keyof typeof CONTACT_STATUS;
 type SatisfactionResult = keyof typeof SATISFACTION;
-type ViewFilter = "all" | "daily" | "subscribers" | "pending" | "contacted" | "no_answer" | "postponed";
+type ViewFilter = "all" | "daily" | "subscribers" | "transferred" | "pending" | "contacted" | "no_answer" | "postponed";
+
+const DESTINATIONS = {
+  support: { label: "مبيعات الدعم", color: "text-emerald-400", bg: "bg-emerald-500/10" },
+  renewals: { label: "التجديدات", color: "text-sky-400", bg: "bg-sky-500/10" },
+} as const;
+
+const TRANSFER_PLANS = ["الكاشير + بطاقات الولاء", "الكاشير", "بطاقات الولاء", ...PLANS.filter((p) => p !== "الكاشير")];
+
+const EMPTY_TRANSFER = {
+  destination: "support" as keyof typeof DESTINATIONS,
+  plan: TRANSFER_PLANS[0],
+  value: "",
+  assigned_rep: "",
+  note: "",
+};
+
+function formatLogTime(iso: string) {
+  const d = new Date(iso);
+  return d.toLocaleString("ar-SA-u-nu-latn", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+}
 
 const PRIORITY = {
   high: { label: "أولوية عالية", color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
@@ -151,7 +177,8 @@ const EMPTY_FORM = {
 /* ---------- page ---------- */
 
 export default function TargetingPage() {
-  const { activeOrgId } = useAuth();
+  const { activeOrgId, user } = useAuth();
+  const authorName = user?.name || "—";
   const router = useRouter();
   const today = new Date();
 
@@ -198,6 +225,19 @@ export default function TargetingPage() {
   const [candidates, setCandidates] = useState<SubscriberCandidate[]>([]);
   const [importError, setImportError] = useState("");
 
+  // Per-client log
+  const [logsOpen, setLogsOpen] = useState(false);
+  const [logsClient, setLogsClient] = useState<TargetClient | null>(null);
+  const [logs, setLogs] = useState<TargetClientLog[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [newLogNote, setNewLogNote] = useState("");
+
+  // Transfer (client agreed) → مبيعات الدعم / التجديدات
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferClient, setTransferClient] = useState<TargetClient | null>(null);
+  const [transferForm, setTransferForm] = useState(EMPTY_TRANSFER);
+  const [transferError, setTransferError] = useState("");
+
   // Daily quote
   const quote = getDailyQuote();
 
@@ -226,6 +266,7 @@ export default function TargetingPage() {
         .filter((c) => c.recommendation)
         .sort((a, b) => order[a.recommendation_priority ?? "medium"] - order[b.recommendation_priority ?? "medium"]);
     }
+    else if (viewFilter === "transferred") list = list.filter((c) => c.transferred_to);
     else if (viewFilter === "pending") list = list.filter((c) => c.contact_status === "pending");
     else if (viewFilter === "contacted") list = list.filter((c) => c.contact_status === "contacted");
     else if (viewFilter === "no_answer") list = list.filter((c) => c.contact_status === "no_answer");
@@ -239,6 +280,7 @@ export default function TargetingPage() {
   const pendingCount = clients.filter((c) => c.contact_status === "pending").length;
 
   const subscribersCount = clients.filter((c) => c.recommendation).length;
+  const transferredCount = clients.filter((c) => c.transferred_to).length;
 
   const importPreview = useMemo(() => {
     const { toInsert, toRefresh } = diffAgainstExisting(candidates, clients);
@@ -355,11 +397,101 @@ export default function TargetingPage() {
         notes: contactNotes || undefined,
       });
       setClients((prev) => prev.map((c) => (c.id === contactClient.id ? updated : c)));
+      addTargetClientLog({
+        client_id: contactClient.id,
+        kind: "contact",
+        contact_status: contactStatus,
+        satisfaction_result: satisfactionResult || undefined,
+        note: contactNotes || undefined,
+        author_name: authorName,
+      }).catch(console.error);
       setContactOpen(false);
     } catch (err) {
       console.error(err);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function openLogs(c: TargetClient) {
+    setLogsClient(c);
+    setLogs([]);
+    setNewLogNote("");
+    setLogsOpen(true);
+    setLogsLoading(true);
+    try {
+      setLogs(await fetchTargetClientLogs(c.id));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLogsLoading(false);
+    }
+  }
+
+  async function handleAddLogNote() {
+    if (!logsClient || !newLogNote.trim()) return;
+    setSaving(true);
+    try {
+      const created = await addTargetClientLog({
+        client_id: logsClient.id,
+        kind: "note",
+        note: newLogNote.trim(),
+        author_name: authorName,
+      });
+      setLogs((prev) => [created, ...prev]);
+      setNewLogNote("");
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function openTransfer(c: TargetClient) {
+    setTransferClient(c);
+    setTransferError("");
+    setTransferForm({
+      ...EMPTY_TRANSFER,
+      // Basic-plan renewal subscribers upgrade through التجديدات; the rest through مبيعات الدعم.
+      destination: c.source?.startsWith("التجديدات") ? "renewals" : "support",
+      assigned_rep: c.assigned_rep || "",
+    });
+    setTransferOpen(true);
+  }
+
+  async function handleTransfer() {
+    if (!transferClient) return;
+    const value = Number(transferForm.value);
+    if (!transferForm.plan || !Number.isFinite(value) || value <= 0) {
+      setTransferError("اختر الباقة وأدخل القيمة");
+      return;
+    }
+    setSaving(true);
+    setTransferError("");
+    try {
+      const updated = await transferTargetClient(transferClient, {
+        destination: transferForm.destination,
+        plan: transferForm.plan,
+        value,
+        assignedRep: transferForm.assigned_rep.trim() || undefined,
+        note: transferForm.note.trim() || undefined,
+        author: authorName,
+      });
+      setClients((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+      setTransferOpen(false);
+    } catch (err) {
+      console.error(err);
+      setTransferError("تعذّر النقل، حاول مرة أخرى");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function openTransferred(c: TargetClient) {
+    if (c.transferred_to === "support" && c.transferred_ref) {
+      router.push(`/support-sales?deal=${c.transferred_ref}`);
+    } else if (c.transferred_to === "renewals") {
+      router.push(`/renewals?profile=${encodeURIComponent(c.client_phone || c.client_name)}`);
     }
   }
 
@@ -414,6 +546,7 @@ export default function TargetingPage() {
     { key: "all", label: "الكل" },
     { key: "daily", label: "هدف اليوم" },
     { key: "subscribers", label: "المشتركين (ولاء + كاشير)" },
+    { key: "transferred", label: "وافق وتم نقله" },
     { key: "pending", label: "لم يتم التواصل" },
     { key: "contacted", label: "تم التواصل" },
     { key: "no_answer", label: "لم يرد" },
@@ -570,6 +703,11 @@ export default function TargetingPage() {
                 {subscribersCount}
               </span>
             )}
+            {f.key === "transferred" && transferredCount > 0 && (
+              <span className="mr-1.5 px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[12px]">
+                {transferredCount}
+              </span>
+            )}
             {f.key === "daily" && dailyCount > 0 && (
               <span className="mr-1.5 px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[12px]">
                 {dailyCount}
@@ -702,6 +840,20 @@ export default function TargetingPage() {
                   )}
                 </div>
 
+                {client.transferred_to && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); openTransferred(client); }}
+                    className={`w-full flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-[12px] font-medium ${DESTINATIONS[client.transferred_to].bg} ${DESTINATIONS[client.transferred_to].color} hover:opacity-80 transition-opacity`}
+                    title="فتح في القسم المنقول إليه"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      وافق — نُقل إلى {DESTINATIONS[client.transferred_to].label}
+                    </span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </button>
+                )}
+
                 {client.recommendation && (() => {
                   const pr = PRIORITY[client.recommendation_priority ?? "medium"];
                   return (
@@ -733,6 +885,27 @@ export default function TargetingPage() {
                       <PhoneCall className="w-3.5 h-3.5" />
                       تسجيل تواصل
                     </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1 text-xs"
+                      onClick={() => openLogs(client)}
+                      title="سجل العميل"
+                    >
+                      <History className="w-3.5 h-3.5" />
+                    </Button>
+                    {!client.transferred_to && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1 text-xs text-emerald-400 hover:text-emerald-400"
+                        onClick={() => openTransfer(client)}
+                        title="وافق العميل — نقل لمبيعات الدعم أو التجديدات"
+                      >
+                        <ArrowLeftRight className="w-3.5 h-3.5" />
+                        وافق
+                      </Button>
+                    )}
                     {client.deal_id && (
                       <Button
                         variant="ghost"
@@ -935,6 +1108,144 @@ export default function TargetingPage() {
             <Button variant="outline" onClick={() => setContactOpen(false)}>إلغاء</Button>
             <Button onClick={handleContactSave} disabled={saving}>
               {saving ? "جاري الحفظ..." : "حفظ النتيجة"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Client Log ─── */}
+      <Dialog open={logsOpen} onOpenChange={setLogsOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>سجل العميل</DialogTitle>
+            <DialogDescription>{logsClient?.client_name}{logsClient?.client_phone ? ` — ${logsClient.client_phone}` : ""}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="flex gap-2">
+              <textarea
+                value={newLogNote}
+                onChange={(e) => setNewLogNote(e.target.value)}
+                placeholder="أضف ملاحظة للسجل..."
+                rows={2}
+                className="flex-1 rounded-lg border border-input bg-transparent px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              <Button onClick={handleAddLogNote} disabled={saving || !newLogNote.trim()} className="self-end">
+                إضافة
+              </Button>
+            </div>
+            <div className="max-h-[50vh] overflow-y-auto space-y-2 pl-1">
+              {logsLoading ? (
+                Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)
+              ) : logs.length === 0 ? (
+                <p className="text-center text-sm text-muted-foreground py-6">لا يوجد سجل لهذا العميل بعد</p>
+              ) : (
+                logs.map((log) => {
+                  const st = log.contact_status ? CONTACT_STATUS[log.contact_status as ContactStatus] : null;
+                  const sat = log.satisfaction_result ? SATISFACTION[log.satisfaction_result as SatisfactionResult] : null;
+                  const Icon = log.kind === "transfer" ? ArrowLeftRight : log.kind === "contact" ? PhoneCall : StickyNote;
+                  return (
+                    <div
+                      key={log.id}
+                      className={`rounded-lg border p-3 space-y-1.5 ${log.kind === "transfer" ? "border-emerald-500/30 bg-emerald-500/[0.05]" : "border-border"}`}
+                    >
+                      <div className="flex items-center gap-2 flex-wrap text-[12px]">
+                        <Icon className={`w-3.5 h-3.5 ${log.kind === "transfer" ? "text-emerald-400" : "text-muted-foreground"}`} />
+                        <span className="font-medium text-foreground">
+                          {log.kind === "transfer" ? "نقل" : log.kind === "contact" ? "تواصل" : "ملاحظة"}
+                        </span>
+                        {st && <span className={`px-2 py-0.5 rounded-full ${st.bg} ${st.color}`}>{st.label}</span>}
+                        {sat && <span className={`px-2 py-0.5 rounded-full ${sat.bg} ${sat.color}`}>{sat.label}</span>}
+                        <span className="mr-auto text-muted-foreground">
+                          {log.author_name} · {formatLogTime(log.created_at)}
+                        </span>
+                      </div>
+                      {log.note && <p className="text-[13px] text-foreground/90 leading-relaxed whitespace-pre-wrap">{log.note}</p>}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Transfer (client agreed) ─── */}
+      <Dialog open={transferOpen} onOpenChange={setTransferOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>وافق العميل — نقل</DialogTitle>
+            <DialogDescription>
+              {transferClient?.client_name} — يُنشأ له سجل «انتظار الدفع» في القسم المختار
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>النقل إلى</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {(Object.entries(DESTINATIONS) as [keyof typeof DESTINATIONS, typeof DESTINATIONS[keyof typeof DESTINATIONS]][]).map(([key, d]) => (
+                  <button
+                    key={key}
+                    onClick={() => setTransferForm({ ...transferForm, destination: key })}
+                    className={`px-3 py-2.5 rounded-lg text-sm font-medium border transition-colors ${
+                      transferForm.destination === key
+                        ? `${d.bg} ${d.color} border-current`
+                        : "border-border text-muted-foreground hover:border-muted-foreground"
+                    }`}
+                  >
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>الباقة / المنتج *</Label>
+                <Select value={transferForm.plan} onValueChange={(v) => v && setTransferForm({ ...transferForm, plan: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TRANSFER_PLANS.map((p) => (
+                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>القيمة (ريال) *</Label>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  value={transferForm.value}
+                  onChange={(e) => setTransferForm({ ...transferForm, value: e.target.value })}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>الموظف المسؤول</Label>
+              <Input
+                value={transferForm.assigned_rep}
+                onChange={(e) => setTransferForm({ ...transferForm, assigned_rep: e.target.value })}
+                placeholder="اسم الموظف"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>ملاحظة</Label>
+              <textarea
+                value={transferForm.note}
+                onChange={(e) => setTransferForm({ ...transferForm, note: e.target.value })}
+                placeholder="تفاصيل الاتفاق..."
+                rows={2}
+                className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+          </div>
+          {transferError && <p className="text-xs text-red-400">{transferError}</p>}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTransferOpen(false)}>إلغاء</Button>
+            <Button onClick={handleTransfer} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
+              {saving ? "جاري النقل..." : `نقل إلى ${DESTINATIONS[transferForm.destination].label}`}
             </Button>
           </DialogFooter>
         </DialogContent>
