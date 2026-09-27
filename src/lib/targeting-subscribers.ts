@@ -24,6 +24,8 @@ export interface SubscriberCandidate {
   deal_id?: string;
   recommendation: string;
   recommendation_priority: RecommendationPriority;
+  /** Subscription end date (YYYY-MM-DD), when known. */
+  expiry_date?: string;
 }
 
 export const SOURCE_RENEWALS = "التجديدات - الباقة الأساسية";
@@ -58,6 +60,31 @@ function daysSince(date?: string | null, now = Date.now()): number | null {
   return Math.floor((now - t) / 86_400_000);
 }
 
+function addYear(date: string): string {
+  const [y, m, d] = date.slice(0, 10).split("-");
+  return `${Number(y) + 1}-${m}-${d}`;
+}
+
+/**
+ * A customer's subscription end date from their renewal rows (renewal_date is
+ * the expiry): the earliest still-open renewal after the last completed one,
+ * otherwise the last completed renewal's date + one year.
+ */
+function expiryFromRenewals(rows: Renewal[]): string | undefined {
+  const dated = rows.filter((r) => r.renewal_date && r.status !== "ملغي بسبب");
+  const lastDone = dated
+    .filter((r) => r.status === "مكتمل")
+    .map((r) => r.renewal_date.slice(0, 10))
+    .sort()
+    .pop();
+  const nextOpen = dated
+    .filter((r) => r.status !== "مكتمل" && r.renewal_date.slice(0, 10) > (lastDone ?? ""))
+    .map((r) => r.renewal_date.slice(0, 10))
+    .sort()[0];
+  if (nextOpen) return nextOpen;
+  return lastDone ? addYear(lastDone) : undefined;
+}
+
 interface Aggregate {
   key: string;
   name: string;
@@ -65,7 +92,6 @@ interface Aggregate {
   rep?: string;
   basicRenewals: number;
   lastRenewalPaid?: string;
-  nextRenewal?: string;
   supportDeals: Deal[];
 }
 
@@ -108,10 +134,6 @@ export function buildSubscriberCandidates(
     a.basicRenewals = new Set(completed.map((r) => r.renewal_date)).size;
     a.lastRenewalPaid = last.payment_date || last.renewal_date;
     a.rep = last.assigned_rep || a.rep;
-    const today = new Date(now).toISOString().slice(0, 10);
-    a.nextRenewal = sorted.find(
-      (r) => r.status !== "مكتمل" && r.status !== "ملغي بسبب" && (r.renewal_date || "") >= today
-    )?.renewal_date;
   }
 
   // ── Support sales: closed deals ──
@@ -144,6 +166,11 @@ export function buildSubscriberCandidates(
       .sort()
       .pop();
     const since = daysSince(lastPaid, now);
+    // Support-sale customers usually have an auto-created renewal row too;
+    // fall back to one year after the latest closed deal.
+    const renewalRows = renewalsByKey.get(a.key);
+    const dealDate = (latestDeal?.close_date || latestDeal?.deal_date)?.slice(0, 10);
+    const expiry = (renewalRows && expiryFromRenewals(renewalRows)) || (dealDate ? addYear(dealDate) : undefined);
 
     const { text, priority } = recommend({
       fromRenewals,
@@ -154,7 +181,7 @@ export function buildSubscriberCandidates(
       hasCashier,
       openTickets: open,
       daysSincePaid: since,
-      daysToRenewal: a.nextRenewal ? -(daysSince(a.nextRenewal, now) ?? 0) : null,
+      daysToRenewal: expiry ? -(daysSince(expiry, now) ?? 0) : null,
     });
 
     result.push({
@@ -171,6 +198,7 @@ export function buildSubscriberCandidates(
       deal_id: !fromRenewals && latestDeal ? latestDeal.id : undefined,
       recommendation: text,
       recommendation_priority: priority,
+      expiry_date: expiry,
     });
   }
 
@@ -222,10 +250,14 @@ function recommend(i: RecommendInput): { text: string; priority: RecommendationP
     why.push(`اشترى من مبيعات الدعم${i.supportPlan ? ` (${i.supportPlan})` : ""}`);
   }
 
-  const renewalSoon = i.daysToRenewal !== null && i.daysToRenewal <= 45;
-  if (renewalSoon) {
+  const expiredLongAgo = i.daysToRenewal !== null && i.daysToRenewal < -30;
+  const renewalSoon = i.daysToRenewal !== null && !expiredLongAgo && i.daysToRenewal <= 45;
+  if (expiredLongAgo) {
+    low = true;
+    why.push(`انتهى اشتراكه منذ ${-i.daysToRenewal!} يوم — تأكد من تجديده أولاً`);
+  } else if (renewalSoon) {
     high = true;
-    why.push(i.daysToRenewal! <= 0 ? "تجديده مستحق الآن" : `تجديده القادم بعد ${i.daysToRenewal} يوم`);
+    why.push(i.daysToRenewal! <= 0 ? "اشتراكه ينتهي الآن — وقت التجديد" : `اشتراكه ينتهي بعد ${i.daysToRenewal} يوم`);
   } else if (i.daysSincePaid !== null && i.daysSincePaid >= 0 && i.daysSincePaid <= 45) {
     high = true;
     why.push("دفع مؤخراً والتجربة حاضرة في ذهنه");
@@ -270,7 +302,11 @@ export function diffAgainstExisting(
   for (const c of candidates) {
     const match = existingByKey.get(c.key);
     if (match) {
-      if (match.recommendation !== c.recommendation || match.recommendation_priority !== c.recommendation_priority) {
+      if (
+        match.recommendation !== c.recommendation ||
+        match.recommendation_priority !== c.recommendation_priority ||
+        (match.expiry_date ?? undefined) !== c.expiry_date
+      ) {
         toRefresh.push({ id: match.id, c });
       }
     } else if (!(c.deal_id && existingDealIds.has(c.deal_id))) {

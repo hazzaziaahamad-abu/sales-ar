@@ -488,6 +488,8 @@ export interface TargetClient {
   /** Suggested pitch (loyalty cards / cashier) for imported subscribers. */
   recommendation?: string;
   recommendation_priority?: "high" | "medium" | "low";
+  /** Subscription end date (YYYY-MM-DD). */
+  expiry_date?: string | null;
   /** Set once the client agreed and was moved to مبيعات الدعم / التجديدات. */
   transferred_to?: "support" | "renewals";
   transferred_at?: string;

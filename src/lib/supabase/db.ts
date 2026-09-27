@@ -1992,6 +1992,7 @@ export async function importSubscribersToTargeting(
         sales_type: c.sales_type || null,
         recommendation: c.recommendation,
         recommendation_priority: c.recommendation_priority,
+        expiry_date: c.expiry_date || null,
         month,
         year,
         contact_status: "pending",
@@ -2004,7 +2005,12 @@ export async function importSubscribersToTargeting(
   for (const { id, c } of toRefresh) {
     const { error } = await supabase
       .from("targeting_clients")
-      .update({ recommendation: c.recommendation, recommendation_priority: c.recommendation_priority, updated_at: now })
+      .update({
+        recommendation: c.recommendation,
+        recommendation_priority: c.recommendation_priority,
+        expiry_date: c.expiry_date || null,
+        updated_at: now,
+      })
       .eq("id", id);
     if (error) throw error;
   }

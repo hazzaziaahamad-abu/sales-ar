@@ -96,7 +96,7 @@ const SATISFACTION = {
 
 type ContactStatus = keyof typeof CONTACT_STATUS;
 type SatisfactionResult = keyof typeof SATISFACTION;
-type ViewFilter = "all" | "daily" | "subscribers" | "transferred" | "pending" | "contacted" | "no_answer" | "postponed";
+type ViewFilter = "all" | "daily" | "subscribers" | "expiring" | "transferred" | "pending" | "contacted" | "no_answer" | "postponed";
 
 const DESTINATIONS = {
   support: { label: "مبيعات الدعم", color: "text-emerald-400", bg: "bg-emerald-500/10" },
@@ -112,6 +112,20 @@ const EMPTY_TRANSFER = {
   assigned_rep: "",
   note: "",
 };
+
+/** Days from today until the given YYYY-MM-DD (negative = already past). */
+function daysUntil(date: string, todayStr: string) {
+  return Math.round((new Date(date).getTime() - new Date(todayStr).getTime()) / 86_400_000);
+}
+
+function expiryInfo(date: string, todayStr: string) {
+  const days = daysUntil(date, todayStr);
+  const formatted = new Date(date).toLocaleDateString("ar-SA-u-nu-latn-ca-gregory", { day: "numeric", month: "short", year: "numeric" });
+  if (days < 0) return { days, formatted, label: `منتهي منذ ${-days} يوم`, color: "text-red-400", bg: "bg-red-500/10" };
+  if (days === 0) return { days, formatted, label: "ينتهي اليوم", color: "text-red-400", bg: "bg-red-500/10" };
+  if (days <= 30) return { days, formatted, label: `باقي ${days} يوم`, color: "text-amber-400", bg: "bg-amber-500/10" };
+  return { days, formatted, label: `باقي ${days} يوم`, color: "text-muted-foreground", bg: "bg-white/5" };
+}
 
 function formatLogTime(iso: string) {
   const d = new Date(iso);
@@ -172,6 +186,7 @@ const EMPTY_FORM = {
   source: "",
   assigned_rep: "",
   notes: "",
+  expiry_date: "",
 };
 
 /* ---------- page ---------- */
@@ -266,6 +281,11 @@ export default function TargetingPage() {
         .filter((c) => c.recommendation)
         .sort((a, b) => order[a.recommendation_priority ?? "medium"] - order[b.recommendation_priority ?? "medium"]);
     }
+    else if (viewFilter === "expiring") {
+      list = list
+        .filter((c) => c.expiry_date && daysUntil(c.expiry_date, todayStr) <= 30)
+        .sort((a, b) => (a.expiry_date ?? "").localeCompare(b.expiry_date ?? ""));
+    }
     else if (viewFilter === "transferred") list = list.filter((c) => c.transferred_to);
     else if (viewFilter === "pending") list = list.filter((c) => c.contact_status === "pending");
     else if (viewFilter === "contacted") list = list.filter((c) => c.contact_status === "contacted");
@@ -281,6 +301,7 @@ export default function TargetingPage() {
 
   const subscribersCount = clients.filter((c) => c.recommendation).length;
   const transferredCount = clients.filter((c) => c.transferred_to).length;
+  const expiringCount = clients.filter((c) => c.expiry_date && daysUntil(c.expiry_date, todayStr) <= 30).length;
 
   const importPreview = useMemo(() => {
     const { toInsert, toRefresh } = diffAgainstExisting(candidates, clients);
@@ -339,6 +360,7 @@ export default function TargetingPage() {
       source: c.source || "",
       assigned_rep: c.assigned_rep || "",
       notes: c.notes || "",
+      expiry_date: c.expiry_date || "",
     });
     setAddOpen(true);
   }
@@ -355,6 +377,7 @@ export default function TargetingPage() {
           source: form.source || undefined,
           assigned_rep: form.assigned_rep || undefined,
           notes: form.notes || undefined,
+          expiry_date: form.expiry_date || null,
         });
         setClients((prev) => prev.map((c) => (c.id === editingId ? updated : c)));
       } else {
@@ -368,6 +391,7 @@ export default function TargetingPage() {
           contact_status: "pending",
           assigned_rep: form.assigned_rep || undefined,
           notes: form.notes || undefined,
+          expiry_date: form.expiry_date || undefined,
         });
         setClients((prev) => [created, ...prev]);
       }
@@ -546,6 +570,7 @@ export default function TargetingPage() {
     { key: "all", label: "الكل" },
     { key: "daily", label: "هدف اليوم" },
     { key: "subscribers", label: "المشتركين (ولاء + كاشير)" },
+    { key: "expiring", label: "ينتهي خلال 30 يوم" },
     { key: "transferred", label: "وافق وتم نقله" },
     { key: "pending", label: "لم يتم التواصل" },
     { key: "contacted", label: "تم التواصل" },
@@ -703,6 +728,11 @@ export default function TargetingPage() {
                 {subscribersCount}
               </span>
             )}
+            {f.key === "expiring" && expiringCount > 0 && (
+              <span className="mr-1.5 px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 text-[12px]">
+                {expiringCount}
+              </span>
+            )}
             {f.key === "transferred" && transferredCount > 0 && (
               <span className="mr-1.5 px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[12px]">
                 {transferredCount}
@@ -839,6 +869,19 @@ export default function TargetingPage() {
                     </span>
                   )}
                 </div>
+
+                {client.expiry_date && (() => {
+                  const ex = expiryInfo(client.expiry_date, todayStr);
+                  return (
+                    <div className={`flex items-center justify-between gap-2 rounded-lg px-3 py-1.5 text-[12px] ${ex.bg}`}>
+                      <span className="flex items-center gap-1.5 text-muted-foreground">
+                        <CalendarDays className="w-3.5 h-3.5" />
+                        تاريخ الانتهاء: <span className="text-foreground font-medium">{ex.formatted}</span>
+                      </span>
+                      <span className={`font-medium ${ex.color}`}>{ex.label}</span>
+                    </div>
+                  );
+                })()}
 
                 {client.transferred_to && (
                   <button
@@ -1010,6 +1053,14 @@ export default function TargetingPage() {
                   placeholder="اسم الموظف"
                 />
               </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>تاريخ الانتهاء</Label>
+              <Input
+                type="date"
+                value={form.expiry_date}
+                onChange={(e) => setForm({ ...form, expiry_date: e.target.value })}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>ملاحظات</Label>
@@ -1286,7 +1337,7 @@ export default function TargetingPage() {
               </div>
               {importPreview.refresh > 0 && (
                 <p className="text-xs text-muted-foreground">
-                  {importPreview.refresh} عميل موجود مسبقاً في القائمة — ستُحدَّث توصيته فقط دون المساس بحالة التواصل.
+                  {importPreview.refresh} عميل موجود مسبقاً في القائمة — ستُحدَّث توصيته وتاريخ انتهائه فقط دون المساس بحالة التواصل.
                 </p>
               )}
               <div className="max-h-[45vh] overflow-y-auto space-y-2 pl-1">
@@ -1302,6 +1353,11 @@ export default function TargetingPage() {
                           {c.client_phone && <span className="text-[12px] text-muted-foreground">{c.client_phone}</span>}
                           <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${pr.bg} ${pr.color}`}>{pr.label}</span>
                           <span className="px-2 py-0.5 rounded-full bg-white/5 text-[11px] text-muted-foreground">{c.source}</span>
+                          {c.expiry_date && (
+                            <span className={`px-2 py-0.5 rounded-full text-[11px] ${expiryInfo(c.expiry_date, todayStr).bg} ${expiryInfo(c.expiry_date, todayStr).color}`}>
+                              ينتهي {c.expiry_date}
+                            </span>
+                          )}
                         </div>
                         <p className="text-[12px] text-muted-foreground leading-relaxed">{c.recommendation}</p>
                       </div>
@@ -1318,7 +1374,11 @@ export default function TargetingPage() {
               onClick={handleImport}
               disabled={importLoading || importing || (importPreview.toInsert.length === 0 && importPreview.refresh === 0)}
             >
-              {importing ? "جاري النقل..." : `نقل ${importPreview.toInsert.length} عميل`}
+              {importing
+                ? "جاري النقل..."
+                : importPreview.toInsert.length > 0
+                  ? `نقل ${importPreview.toInsert.length} عميل`
+                  : `تحديث ${importPreview.refresh} عميل`}
             </Button>
           </DialogFooter>
         </DialogContent>
