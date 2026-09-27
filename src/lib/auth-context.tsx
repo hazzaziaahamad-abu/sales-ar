@@ -215,6 +215,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/** مثل useAuth لكن يرجّع null خارج AuthProvider (الصفحات العامة). */
+export function useOptionalAuth(): AuthContextValue | null {
+  return useContext(AuthContext);
+}
+
 export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");

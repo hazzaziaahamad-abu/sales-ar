@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { useAuth } from "@/lib/auth-context";
+import { useOptionalAuth } from "@/lib/auth-context";
+import { fetchPublicContent } from "@/lib/sales/public-content";
 import { getEditableContent, saveEditableContent } from "@/lib/supabase/db";
 import {
   HelpCircle,
@@ -83,8 +84,10 @@ function Field({ label, value, onChange, rows = 2 }: { label: string; value: str
 }
 
 /* ---------- المكوّن الرئيسي: بنك ردود سريعة على أسئلة العملاء ---------- */
-export default function CustomerFAQPanel({ id, storageKey, defaultItems }: { id?: string; storageKey: string; defaultItems: FAQItem[] }) {
-  const { user, isImpersonating } = useAuth();
+export default function CustomerFAQPanel({ id, storageKey, defaultItems, publicMode = false }: { id?: string; storageKey: string; defaultItems: FAQItem[]; /** صفحة عامة: عرض فقط، والمحتوى من API عام */ publicMode?: boolean }) {
+  const auth = useOptionalAuth();
+  const user = publicMode ? null : auth?.user;
+  const isImpersonating = !!auth?.isImpersonating;
   // الإضافة والتعديل للمدير فقط (المشرف العام أو دور «مدير»/admin) — الموظف يعرض وينسخ فقط.
   const isManager = !!user && (user.isSuperAdmin || user.roleName === "مدير" || user.roleName === "admin");
   const canEdit = isManager && !isImpersonating;
@@ -105,7 +108,7 @@ export default function CustomerFAQPanel({ id, storageKey, defaultItems }: { id?
 
   useEffect(() => {
     let alive = true;
-    getEditableContent<Stored>(storageKey)
+    (publicMode ? fetchPublicContent<Stored>(storageKey) : getEditableContent<Stored>(storageKey))
       .then((data) => {
         if (alive && data && Array.isArray(data.items) && data.items.length) setItems(data.items);
       })

@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useAuth } from "@/lib/auth-context";
+import { useOptionalAuth } from "@/lib/auth-context";
+import { fetchPublicContent } from "@/lib/sales/public-content";
 import { getEditableContent, saveEditableContent } from "@/lib/supabase/db";
 import {
   Phone,
@@ -112,6 +113,7 @@ export default function ContactFlowPanel({
   defaultSteps,
   defaultLoyalty,
   defaultInterestedSteps,
+  publicMode = false,
 }: {
   /** معرّف HTML للوصول المباشر عبر رابط (‎#…‎) */
   id?: string;
@@ -121,8 +123,12 @@ export default function ContactFlowPanel({
   defaultLoyalty: CFLoyalty;
   /** مسار «العميل المهتم» (اختياري) — يظهر مبدّل السيناريو عند تمريره. */
   defaultInterestedSteps?: CFStep[];
+  /** صفحة عامة: عرض فقط، والمحتوى من API عام */
+  publicMode?: boolean;
 }) {
-  const { user, isImpersonating } = useAuth();
+  const auth = useOptionalAuth();
+  const user = publicMode ? null : auth?.user;
+  const isImpersonating = !!auth?.isImpersonating;
   const canEdit = !!user?.isSuperAdmin && !isImpersonating;
   const hasInterested = Array.isArray(defaultInterestedSteps) && defaultInterestedSteps.length > 0;
 
@@ -149,7 +155,7 @@ export default function ContactFlowPanel({
   // تحميل المحتوى المحفوظ من قاعدة البيانات
   useEffect(() => {
     let alive = true;
-    getEditableContent<Stored>(storageKey)
+    (publicMode ? fetchPublicContent<Stored>(storageKey) : getEditableContent<Stored>(storageKey))
       .then((data) => {
         if (!alive || !data) return;
         if (Array.isArray(data.steps) && data.steps.length) setSteps(mergeSteps(defaultSteps, data.steps));
