@@ -16,10 +16,15 @@ const TARGETS_KEY = `${KEY_PREFIX}_targets`;
 
 type Attendance = "present" | "late" | "absent";
 
+/** التزام اليوم — يُقيَّم في اليوم التالي: نُفّذ (true) أو لم يُنفَّذ (false). */
+interface Commitment {
+  text: string;
+  done?: boolean;
+}
+
 interface Entry {
   attendance?: Attendance;
-  yesterday?: string;
-  today?: string;
+  commitments?: Commitment[];
   blocker?: string;
   calls?: number;
   offers?: number;
@@ -75,6 +80,16 @@ function weekStart(date: string): string {
   return d.toISOString().slice(0, 10);
 }
 
+function prevDay(date: string): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+const keyDate = (key: string) => key.split(":")[1];
+const keyMember = (key: string) => key.split(":")[2];
+const rateColor = (v: number) => (v >= 80 ? "text-emerald-400" : v >= 50 ? "text-amber-400" : "text-red-400");
+
 function pct(value: number, target: number) {
   if (!target) return 0;
   return Math.min(100, Math.round((value / target) * 100));
@@ -103,14 +118,15 @@ export default function DailyHuddlePage() {
     try {
       const [t, rows] = await Promise.all([
         getEditableContent<Targets>(TARGETS_KEY),
-        getEditableContentRange<Entry>(`${KEY_PREFIX}:${weekStart(date)}`, `${KEY_PREFIX}:${date}:￿`),
+        // من بداية الأسبوع أو أمس (أيهما أسبق) — نحتاج أمس لعرض أرقامه وتقييم التزاماته.
+        getEditableContentRange<Entry>(`${KEY_PREFIX}:${[weekStart(date), prevDay(date)].sort()[0]}`, `${KEY_PREFIX}:${date}:￿`),
       ]);
       if (t) setTargets({ ...DEFAULT_TARGETS, ...t });
       setWeek(rows);
       const today: Record<string, Entry> = {};
       for (const r of rows) {
-        const member = r.key.split(":")[2];
-        if (r.key.startsWith(`${KEY_PREFIX}:${date}:`) && TEAM.includes(member)) today[member] = r.value;
+        const member = keyMember(r.key);
+        if (keyDate(r.key) === date && TEAM.includes(member)) today[member] = r.value;
       }
       setEntries(today);
     } catch (e) {
@@ -130,23 +146,25 @@ export default function DailyHuddlePage() {
   }
 
   // الحضور والجودة يسجّلهما المدير والباقي يسجّله الموظف — نقرأ آخر نسخة قبل الحفظ حتى لا يمسح أحدهما تعديل الآخر.
-  async function save(member: string, patch?: Partial<Entry>) {
+  async function save(member: string, patch?: Partial<Entry>, forDate = date) {
     setSaving(member);
     setError(null);
     try {
-      const latest = (await getEditableContent<Entry>(entryKey(date, member))) ?? {};
+      const key = entryKey(forDate, member);
+      const latest = (await getEditableContent<Entry>(key)) ?? {};
       const own: Entry = { ...entries[member] };
       delete own.attendance;
       delete own.quality;
+      own.commitments = own.commitments?.filter((c) => c.text.trim());
       const entry: Entry = {
         ...latest,
         ...(patch ?? own),
         updated_by: user?.name,
         updated_at: new Date().toISOString(),
       };
-      await saveEditableContent(entryKey(date, member), entry);
-      setEntries((prev) => ({ ...prev, [member]: entry }));
-      setWeek((prev) => [...prev.filter((r) => r.key !== entryKey(date, member)), { key: entryKey(date, member), value: entry }]);
+      await saveEditableContent(key, entry);
+      if (forDate === date) setEntries((prev) => ({ ...prev, [member]: entry }));
+      setWeek((prev) => [...prev.filter((r) => r.key !== key), { key, value: entry }]);
       setSaved(member);
       setTimeout(() => setSaved((s) => (s === member ? null : s)), 2000);
     } catch (e) {
@@ -175,13 +193,34 @@ export default function DailyHuddlePage() {
   const attendedCount = TEAM.filter((n) => entries[n]?.attendance === "present" || entries[n]?.attendance === "late").length;
   const winning = METRICS.every((m) => teamTotals[m.key] >= targets[m.key] * TEAM.length);
 
+  const yesterday = prevDay(date);
+  const yesterdayEntry = (member: string) => week.find((r) => keyDate(r.key) === yesterday && keyMember(r.key) === member)?.value;
+
+  function setCommitmentText(member: string, i: number, text: string) {
+    const list = [...(entries[member]?.commitments ?? [])];
+    while (list.length < 3) list.push({ text: "" });
+    list[i] = { ...list[i], text };
+    update(member, { commitments: list });
+  }
+
+  function markCommitment(member: string, i: number, done: boolean) {
+    const list = [...(yesterdayEntry(member)?.commitments ?? [])];
+    list[i] = { ...list[i], done: list[i].done === done ? undefined : done };
+    save(member, { commitments: list }, yesterday);
+  }
+
   // ── لوحة الأسبوع ──
+  const ws = weekStart(date);
   const weekRows = TEAM.map((member) => {
-    const days = week.filter((r) => r.key.split(":")[2] === member).map((r) => r.value);
+    const days = week.filter((r) => keyMember(r.key) === member && keyDate(r.key) >= ws).map((r) => r.value);
+    const evaluated = days.flatMap((d) => d.commitments ?? []).filter((c) => c.done !== undefined);
     const sum = (k: (typeof METRICS)[number]["key"]) => days.reduce((s, d) => s + (d[k] ?? 0), 0);
     const reported = days.filter((d) => METRICS.some((m) => (d[m.key] ?? 0) > 0)).length;
     const qualityDays = days.map((d) => qualityAvg(d.quality)).filter((v): v is number => v !== null);
     return {
+      commitRate: evaluated.length ? Math.round((evaluated.filter((c) => c.done).length / evaluated.length) * 100) : null,
+      commitDone: evaluated.filter((c) => c.done).length,
+      commitTotal: evaluated.length,
       quality: qualityDays.length ? qualityDays.reduce((a, b) => a + b, 0) / qualityDays.length : null,
       member,
       attended: days.filter((d) => d.attendance === "present" || d.attendance === "late").length,
@@ -322,26 +361,83 @@ export default function DailyHuddlePage() {
                   </div>
                 </div>
 
-                <div className="space-y-2 mt-3">
-                  {([
-                    { key: "yesterday", label: "ماذا أنجزت أمس؟" },
-                    { key: "today", label: "أهم 3 أشياء اليوم" },
-                    { key: "blocker", label: "عائق تحتاج فيه مساعدة" },
-                  ] as const).map((f) => (
-                    <label key={f.key} className="block text-xs text-muted-foreground">
-                      {f.label}
-                      <textarea
-                        rows={2}
-                        value={e[f.key] ?? ""}
-                        readOnly={!editable}
-                        onChange={(ev) => update(member, { [f.key]: ev.target.value })}
-                        className={`block w-full mt-1 px-3 py-2 rounded-lg bg-white/[0.04] border text-sm text-foreground resize-none ${
-                          f.key === "blocker" && e.blocker?.trim() ? "border-red-500/30" : "border-white/[0.08]"
-                        }`}
-                      />
-                    </label>
-                  ))}
-                </div>
+                {(() => {
+                  const y = yesterdayEntry(member);
+                  const yCommitments = y?.commitments ?? [];
+                  const commitments = [...(e.commitments ?? [])];
+                  while (commitments.length < 3) commitments.push({ text: "" });
+                  return (
+                    <div className="space-y-3 mt-3">
+                      {/* أمس: أرقام تلقائية + تقييم التزامات أمس */}
+                      <div className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-3">
+                        <div className="text-xs text-muted-foreground">
+                          أمس:{" "}
+                          {y && METRICS.some((m) => (y[m.key] ?? 0) > 0) ? (
+                            <span className="text-foreground font-medium">
+                              {METRICS.map((m) => `${y[m.key] ?? 0} ${m.label}`).join(" · ")}
+                            </span>
+                          ) : (
+                            <span>لا توجد أرقام مسجّلة</span>
+                          )}
+                        </div>
+                        {yCommitments.length > 0 && (
+                          <div className="space-y-1 mt-2">
+                            <div className="text-[11px] text-muted-foreground">التزامات أمس — هل نُفّذت؟</div>
+                            {yCommitments.map((c, i) => (
+                              <div key={i} className="flex items-center justify-between gap-2">
+                                <span className={`text-sm ${c.done === true ? "text-emerald-400" : c.done === false ? "text-red-400 line-through" : "text-foreground"}`}>
+                                  {c.text}
+                                </span>
+                                <div className="flex gap-1 shrink-0">
+                                  {([true, false] as const).map((d) => (
+                                    <button
+                                      key={String(d)}
+                                      disabled={!editable || saving === member}
+                                      onClick={() => markCommitment(member, i, d)}
+                                      className={`w-7 h-6 rounded-md text-xs transition-all ${
+                                        c.done === d ? (d ? "bg-emerald-500/20 ring-1 ring-emerald-500/40" : "bg-red-500/20 ring-1 ring-red-500/40") : "bg-white/[0.04] opacity-60"
+                                      } ${editable ? "hover:opacity-100" : "cursor-default"}`}
+                                    >
+                                      {d ? "✅" : "❌"}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="text-xs text-muted-foreground">
+                        أهم 3 أشياء اليوم
+                        <div className="space-y-1.5 mt-1">
+                          {commitments.slice(0, 3).map((c, i) => (
+                            <input
+                              key={i}
+                              value={c.text}
+                              readOnly={!editable}
+                              placeholder={editable ? `${i + 1}. مثال: إغلاق عميل / متابعة 5 عروض` : ""}
+                              onChange={(ev) => setCommitmentText(member, i, ev.target.value)}
+                              className="block w-full px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-foreground"
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      <label className="block text-xs text-muted-foreground">
+                        عائق تحتاج فيه مساعدة (اختياري)
+                        <input
+                          value={e.blocker ?? ""}
+                          readOnly={!editable}
+                          onChange={(ev) => update(member, { blocker: ev.target.value })}
+                          className={`block w-full mt-1 px-3 py-1.5 rounded-lg bg-white/[0.04] border text-sm text-foreground ${
+                            e.blocker?.trim() ? "border-red-500/40 text-red-300" : "border-white/[0.08]"
+                          }`}
+                        />
+                      </label>
+                    </div>
+                  );
+                })()}
 
                 <div className="grid grid-cols-3 gap-2 mt-3">
                   {METRICS.map((m) => {
@@ -435,6 +531,7 @@ export default function DailyHuddlePage() {
                 <th className="text-center py-2 font-medium">حضور</th>
                 <th className="text-center py-2 font-medium">تأخير</th>
                 <th className="text-center py-2 font-medium">أيام التحديث</th>
+                <th className="text-center py-2 font-medium">الالتزام</th>
                 {isManager && <th className="text-center py-2 font-medium">الجودة</th>}
                 {METRICS.map((m) => <th key={m.key} className="text-center py-2 font-medium">{m.label}</th>)}
               </tr>
@@ -447,6 +544,9 @@ export default function DailyHuddlePage() {
                   <td className="py-2 text-center">{r.attended}</td>
                   <td className={`py-2 text-center ${r.late ? "text-amber-400" : ""}`}>{r.late}</td>
                   <td className="py-2 text-center">{r.reported}</td>
+                  <td className={`py-2 text-center font-bold ${r.commitRate !== null ? rateColor(r.commitRate) : "text-muted-foreground"}`}>
+                    {r.commitRate !== null ? <span title={`${r.commitDone} من ${r.commitTotal}`}>{r.commitRate}%</span> : "—"}
+                  </td>
                   {isManager && (
                     <td className={`py-2 text-center font-bold ${r.quality !== null ? qualityColor(r.quality) : "text-muted-foreground"}`}>
                       {r.quality !== null ? r.quality.toFixed(1) : "—"}
@@ -465,7 +565,7 @@ export default function DailyHuddlePage() {
             </tbody>
           </table>
         </div>
-        <p className="text-[11px] text-muted-foreground mt-2">الأخضر: المعدّل اليومي يحقق الهدف في الأيام التي حُدّثت فيها الأرقام.{isManager && " الجودة: متوسط تقييم المدير من 5 (4+ ممتاز، أقل من 3 يحتاج تدريب) — تظهر لك فقط."}</p>
+        <p className="text-[11px] text-muted-foreground mt-2">الأخضر: المعدّل اليومي يحقق الهدف في الأيام التي حُدّثت فيها الأرقام. الالتزام: نسبة «أهم 3 أشياء» المنفّذة فعلاً.{isManager && " الجودة: متوسط تقييم المدير من 5 (4+ ممتاز، أقل من 3 يحتاج تدريب) — تظهر لك فقط."}</p>
       </div>
     </div>
   );
