@@ -199,7 +199,7 @@ export default function DailyHuddlePage() {
         {[
           { time: "12:40 ظهراً", text: "الاجتماع اليومي — 10 دقائق، الكاميرا مفتوحة" },
           { time: "9:45 مساءً", text: "كل موظف يحدّث أرقامه هنا قبل نهاية الدوام" },
-          { time: "الأحد", text: "اجتماع الأسبوع: هل التزمنا؟ وما التزامنا القادم؟" },
+          { time: "السبت 1:30 ظهراً", text: "اجتماع الأسبوع: هل التزمنا؟ وما التزامنا القادم؟" },
         ].map((r) => (
           <div key={r.time} className="cc-card rounded-[14px] p-3 border border-white/[0.06]">
             <div className="text-xs font-bold text-violet-400">{r.time}</div>
