@@ -9,7 +9,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   CONTENT_KINDS, ITEM_STATUSES, PLAN_STATUSES, PLATFORMS, kindLabel, platformLabel, isVideoKind,
-  type ContentItem, type ContentKind, type ContentPlan, type ContentSuggestion, type TimelineRow,
+  type ContentItem, type ContentKind, type ContentPlan, type SavedSuggestion, type TimelineRow,
 } from "@/lib/content-plans/types";
 
 const KIND_STYLE: Record<ContentKind, { icon: typeof Video; color: string }> = {
@@ -23,7 +23,7 @@ const KIND_STYLE: Record<ContentKind, { icon: typeof Video; color: string }> = {
 const inputCls =
   "w-full rounded-lg bg-white/[0.06] border border-border px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-violet-500/50 disabled:opacity-70";
 
-type PlanPayload = { plan: ContentPlan; items: ContentItem[]; canEdit: boolean; isOwner: boolean };
+type PlanPayload = { plan: ContentPlan; items: ContentItem[]; suggestions: SavedSuggestion[]; canEdit: boolean; isOwner: boolean };
 
 /**
  * محرر خطة المحتوى. يعمل في لوحة التحكم (apiBase = /api/content-plans/<id>)
@@ -194,7 +194,14 @@ export default function ContentPlanEditor({ apiBase }: { apiBase: string }) {
 
       {isOwner && <SharePanel plan={plan} onUpdate={updatePlan} />}
 
-      {canEdit && <AIIdeasPanel api={api} onAdd={addItems} />}
+      {canEdit && (
+        <AIIdeasPanel
+          api={api}
+          suggestions={data.suggestions ?? []}
+          setSuggestions={(fn) => setData((d) => (d ? { ...d, suggestions: fn(d.suggestions ?? []) } : d))}
+          onItemsAdded={(added) => setData((d) => (d ? { ...d, items: [...d.items, ...added] } : d))}
+        />
+      )}
 
       {/* العناصر */}
       <div className="glass-surface rounded-[14px] border border-border p-5 hover:translate-y-0">
@@ -393,23 +400,35 @@ function SharePanel({ plan, onUpdate }: { plan: ContentPlan; onUpdate: (p: Parti
 
 type ApiFn = <T>(path: string, init?: RequestInit) => Promise<T>;
 
-function AIIdeasPanel({ api, onAdd }: { api: ApiFn; onAdd: (items: Partial<ContentItem>[]) => Promise<ContentItem[]> }) {
-  const [open, setOpen] = useState(false);
+function AIIdeasPanel({ api, suggestions, setSuggestions, onItemsAdded }: {
+  api: ApiFn;
+  suggestions: SavedSuggestion[];
+  setSuggestions: (fn: (prev: SavedSuggestion[]) => SavedSuggestion[]) => void;
+  onItemsAdded: (items: ContentItem[]) => void;
+}) {
+  const [open, setOpen] = useState(suggestions.some((s) => !s.added));
   const [kind, setKind] = useState<ContentKind | "">("");
   const [count, setCount] = useState(5);
   const [hint, setHint] = useState("");
   const [loading, setLoading] = useState(false);
-  const [ideas, setIdeas] = useState<(ContentSuggestion & { added?: boolean })[]>([]);
-  const [expanded, setExpanded] = useState<number | null>(null);
+  const [showAdded, setShowAdded] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [freshIds, setFreshIds] = useState<string[]>([]);
+
+  const pending = suggestions.filter((s) => !s.added);
+  const addedCount = suggestions.length - pending.length;
+  const visible = showAdded ? suggestions : pending;
 
   const generate = async () => {
     setLoading(true);
     try {
-      const res = await api<{ ideas: ContentSuggestion[] }>("/ai", {
+      const res = await api<{ suggestions: SavedSuggestion[] }>("/ai", {
         method: "POST",
         body: JSON.stringify({ mode: "ideas", kind: kind || undefined, count, hint }),
       });
-      setIdeas(res.ideas);
+      // الجديدة فوق، والقديمة تبقى تحتها
+      setSuggestions((prev) => [...res.suggestions, ...prev]);
+      setFreshIds(res.suggestions.map((x) => x.id));
       setExpanded(null);
     } catch (e) {
       alert((e as Error).message);
@@ -418,10 +437,29 @@ function AIIdeasPanel({ api, onAdd }: { api: ApiFn; onAdd: (items: Partial<Conte
     }
   };
 
-  const add = async (list: number[]) => {
+  const add = async (list: SavedSuggestion[]) => {
     try {
-      await onAdd(list.map((i) => ({ ...ideas[i], source: "ai" as const, added: undefined })));
-      setIdeas((prev) => prev.map((x, i) => (list.includes(i) ? { ...x, added: true } : x)));
+      const res = await api<{ items: ContentItem[] }>("/items", {
+        method: "POST",
+        body: JSON.stringify({
+          items: list.map((x) => ({
+            kind: x.kind, title: x.title, idea: x.idea, script: x.script, caption: x.caption,
+            timeline: x.timeline, focus_points: x.focus_points, source: "ai", suggestion_id: x.id,
+          })),
+        }),
+      });
+      onItemsAdded(res.items);
+      const ids = list.map((x) => x.id);
+      setSuggestions((prev) => prev.map((x) => (ids.includes(x.id) ? { ...x, added: true } : x)));
+    } catch (e) {
+      alert((e as Error).message);
+    }
+  };
+
+  const dismiss = async (query: string, keep: (x: SavedSuggestion) => boolean) => {
+    try {
+      await api(`/suggestions?${query}`, { method: "DELETE" });
+      setSuggestions((prev) => prev.filter(keep));
     } catch (e) {
       alert((e as Error).message);
     }
@@ -432,6 +470,9 @@ function AIIdeasPanel({ api, onAdd }: { api: ApiFn; onAdd: (items: Partial<Conte
       <button onClick={() => setOpen((v) => !v)} className="w-full flex items-center justify-between">
         <span className="flex items-center gap-2 text-sm font-bold text-foreground">
           <Sparkles className="w-4 h-4 text-violet-400" /> ولّد أفكار بالذكاء الاصطناعي
+          {pending.length > 0 && (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300">{pending.length} فكرة محفوظة</span>
+          )}
         </span>
         {open ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
       </button>
@@ -460,32 +501,52 @@ function AIIdeasPanel({ api, onAdd }: { api: ApiFn; onAdd: (items: Partial<Conte
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-500 text-white text-sm font-semibold hover:bg-violet-600 disabled:opacity-60"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-            {loading ? "جاري التوليد..." : ideas.length ? "ولّد أفكار جديدة" : "ولّد الأفكار"}
+            {loading ? "جاري التوليد..." : suggestions.length ? "ولّد أفكار جديدة غيرها" : "ولّد الأفكار"}
           </button>
 
-          {ideas.length > 0 && (
+          {suggestions.length > 0 && (
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-muted-foreground">اقتراحات ({ideas.length}) — اختر اللي يعجبك وأضفه للخطة</p>
-                {ideas.some((i) => !i.added) && (
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <p className="text-xs text-muted-foreground">
+                  الأفكار المحفوظة ({pending.length}) — تبقى هنا لين تضيفها أو تتجاهلها
+                </p>
+                <div className="flex items-center gap-3">
+                  {addedCount > 0 && (
+                    <button onClick={() => setShowAdded((v) => !v)} className="text-[11px] text-muted-foreground hover:text-foreground">
+                      {showAdded ? "إخفاء المضافة" : `عرض المضافة (${addedCount})`}
+                    </button>
+                  )}
+                  {pending.length > 0 && (
+                    <button onClick={() => add(pending)} className="text-xs font-semibold text-violet-400 hover:text-violet-300">
+                      إضافة الكل
+                    </button>
+                  )}
                   <button
-                    onClick={() => add(ideas.map((_, i) => i).filter((i) => !ideas[i].added))}
-                    className="text-xs font-semibold text-violet-400 hover:text-violet-300"
+                    onClick={() => confirm("مسح كل الأفكار المحفوظة؟ (العناصر المضافة للخطة ما تنحذف)") && dismiss("scope=all", () => false)}
+                    className="text-[11px] text-muted-foreground hover:text-red-400"
                   >
-                    إضافة الكل
+                    مسح الكل
                   </button>
-                )}
+                </div>
               </div>
-              {ideas.map((s, i) => {
+              {visible.length === 0 && (
+                <p className="text-xs text-muted-foreground py-2">كل الأفكار أُضيفت للخطة — ولّد أفكار جديدة</p>
+              )}
+              {visible.map((s) => {
                 const S = KIND_STYLE[s.kind] ?? KIND_STYLE.video;
+                const isOpen = expanded === s.id;
                 return (
-                  <div key={i} className={cn("p-3 rounded-lg border bg-white/[0.03]", s.added ? "border-emerald-500/30 opacity-70" : "border-border")}>
+                  <div key={s.id} className={cn("p-3 rounded-lg border bg-white/[0.03]",
+                    s.added ? "border-emerald-500/30 opacity-70" : freshIds.includes(s.id) ? "border-violet-500/40" : "border-border")}>
                     <div className="flex items-start gap-2">
                       <span className={cn("w-7 h-7 rounded-lg flex items-center justify-center shrink-0", S.color)}><S.icon className="w-3.5 h-3.5" /></span>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-foreground">{s.title}</p>
+                        <p className="text-sm font-bold text-foreground">
+                          {s.title}
+                          {freshIds.includes(s.id) && <span className="mr-2 text-[10px] font-bold text-violet-300">جديدة</span>}
+                        </p>
                         <p className="text-xs text-muted-foreground mt-0.5">{kindLabel(s.kind)} · {s.idea}</p>
-                        {expanded === i && (
+                        {isOpen && (
                           <div className="mt-2 space-y-2">
                             <pre className="whitespace-pre-wrap font-sans text-xs text-foreground/90 bg-black/20 rounded-lg p-2.5 leading-relaxed">{s.script}</pre>
                             {s.timeline?.length > 0 && <TimelineEditor rows={s.timeline} canEdit={false} onChange={() => {}} />}
@@ -498,12 +559,21 @@ function AIIdeasPanel({ api, onAdd }: { api: ApiFn; onAdd: (items: Partial<Conte
                         {s.added ? (
                           <span className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1"><Check className="w-3 h-3" /> أُضيفت</span>
                         ) : (
-                          <button onClick={() => add([i])} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-500/20 text-violet-300 hover:bg-violet-500/30 text-[11px] font-semibold">
-                            <Plus className="w-3 h-3" /> إضافة
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => add([s])} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-500/20 text-violet-300 hover:bg-violet-500/30 text-[11px] font-semibold">
+                              <Plus className="w-3 h-3" /> إضافة
+                            </button>
+                            <button
+                              onClick={() => dismiss(`id=${encodeURIComponent(s.id)}`, (x) => x.id !== s.id)}
+                              title="تجاهل"
+                              className="p-1 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         )}
-                        <button onClick={() => setExpanded(expanded === i ? null : i)} className="text-[11px] text-muted-foreground hover:text-foreground">
-                          {expanded === i ? "إخفاء التفاصيل" : "عرض السكربت"}
+                        <button onClick={() => setExpanded(isOpen ? null : s.id)} className="text-[11px] text-muted-foreground hover:text-foreground">
+                          {isOpen ? "إخفاء التفاصيل" : "عرض السكربت"}
                         </button>
                       </div>
                     </div>

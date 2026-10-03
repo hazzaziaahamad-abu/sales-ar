@@ -104,9 +104,19 @@ export async function loadPlanPayload(access: Extract<PlanAccess, { ok: true }>)
     .eq("plan_id", access.plan.id)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
+  // الاقتراحات للي يقدر يعدّل فقط (زائر العرض ما يحتاجها)
+  const { data: suggestions } = access.canEdit
+    ? await supabaseAdmin
+        .from("content_suggestions")
+        .select("*")
+        .eq("plan_id", access.plan.id)
+        .order("created_at", { ascending: false })
+        .limit(200)
+    : { data: [] };
   return {
     plan: publicPlan(access.plan, access.isOwner),
     items: (items ?? []) as ContentItem[],
+    suggestions: suggestions ?? [],
     canEdit: access.canEdit,
     isOwner: access.isOwner,
   };

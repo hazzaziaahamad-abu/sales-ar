@@ -58,6 +58,11 @@ export async function handleItems(req: NextRequest, resolve: Resolver) {
     }));
     const { data, error } = await supabaseAdmin.from("content_items").insert(rows).select("*");
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    // عناصر مصدرها اقتراح محفوظ → نعلّم الاقتراح «أُضيف»
+    const suggestionIds = list.slice(0, 20).map((it) => it.suggestion_id).filter((x): x is string => typeof x === "string" && !!x);
+    if (suggestionIds.length) {
+      await supabaseAdmin.from("content_suggestions").update({ added: true }).eq("plan_id", planId).in("id", suggestionIds);
+    }
     await touchPlan(planId);
     return NextResponse.json({ items: data ?? [] });
   }
@@ -103,15 +108,44 @@ export async function handleAI(req: NextRequest, resolve: Resolver) {
       const result = await generateScript(access.plan, item, typeof b.instruction === "string" ? b.instruction : undefined);
       return NextResponse.json(result);
     }
-    const { data: existing } = await supabaseAdmin.from("content_items").select("title").eq("plan_id", access.plan.id);
+    // لا نكرر عناوين العناصر ولا الاقتراحات السابقة
+    const [{ data: existing }, { data: previous }] = await Promise.all([
+      supabaseAdmin.from("content_items").select("title").eq("plan_id", access.plan.id),
+      supabaseAdmin.from("content_suggestions").select("title").eq("plan_id", access.plan.id)
+        .order("created_at", { ascending: false }).limit(60),
+    ]);
+    const hint = typeof b.hint === "string" ? b.hint.slice(0, 1000) : "";
     const ideas = await generateIdeas(
       access.plan,
-      (existing ?? []).map((e) => e.title).filter(Boolean),
-      { kind: typeof b.kind === "string" ? b.kind : undefined, count: Number(b.count), hint: typeof b.hint === "string" ? b.hint : undefined }
+      [...(existing ?? []), ...(previous ?? [])].map((e) => e.title).filter(Boolean),
+      { kind: typeof b.kind === "string" ? b.kind : undefined, count: Number(b.count), hint }
     );
-    return NextResponse.json({ ideas });
+    if (!ideas.length) return NextResponse.json({ suggestions: [] });
+    const { data: saved, error } = await supabaseAdmin
+      .from("content_suggestions")
+      .insert(ideas.map((i) => ({ ...i, plan_id: access.plan.id, hint })))
+      .select("*");
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ suggestions: saved ?? [] });
   } catch (e) {
     console.error("content-plan AI error:", e);
     return NextResponse.json({ error: "تعذّر التوليد بالذكاء الاصطناعي، حاول مرة أخرى" }, { status: 502 });
   }
+}
+
+/** DELETE ?id=<id> يتجاهل اقتراحاً، أو ?scope=added|all لمسح المضافة/الكل. */
+export async function handleSuggestions(req: NextRequest, resolve: Resolver) {
+  const access = await resolve();
+  if (!access.ok) return access.res;
+  if (!access.canEdit) return readOnly();
+  if (req.method !== "DELETE") return NextResponse.json({ error: "Method not allowed" }, { status: 405 });
+  const id = req.nextUrl.searchParams.get("id");
+  const scope = req.nextUrl.searchParams.get("scope");
+  let q = supabaseAdmin.from("content_suggestions").delete().eq("plan_id", access.plan.id);
+  if (id) q = q.eq("id", id);
+  else if (scope === "added") q = q.eq("added", true);
+  else if (scope !== "all") return NextResponse.json({ error: "id أو scope مطلوب" }, { status: 400 });
+  const { error } = await q;
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
 }

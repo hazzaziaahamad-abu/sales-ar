@@ -63,6 +63,14 @@ export interface ContentSuggestion {
   focus_points: string[];
 }
 
+/** اقتراح محفوظ في قاعدة البيانات (يبقى بعد إعادة فتح الصفحة). */
+export interface SavedSuggestion extends ContentSuggestion {
+  id: string;
+  hint: string;
+  added: boolean;
+  created_at: string;
+}
+
 /** الأنواع اللي لها تايم لاين ونقاط تركيز (فيديو). */
 export const isVideoKind = (k: string) => k === "video" || k === "reel";
 
