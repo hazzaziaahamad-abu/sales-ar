@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getOrgId } from "@/lib/supabase/db";
-import { PLAN_STATUSES, PLATFORMS, platformLabel, type ContentPlan } from "@/lib/content-plans/types";
+import { PLAN_STATUSES, PLATFORMS, platformLabel, orgContentProfile, type ContentPlan } from "@/lib/content-plans/types";
 import { MarketingTabs } from "@/components/content-plans/MarketingTabs";
 import { Plus, Clapperboard, Trash2, Link2, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,11 @@ export default function ContentMarketingPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY);
+  const openForm = () => {
+    // الجمهور الافتراضي حسب المنظمة (حجوزات: الصالونات والشاليهات)
+    if (!showForm && !form.audience) setForm((f) => ({ ...f, audience: orgContentProfile(getOrgId()).audience }));
+    setShowForm(!showForm);
+  };
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(
@@ -64,7 +69,7 @@ export default function ContentMarketingPage() {
           <p className="text-muted-foreground text-sm mt-0.5">خطط محتوى للفيديوهات وتصاميم البوستات — عنوان وفكرة وسكربت، مع توليد أفكار بالذكاء الاصطناعي ورابط مشاركة</p>
         </div>
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={openForm}
           className="flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-500/20 text-violet-400 hover:bg-violet-500/30 border border-violet-500/20 font-semibold text-sm transition-colors"
         >
           <Plus className="w-4 h-4" />
@@ -82,7 +87,7 @@ export default function ContentMarketingPage() {
             </div>
             <div>
               <label className="text-xs font-semibold text-muted-foreground block mb-1">الجمهور المستهدف</label>
-              <input value={form.audience} onChange={(e) => setForm({ ...form, audience: e.target.value })} className={inputCls} placeholder="مثال: أصحاب المطاعم الصغيرة" />
+              <input value={form.audience} onChange={(e) => setForm({ ...form, audience: e.target.value })} className={inputCls} placeholder="مثال: أصحاب الصالونات" />
             </div>
             <div>
               <label className="text-xs font-semibold text-muted-foreground block mb-1">المنتج</label>

@@ -84,3 +84,18 @@ export const PLATFORMS: { value: string; label: string }[] = [
 
 export const kindLabel = (k: string) => CONTENT_KINDS.find((c) => c.value === k)?.label ?? k;
 export const platformLabel = (p: string) => PLATFORMS.find((x) => x.value === p)?.label ?? p;
+
+/** نشاط كل منظمة وجمهورها الافتراضي — يُعطى للذكاء الاصطناعي ويظهر كاقتراح في نموذج الإنشاء. */
+export const ORG_CONTENT_PROFILES: Record<string, { business: string; audience: string }> = {
+  "00000000-0000-0000-0000-000000000001": {
+    business: "«قائمة الطلبات» — شركة تقنية سعودية تقدم للمطاعم والكافيهات قوائم إلكترونية وكاشير وأنظمة ولاء",
+    audience: "أصحاب المطاعم والكافيهات",
+  },
+  "00000000-0000-0000-0000-000000000002": {
+    business: "«حجوزات» — منصة/نظام حجوزات إلكترونية سعودية للصالونات والشاليهات (استقبال الحجوزات، المواعيد، الدفع والتذكير)",
+    audience: "أصحاب الصالونات والشاليهات",
+  },
+};
+
+export const orgContentProfile = (orgId: string) =>
+  ORG_CONTENT_PROFILES[orgId] ?? ORG_CONTENT_PROFILES["00000000-0000-0000-0000-000000000001"];

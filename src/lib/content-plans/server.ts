@@ -6,7 +6,7 @@ import { getAuthUser, isSuperAdmin } from "@/lib/permissions";
 import { generateJSON } from "@/lib/ai/gemini";
 import { CONTENT_IDEAS_PROMPT, CONTENT_SCRIPT_PROMPT } from "@/lib/ai/prompts";
 import {
-  CONTENT_KINDS, ITEM_STATUSES, PLAN_STATUSES, PLATFORMS, kindLabel, platformLabel,
+  CONTENT_KINDS, ITEM_STATUSES, PLAN_STATUSES, PLATFORMS, kindLabel, platformLabel, orgContentProfile,
   type ContentItem, type ContentPlan, type ContentSuggestion, type ContentKind,
 } from "./types";
 
@@ -138,7 +138,7 @@ function planContext(plan: ContentPlan) {
   return {
     عنوان_الخطة: plan.title,
     الوصف_والهدف: plan.description || "غير محدد",
-    الجمهور_المستهدف: plan.audience || "أصحاب المطاعم والكافيهات والمحلات في السعودية",
+    الجمهور_المستهدف: plan.audience || orgContentProfile(plan.org_id).audience,
     المنتج: plan.related_product || "غير محدد",
     المنصات: plan.platforms?.length ? plan.platforms.map(platformLabel).join("، ") : "غير محدد",
     النبرة: plan.tone || "قريبة وعفوية باللهجة السعودية",
@@ -153,6 +153,7 @@ export async function generateIdeas(
   const count = Math.min(Math.max(Number(opts.count) || 5, 1), 10);
   const kind = opts.kind && KINDS.includes(opts.kind) ? (opts.kind as ContentKind) : null;
   const prompt = CONTENT_IDEAS_PROMPT
+    .replace("{business}", orgContentProfile(plan.org_id).business)
     .replace("{plan}", JSON.stringify(planContext(plan), null, 2))
     .replace("{count}", String(count))
     .replace("{kind}", kind ? kindLabel(kind) + ` (القيمة: ${kind})` : "نوّع بين الأنواع المتاحة")
@@ -178,6 +179,7 @@ export async function generateScript(
 ): Promise<{ script: string; caption: string }> {
   const kind = item.kind && KINDS.includes(item.kind) ? item.kind : "video";
   const prompt = CONTENT_SCRIPT_PROMPT
+    .replace("{business}", orgContentProfile(plan.org_id).business)
     .replace("{plan}", JSON.stringify(planContext(plan), null, 2))
     .replace("{kind}", kindLabel(kind))
     .replace("{title}", str(item.title, 500) || "بدون عنوان")
