@@ -7,7 +7,7 @@ import { generateJSON } from "@/lib/ai/gemini";
 import { CONTENT_IDEAS_PROMPT, CONTENT_SCRIPT_PROMPT } from "@/lib/ai/prompts";
 import {
   CONTENT_KINDS, ITEM_STATUSES, PLAN_STATUSES, PLATFORMS, kindLabel, platformLabel, orgContentProfile,
-  type ContentItem, type ContentPlan, type ContentSuggestion, type ContentKind,
+  type ContentItem, type ContentPlan, type ContentSuggestion, type ContentKind, type TimelineRow,
 } from "./types";
 
 const KINDS = CONTENT_KINDS.map((k) => k.value) as string[];
@@ -16,6 +16,25 @@ const PLAN_STATUS_VALUES = PLAN_STATUSES.map((s) => s.value) as string[];
 const PLATFORM_VALUES = PLATFORMS.map((p) => p.value);
 
 const str = (v: unknown, max = 20000) => (typeof v === "string" ? v.slice(0, max) : undefined);
+
+/** يطبّع تايم لاين الفيديو (من المستخدم أو من الـAI). */
+export function cleanTimeline(v: unknown): TimelineRow[] {
+  if (!Array.isArray(v)) return [];
+  return v.slice(0, 40).map((r) => {
+    const row = (r ?? {}) as Record<string, unknown>;
+    return {
+      time: String(row.time ?? "").slice(0, 50),
+      shot: String(row.shot ?? "").slice(0, 2000),
+      voice: String(row.voice ?? "").slice(0, 2000),
+      text: String(row.text ?? "").slice(0, 1000),
+    };
+  });
+}
+
+export function cleanFocusPoints(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v.slice(0, 20).map((x) => String(x ?? "").slice(0, 500));
+}
 
 // ─── سياق الوصول ─────────────────────────────────────────────────────────────
 
@@ -118,6 +137,8 @@ export function sanitizeItem(body: Record<string, unknown>) {
     const v = str(body[k]);
     if (v !== undefined) item[k] = v;
   }
+  if (Array.isArray(body.timeline)) item.timeline = cleanTimeline(body.timeline);
+  if (Array.isArray(body.focus_points)) item.focus_points = cleanFocusPoints(body.focus_points);
   if (typeof body.kind === "string" && KINDS.includes(body.kind)) item.kind = body.kind;
   if (typeof body.status === "string" && ITEM_STATUS_VALUES.includes(body.status)) item.status = body.status;
   if (typeof body.platform === "string" && (body.platform === "" || PLATFORM_VALUES.includes(body.platform))) item.platform = body.platform;
@@ -169,6 +190,8 @@ export async function generateIdeas(
       idea: String(i.idea ?? ""),
       script: String(i.script ?? ""),
       caption: String(i.caption ?? ""),
+      timeline: cleanTimeline(i.timeline),
+      focus_points: cleanFocusPoints(i.focus_points),
     }));
 }
 
@@ -176,7 +199,7 @@ export async function generateScript(
   plan: ContentPlan,
   item: { kind?: string; title?: string; idea?: string; script?: string },
   instruction?: string
-): Promise<{ script: string; caption: string }> {
+): Promise<{ script: string; caption: string; timeline: TimelineRow[]; focus_points: string[] }> {
   const kind = item.kind && KINDS.includes(item.kind) ? item.kind : "video";
   const prompt = CONTENT_SCRIPT_PROMPT
     .replace("{business}", orgContentProfile(plan.org_id).business)
@@ -186,6 +209,11 @@ export async function generateScript(
     .replace("{idea}", str(item.idea, 3000) || "غير محددة")
     .replace("{current}", str(item.script, 8000)?.trim() || "لا يوجد")
     .replace("{instruction}", str(instruction, 1000)?.trim() || "اكتب أفضل نسخة ممكنة");
-  const res = await generateJSON<{ script: string; caption: string }>(prompt);
-  return { script: String(res.script ?? ""), caption: String(res.caption ?? "") };
+  const res = await generateJSON<{ script: string; caption: string; timeline?: unknown; focus_points?: unknown }>(prompt);
+  return {
+    script: String(res.script ?? ""),
+    caption: String(res.caption ?? ""),
+    timeline: cleanTimeline(res.timeline),
+    focus_points: cleanFocusPoints(res.focus_points),
+  };
 }

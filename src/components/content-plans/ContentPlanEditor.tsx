@@ -4,11 +4,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Sparkles, Plus, Trash2, Copy, Check, Link2, Video, Image as ImageIcon, Layers, Film, Smartphone,
   X, Loader2, RefreshCw, Pencil, Eye, Calendar, ChevronDown, ChevronUp, Wand2, FileText,
+  Clock, Target,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  CONTENT_KINDS, ITEM_STATUSES, PLAN_STATUSES, PLATFORMS, kindLabel, platformLabel,
-  type ContentItem, type ContentKind, type ContentPlan, type ContentSuggestion,
+  CONTENT_KINDS, ITEM_STATUSES, PLAN_STATUSES, PLATFORMS, kindLabel, platformLabel, isVideoKind,
+  type ContentItem, type ContentKind, type ContentPlan, type ContentSuggestion, type TimelineRow,
 } from "@/lib/content-plans/types";
 
 const KIND_STYLE: Record<ContentKind, { icon: typeof Video; color: string }> = {
@@ -487,6 +488,8 @@ function AIIdeasPanel({ api, onAdd }: { api: ApiFn; onAdd: (items: Partial<Conte
                         {expanded === i && (
                           <div className="mt-2 space-y-2">
                             <pre className="whitespace-pre-wrap font-sans text-xs text-foreground/90 bg-black/20 rounded-lg p-2.5 leading-relaxed">{s.script}</pre>
+                            {s.timeline?.length > 0 && <TimelineEditor rows={s.timeline} canEdit={false} onChange={() => {}} />}
+                            {s.focus_points?.length > 0 && <FocusPointsEditor points={s.focus_points} canEdit={false} onChange={() => {}} />}
                             {s.caption && <p className="text-xs text-muted-foreground whitespace-pre-wrap">📝 {s.caption}</p>}
                           </div>
                         )}
@@ -500,7 +503,7 @@ function AIIdeasPanel({ api, onAdd }: { api: ApiFn; onAdd: (items: Partial<Conte
                           </button>
                         )}
                         <button onClick={() => setExpanded(expanded === i ? null : i)} className="text-[11px] text-muted-foreground hover:text-foreground">
-                          {expanded === i ? "إخفاء السكربت" : "عرض السكربت"}
+                          {expanded === i ? "إخفاء التفاصيل" : "عرض السكربت"}
                         </button>
                       </div>
                     </div>
@@ -556,6 +559,8 @@ function ItemCard({ item, index, canEdit, onOpen, onDelete, onStatus }: {
         <div className="flex items-center gap-3 mt-2 text-[11px] text-muted-foreground">
           {item.platform && <span>{platformLabel(item.platform)}</span>}
           {item.publish_date && <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{item.publish_date}</span>}
+          {(item.timeline?.length ?? 0) > 0 && <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{item.timeline.length} مشاهد</span>}
+          {(item.focus_points?.length ?? 0) > 0 && <span className="flex items-center gap-1"><Target className="w-3 h-3" />{item.focus_points.length} نقاط تركيز</span>}
           <span className="mr-auto text-violet-400 font-semibold flex items-center gap-1">
             {canEdit ? <><Pencil className="w-3 h-3" /> فتح وتعديل</> : <><Eye className="w-3 h-3" /> عرض</>}
           </span>
@@ -571,7 +576,9 @@ function ItemEditor({ item, canEdit, api, onClose, onSave, onDelete }: {
   item: ContentItem; canEdit: boolean; api: ApiFn;
   onClose: () => void; onSave: (i: ContentItem) => Promise<void>; onDelete: () => void;
 }) {
-  const [form, setForm] = useState<ContentItem>(item);
+  // عناصر قديمة قد لا تحمل الحقول الجديدة
+  const base = useMemo<ContentItem>(() => ({ ...item, timeline: item.timeline ?? [], focus_points: item.focus_points ?? [] }), [item]);
+  const [form, setForm] = useState<ContentItem>(base);
   const [saving, setSaving] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [instruction, setInstruction] = useState("");
@@ -583,11 +590,17 @@ function ItemEditor({ item, canEdit, api, onClose, onSave, onDelete }: {
     if (form.script.trim() && !instruction.trim() && !confirm("سيتم استبدال السكربت الحالي بنسخة محسّنة. متابعة؟")) return;
     setAiLoading(true);
     try {
-      const res = await api<{ script: string; caption: string }>("/ai", {
+      const res = await api<{ script: string; caption: string; timeline: TimelineRow[]; focus_points: string[] }>("/ai", {
         method: "POST",
         body: JSON.stringify({ mode: "script", item: form, instruction }),
       });
-      setForm((f) => ({ ...f, script: res.script || f.script, caption: res.caption || f.caption }));
+      setForm((f) => ({
+        ...f,
+        script: res.script || f.script,
+        caption: res.caption || f.caption,
+        timeline: res.timeline?.length ? res.timeline : f.timeline,
+        focus_points: res.focus_points?.length ? res.focus_points : f.focus_points,
+      }));
       setInstruction("");
     } catch (e) {
       alert((e as Error).message);
@@ -605,7 +618,8 @@ function ItemEditor({ item, canEdit, api, onClose, onSave, onDelete }: {
     try { await onSave(form); } catch (e) { alert((e as Error).message); setSaving(false); }
   };
 
-  const dirty = JSON.stringify(form) !== JSON.stringify(item);
+  const dirty = JSON.stringify(form) !== JSON.stringify(base);
+  const video = isVideoKind(form.kind);
   const close = () => { if (!dirty || confirm("فيه تعديلات غير محفوظة. إغلاق بدون حفظ؟")) onClose(); };
 
   return (
@@ -681,8 +695,29 @@ function ItemEditor({ item, canEdit, api, onClose, onSave, onDelete }: {
             >
               {aiLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
               {form.script ? "حسّن بالذكاء الاصطناعي" : "اكتب السكربت بالذكاء الاصطناعي"}
+              {video && " + التايم لاين"}
             </button>
           </div>
+        )}
+
+        {video && (
+          <>
+            <Field
+              label="التايم لاين"
+              action={
+                form.timeline.length ? (
+                  <button onClick={() => copy("timeline", timelineToText(form.timeline))} className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground">
+                    {copied === "timeline" ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />} نسخ
+                  </button>
+                ) : null
+              }
+            >
+              <TimelineEditor rows={form.timeline} canEdit={canEdit} onChange={(rows) => set("timeline", rows)} />
+            </Field>
+            <Field label="نقاط التركيز أثناء التصوير">
+              <FocusPointsEditor points={form.focus_points} canEdit={canEdit} onChange={(pts) => set("focus_points", pts)} />
+            </Field>
+          </>
         )}
 
         <Field
@@ -744,5 +779,128 @@ function FilterChip({ active, onClick, label }: { active: boolean; onClick: () =
     >
       {label}
     </button>
+  );
+}
+
+// ─── تايم لاين الفيديو ونقاط التركيز ─────────────────────────────────────────
+
+function timelineToText(rows: TimelineRow[]) {
+  return rows
+    .map((r) => [`⏱ ${r.time}`, r.shot && `🎬 ${r.shot}`, r.voice && `🎙 ${r.voice}`, r.text && `🔤 ${r.text}`].filter(Boolean).join("\n"))
+    .join("\n\n");
+}
+
+/** يقترح وقت المشهد التالي بعد آخر مشهد (مثال: بعد "3-8ث" → "8-13ث"). */
+function nextTime(rows: TimelineRow[]) {
+  if (!rows.length) return "0-3ث";
+  const m = rows[rows.length - 1].time.match(/(\d+)\D*$/);
+  if (!m) return "";
+  const start = Number(m[1]);
+  return `${start}-${start + 5}ث`;
+}
+
+function TimelineEditor({ rows, canEdit, onChange }: { rows: TimelineRow[]; canEdit: boolean; onChange: (rows: TimelineRow[]) => void }) {
+  const update = (i: number, k: keyof TimelineRow, v: string) => onChange(rows.map((r, idx) => (idx === i ? { ...r, [k]: v } : r)));
+  const move = (i: number, d: -1 | 1) => {
+    const j = i + d;
+    if (j < 0 || j >= rows.length) return;
+    const next = [...rows];
+    [next[i], next[j]] = [next[j], next[i]];
+    onChange(next);
+  };
+
+  if (!canEdit) {
+    if (!rows.length) return <p className="text-xs text-muted-foreground">لا يوجد تايم لاين</p>;
+    return (
+      <div className="rounded-lg border border-border overflow-hidden">
+        <div className="hidden sm:grid grid-cols-[70px_1fr_1fr_0.8fr] gap-2 px-3 py-1.5 bg-white/[0.04] text-[10px] font-bold text-muted-foreground">
+          <span>الوقت</span><span>اللقطة</span><span>الكلام</span><span>نص على الشاشة</span>
+        </div>
+        {rows.map((r, i) => (
+          <div key={i} className="grid grid-cols-1 sm:grid-cols-[70px_1fr_1fr_0.8fr] gap-1 sm:gap-2 px-3 py-2 border-t border-border/50 text-xs first:border-t-0 sm:first:border-t">
+            <span className="font-mono font-bold text-violet-300" dir="ltr">{r.time}</span>
+            <span className="text-foreground whitespace-pre-wrap">{r.shot && <span className="sm:hidden text-muted-foreground">🎬 </span>}{r.shot}</span>
+            <span className="text-foreground/90 whitespace-pre-wrap">{r.voice && <span className="sm:hidden text-muted-foreground">🎙 </span>}{r.voice}</span>
+            <span className="text-amber-300/90 whitespace-pre-wrap">{r.text && <span className="sm:hidden text-muted-foreground">🔤 </span>}{r.text}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  const cell = "w-full rounded-md bg-white/[0.05] border border-border px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-violet-500/50 resize-y";
+  return (
+    <div className="space-y-2">
+      {rows.length > 0 && (
+        <div className="hidden sm:grid grid-cols-[80px_1fr_1fr_0.8fr_52px] gap-2 px-1 text-[10px] font-bold text-muted-foreground">
+          <span>الوقت</span><span>اللقطة / المشهد</span><span>الكلام / التعليق</span><span>نص على الشاشة</span><span />
+        </div>
+      )}
+      {rows.map((r, i) => (
+        <div key={i} className="grid grid-cols-1 sm:grid-cols-[80px_1fr_1fr_0.8fr_52px] gap-2 p-2 sm:p-0 rounded-lg bg-white/[0.02] sm:bg-transparent border border-border sm:border-0">
+          <input value={r.time} onChange={(e) => update(i, "time", e.target.value)} placeholder="0-3ث" dir="ltr" className={cn(cell, "font-mono text-center")} />
+          <textarea rows={2} value={r.shot} onChange={(e) => update(i, "shot", e.target.value)} placeholder="لقطة قريبة للجوال..." className={cell} />
+          <textarea rows={2} value={r.voice} onChange={(e) => update(i, "voice", e.target.value)} placeholder="وش يقول المقدّم؟" className={cell} />
+          <textarea rows={2} value={r.text} onChange={(e) => update(i, "text", e.target.value)} placeholder="نص يظهر على الشاشة" className={cell} />
+          <div className="flex sm:flex-col items-center justify-end sm:justify-start gap-1">
+            <button onClick={() => move(i, -1)} disabled={i === 0} className="p-1 rounded text-muted-foreground hover:text-foreground disabled:opacity-30"><ChevronUp className="w-3.5 h-3.5" /></button>
+            <button onClick={() => move(i, 1)} disabled={i === rows.length - 1} className="p-1 rounded text-muted-foreground hover:text-foreground disabled:opacity-30"><ChevronDown className="w-3.5 h-3.5" /></button>
+            <button onClick={() => onChange(rows.filter((_, idx) => idx !== i))} className="p-1 rounded text-muted-foreground hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
+          </div>
+        </div>
+      ))}
+      <button
+        onClick={() => onChange([...rows, { time: nextTime(rows), shot: "", voice: "", text: "" }])}
+        className="flex items-center gap-1 text-xs font-semibold text-violet-400 hover:text-violet-300"
+      >
+        <Plus className="w-3.5 h-3.5" /> إضافة مشهد
+      </button>
+    </div>
+  );
+}
+
+function FocusPointsEditor({ points, canEdit, onChange }: { points: string[]; canEdit: boolean; onChange: (p: string[]) => void }) {
+  const [draft, setDraft] = useState("");
+  const add = () => {
+    if (!draft.trim()) return;
+    onChange([...points, draft.trim()]);
+    setDraft("");
+  };
+
+  return (
+    <div className="space-y-1.5 p-3 rounded-lg bg-amber-500/5 border border-amber-500/15">
+      {points.length === 0 && !canEdit && <p className="text-xs text-muted-foreground">لا توجد نقاط تركيز</p>}
+      {points.map((p, i) => (
+        <div key={i} className="flex items-start gap-2 group">
+          <Target className="w-3.5 h-3.5 text-amber-400 mt-1 shrink-0" />
+          {canEdit ? (
+            <>
+              <input
+                value={p}
+                onChange={(e) => onChange(points.map((x, idx) => (idx === i ? e.target.value : x)))}
+                className="flex-1 bg-transparent text-sm text-foreground focus:outline-none focus:bg-white/[0.04] rounded px-1"
+              />
+              <button onClick={() => onChange(points.filter((_, idx) => idx !== i))} className="p-0.5 text-muted-foreground hover:text-red-400 opacity-60 group-hover:opacity-100">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </>
+          ) : (
+            <span className="text-sm text-foreground">{p}</span>
+          )}
+        </div>
+      ))}
+      {canEdit && (
+        <div className="flex gap-2 pt-1">
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && add()}
+            placeholder="أضف نقطة تركيز: مثال وضّح الخطّاف في أول 3 ثواني"
+            className="flex-1 rounded-md bg-white/[0.05] border border-border px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-amber-500/50"
+          />
+          <button onClick={add} disabled={!draft.trim()} className="px-3 rounded-md bg-amber-500/20 text-amber-300 text-xs font-semibold disabled:opacity-50">إضافة</button>
+        </div>
+      )}
+    </div>
   );
 }

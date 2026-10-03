@@ -24,6 +24,14 @@ export interface ContentPlan {
   items_count?: number;
 }
 
+/** صف في تايم لاين الفيديو. */
+export interface TimelineRow {
+  time: string;   // مثال: 0-3ث
+  shot: string;   // اللقطة / المشهد
+  voice: string;  // الكلام / التعليق الصوتي
+  text: string;   // نص على الشاشة
+}
+
 export interface ContentItem {
   id: string;
   plan_id: string;
@@ -32,6 +40,8 @@ export interface ContentItem {
   idea: string;
   script: string;
   caption: string;
+  timeline: TimelineRow[];
+  focus_points: string[];
   platform: string;
   publish_date: string | null;
   status: ContentItemStatus;
@@ -49,7 +59,12 @@ export interface ContentSuggestion {
   idea: string;
   script: string;
   caption: string;
+  timeline: TimelineRow[];
+  focus_points: string[];
 }
+
+/** الأنواع اللي لها تايم لاين ونقاط تركيز (فيديو). */
+export const isVideoKind = (k: string) => k === "video" || k === "reel";
 
 export const CONTENT_KINDS: { value: ContentKind; label: string; scriptLabel: string }[] = [
   { value: "video", label: "فيديو", scriptLabel: "السكربت" },
