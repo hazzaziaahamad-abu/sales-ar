@@ -36,6 +36,22 @@ export async function saveEditableContent(key: string, value: unknown): Promise<
   if (error) throw error;
 }
 
+/** يجلب كل مفاتيح المحتوى ضمن نطاق [fromKey, toKey] (ترتيب نصّي) — مثل سجلات يوم/أسبوع بمفاتيح مؤرّخة. */
+export async function getEditableContentRange<T = unknown>(
+  fromKey: string,
+  toKey: string
+): Promise<{ key: string; value: T }[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("sales_guide_settings")
+    .select("setting_key, setting_value")
+    .eq("org_id", getOrgId())
+    .gte("setting_key", fromKey)
+    .lte("setting_key", toKey);
+  if (error) throw error;
+  return (data ?? []).map((r) => ({ key: r.setting_key as string, value: r.setting_value as T }));
+}
+
 // ─── ACTIVITY LOG ───────────────────────────────────────────────────────────
 
 export async function logActivity(entry: {

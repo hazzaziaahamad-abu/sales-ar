@@ -70,6 +70,7 @@ export const NAV_ITEMS = [
   { label: "المبيعات", href: "/sales", slug: "sales", icon: TrendingUp, color: "emerald", group: "المبيعات والدعم" },
   { label: "تدريب المبيعات", href: "/sales-playbook", slug: "sales-playbook", icon: BookMarked, color: "emerald", group: "المبيعات والدعم" },
   { label: "خريطة رحلة الطلب", href: "/sales-training", slug: "sales-training", icon: Map, color: "violet", group: "المبيعات والدعم" },
+  { label: "الإيقاع اليومي", href: "/daily-huddle", slug: "daily-huddle", icon: CalendarCheck, color: "violet", group: "المبيعات والدعم" },
   { label: "مسار الاتصال", href: "/contact-flow", slug: "contact-flow", icon: PhoneCall, color: "violet", group: "المبيعات والدعم" },
   { label: "خريطة منصة نحجز", href: "/nahjez-map", slug: "nahjez-map", icon: CalendarCheck, color: "teal", group: "المبيعات والدعم" },
   { label: "دليل العرض للموظفين — المنيو", href: "/offer/menu-staff", slug: "offer-menu-staff", icon: BookOpen, color: "violet", group: "المبيعات والدعم", external: true },
