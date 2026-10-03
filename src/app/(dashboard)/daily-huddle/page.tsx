@@ -365,6 +365,8 @@ export default function DailyHuddlePage() {
                   })}
                 </div>
 
+                {/* تقييم الجودة خاص: يظهر للمدير وللموظف نفسه فقط */}
+                {editable && (
                 <div className="mt-3 rounded-xl bg-white/[0.02] border border-white/[0.06] p-3">
                   <div className="flex items-center justify-between text-xs mb-2">
                     <span className="font-bold text-foreground">جودة الاستهداف</span>
@@ -399,6 +401,7 @@ export default function DailyHuddlePage() {
                     })}
                   </div>
                 </div>
+                )}
 
                 {editable && (
                   <div className="flex items-center justify-between mt-3">
@@ -432,7 +435,7 @@ export default function DailyHuddlePage() {
                 <th className="text-center py-2 font-medium">حضور</th>
                 <th className="text-center py-2 font-medium">تأخير</th>
                 <th className="text-center py-2 font-medium">أيام التحديث</th>
-                <th className="text-center py-2 font-medium">الجودة</th>
+                {isManager && <th className="text-center py-2 font-medium">الجودة</th>}
                 {METRICS.map((m) => <th key={m.key} className="text-center py-2 font-medium">{m.label}</th>)}
               </tr>
             </thead>
@@ -444,9 +447,11 @@ export default function DailyHuddlePage() {
                   <td className="py-2 text-center">{r.attended}</td>
                   <td className={`py-2 text-center ${r.late ? "text-amber-400" : ""}`}>{r.late}</td>
                   <td className="py-2 text-center">{r.reported}</td>
-                  <td className={`py-2 text-center font-bold ${r.quality !== null ? qualityColor(r.quality) : "text-muted-foreground"}`}>
-                    {r.quality !== null ? r.quality.toFixed(1) : "—"}
-                  </td>
+                  {isManager && (
+                    <td className={`py-2 text-center font-bold ${r.quality !== null ? qualityColor(r.quality) : "text-muted-foreground"}`}>
+                      {r.quality !== null ? r.quality.toFixed(1) : "—"}
+                    </td>
+                  )}
                   {METRICS.map((m) => {
                     const ok = r.reported > 0 && r[m.key] >= targets[m.key] * r.reported;
                     return (
@@ -460,7 +465,7 @@ export default function DailyHuddlePage() {
             </tbody>
           </table>
         </div>
-        <p className="text-[11px] text-muted-foreground mt-2">الأخضر: المعدّل اليومي يحقق الهدف في الأيام التي حُدّثت فيها الأرقام. الجودة: متوسط تقييم المدير من 5 (4+ ممتاز، أقل من 3 يحتاج تدريب).</p>
+        <p className="text-[11px] text-muted-foreground mt-2">الأخضر: المعدّل اليومي يحقق الهدف في الأيام التي حُدّثت فيها الأرقام.{isManager && " الجودة: متوسط تقييم المدير من 5 (4+ ممتاز، أقل من 3 يحتاج تدريب) — تظهر لك فقط."}</p>
       </div>
     </div>
   );
