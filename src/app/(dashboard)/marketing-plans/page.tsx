@@ -7,6 +7,7 @@ import { fetchMarketingPlans, createMarketingPlan, deleteMarketingPlan, fetchPla
 import type { MarketingPlan } from "@/types";
 import { Plus, Megaphone, Trash2, Calendar, Target, Package, ChevronLeft, Lightbulb } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MarketingTabs } from "@/components/content-plans/MarketingTabs";
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
   draft: { label: "مسودة", color: "bg-slate-500/20 text-slate-400" },
@@ -60,6 +61,8 @@ export default function MarketingPlansPage() {
 
   return (
     <div className="space-y-6">
+      <MarketingTabs active="plans" />
+
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-extrabold text-foreground flex items-center gap-2">
