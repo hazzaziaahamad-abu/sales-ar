@@ -24,6 +24,7 @@ interface Entry {
   calls?: number;
   offers?: number;
   closes?: number;
+  quality?: Partial<Record<QualityKey, number>>;
   updated_by?: string;
   updated_at?: string;
 }
@@ -41,6 +42,23 @@ const METRICS = [
   { key: "offers", label: "عروض" },
   { key: "closes", label: "إغلاقات" },
 ] as const;
+
+// جودة الاستهداف — يقيّمها المدير من 1 إلى 5 بعد الاستماع لمكالمة للموظف.
+const QUALITY = [
+  { key: "clarity", label: "وضوح العرض" },
+  { key: "response", label: "الرد المثالي" },
+  { key: "technique", label: "تطبيق أساليب المبيعات" },
+  { key: "knowledge", label: "الإلمام" },
+] as const;
+type QualityKey = (typeof QUALITY)[number]["key"];
+
+/** متوسط التقييمات المُدخلة (من 5)، أو null إن لم يُقيَّم شيء. */
+function qualityAvg(q?: Entry["quality"]): number | null {
+  const vals = QUALITY.map((c) => q?.[c.key]).filter((v): v is number => !!v);
+  return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+}
+
+const qualityColor = (v: number) => (v >= 4 ? "text-emerald-400" : v >= 3 ? "text-amber-400" : "text-red-400");
 
 const ATTENDANCE: { key: Attendance; label: string; cls: string }[] = [
   { key: "present", label: "حاضر", cls: "bg-emerald-500/15 text-emerald-400 ring-emerald-500/30" },
@@ -111,7 +129,7 @@ export default function DailyHuddlePage() {
     setEntries((prev) => ({ ...prev, [member]: { ...prev[member], ...patch } }));
   }
 
-  // الحضور يسجّله المدير والباقي يسجّله الموظف — نقرأ آخر نسخة قبل الحفظ حتى لا يمسح أحدهما تعديل الآخر.
+  // الحضور والجودة يسجّلهما المدير والباقي يسجّله الموظف — نقرأ آخر نسخة قبل الحفظ حتى لا يمسح أحدهما تعديل الآخر.
   async function save(member: string, patch?: Partial<Entry>) {
     setSaving(member);
     setError(null);
@@ -119,6 +137,7 @@ export default function DailyHuddlePage() {
       const latest = (await getEditableContent<Entry>(entryKey(date, member))) ?? {};
       const own: Entry = { ...entries[member] };
       delete own.attendance;
+      delete own.quality;
       const entry: Entry = {
         ...latest,
         ...(patch ?? own),
@@ -161,7 +180,9 @@ export default function DailyHuddlePage() {
     const days = week.filter((r) => r.key.split(":")[2] === member).map((r) => r.value);
     const sum = (k: (typeof METRICS)[number]["key"]) => days.reduce((s, d) => s + (d[k] ?? 0), 0);
     const reported = days.filter((d) => METRICS.some((m) => (d[m.key] ?? 0) > 0)).length;
+    const qualityDays = days.map((d) => qualityAvg(d.quality)).filter((v): v is number => v !== null);
     return {
+      quality: qualityDays.length ? qualityDays.reduce((a, b) => a + b, 0) / qualityDays.length : null,
       member,
       attended: days.filter((d) => d.attendance === "present" || d.attendance === "late").length,
       late: days.filter((d) => d.attendance === "late").length,
@@ -344,6 +365,41 @@ export default function DailyHuddlePage() {
                   })}
                 </div>
 
+                <div className="mt-3 rounded-xl bg-white/[0.02] border border-white/[0.06] p-3">
+                  <div className="flex items-center justify-between text-xs mb-2">
+                    <span className="font-bold text-foreground">جودة الاستهداف</span>
+                    {qualityAvg(e.quality) !== null ? (
+                      <span className={`font-bold ${qualityColor(qualityAvg(e.quality)!)}`}>{qualityAvg(e.quality)!.toFixed(1)} / 5</span>
+                    ) : (
+                      <span className="text-muted-foreground">لم يُقيَّم</span>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    {QUALITY.map((c) => {
+                      const v = e.quality?.[c.key];
+                      return (
+                        <div key={c.key} className="flex items-center justify-between gap-2">
+                          <span className="text-xs text-muted-foreground">{c.label}</span>
+                          <div className="flex gap-1">
+                            {[1, 2, 3, 4, 5].map((n) => (
+                              <button
+                                key={n}
+                                disabled={!isManager || saving === member}
+                                onClick={() => save(member, { quality: { ...e.quality, [c.key]: v === n ? undefined : n } })}
+                                className={`w-6 h-6 rounded-md text-[11px] font-bold transition-all ${
+                                  v && n <= v ? `bg-violet-500/20 ${qualityColor(v)}` : "bg-white/[0.04] text-muted-foreground"
+                                } ${isManager ? "hover:bg-white/[0.1]" : "cursor-default"}`}
+                              >
+                                {n}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 {editable && (
                   <div className="flex items-center justify-between mt-3">
                     <span className="text-[11px] text-muted-foreground">
@@ -376,6 +432,7 @@ export default function DailyHuddlePage() {
                 <th className="text-center py-2 font-medium">حضور</th>
                 <th className="text-center py-2 font-medium">تأخير</th>
                 <th className="text-center py-2 font-medium">أيام التحديث</th>
+                <th className="text-center py-2 font-medium">الجودة</th>
                 {METRICS.map((m) => <th key={m.key} className="text-center py-2 font-medium">{m.label}</th>)}
               </tr>
             </thead>
@@ -387,6 +444,9 @@ export default function DailyHuddlePage() {
                   <td className="py-2 text-center">{r.attended}</td>
                   <td className={`py-2 text-center ${r.late ? "text-amber-400" : ""}`}>{r.late}</td>
                   <td className="py-2 text-center">{r.reported}</td>
+                  <td className={`py-2 text-center font-bold ${r.quality !== null ? qualityColor(r.quality) : "text-muted-foreground"}`}>
+                    {r.quality !== null ? r.quality.toFixed(1) : "—"}
+                  </td>
                   {METRICS.map((m) => {
                     const ok = r.reported > 0 && r[m.key] >= targets[m.key] * r.reported;
                     return (
@@ -400,7 +460,7 @@ export default function DailyHuddlePage() {
             </tbody>
           </table>
         </div>
-        <p className="text-[11px] text-muted-foreground mt-2">الأخضر: المعدّل اليومي يحقق الهدف في الأيام التي حُدّثت فيها الأرقام.</p>
+        <p className="text-[11px] text-muted-foreground mt-2">الأخضر: المعدّل اليومي يحقق الهدف في الأيام التي حُدّثت فيها الأرقام. الجودة: متوسط تقييم المدير من 5 (4+ ممتاز، أقل من 3 يحتاج تدريب).</p>
       </div>
     </div>
   );
