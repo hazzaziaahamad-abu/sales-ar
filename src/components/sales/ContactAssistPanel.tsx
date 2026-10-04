@@ -10,14 +10,28 @@ const PURPLE_DEEP = "#5B21B6";
 
 type Draft = { summary: string; call: string; wa: string; tip: string };
 
-const EXAMPLES = [
-  "العميل عنده كوفي وحاب يعرف الفرق بين الذهبية و VIP",
-  "يقول السعر غالي وعنده عرض من شركة ثانية",
-  "يبي كاشير بس عنده أجهزة قديمة، يسأل إذا تشتغل",
-];
+type Product = "menu" | "nahjez";
+
+const EXAMPLES: Record<Product, string[]> = {
+  menu: [
+    "العميل عنده كوفي وحاب يعرف الفرق بين الذهبية و VIP",
+    "يقول السعر غالي وعنده عرض من شركة ثانية",
+    "يبي كاشير بس عنده أجهزة قديمة، يسأل إذا تشتغل",
+  ],
+  nahjez: [
+    "صاحبة صالون تسأل وش الفرق بين الأساسية ونمو الأعمال",
+    "تقول عميلاتي متعوّدات يحجزون بالواتساب",
+    "تسأل كيف تشتغل بطاقات الهدايا وهل تستفيد منها",
+  ],
+};
+
+const PLACEHOLDER: Record<Product, string> = {
+  menu: "مثال: العميل عنده مطعمين ويبي منيو رقمي مع طلبات توصيل، ويسأل عن السعر…",
+  nahjez: "مثال: صالون عنده ٤ موظفات ويعاني من غياب العميلات عن المواعيد، ويسأل عن العربون…",
+};
 
 /* ---------- مساعد الصياغة: الموظف يكتب طلب العميل والذكاء الاصطناعي يصيغ الرد ---------- */
-export default function ContactAssistPanel({ id }: { id?: string }) {
+export default function ContactAssistPanel({ id, product = "menu" }: { id?: string; product?: Product }) {
   const [request, setRequest] = useState("");
   const [rep, setRep] = useState("");
   const [client, setClient] = useState("");
@@ -34,7 +48,7 @@ export default function ContactAssistPanel({ id }: { id?: string }) {
       const res = await fetch("/api/public/contact-flow/assist", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ request, rep, client }),
+        body: JSON.stringify({ request, rep, client, product }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json?.error || "تعذّرت الصياغة");
@@ -71,7 +85,9 @@ export default function ContactAssistPanel({ id }: { id?: string }) {
             مساعد الصياغة — اكتب طلب العميل
           </h3>
           <p className="text-xs font-semibold" style={{ color: "#8a7c70" }}>
-            اكتب وش طلب العميل أو وش قال، ويصيغ لك سكربت المكالمة ورسالة الواتساب حسب المسار والأسعار المعتمدة.
+            {product === "nahjez"
+              ? "اكتب وش طلبت العميلة أو وش قالت عن الحجوزات أو بطاقات الهدايا والولاء، ويصيغ لك سكربت المكالمة ورسالة الواتساب حسب مسار نحجز وباقاته."
+              : "اكتب وش طلب العميل أو وش قال، ويصيغ لك سكربت المكالمة ورسالة الواتساب حسب المسار والأسعار المعتمدة."}
           </p>
         </div>
       </div>
@@ -85,13 +101,13 @@ export default function ContactAssistPanel({ id }: { id?: string }) {
         rows={3}
         maxLength={2000}
         dir="rtl"
-        placeholder="مثال: العميل عنده مطعمين ويبي منيو رقمي مع طلبات توصيل، ويسأل عن السعر…"
+        placeholder={PLACEHOLDER[product]}
         className="mt-2 w-full rounded-xl px-3 py-2 text-right text-sm font-semibold outline-none focus-visible:ring-4 focus-visible:ring-violet-200"
         style={{ ...inputStyle, resize: "vertical" }}
       />
 
       <div className="mt-2 flex flex-wrap gap-1.5">
-        {EXAMPLES.map((ex) => (
+        {EXAMPLES[product].map((ex) => (
           <button
             key={ex}
             onClick={() => setRequest(ex)}

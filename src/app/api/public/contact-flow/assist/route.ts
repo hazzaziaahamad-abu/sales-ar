@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { generateJSON } from "@/lib/ai/gemini";
 import { CONTACT_FLOW, INTERESTED_FLOW, TIERS, CUSTOMER_FAQ } from "@/lib/sales/contact-flow-content";
+import * as NAHJEZ from "@/lib/sales/nahjez-content";
 import type { CFStep } from "@/components/sales/ContactFlowPanel";
 import type { FAQItem } from "@/components/sales/CustomerFAQPanel";
 
@@ -35,16 +36,43 @@ async function loadSetting<T>(key: string): Promise<T | null> {
   return (data?.setting_value as T) ?? null;
 }
 
-async function buildKnowledge() {
+export type AssistProduct = "menu" | "nahjez";
+
+type FlowStep = Pick<CFStep, "title" | "goal" | "call" | "wa">;
+const fmtSteps = (s: FlowStep[]) => s.map((x, i) => `${i + 1}. ${x.title} — ${x.goal}\n   مكالمة: ${x.call}\n   واتساب: ${x.wa}`).join("\n");
+
+// نحجز: منصة إدارة الحجوزات للصالونات والمراكز + بطاقات الهدايا والولاء.
+async function buildNahjezKnowledge() {
+  const flow = await loadSetting<{ steps?: CFStep[]; interestedSteps?: CFStep[]; loyalty?: typeof NAHJEZ.LOYALTY }>("contact_flow_nahjez").catch(() => null);
+  const steps: FlowStep[] = flow?.steps?.length ? flow.steps : NAHJEZ.CONTACT_FLOW;
+  const interested: FlowStep[] = flow?.interestedSteps?.length ? flow.interestedSteps : NAHJEZ.INTERESTED_FLOW;
+  const loyalty = flow?.loyalty?.title ? flow.loyalty : NAHJEZ.LOYALTY;
+  return [
+    "## الباقات",
+    NAHJEZ.TIERS.map((t) => `- ${t.name}: ${t.monthly} ريال شهرياً أو ${t.yearly} سنوياً (توفير ${t.save}) — ${t.note}`).join("\n"),
+    "بدون عمولة على الحجوزات · فوترة متوافقة مع هيئة الزكاة والضريبة · إلغاء بأي وقت",
+    "## مطابقة الاحتياج بالباقة",
+    NAHJEZ.MATCHING.map((m) => `- ${m.type} ← ${m.pkg}`).join("\n"),
+    `## ${loyalty.title} (${loyalty.pkg})`,
+    `${loyalty.why}\n${(loyalty.bullets || []).map((b) => `• ${b}`).join("\n")}\nاعتراض: ${loyalty.objection?.q}\nالرد: ${loyalty.objection?.a}`,
+    "## مسار الاتصال المعتمد",
+    fmtSteps(steps),
+    "## مسار العميل المهتم",
+    fmtSteps(interested),
+    "## تحديات واعتراضات شائعة وحلولها",
+    NAHJEZ.CHALLENGES.map((c) => `- ${c.challenge}: ${c.solution}`).join("\n"),
+  ].join("\n\n");
+}
+
+async function buildMenuKnowledge() {
   const [flow, faq] = await Promise.all([
     loadSetting<{ steps?: CFStep[]; interestedSteps?: CFStep[] }>("contact_flow_menu").catch(() => null),
     loadSetting<{ items?: FAQItem[] }>("customer_faq_menu").catch(() => null),
   ]);
-  const steps: Pick<CFStep, "title" | "goal" | "call" | "wa">[] = flow?.steps?.length ? flow.steps : CONTACT_FLOW;
-  const interested: Pick<CFStep, "title" | "goal" | "call" | "wa">[] = flow?.interestedSteps?.length ? flow.interestedSteps : INTERESTED_FLOW;
+  const steps: FlowStep[] = flow?.steps?.length ? flow.steps : CONTACT_FLOW;
+  const interested: FlowStep[] = flow?.interestedSteps?.length ? flow.interestedSteps : INTERESTED_FLOW;
   const items: FAQItem[] = faq?.items?.length ? faq.items : CUSTOMER_FAQ;
 
-  const fmtSteps = (s: typeof steps) => s.map((x, i) => `${i + 1}. ${x.title} — ${x.goal}\n   مكالمة: ${x.call}\n   واتساب: ${x.wa}`).join("\n");
   return [
     "## الباقات (سنوياً قبل الضريبة)",
     TIERS.map((t) => `- ${t.name}: ${t.price} ريال — ${t.note}`).join("\n"),
@@ -57,7 +85,12 @@ async function buildKnowledge() {
   ].join("\n\n");
 }
 
-const PROMPT = `أنت مساعد مبيعات لفريق «قائمة الطلبات» (منيو رقمي + نظام طلب ودفع + كاشير + بطاقات ولاء للمطاعم والكوفيهات في السعودية).
+const PRODUCT_INTRO: Record<AssistProduct, string> = {
+  menu: "فريق «قائمة الطلبات» (منيو رقمي + نظام طلب ودفع + كاشير + بطاقات ولاء للمطاعم والكوفيهات في السعودية)",
+  nahjez: "فريق «نحجز» (منصة إدارة الحجوزات للصالونات ومراكز التجميل والعناية في السعودية: حجز أونلاين + تذكير واتساب + مدفوعات وعربون + بطاقات الهدايا والولاء). العميلات غالباً نساء فخاطب صاحبة الصالون بصيغة المؤنث إن كان مناسباً",
+};
+
+const PROMPT = `أنت مساعد مبيعات لـ{intro}.
 الموظف كتب لك ماذا طلب العميل أو ماذا قال. مهمتك تصيغ له رداً جاهزاً بلهجة سعودية بيضاء مهذّبة ودافئة، بنفس أسلوب المسار المعتمد أدناه.
 
 قواعد:
@@ -94,7 +127,11 @@ export async function POST(req: NextRequest) {
     const rep = String(body?.rep || "").trim().slice(0, 60) || "{اسمك}";
     const client = String(body?.client || "").trim().slice(0, 60) || "(غير مذكور)";
 
-    const prompt = PROMPT.replace("{knowledge}", await buildKnowledge())
+    const product: AssistProduct = body?.product === "nahjez" ? "nahjez" : "menu";
+    const knowledge = product === "nahjez" ? await buildNahjezKnowledge() : await buildMenuKnowledge();
+
+    const prompt = PROMPT.replace("{intro}", PRODUCT_INTRO[product])
+      .replace("{knowledge}", knowledge)
       .replace("{rep}", rep)
       .replace("{client}", client)
       .replace("{request}", request);
