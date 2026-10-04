@@ -715,7 +715,7 @@ function TrackersCard({
 }) {
   return (
     <div className="bg-[#141926] border border-[#2a3242] rounded-2xl p-6">
-      <h3 className="font-semibold text-base mb-5">المتابعة اليومية</h3>
+      <h3 className="font-semibold text-base mb-5">المؤشرات الصحية اليومية</h3>
       <div className="flex flex-col gap-4">
         <TrackerRow icon="⚖️" label="الوزن اليوم" value={todayLog.weight ? arabicNum(todayLog.weight) : "—"} target="كجم">
           <button
