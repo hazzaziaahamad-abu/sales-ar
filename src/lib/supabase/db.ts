@@ -131,6 +131,53 @@ export async function fetchActivityLogs(options?: {
   return (data ?? []) as ActivityLog[];
 }
 
+/** كل نشاط الفريق في يوم محدد (YYYY-MM-DD بتوقيت السعودية): العمليات + الدخول + ملاحظات المتابعة. */
+export async function fetchTeamActivityForDay(day: string): Promise<{
+  logs: ActivityLog[];
+  logins: UserLoginLog[];
+  notes: (FollowUpNote & { entity_name?: string })[];
+}> {
+  const supabase = createClient();
+  const orgId = getOrgId();
+  const from = new Date(`${day}T00:00:00+03:00`).toISOString();
+  const to = new Date(new Date(`${day}T00:00:00+03:00`).getTime() + 86400000).toISOString();
+
+  const [logsRes, loginsRes, notesRes] = await Promise.all([
+    supabase.from("activity_logs").select("*").eq("org_id", orgId)
+      .gte("created_at", from).lt("created_at", to)
+      .order("created_at", { ascending: false }).limit(2000),
+    supabase.from("user_login_logs").select("*").eq("org_id", orgId)
+      .gte("login_at", from).lt("login_at", to)
+      .order("login_at", { ascending: false }).limit(1000),
+    supabase.from("follow_up_notes").select("*").eq("org_id", orgId)
+      .gte("created_at", from).lt("created_at", to)
+      .order("created_at", { ascending: false }).limit(1000),
+  ]);
+  if (logsRes.error) throw logsRes.error;
+  if (loginsRes.error) throw loginsRes.error;
+  if (notesRes.error) throw notesRes.error;
+
+  const notes = (notesRes.data ?? []) as FollowUpNote[];
+  const dealIds = notes.filter(n => n.entity_type === "deal").map(n => n.entity_id);
+  const renewalIds = notes.filter(n => n.entity_type === "renewal").map(n => n.entity_id);
+  const ticketIds = notes.filter(n => n.entity_type === "ticket").map(n => n.entity_id);
+  const nameMap: Record<string, string> = {};
+  await Promise.all([
+    dealIds.length > 0 && supabase.from("deals").select("id, client_name").in("id", dealIds)
+      .then(({ data }) => data?.forEach(d => { nameMap[d.id] = d.client_name; })),
+    renewalIds.length > 0 && supabase.from("renewals").select("id, customer_name").in("id", renewalIds)
+      .then(({ data }) => data?.forEach(r => { nameMap[r.id] = r.customer_name; })),
+    ticketIds.length > 0 && supabase.from("tickets").select("id, client_name").in("id", ticketIds)
+      .then(({ data }) => data?.forEach(t => { nameMap[t.id] = t.client_name; })),
+  ]);
+
+  return {
+    logs: (logsRes.data ?? []) as ActivityLog[],
+    logins: (loginsRes.data ?? []) as UserLoginLog[],
+    notes: notes.map(n => ({ ...n, entity_name: nameMap[n.entity_id] || "" })),
+  };
+}
+
 // ─── CLIENT CODE GENERATOR ──────────────────────────────────────────────────
 
 async function getNextClientCode(table: "deals" | "renewals", prefix: "S" | "R" | "D"): Promise<string> {

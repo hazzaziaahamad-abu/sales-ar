@@ -15,6 +15,7 @@ import { fetchDeals, fetchRenewals, fetchEmployees, fetchRecentFollowUpNotes, up
 import { OfferVisitsPanel } from "@/components/OfferVisitsPanel";
 import { ManagementChat } from "@/components/ManagementChat";
 import { ClientProfilePanel } from "@/components/client-profile-panel";
+import { YesterdaySummary } from "@/components/secretary/yesterday-summary";
 import type { ActivityLog } from "@/types";
 import { useAuth } from "@/lib/auth-context";
 import { formatMoneyFull, todayLocal, dateToLocal, saudiDateStr } from "@/lib/utils/format";
@@ -1738,6 +1739,11 @@ export default function SecretaryPage() {
           onRemind={remindTomorrow}
           onOpenProfile={(q) => setProfileQuery(q)}
         />
+      )}
+
+      {/* ─── ملخص أمس: كل ما تم في المنصة من الفريق ─── */}
+      {!loading && (
+        <YesterdaySummary deals={deals} renewals={renewals} tickets={tickets} employees={employees} />
       )}
 
       {/* ─── 1. Briefing with Month Filter ─── */}
