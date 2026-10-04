@@ -131,6 +131,20 @@ export async function fetchActivityLogs(options?: {
   return (data ?? []) as ActivityLog[];
 }
 
+/** الصفقات المكتملة (المغلقة) في يوم محدد YYYY-MM-DD. */
+export async function fetchClosedDealsOn(day: string): Promise<Deal[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("deals")
+    .select("*")
+    .eq("org_id", getOrgId())
+    .eq("stage", "مكتملة")
+    .eq("close_date", day)
+    .order("deal_value", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as Deal[];
+}
+
 /** كل نشاط الفريق في يوم محدد (YYYY-MM-DD بتوقيت السعودية): العمليات + الدخول + ملاحظات المتابعة. */
 export async function fetchTeamActivityForDay(day: string): Promise<{
   logs: ActivityLog[];
