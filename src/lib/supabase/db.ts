@@ -131,7 +131,7 @@ export async function fetchActivityLogs(options?: {
   return (data ?? []) as ActivityLog[];
 }
 
-/** الصفقات المكتملة (المغلقة) في يوم محدد YYYY-MM-DD. */
+/** الصفقات المكتملة (المغلقة) في يوم محدد YYYY-MM-DD بتوقيت السعودية. */
 export async function fetchClosedDealsOn(day: string): Promise<Deal[]> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -139,7 +139,9 @@ export async function fetchClosedDealsOn(day: string): Promise<Deal[]> {
     .select("*")
     .eq("org_id", getOrgId())
     .eq("stage", "مكتملة")
-    .eq("close_date", day)
+    // close_date مخزّن كـ timestamp — نأخذ اليوم كاملاً بتوقيت السعودية.
+    .gte("close_date", new Date(`${day}T00:00:00+03:00`).toISOString())
+    .lt("close_date", new Date(new Date(`${day}T00:00:00+03:00`).getTime() + 86400000).toISOString())
     .order("deal_value", { ascending: false });
   if (error) throw error;
   return (data ?? []) as Deal[];
