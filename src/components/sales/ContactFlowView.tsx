@@ -8,6 +8,7 @@ import { useEffect } from "react";
 import { PhoneCall } from "lucide-react";
 import ContactFlowPanel from "@/components/sales/ContactFlowPanel";
 import CustomerFAQPanel from "@/components/sales/CustomerFAQPanel";
+import ContactAssistPanel from "@/components/sales/ContactAssistPanel";
 import { CONTACT_FLOW, INTERESTED_FLOW, LOYALTY, CF_TIERS, CUSTOMER_FAQ } from "@/lib/sales/contact-flow-content";
 
 const INK = "#40332b";
@@ -19,7 +20,7 @@ export default function ContactFlowView({ publicMode = false }: { publicMode?: b
   // ‎#customer-faq‎ ينزل مباشرة للأسئلة.
   useEffect(() => {
     const hash = window.location.hash.replace("#", "");
-    if (hash !== "contact-flow" && hash !== "customer-faq") return;
+    if (hash !== "contact-flow" && hash !== "customer-faq" && hash !== "ai-assist") return;
     const t = setTimeout(() => document.getElementById(hash)?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
     return () => clearTimeout(t);
   }, []);
@@ -60,6 +61,9 @@ export default function ContactFlowView({ publicMode = false }: { publicMode?: b
           <a href="#customer-faq" className="rounded-lg px-3 py-1.5" style={{ backgroundColor: "#fff", border: "1px solid #e2d3c3", color: INK }}>
             العميل سأل؟
           </a>
+          <a href="#ai-assist" className="rounded-lg px-3 py-1.5" style={{ backgroundColor: "#EDE9FE", border: "1px solid #d8ccf5", color: PURPLE }}>
+            ✨ مساعد الصياغة
+          </a>
         </nav>
       </header>
 
@@ -73,6 +77,7 @@ export default function ContactFlowView({ publicMode = false }: { publicMode?: b
         publicMode={publicMode}
       />
       <CustomerFAQPanel id="customer-faq" storageKey="customer_faq_menu" defaultItems={CUSTOMER_FAQ} publicMode={publicMode} />
+      <ContactAssistPanel id="ai-assist" />
     </div>
   );
 }
