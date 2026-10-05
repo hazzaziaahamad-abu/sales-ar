@@ -4,17 +4,15 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import {
   getEditableContent, saveEditableContent, getEditableContentRange, fetchClosedDealsOn,
-  fetchDeals, fetchRenewals, fetchTickets, fetchEmployees,
 } from "@/lib/supabase/db";
 import { todayLocal, formatMoneyFull } from "@/lib/utils/format";
-import type { Deal, Renewal, Ticket, Employee } from "@/types";
+import type { Deal } from "@/types";
 import { SecretaryView } from "@/components/secretary/secretary-view";
-import { YesterdaySummary } from "@/components/secretary/yesterday-summary";
 import { RecentUpdatesView } from "@/components/recent-updates/recent-updates-view";
 import { SalesConfirmations } from "@/components/daily-huddle/sales-confirmations";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CalendarClock, Users, Trophy, Save, Check, Settings2, Compass, History, HeartPulse, Activity, BadgeCheck } from "lucide-react";
+import { CalendarClock, Users, Trophy, Save, Check, Settings2, Compass, HeartPulse, Activity, BadgeCheck } from "lucide-react";
 
 // تجربة أولية: فريق «قائمة الطلبات» فقط.
 // النموذج: اجتماع يومي قصير (Daily Huddle) + لوحة نتائج بمقاييس الأفعال (4DX).
@@ -604,7 +602,6 @@ const TABS = [
   { key: "team", label: "الفريق اليوم", icon: Users },
   { key: "compass", label: "بوصلة اليوم", icon: Compass },
   { key: "confirmations", label: "تأكيدات المبيعات", icon: BadgeCheck },
-  { key: "yesterday", label: "أمس", icon: History },
   { key: "health", label: "صحة الأقسام", icon: HeartPulse },
   { key: "activity", label: "نشاط الفريق", icon: Activity },
 ] as const;
@@ -622,7 +619,7 @@ export default function DailyHuddlePage() {
         </div>
         <div>
           <h1 className="text-lg font-bold text-foreground">المتابعة اليومية</h1>
-          <p className="text-xs text-muted-foreground">الفريق · اليوم · تأكيدات المبيعات · أمس · صحة الأقسام · نشاط الفريق</p>
+          <p className="text-xs text-muted-foreground">الفريق · بوصلة اليوم · تأكيدات المبيعات · صحة الأقسام · نشاط الفريق</p>
         </div>
       </div>
 
@@ -644,28 +641,10 @@ export default function DailyHuddlePage() {
       </div>
 
       {tab === "team" && <TeamTodayTab />}
-      {tab === "compass" && <SecretaryView embedded sections={["compass", "priorities", "tasks", "quickTasks"]} />}
+      {tab === "compass" && <SecretaryView embedded sections={["compass", "yesterday", "priorities", "tasks", "quickTasks"]} />}
       {tab === "confirmations" && <SalesConfirmations />}
-      {tab === "yesterday" && <YesterdayTab />}
       {tab === "health" && <SecretaryView embedded sections={["hotCold", "supportHealth", "renewalHealth"]} />}
       {tab === "activity" && <RecentUpdatesView embedded tabs={["updates", "log"]} />}
     </div>
   );
-}
-
-function YesterdayTab() {
-  const [data, setData] = useState<{ deals: Deal[]; renewals: Renewal[]; tickets: Ticket[]; employees: Employee[] } | null>(null);
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
-    Promise.all([fetchDeals(), fetchRenewals(), fetchTickets(), fetchEmployees()])
-      .then(([deals, renewals, tickets, employees]) => setData({ deals, renewals, tickets, employees }))
-      .catch((e) => { console.error(e); setError(true); });
-  }, []);
-
-  if (error) {
-    return <div className="rounded-[14px] p-3 text-sm bg-red-500/10 text-red-400 border border-red-500/20">تعذّر تحميل البيانات</div>;
-  }
-  if (!data) return <Skeleton className="h-64 rounded-2xl" />;
-  return <YesterdaySummary {...data} />;
 }

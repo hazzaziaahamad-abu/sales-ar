@@ -642,6 +642,8 @@ type ChatTarget = { type: "deal" | "renewal" | "client"; id: string; name: strin
 type DetailRow = { id: string; name: string; query: string; meta: string; value: number; sourceLabel: string };
 type StateGroup = { state: string; icon: string; text: string; border: string; count: number; value: number; items: DetailRow[] };
 type CompassCategory = { key: string; label: string; groups: StateGroup[] };
+type CompassWindow = "24h" | "7d";
+const COMPASS_WINDOW_LABEL: Record<CompassWindow, string> = { "24h": "آخر ٢٤ ساعة", "7d": "آخر ٧ أيام" };
 
 function DailyResultsSystem({
   hotDeals, warmDeals, ownerAttention, quickActionDeals, renewalActions, categories, repPhoneByName, todayStats, onRemind, onOpenProfile,
@@ -651,16 +653,18 @@ function DailyResultsSystem({
   ownerAttention: { deal: Deal; intel: DealIntel }[];
   quickActionDeals: { deal: Deal; intel: DealIntel }[];
   renewalActions: { r: Renewal; days: number }[];
-  categories: CompassCategory[];
+  categories: Record<CompassWindow, CompassCategory[]>;
   repPhoneByName: Map<string, string>;
   todayStats: { closed: number; revenue: number; renewals: number };
   onRemind: (d: Deal) => void;
   onOpenProfile: (query: string) => void;
 }) {
   const [chat, setChat] = useState<ChatTarget | null>(null);
-  const [activeCat, setActiveCat] = useState(categories[0]?.key || "support");
+  const [win, setWin] = useState<CompassWindow>("24h");
+  const winCategories = categories[win];
+  const [activeCat, setActiveCat] = useState(winCategories[0]?.key || "support");
   const [detail, setDetail] = useState<{ title: string; items: DetailRow[] } | null>(null);
-  const cat = categories.find((c) => c.key === activeCat) || categories[0];
+  const cat = winCategories.find((c) => c.key === activeCat) || winCategories[0];
   const repMsgForDeal = (d: Deal) =>
     `السلام عليكم ${(d.assigned_rep_name || "").trim()}،\nمتابعة صفقة: ${d.client_name} — ${d.stage} — ${formatMoneyFull(d.deal_value)}\nالمطلوب: ${microStep(d.stage)}\nتكفى تابعها اليوم وحدّثني بالنتيجة.`;
   // نخفي الصفقات المتجاوزة ٣٠ يوماً بلا تفاعل (تركيز).
@@ -707,11 +711,24 @@ function DailyResultsSystem({
         ))}
       </div>
 
-      {/* الحالات — آخر ٧ أيام، مقسّمة حسب الفئة */}
+      {/* الحالات — آخر ٢٤ ساعة / آخر ٧ أيام، مقسّمة حسب الفئة */}
       <div>
-        <p className="text-[12px] font-bold text-muted-foreground mb-1.5">الحالات — آخر ٧ أيام · اضغط للتفاصيل</p>
+        <div className="flex items-center justify-between gap-2 flex-wrap mb-1.5">
+          <p className="text-[12px] font-bold text-muted-foreground">الحالات — {COMPASS_WINDOW_LABEL[win]} · اضغط للتفاصيل</p>
+          <div className="flex items-center gap-0.5 rounded-lg bg-white/[0.04] border border-white/[0.06] p-0.5">
+            {(["24h", "7d"] as const).map((w) => (
+              <button
+                key={w}
+                onClick={() => setWin(w)}
+                className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition-colors ${win === w ? "bg-violet-500/20 text-violet-300" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                {COMPASS_WINDOW_LABEL[w]}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="flex items-center gap-1 flex-wrap mb-2">
-          {categories.map((c) => {
+          {winCategories.map((c) => {
             const total = c.groups.reduce((s, g) => s + g.count, 0);
             return (
               <button
@@ -727,7 +744,7 @@ function DailyResultsSystem({
         {cat && cat.groups.length > 0 ? (
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
             {cat.groups.map((g) => (
-              <button key={g.state} onClick={() => setDetail({ title: `${g.icon} ${g.state}`, items: g.items })} className={`rounded-xl bg-white/[0.03] border ${g.border} p-2.5 text-center transition-colors`}>
+              <button key={g.state} onClick={() => setDetail({ title: `${g.icon} ${g.state} — ${COMPASS_WINDOW_LABEL[win]}`, items: g.items })} className={`rounded-xl bg-white/[0.03] border ${g.border} p-2.5 text-center transition-colors`}>
                 <div className="flex items-center justify-center gap-1">
                   <span className={`text-xl font-extrabold ${g.text}`}>{g.count}</span>
                   <span className="text-sm">{g.icon}</span>
@@ -737,7 +754,7 @@ function DailyResultsSystem({
             ))}
           </div>
         ) : (
-          <p className="text-[12px] text-muted-foreground text-center py-3">لا يوجد نشاط في آخر ٧ أيام</p>
+          <p className="text-[12px] text-muted-foreground text-center py-3">لا يوجد نشاط في {COMPASS_WINDOW_LABEL[win]}</p>
         )}
       </div>
 
@@ -881,7 +898,7 @@ function DailyResultsSystem({
         <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-3" onClick={() => setDetail(null)}>
           <div className="w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-bold text-foreground">{detail.title} — آخر ٧ أيام ({detail.items.length})</span>
+              <span className="text-sm font-bold text-foreground">{detail.title} ({detail.items.length})</span>
               <button onClick={() => setDetail(null)} className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.06] text-muted-foreground hover:text-foreground" title="إغلاق">
                 <XIcon className="w-4 h-4" />
               </button>
@@ -1124,65 +1141,71 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
     return m;
   }, [employees]);
 
-  // بوكسات الحالات — آخر ٧ أيام، مقسّمة: مبيعات الدعم / التجديدات / مبيعات المكتب / تذاكر الدعم.
-  const compassCategories = useMemo<CompassCategory[]>(() => {
+  // بوكسات الحالات — آخر ٢٤ ساعة / آخر ٧ أيام، مقسّمة: مبيعات الدعم / التجديدات / مبيعات المكتب / تذاكر الدعم.
+  const compassCategories = useMemo<Record<CompassWindow, CompassCategory[]>>(() => {
     const now = Date.now();
-    const within7 = (ds?: string | null) => !!ds && (now - new Date(ds).getTime()) <= 7 * 86400000;
-    const dayLabel = (ds?: string) => {
-      if (!ds) return "";
-      const d = Math.floor((now - new Date(ds).getTime()) / 86400000);
-      return d <= 0 ? "اليوم" : d === 1 ? "أمس" : `قبل ${d}ي`;
-    };
+    const build = (windowMs: number): CompassCategory[] => {
+      const withinWindow = (ds?: string | null) => !!ds && (now - new Date(ds).getTime()) <= windowMs;
+      const dayLabel = (ds?: string) => {
+        if (!ds) return "";
+        const d = Math.floor((now - new Date(ds).getTime()) / 86400000);
+        return d <= 0 ? "اليوم" : d === 1 ? "أمس" : `قبل ${d}ي`;
+      };
 
-    const dealGroups = (type: "support" | "office", sourceLabel: string): StateGroup[] => {
-      const items = recentStageDeals.filter(x => type === "support" ? x.deal.sales_type === "support" : (x.deal.sales_type === "office" || !x.deal.sales_type));
-      const map = new Map<string, StateGroup>();
-      for (const x of items) {
-        const st = x.deal.stage;
-        const ui = STAGE_UI[st] || { icon: "•", text: "text-foreground", border: "border-white/[0.08] hover:border-white/20" };
-        let g = map.get(st);
-        if (!g) { g = { state: st, icon: ui.icon, text: ui.text, border: ui.border, count: 0, value: 0, items: [] }; map.set(st, g); }
-        g.count++; g.value += x.deal.deal_value;
-        const dCreated = (x.deal.deal_date || x.deal.created_at) ? new Date(x.deal.deal_date || x.deal.created_at).toLocaleDateString("en-GB") : "";
-        g.items.push({ id: x.deal.id, name: x.deal.client_name, query: x.deal.client_phone || x.deal.client_name, meta: `${x.deal.assigned_rep_name || "بلا مسؤول"} · آخر تفاعل ${dayLabel(x.intel.lastActivityDate)}${dCreated ? ` · أُنشئت ${dCreated}` : ""}`, value: x.deal.deal_value, sourceLabel });
-      }
-      return STAGE_ORDER.filter(s => map.has(s)).map(s => map.get(s)!);
-    };
+      const dealGroups = (type: "support" | "office", sourceLabel: string): StateGroup[] => {
+        const items = recentStageDeals
+          // ٧ أيام: نفس فلتر recentStageDeals (بالأيام)؛ ٢٤ ساعة: بالوقت الفعلي لآخر تفاعل.
+          .filter(x => windowMs >= 7 * 86400000 || withinWindow(x.intel.lastActivityDate))
+          .filter(x => type === "support" ? x.deal.sales_type === "support" : (x.deal.sales_type === "office" || !x.deal.sales_type));
+        const map = new Map<string, StateGroup>();
+        for (const x of items) {
+          const st = x.deal.stage;
+          const ui = STAGE_UI[st] || { icon: "•", text: "text-foreground", border: "border-white/[0.08] hover:border-white/20" };
+          let g = map.get(st);
+          if (!g) { g = { state: st, icon: ui.icon, text: ui.text, border: ui.border, count: 0, value: 0, items: [] }; map.set(st, g); }
+          g.count++; g.value += x.deal.deal_value;
+          const dCreated = (x.deal.deal_date || x.deal.created_at) ? new Date(x.deal.deal_date || x.deal.created_at).toLocaleDateString("en-GB") : "";
+          g.items.push({ id: x.deal.id, name: x.deal.client_name, query: x.deal.client_phone || x.deal.client_name, meta: `${x.deal.assigned_rep_name || "بلا مسؤول"} · آخر تفاعل ${dayLabel(x.intel.lastActivityDate)}${dCreated ? ` · أُنشئت ${dCreated}` : ""}`, value: x.deal.deal_value, sourceLabel });
+        }
+        return STAGE_ORDER.filter(s => map.has(s)).map(s => map.get(s)!);
+      };
 
-    const renewalGroups = (): StateGroup[] => {
-      const items = renewals.filter(r => within7(r.updated_at) || within7(r.created_at));
-      const map = new Map<string, StateGroup>();
-      for (const r of items) {
-        const st = r.status || "—";
-        let g = map.get(st);
-        if (!g) { g = { state: st, icon: "🔄", text: "text-sky-400", border: "border-sky-500/25 hover:border-sky-500/50", count: 0, value: 0, items: [] }; map.set(st, g); }
-        g.count++; g.value += r.plan_price;
-        const rCreated = r.created_at ? new Date(r.created_at).toLocaleDateString("en-GB") : "";
-        g.items.push({ id: r.id, name: r.customer_name, query: r.customer_phone || r.customer_name, meta: `${r.plan_name} · تجديد ${r.renewal_date}${rCreated ? ` · أُنشئت ${rCreated}` : ""}`, value: r.plan_price, sourceLabel: "تجديد" });
-      }
-      return Array.from(map.values()).sort((a, b) => b.count - a.count);
-    };
+      const renewalGroups = (): StateGroup[] => {
+        const items = renewals.filter(r => withinWindow(r.updated_at) || withinWindow(r.created_at));
+        const map = new Map<string, StateGroup>();
+        for (const r of items) {
+          const st = r.status || "—";
+          let g = map.get(st);
+          if (!g) { g = { state: st, icon: "🔄", text: "text-sky-400", border: "border-sky-500/25 hover:border-sky-500/50", count: 0, value: 0, items: [] }; map.set(st, g); }
+          g.count++; g.value += r.plan_price;
+          const rCreated = r.created_at ? new Date(r.created_at).toLocaleDateString("en-GB") : "";
+          g.items.push({ id: r.id, name: r.customer_name, query: r.customer_phone || r.customer_name, meta: `${r.plan_name} · تجديد ${r.renewal_date}${rCreated ? ` · أُنشئت ${rCreated}` : ""}`, value: r.plan_price, sourceLabel: "تجديد" });
+        }
+        return Array.from(map.values()).sort((a, b) => b.count - a.count);
+      };
 
-    const ticketGroups = (): StateGroup[] => {
-      const items = tickets.filter(t => within7(t.created_at) || within7(t.updated_at));
-      const map = new Map<string, StateGroup>();
-      for (const t of items) {
-        const st = t.status || "—";
-        let g = map.get(st);
-        if (!g) { g = { state: st, icon: "🎫", text: "text-orange-400", border: "border-orange-500/25 hover:border-orange-500/50", count: 0, value: 0, items: [] }; map.set(st, g); }
-        g.count++;
-        const created = t.created_at ? new Date(t.created_at).toLocaleDateString("en-GB") : "";
-        g.items.push({ id: t.id, name: t.client_name, query: t.client_phone || t.client_name, meta: `${(t.issue || "").slice(0, 40)}${t.priority ? ` · ${t.priority}` : ""}${created ? ` · أُنشئت ${created}` : ""}`, value: 0, sourceLabel: "تذكرة" });
-      }
-      return Array.from(map.values()).sort((a, b) => b.count - a.count);
-    };
+      const ticketGroups = (): StateGroup[] => {
+        const items = tickets.filter(t => withinWindow(t.created_at) || withinWindow(t.updated_at));
+        const map = new Map<string, StateGroup>();
+        for (const t of items) {
+          const st = t.status || "—";
+          let g = map.get(st);
+          if (!g) { g = { state: st, icon: "🎫", text: "text-orange-400", border: "border-orange-500/25 hover:border-orange-500/50", count: 0, value: 0, items: [] }; map.set(st, g); }
+          g.count++;
+          const created = t.created_at ? new Date(t.created_at).toLocaleDateString("en-GB") : "";
+          g.items.push({ id: t.id, name: t.client_name, query: t.client_phone || t.client_name, meta: `${(t.issue || "").slice(0, 40)}${t.priority ? ` · ${t.priority}` : ""}${created ? ` · أُنشئت ${created}` : ""}`, value: 0, sourceLabel: "تذكرة" });
+        }
+        return Array.from(map.values()).sort((a, b) => b.count - a.count);
+      };
 
-    return [
-      { key: "support", label: "مبيعات الدعم", groups: dealGroups("support", "دعم") },
-      { key: "renewals", label: "التجديدات", groups: renewalGroups() },
-      { key: "office", label: "مبيعات المكتب", groups: dealGroups("office", "مكتب") },
-      { key: "tickets", label: "تذاكر الدعم", groups: ticketGroups() },
-    ];
+      return [
+        { key: "support", label: "مبيعات الدعم", groups: dealGroups("support", "دعم") },
+        { key: "renewals", label: "التجديدات", groups: renewalGroups() },
+        { key: "office", label: "مبيعات المكتب", groups: dealGroups("office", "مكتب") },
+        { key: "tickets", label: "تذاكر الدعم", groups: ticketGroups() },
+      ];
+    };
+    return { "24h": build(86400000), "7d": build(7 * 86400000) };
   }, [recentStageDeals, renewals, tickets]);
 
   // Rep escalation: reps with 3+ stale/cold deals
