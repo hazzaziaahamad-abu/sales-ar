@@ -81,9 +81,8 @@ function toSales(deals: Deal[], renewals: Renewal[]): SaleItem[] {
   return items;
 }
 
-export function SalesConfirmations() {
+export function SalesConfirmations({ canConfirm }: { canConfirm: boolean }) {
   const { user } = useAuth();
-  const canConfirm = user?.isSuperAdmin ?? false;
   const today = saudiDateStr();
 
   const [day, setDay] = useState(today);

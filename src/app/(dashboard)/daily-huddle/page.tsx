@@ -10,6 +10,8 @@ import type { Deal } from "@/types";
 import { SecretaryView } from "@/components/secretary/secretary-view";
 import { RecentUpdatesView } from "@/components/recent-updates/recent-updates-view";
 import { SalesConfirmations } from "@/components/daily-huddle/sales-confirmations";
+import { HuddleManagersButton } from "@/components/daily-huddle/huddle-managers-button";
+import { useHuddleManagers } from "@/lib/huddle-managers";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CalendarClock, Users, Trophy, Save, Check, Settings2, Compass, HeartPulse, Activity, BadgeCheck } from "lucide-react";
@@ -104,9 +106,8 @@ function pct(value: number, target: number) {
   return Math.min(100, Math.round((value / target) * 100));
 }
 
-function TeamTodayTab() {
+function TeamTodayTab({ isManager }: { isManager: boolean }) {
   const { user, activeOrgId } = useAuth();
-  const isManager = user?.isSuperAdmin ?? false;
   const myFirstName = user?.name?.trim().split(/\s+/)[0] ?? "";
 
   const [date, setDate] = useState(todayLocal());
@@ -588,7 +589,7 @@ function TeamTodayTab() {
             </tbody>
           </table>
         </div>
-        <p className="text-[11px] text-muted-foreground mt-2">الأخضر: المعدّل اليومي يحقق الهدف في الأيام التي حُدّثت فيها الأرقام. الالتزام: نسبة «أهم 3 أشياء» المنفّذة فعلاً.{isManager && " الجودة: متوسط تقييم المدير من 5 (4+ ممتاز، أقل من 3 يحتاج تدريب) — تظهر لك فقط."}</p>
+        <p className="text-[11px] text-muted-foreground mt-2">الأخضر: المعدّل اليومي يحقق الهدف في الأيام التي حُدّثت فيها الأرقام. الالتزام: نسبة «أهم 3 أشياء» المنفّذة فعلاً.{isManager && " الجودة: متوسط تقييم المدير من 5 (4+ ممتاز، أقل من 3 يحتاج تدريب) — تظهر لمدراء المتابعة فقط."}</p>
       </div>
     </div>
   );
@@ -610,6 +611,8 @@ type TabKey = (typeof TABS)[number]["key"];
 
 export default function DailyHuddlePage() {
   const [tab, setTab] = useState<TabKey>("team");
+  const huddleManagers = useHuddleManagers();
+  const { isManager } = huddleManagers;
 
   return (
     <div className="space-y-5">
@@ -621,6 +624,11 @@ export default function DailyHuddlePage() {
           <h1 className="text-lg font-bold text-foreground">المتابعة اليومية</h1>
           <p className="text-xs text-muted-foreground">الفريق · بوصلة اليوم · تأكيدات المبيعات · صحة الأقسام · نشاط الفريق</p>
         </div>
+        {huddleManagers.isOwner && (
+          <div className="mr-auto">
+            <HuddleManagersButton managers={huddleManagers.managers} onSave={huddleManagers.save} />
+          </div>
+        )}
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
@@ -640,9 +648,9 @@ export default function DailyHuddlePage() {
         ))}
       </div>
 
-      {tab === "team" && <TeamTodayTab />}
+      {tab === "team" && <TeamTodayTab isManager={isManager} />}
       {tab === "compass" && <SecretaryView embedded sections={["compass", "yesterday", "priorities", "tasks", "quickTasks"]} />}
-      {tab === "confirmations" && <SalesConfirmations />}
+      {tab === "confirmations" && <SalesConfirmations canConfirm={isManager} />}
       {tab === "health" && <SecretaryView embedded sections={["hotCold", "supportHealth", "renewalHealth"]} />}
       {tab === "activity" && <RecentUpdatesView embedded tabs={["updates", "log"]} />}
     </div>
