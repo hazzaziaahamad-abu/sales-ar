@@ -11,9 +11,10 @@ import type { Deal, Renewal, Ticket, Employee } from "@/types";
 import { SecretaryView } from "@/components/secretary/secretary-view";
 import { YesterdaySummary } from "@/components/secretary/yesterday-summary";
 import { RecentUpdatesView } from "@/components/recent-updates/recent-updates-view";
+import { SalesConfirmations } from "@/components/daily-huddle/sales-confirmations";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CalendarClock, Users, Trophy, Save, Check, Settings2, Compass, History, HeartPulse, Activity } from "lucide-react";
+import { CalendarClock, Users, Trophy, Save, Check, Settings2, Compass, History, HeartPulse, Activity, BadgeCheck } from "lucide-react";
 
 // تجربة أولية: فريق «قائمة الطلبات» فقط.
 // النموذج: اجتماع يومي قصير (Daily Huddle) + لوحة نتائج بمقاييس الأفعال (4DX).
@@ -602,6 +603,7 @@ function TeamTodayTab() {
 const TABS = [
   { key: "team", label: "الفريق اليوم", icon: Users },
   { key: "compass", label: "بوصلة اليوم", icon: Compass },
+  { key: "confirmations", label: "تأكيدات المبيعات", icon: BadgeCheck },
   { key: "yesterday", label: "أمس", icon: History },
   { key: "health", label: "صحة الأقسام", icon: HeartPulse },
   { key: "activity", label: "نشاط الفريق", icon: Activity },
@@ -620,7 +622,7 @@ export default function DailyHuddlePage() {
         </div>
         <div>
           <h1 className="text-lg font-bold text-foreground">المتابعة اليومية</h1>
-          <p className="text-xs text-muted-foreground">الفريق · اليوم · أمس · صحة الأقسام · نشاط الفريق</p>
+          <p className="text-xs text-muted-foreground">الفريق · اليوم · تأكيدات المبيعات · أمس · صحة الأقسام · نشاط الفريق</p>
         </div>
       </div>
 
@@ -643,6 +645,7 @@ export default function DailyHuddlePage() {
 
       {tab === "team" && <TeamTodayTab />}
       {tab === "compass" && <SecretaryView embedded sections={["compass", "priorities", "tasks", "quickTasks"]} />}
+      {tab === "confirmations" && <SalesConfirmations />}
       {tab === "yesterday" && <YesterdayTab />}
       {tab === "health" && <SecretaryView embedded sections={["hotCold", "supportHealth", "renewalHealth"]} />}
       {tab === "activity" && <RecentUpdatesView embedded tabs={["updates", "log"]} />}
