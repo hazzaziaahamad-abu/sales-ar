@@ -23,6 +23,8 @@ import {
 } from "lucide-react";
 import {
   CATEGORY_LABELS,
+  KIND_LABELS,
+  KIND_COLORS,
   SEVERITY_LABELS,
   SEVERITY_COLORS,
   STATUS_LABELS,
@@ -31,6 +33,7 @@ import {
   VERDICT_LABELS,
   VERDICT_COLORS,
   type ChallengeCategory,
+  type ChallengeKind,
   type ChallengeSeverity,
   type ChallengeStatus,
   type Measurement,
@@ -54,6 +57,8 @@ type Challenge = {
   challenge_number: number;
   submitter_name: string | null;
   is_anonymous: boolean;
+  kind?: ChallengeKind;
+  client_name?: string | null;
   category: ChallengeCategory;
   against_party: string | null;
   title: string;
@@ -101,6 +106,7 @@ export default function ChallengesPage() {
   const [showNew, setShowNew] = useState(false);
 
   const [fCategory, setFCategory] = useState<string>("all");
+  const [fKind, setFKind] = useState<string>("all");
   const [fStatus, setFStatus] = useState<string>("all");
   const [fSeverity, setFSeverity] = useState<string>("all");
 
@@ -119,11 +125,12 @@ export default function ChallengesPage() {
 
   const filtered = useMemo(() => {
     return list.filter((c) =>
+      (fKind === "all" || (c.kind ?? "challenge") === fKind) &&
       (fCategory === "all" || c.category === fCategory) &&
       (fStatus === "all" || c.status === fStatus) &&
       (fSeverity === "all" || c.severity === fSeverity)
     );
-  }, [list, fCategory, fStatus, fSeverity]);
+  }, [list, fKind, fCategory, fStatus, fSeverity]);
 
   const stats = useMemo(() => ({
     total: list.length,
@@ -166,6 +173,8 @@ export default function ChallengesPage() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-2">
+        <FilterSelect value={fKind} onChange={setFKind} label="النوع"
+          options={[["all", "كل الأنواع"], ...Object.entries(KIND_LABELS)]} />
         <FilterSelect value={fCategory} onChange={setFCategory} label="التصنيف"
           options={[["all", "كل التصنيفات"], ...Object.entries(CATEGORY_LABELS)]} />
         <FilterSelect value={fStatus} onChange={setFStatus} label="الحالة"
@@ -189,7 +198,9 @@ export default function ChallengesPage() {
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs font-mono text-muted-foreground">#{c.challenge_number}</span>
-                  <span className="cc-badge bg-white/[0.06] text-muted-foreground">{CATEGORY_LABELS[c.category]}</span>
+                  {c.kind && c.kind !== "challenge"
+                    ? <span className={`cc-badge ring-1 ${KIND_COLORS[c.kind]}`}>{KIND_LABELS[c.kind]}</span>
+                    : <span className="cc-badge bg-white/[0.06] text-muted-foreground">{CATEGORY_LABELS[c.category]}</span>}
                   {c.origin === "manager" && (
                     <span className="cc-badge bg-cyan-500/15 text-cyan-400 flex items-center gap-1"><Crown className="w-3 h-3" /> من المدير</span>
                   )}
@@ -298,7 +309,9 @@ function DetailModal({ id, onClose, onChanged }: { id: string; onClose: () => vo
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs font-mono text-muted-foreground">#{detail.challenge.challenge_number}</span>
-                  <span className="cc-badge bg-white/[0.06] text-muted-foreground">{CATEGORY_LABELS[detail.challenge.category]}</span>
+                  {detail.challenge.kind && detail.challenge.kind !== "challenge"
+                    ? <span className={`cc-badge ring-1 ${KIND_COLORS[detail.challenge.kind]}`}>{KIND_LABELS[detail.challenge.kind]}</span>
+                    : <span className="cc-badge bg-white/[0.06] text-muted-foreground">{CATEGORY_LABELS[detail.challenge.category]}</span>}
                   <span className={`cc-badge ring-1 ${SEVERITY_COLORS[detail.challenge.severity]}`}>{SEVERITY_LABELS[detail.challenge.severity]}</span>
                   {detail.challenge.origin === "manager" && (
                     <span className="cc-badge bg-cyan-500/15 text-cyan-400 flex items-center gap-1"><Crown className="w-3 h-3" /> من المدير</span>

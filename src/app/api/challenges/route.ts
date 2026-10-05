@@ -7,6 +7,12 @@ export const runtime = "nodejs";
 
 const CATEGORIES = ["communication", "coworker_error", "admin_delay", "other"];
 const SEVERITIES = ["low", "medium", "high"];
+const KINDS = ["challenge", "customer_request", "development"];
+const KIND_SUBMITTED: Record<string, string> = {
+  challenge: "تم رفع التحدي",
+  customer_request: "تم رفع طلب العميل",
+  development: "تم رفع طلب التطوير",
+};
 
 /** GET /api/challenges?orgId=...  → قائمة التحديات للمدير (مع أعداد الحلول). */
 export async function GET(req: NextRequest) {
@@ -44,8 +50,11 @@ export async function POST(req: NextRequest) {
   const description = String(body.description ?? "").trim();
   const category = CATEGORIES.includes(body.category) ? body.category : "communication";
   const severity = SEVERITIES.includes(body.severity) ? body.severity : "medium";
-  const isAnonymous = body.is_anonymous === true;
+  const kind = KINDS.includes(body.kind) ? body.kind : "challenge";
+  // الإخفاء خاص بالتحديات؛ الطلبات والتطويرات تحتاج اسم الرافع للمتابعة.
+  const isAnonymous = kind === "challenge" && body.is_anonymous === true;
   const againstParty = body.against_party ? String(body.against_party).trim() : null;
+  const clientName = kind === "customer_request" && body.client_name ? String(body.client_name).trim() || null : null;
 
   if (!title || !description) {
     return NextResponse.json({ error: "العنوان والوصف مطلوبان" }, { status: 400 });
@@ -69,7 +78,9 @@ export async function POST(req: NextRequest) {
       submitted_by: user.id,
       submitter_name: profile?.name ?? null,
       is_anonymous: origin === "manager" ? false : isAnonymous,
-      category,
+      kind,
+      client_name: clientName,
+      category: kind === "challenge" ? category : "other",
       against_party: againstParty,
       title,
       description,
@@ -86,7 +97,7 @@ export async function POST(req: NextRequest) {
     challenge_id: challenge.id,
     org_id: orgId,
     event_type: "submitted",
-    description: origin === "manager" ? "رفع المدير تحديًا" : "تم رفع التحدي",
+    description: origin === "manager" && kind === "challenge" ? "رفع المدير تحديًا" : KIND_SUBMITTED[kind],
     actor_name: origin === "manager" ? profile?.name ?? "المدير" : isAnonymous ? "موظف (بدون اسم)" : profile?.name ?? null,
   });
 

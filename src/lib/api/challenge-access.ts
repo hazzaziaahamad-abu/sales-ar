@@ -33,3 +33,15 @@ export async function getManagerContext(): Promise<
   const profile = await getChallengeProfile(user.id);
   return { ok: true, user: { id: user.id }, profile };
 }
+
+/** هل المستخدم من «مدراء المتابعة اليومية» (إعداد يحدده السوبر أدمن داخل الصفحة)؟ */
+export async function isHuddleManager(userId: string, orgId: string): Promise<boolean> {
+  const { data } = await supabaseAdmin
+    .from("sales_guide_settings")
+    .select("setting_value")
+    .eq("org_id", orgId)
+    .eq("setting_key", "huddle_managers")
+    .maybeSingle();
+  const list = data?.setting_value;
+  return Array.isArray(list) && list.some((m: { id?: string }) => m?.id === userId);
+}

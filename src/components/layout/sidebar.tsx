@@ -86,7 +86,8 @@ export const NAV_ITEMS = [
   { label: "بوكس الهدايا", href: "/gifts", slug: "gifts", icon: Gift, color: "amber", group: "العملاء" },
   { label: "إدارة المهام", href: "/tasks", slug: "tasks", icon: ListTodo, color: "indigo", group: "المهام" },
   { label: "مهامي", href: "/my-tasks", slug: "my-tasks", icon: UserCheck, color: "cyan", group: "المهام" },
-  { label: "تحدياتي", href: "/my-challenges", slug: "my-challenges", icon: ShieldQuestion, color: "violet", group: "المهام" },
+  // انتقلت إلى تبويب «التحديات والطلبات والتطويرات» في المتابعة اليومية
+  // { label: "تحدياتي", href: "/my-challenges", slug: "my-challenges", icon: ShieldQuestion, color: "violet", group: "المهام" },
   { label: "التطويرات", href: "/development", slug: "development", icon: Code, color: "indigo", group: "الفريق والتطوير" },
   { label: "الشراكات", href: "/partnerships", slug: "partnerships", icon: Handshake, color: "teal", group: "الفريق والتطوير" },
   { label: "المسوقين", href: "/marketers", slug: "marketers", icon: Megaphone, color: "pink", group: "الفريق والتطوير" },

@@ -10,11 +10,12 @@ import type { Deal } from "@/types";
 import { SecretaryView } from "@/components/secretary/secretary-view";
 import { RecentUpdatesView } from "@/components/recent-updates/recent-updates-view";
 import { SalesConfirmations } from "@/components/daily-huddle/sales-confirmations";
+import { ChallengesHub } from "@/components/daily-huddle/challenges-hub";
 import { HuddleManagersButton } from "@/components/daily-huddle/huddle-managers-button";
 import { useHuddleManagers } from "@/lib/huddle-managers";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CalendarClock, Users, Trophy, Save, Check, Settings2, Compass, HeartPulse, Activity, BadgeCheck } from "lucide-react";
+import { CalendarClock, Users, Trophy, Save, Check, Settings2, Compass, HeartPulse, Activity, BadgeCheck, ShieldQuestion } from "lucide-react";
 
 // تجربة أولية: فريق «قائمة الطلبات» فقط.
 // النموذج: اجتماع يومي قصير (Daily Huddle) + لوحة نتائج بمقاييس الأفعال (4DX).
@@ -605,6 +606,7 @@ const TABS = [
   { key: "confirmations", label: "تأكيدات المبيعات", icon: BadgeCheck },
   { key: "health", label: "صحة الأقسام", icon: HeartPulse },
   { key: "activity", label: "نشاط الفريق", icon: Activity },
+  { key: "challenges", label: "التحديات والطلبات والتطويرات", icon: ShieldQuestion },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -622,7 +624,7 @@ export default function DailyHuddlePage() {
         </div>
         <div>
           <h1 className="text-lg font-bold text-foreground">المتابعة اليومية</h1>
-          <p className="text-xs text-muted-foreground">الفريق · بوصلة اليوم · تأكيدات المبيعات · صحة الأقسام · نشاط الفريق</p>
+          <p className="text-xs text-muted-foreground">الفريق · بوصلة اليوم · تأكيدات المبيعات · صحة الأقسام · نشاط الفريق · التحديات والطلبات</p>
         </div>
         {huddleManagers.isOwner && (
           <div className="mr-auto">
@@ -653,6 +655,7 @@ export default function DailyHuddlePage() {
       {tab === "confirmations" && <SalesConfirmations canConfirm={isManager} />}
       {tab === "health" && <SecretaryView embedded sections={["hotCold", "supportHealth", "renewalHealth"]} />}
       {tab === "activity" && <RecentUpdatesView embedded tabs={["updates", "log"]} />}
+      {tab === "challenges" && <ChallengesHub />}
     </div>
   );
 }

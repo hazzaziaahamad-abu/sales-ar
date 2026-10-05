@@ -1,6 +1,27 @@
 // ثوابت ومساعدات مشتركة لمركز معالجة التحديات (تُستخدم في الواجهات).
 
+export type ChallengeKind = "challenge" | "customer_request" | "development";
 export type ChallengeCategory = "communication" | "coworker_error" | "admin_delay" | "other";
+
+export const KIND_LABELS: Record<ChallengeKind, string> = {
+  challenge: "تحدي",
+  customer_request: "طلب عميل",
+  development: "تطوير على النظام",
+};
+
+export const KIND_PLURAL_LABELS: Record<ChallengeKind, string> = {
+  challenge: "التحديات",
+  customer_request: "طلبات العملاء",
+  development: "التطويرات",
+};
+
+export const KIND_COLORS: Record<ChallengeKind, string> = {
+  challenge: "bg-violet-500/15 text-violet-300 ring-violet-500/20",
+  customer_request: "bg-amber-500/15 text-amber-300 ring-amber-500/20",
+  development: "bg-cyan-500/15 text-cyan-300 ring-cyan-500/20",
+};
+
+export const KINDS = Object.keys(KIND_LABELS) as ChallengeKind[];
 export type ChallengeSeverity = "low" | "medium" | "high";
 export type ChallengeStatus =
   | "new" | "under_review" | "solutions_proposed" | "in_progress" | "measuring" | "resolved" | "closed";

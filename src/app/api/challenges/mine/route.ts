@@ -13,7 +13,7 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from("employee_challenges")
-    .select("id, challenge_number, category, title, severity, status, is_anonymous, created_at, updated_at, resolved_at")
+    .select("id, challenge_number, kind, client_name, category, title, severity, status, is_anonymous, created_at, updated_at, resolved_at")
     .eq("submitted_by", user.id)
     .order("created_at", { ascending: false });
 
