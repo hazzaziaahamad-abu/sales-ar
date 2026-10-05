@@ -56,10 +56,9 @@ import { countPendingDeals } from "@/lib/supabase/db";
 export const NAV_ITEMS = [
   { label: "نظرة عامة", href: "/dashboard", slug: "dashboard", icon: LayoutDashboard, color: "cyan", group: "عام" },
   { label: "غرفة العمليات", href: "/operations", slug: "operations", icon: BrainCircuit, color: "violet", group: "عام" },
-  { label: "لوحة المتابعة", href: "/follow-up", slug: "follow-up", icon: ClipboardCheck, color: "rose", group: "عام" },
   // مخفية — استُبدلت بـ«بوصلة اليوم» في السكرتير التنفيذي (نظام موجّه للنتائج)
   // { label: "انضباط الإغلاق", href: "/discipline", slug: "discipline", icon: ShieldAlert, color: "amber", group: "عام" },
-  { label: "التحديثات الأخيرة", href: "/recent-updates", slug: "recent-updates", icon: History, color: "cyan", group: "عام" },
+  { label: "سجل الأكاديمية", href: "/recent-updates", slug: "recent-updates", icon: History, color: "cyan", group: "عام" },
   { label: "مشرف AI", href: "/ai-supervisor", slug: "ai-supervisor", icon: ShieldCheck, color: "cyan", group: "الإدارة التنفيذية" },
   { label: "نحجز هب", href: "/requests", slug: "requests", icon: Inbox, color: "violet", group: "الإدارة التنفيذية" },
   { label: "السكرتير التنفيذي", href: "/secretary", slug: "secretary", icon: BrainCircuit, color: "violet", group: "الإدارة التنفيذية" },

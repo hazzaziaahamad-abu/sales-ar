@@ -2,12 +2,18 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { getEditableContent, saveEditableContent, getEditableContentRange, fetchClosedDealsOn } from "@/lib/supabase/db";
+import {
+  getEditableContent, saveEditableContent, getEditableContentRange, fetchClosedDealsOn,
+  fetchDeals, fetchRenewals, fetchTickets, fetchEmployees,
+} from "@/lib/supabase/db";
 import { todayLocal, formatMoneyFull } from "@/lib/utils/format";
-import type { Deal } from "@/types";
+import type { Deal, Renewal, Ticket, Employee } from "@/types";
+import { SecretaryView } from "@/components/secretary/secretary-view";
+import { YesterdaySummary } from "@/components/secretary/yesterday-summary";
+import { RecentUpdatesView } from "@/components/recent-updates/recent-updates-view";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CalendarClock, Users, Trophy, Save, Check, Settings2, BadgeCheck } from "lucide-react";
+import { CalendarClock, Users, Trophy, Save, Check, Settings2, Compass, History, HeartPulse, Activity } from "lucide-react";
 
 // تجربة أولية: فريق «قائمة الطلبات» فقط.
 // النموذج: اجتماع يومي قصير (Daily Huddle) + لوحة نتائج بمقاييس الأفعال (4DX).
@@ -99,7 +105,7 @@ function pct(value: number, target: number) {
   return Math.min(100, Math.round((value / target) * 100));
 }
 
-export default function DailyHuddlePage() {
+function TeamTodayTab() {
   const { user, activeOrgId } = useAuth();
   const isManager = user?.isSuperAdmin ?? false;
   const myFirstName = user?.name?.trim().split(/\s+/)[0] ?? "";
@@ -249,7 +255,7 @@ export default function DailyHuddlePage() {
             <CalendarClock className="w-4 h-4 text-violet-400" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-foreground">المتابعة اليومية — قائمة الطلبات</h1>
+            <h2 className="text-lg font-bold text-foreground">الفريق اليوم — قائمة الطلبات</h2>
             <p className="text-xs text-muted-foreground">اجتماع يومي قصير + لوحة نتائج (تجربة أولية)</p>
           </div>
         </div>
@@ -331,43 +337,6 @@ export default function DailyHuddlePage() {
           })}
         </div>
       </div>
-
-      {/* الصفقات المنجزة في اليوم السابق */}
-      {!loading && (
-        <div className="cc-card rounded-2xl p-4 border border-emerald-500/20">
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-            <div className="flex items-center gap-2">
-              <BadgeCheck className="w-4 h-4 text-emerald-400" />
-              <h2 className="text-sm font-bold text-foreground">الصفقات المنجزة أمس ({yesterday})</h2>
-            </div>
-            <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-400">
-              {closedYesterday.length} صفقة · {formatMoneyFull(closedYesterday.reduce((s, d) => s + (d.deal_value || 0), 0))}
-            </span>
-          </div>
-          {closedYesterday.length === 0 ? (
-            <p className="text-xs text-muted-foreground text-center py-3">لا توجد صفقات منجزة أمس</p>
-          ) : (
-            <div className="space-y-1.5">
-              {closedYesterday.map((d) => {
-                const fromTeam = TEAM.some((m) => isRepOf(d, m));
-                return (
-                  <div key={d.id} className={`flex items-center justify-between gap-2 rounded-lg px-3 py-2 border ${fromTeam ? "bg-emerald-500/[0.05] border-emerald-500/20" : "bg-white/[0.02] border-white/[0.06]"}`}>
-                    <div className="min-w-0">
-                      <div className="text-sm font-bold text-foreground truncate">{d.client_name}</div>
-                      <div className="text-[11px] text-muted-foreground truncate">
-                        {d.assigned_rep_name || "بلا مسؤول"}
-                        {d.plan ? ` · ${d.plan}` : ""}
-                        {d.sales_type ? ` · ${d.sales_type === "support" ? "مبيعات الدعم" : "مبيعات المكتب"}` : ""}
-                      </div>
-                    </div>
-                    <span className="text-sm font-bold text-emerald-400 shrink-0">{formatMoneyFull(d.deal_value)}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Member cards */}
       {loading ? (
@@ -624,4 +593,76 @@ export default function DailyHuddlePage() {
       </div>
     </div>
   );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   الصفحة: تبويبات المتابعة اليومية
+   تجمع الاجتماع اليومي مع أقسام منقولة من «السكرتير التنفيذي» و«التحديثات الأخيرة».
+═══════════════════════════════════════════════════════════════ */
+const TABS = [
+  { key: "team", label: "الفريق اليوم", icon: Users },
+  { key: "compass", label: "بوصلة اليوم", icon: Compass },
+  { key: "yesterday", label: "أمس", icon: History },
+  { key: "health", label: "صحة الأقسام", icon: HeartPulse },
+  { key: "activity", label: "نشاط الفريق", icon: Activity },
+] as const;
+
+type TabKey = (typeof TABS)[number]["key"];
+
+export default function DailyHuddlePage() {
+  const [tab, setTab] = useState<TabKey>("team");
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-violet-500/15 flex items-center justify-center shrink-0">
+          <CalendarClock className="w-5 h-5 text-violet-400" />
+        </div>
+        <div>
+          <h1 className="text-lg font-bold text-foreground">المتابعة اليومية</h1>
+          <p className="text-xs text-muted-foreground">الفريق · اليوم · أمس · صحة الأقسام · نشاط الفريق</p>
+        </div>
+      </div>
+
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+        {TABS.map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={`flex items-center gap-2 shrink-0 rounded-[14px] px-4 py-2.5 text-sm font-bold transition-all border ${
+              tab === key
+                ? "bg-violet-500/15 text-violet-300 border-violet-500/30"
+                : "bg-white/[0.03] text-muted-foreground hover:text-foreground border-white/[0.06]"
+            }`}
+          >
+            <Icon className="w-4 h-4" />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "team" && <TeamTodayTab />}
+      {tab === "compass" && <SecretaryView embedded sections={["compass", "priorities", "tasks", "quickTasks"]} />}
+      {tab === "yesterday" && <YesterdayTab />}
+      {tab === "health" && <SecretaryView embedded sections={["hotCold", "supportHealth", "renewalHealth"]} />}
+      {tab === "activity" && <RecentUpdatesView embedded tabs={["updates", "log"]} />}
+    </div>
+  );
+}
+
+function YesterdayTab() {
+  const [data, setData] = useState<{ deals: Deal[]; renewals: Renewal[]; tickets: Ticket[]; employees: Employee[] } | null>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    Promise.all([fetchDeals(), fetchRenewals(), fetchTickets(), fetchEmployees()])
+      .then(([deals, renewals, tickets, employees]) => setData({ deals, renewals, tickets, employees }))
+      .catch((e) => { console.error(e); setError(true); });
+  }, []);
+
+  if (error) {
+    return <div className="rounded-[14px] p-3 text-sm bg-red-500/10 text-red-400 border border-red-500/20">تعذّر تحميل البيانات</div>;
+  }
+  if (!data) return <Skeleton className="h-64 rounded-2xl" />;
+  return <YesterdaySummary {...data} />;
 }
