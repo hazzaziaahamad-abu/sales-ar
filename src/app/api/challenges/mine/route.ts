@@ -15,6 +15,8 @@ export async function GET() {
     .from("employee_challenges")
     .select("id, challenge_number, kind, client_name, category, title, severity, status, is_anonymous, created_at, updated_at, resolved_at")
     .eq("submitted_by", user.id)
+    // الطلبات والتطويرات صارت تذاكر في work_tickets — المركز للتحديات فقط.
+    .eq("kind", "challenge")
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

@@ -106,7 +106,6 @@ export default function ChallengesPage() {
   const [showNew, setShowNew] = useState(false);
 
   const [fCategory, setFCategory] = useState<string>("all");
-  const [fKind, setFKind] = useState<string>("all");
   const [fStatus, setFStatus] = useState<string>("all");
   const [fSeverity, setFSeverity] = useState<string>("all");
 
@@ -125,12 +124,11 @@ export default function ChallengesPage() {
 
   const filtered = useMemo(() => {
     return list.filter((c) =>
-      (fKind === "all" || (c.kind ?? "challenge") === fKind) &&
       (fCategory === "all" || c.category === fCategory) &&
       (fStatus === "all" || c.status === fStatus) &&
       (fSeverity === "all" || c.severity === fSeverity)
     );
-  }, [list, fKind, fCategory, fStatus, fSeverity]);
+  }, [list, fCategory, fStatus, fSeverity]);
 
   const stats = useMemo(() => ({
     total: list.length,
@@ -173,8 +171,6 @@ export default function ChallengesPage() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-2">
-        <FilterSelect value={fKind} onChange={setFKind} label="النوع"
-          options={[["all", "كل الأنواع"], ...Object.entries(KIND_LABELS)]} />
         <FilterSelect value={fCategory} onChange={setFCategory} label="التصنيف"
           options={[["all", "كل التصنيفات"], ...Object.entries(CATEGORY_LABELS)]} />
         <FilterSelect value={fStatus} onChange={setFStatus} label="الحالة"

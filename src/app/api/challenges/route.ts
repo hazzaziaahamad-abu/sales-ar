@@ -26,6 +26,8 @@ export async function GET(req: NextRequest) {
     .from("employee_challenges")
     .select("*")
     .eq("org_id", orgId)
+    // الطلبات والتطويرات صارت تذاكر في work_tickets — المركز للتحديات فقط.
+    .eq("kind", "challenge")
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

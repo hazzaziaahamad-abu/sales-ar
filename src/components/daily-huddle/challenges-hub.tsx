@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import {
   CATEGORY_LABELS, SEVERITY_LABELS, STATUS_LABELS, STATUS_COLORS, STATUS_FLOW,
-  KIND_LABELS, KIND_PLURAL_LABELS, KIND_COLORS, KINDS,
+  KIND_LABELS, KIND_COLORS,
   type ChallengeCategory, type ChallengeSeverity, type ChallengeStatus, type ChallengeKind,
 } from "@/lib/challenges";
 
@@ -76,14 +76,14 @@ export function ChallengesHub() {
   const [role, setRole] = useState<Role>("employee");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [kindFilter, setKindFilter] = useState<ChallengeKind | "all">("all");
   const [showDone, setShowDone] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
 
   // Form state
-  const [kind, setKind] = useState<ChallengeKind>("challenge");
+  // الطلبات والتطويرات انتقلت لصفحة «الطلبات والتطويرات» (تذاكر) — هنا التحديات فقط.
+  const kind = "challenge" as ChallengeKind;
   const [category, setCategory] = useState<ChallengeCategory>("communication");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -186,12 +186,11 @@ export function ChallengesHub() {
   }, [items]);
 
   const visible = useMemo(() => items
-    .filter((i) => kindFilter === "all" || i.kind === kindFilter)
     .filter((i) => showDone === DONE.includes(i.status))
     .sort((a, b) => showDone
       ? (b.resolved_at || b.updated_at).localeCompare(a.resolved_at || a.updated_at)
       : a.created_at.localeCompare(b.created_at)),
-  [items, kindFilter, showDone]);
+  [items, showDone]);
 
   const lateCount = items.filter((i) => !DONE.includes(i.status) && daysOpen(i.created_at) > LATE_DAYS).length;
   const t = FORM_TEXT[kind];
@@ -206,11 +205,11 @@ export function ChallengesHub() {
             <ShieldQuestion className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-base font-extrabold text-foreground">التحديات والطلبات والتطويرات</h2>
+            <h2 className="text-base font-extrabold text-foreground">التحديات</h2>
             <p className="text-[12px] text-muted-foreground mt-0.5">
               {role === "employee"
-                ? "ارفع تحدي أو طلب عميل أو تطوير، وتابع حالته لين ينجز."
-                : "كل اللي يحتاج حل أو متابعة لين ينجز — الأقدم أولاً."}
+                ? "ارفع أي تحدٍّ يواجهك وتابع حالته — يصل للمدير مباشرة."
+                : "التحديات اللي رفعها الفريق — الأقدم أولاً."}
             </p>
           </div>
         </div>
@@ -218,7 +217,7 @@ export function ChallengesHub() {
           onClick={() => setShowForm((v) => !v)}
           className="flex items-center gap-2 rounded-[12px] bg-violet-500/15 hover:bg-violet-500/25 text-violet-300 border border-violet-500/20 px-4 py-2.5 text-sm font-bold transition-colors"
         >
-          <Plus className="w-4 h-4" /> إضافة جديد
+          <Plus className="w-4 h-4" /> رفع تحدٍّ
         </button>
       </div>
 
@@ -229,17 +228,6 @@ export function ChallengesHub() {
       {/* Form */}
       {showForm && (
         <div className="rounded-[14px] glass-surface border border-border p-4 space-y-4">
-          <div className="grid grid-cols-3 gap-2">
-            {KINDS.map((k) => (
-              <button
-                key={k}
-                onClick={() => setKind(k)}
-                className={`rounded-[10px] px-2 py-2.5 text-[13px] font-bold border transition-colors ${kind === k ? `ring-1 ${KIND_COLORS[k]} border-transparent` : "bg-white/[0.03] border-white/[0.06] text-muted-foreground hover:text-foreground"}`}
-              >
-                {KIND_LABELS[k]}
-              </button>
-            ))}
-          </div>
           <p className="text-[12px] text-muted-foreground">{t.hint}</p>
 
           {kind === "customer_request" && (
@@ -314,12 +302,7 @@ export function ChallengesHub() {
 
       {/* Filters */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <FilterChip active={kindFilter === "all"} onClick={() => setKindFilter("all")} label="الكل" count={openCount.challenge + openCount.customer_request + openCount.development} />
-          {KINDS.map((k) => (
-            <FilterChip key={k} active={kindFilter === k} onClick={() => setKindFilter(k)} label={KIND_PLURAL_LABELS[k]} count={openCount[k]} />
-          ))}
-        </div>
+        <span className="text-[12px] font-bold text-muted-foreground">التحديات ({openCount.challenge} مفتوحة)</span>
         <div className="flex items-center gap-0.5 rounded-lg bg-white/[0.04] border border-white/[0.06] p-0.5">
           {[false, true].map((done) => (
             <button
@@ -357,17 +340,6 @@ export function ChallengesHub() {
         </div>
       )}
     </div>
-  );
-}
-
-function FilterChip({ active, onClick, label, count }: { active: boolean; onClick: () => void; label: string; count: number }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold border transition-colors ${active ? "bg-violet-500/15 text-violet-300 border-violet-500/30" : "text-muted-foreground border-white/[0.06] hover:text-foreground hover:bg-white/[0.04]"}`}
-    >
-      {label}{count > 0 && <span className="opacity-70"> ({count})</span>}
-    </button>
   );
 }
 

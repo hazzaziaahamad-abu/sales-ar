@@ -34,13 +34,13 @@ export async function GET() {
     .from("employee_challenges")
     .select("id, challenge_number, kind, client_name, category, title, description, against_party, severity, status, is_anonymous, submitted_by, submitter_name, created_at, updated_at, resolved_at")
     .eq("org_id", access.orgId)
+    // الطلبات والتطويرات صارت تذاكر في work_tickets — المركز للتحديات فقط.
+    .eq("kind", "challenge")
     .order("created_at", { ascending: false })
     .limit(300);
 
   if (!access.challengeManager) {
-    query = access.huddleManager
-      ? query.or(`kind.neq.challenge,submitted_by.eq.${access.userId}`)
-      : query.eq("submitted_by", access.userId);
+    query = query.eq("submitted_by", access.userId);
   }
 
   const { data, error } = await query;

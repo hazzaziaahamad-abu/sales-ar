@@ -11,6 +11,7 @@ import { SecretaryView } from "@/components/secretary/secretary-view";
 import { RecentUpdatesView } from "@/components/recent-updates/recent-updates-view";
 import { SalesConfirmations } from "@/components/daily-huddle/sales-confirmations";
 import { ChallengesHub } from "@/components/daily-huddle/challenges-hub";
+import { WorkTicketsBoard } from "@/components/work-tickets/work-tickets-board";
 import { TargetingQualityTab } from "@/components/daily-huddle/targeting-quality";
 import { TEAM, KEY_PREFIX, weekStart, type QualityScores } from "@/components/daily-huddle/huddle-shared";
 import { HuddleManagersButton } from "@/components/daily-huddle/huddle-managers-button";
@@ -587,7 +588,28 @@ export default function DailyHuddlePage() {
       {tab === "confirmations" && <SalesConfirmations canConfirm={isManager} />}
       {tab === "health" && <SecretaryView embedded sections={["hotCold", "supportHealth", "renewalHealth"]} />}
       {tab === "activity" && <RecentUpdatesView embedded tabs={["updates", "log"]} />}
-      {tab === "challenges" && <ChallengesHub />}
+      {tab === "challenges" && <ChallengesTab />}
+    </div>
+  );
+}
+
+/** تبويب «التحديات والطلبات والتطويرات»: تذاكر الطلبات والتطويرات + التحديات (كل واحد في قسم). */
+function ChallengesTab() {
+  const [view, setView] = useState<"tickets" | "challenges">("tickets");
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-0.5 rounded-xl bg-white/[0.04] border border-white/[0.06] p-1 w-fit">
+        {([["tickets", "الطلبات والتطويرات"], ["challenges", "التحديات"]] as const).map(([k, l]) => (
+          <button
+            key={k}
+            onClick={() => setView(k)}
+            className={`px-4 py-1.5 rounded-lg text-[13px] font-bold transition-colors ${view === k ? "bg-violet-500/20 text-violet-300" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            {l}
+          </button>
+        ))}
+      </div>
+      {view === "tickets" ? <WorkTicketsBoard embedded /> : <ChallengesHub />}
     </div>
   );
 }

@@ -48,6 +48,7 @@ import {
   PhoneCall,
   CalendarCheck,
   Share2,
+  Ticket,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
@@ -84,6 +85,7 @@ export const NAV_ITEMS = [
   { label: "رضا العملاء", href: "/satisfaction", slug: "satisfaction", icon: Heart, color: "rose", group: "العملاء" },
   { label: "قائمة الاستهداف", href: "/targeting", slug: "targeting", icon: Target, color: "fuchsia", group: "العملاء" },
   { label: "بوكس الهدايا", href: "/gifts", slug: "gifts", icon: Gift, color: "amber", group: "العملاء" },
+  { label: "الطلبات والتطويرات", href: "/work-tickets", slug: "work-tickets", icon: Ticket, color: "amber", group: "المهام" },
   { label: "إدارة المهام", href: "/tasks", slug: "tasks", icon: ListTodo, color: "indigo", group: "المهام" },
   { label: "مهامي", href: "/my-tasks", slug: "my-tasks", icon: UserCheck, color: "cyan", group: "المهام" },
   // انتقلت إلى تبويب «التحديات والطلبات والتطويرات» في المتابعة اليومية
