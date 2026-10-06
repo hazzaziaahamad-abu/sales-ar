@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getTicketAccess } from "@/lib/api/work-ticket-access";
 import { saudiDateStr } from "@/lib/utils/format";
-import { TEMPLATE_KEYS, usesDays, type VerifyItem, type VerifyScope, type VerifyTemplate } from "@/lib/verifications";
+import { TEMPLATES, TEMPLATE_KEYS, usesDays, type VerifyItem, type VerifyScope, type VerifyTemplate } from "@/lib/verifications";
 
 export const runtime = "nodejs";
 
@@ -129,7 +129,9 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}));
   const template = TEMPLATE_KEYS.includes(body.template) ? (body.template as VerifyTemplate) : null;
-  const scope: VerifyScope = ["support", "office", "all"].includes(body.scope) ? body.scope : "all";
+  const rawScope: VerifyScope = ["support", "office", "all", "renewals"].includes(body.scope) ? body.scope : "all";
+  // «التجديدات» = كل التجديدات؛ مع قوالب الصفقات تعني الكل
+  const scope: VerifyScope = template && TEMPLATES[template].entity === "deal" && rawScope === "renewals" ? "all" : rawScope;
   const staleDays = Math.min(Math.max(Number(body.stale_days) || 7, 1), 90);
   const assigneeId = typeof body.assignee_id === "string" ? body.assignee_id : "";
   const dueAt = typeof body.due_at === "string" && !Number.isNaN(Date.parse(body.due_at)) ? new Date(body.due_at).toISOString() : null;

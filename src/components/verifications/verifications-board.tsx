@@ -8,7 +8,7 @@ import {
 import { fetchEmployees, fetchUserProfiles } from "@/lib/supabase/db";
 import { formatMoneyFull, todayLocal } from "@/lib/utils/format";
 import {
-  TEMPLATES, TEMPLATE_KEYS, SCOPE_LABELS, usesDays, STATUS_LABELS, NO_CONTACT, statusOptions, matchItem, summarize,
+  TEMPLATES, TEMPLATE_KEYS, usesDays, scopeOptions, scopeTitle, STATUS_LABELS, NO_CONTACT, statusOptions, matchItem, summarize,
   type VerificationRequest, type VerifyTemplate, type VerifyScope, type VerifyResponse, type VerifyExtra, type MatchResult,
 } from "@/lib/verifications";
 
@@ -47,7 +47,7 @@ function waPhone(p?: string | null): string {
 }
 const isLate = (r: VerificationRequest) => r.status === "pending" && !!r.due_at && new Date(r.due_at).getTime() < Date.now();
 const titleOf = (r: VerificationRequest) =>
-  `${TEMPLATES[r.template].label}${usesDays(r.template) && r.params?.stale_days ? ` (+${r.params.stale_days} يوم)` : ""} — ${SCOPE_LABELS[r.scope]}`;
+  `${TEMPLATES[r.template].label}${usesDays(r.template) && r.params?.stale_days ? ` (+${r.params.stale_days} يوم)` : ""} — ${scopeTitle(r.template, r.scope)}`;
 
 export function VerificationsBoard({ onPendingChange }: { onPendingChange?: (n: number) => void }) {
   const [requests, setRequests] = useState<VerificationRequest[]>([]);
@@ -261,7 +261,11 @@ function NewRequestForm({ onCancel, onCreated, onError }: {
           {TEMPLATE_KEYS.map((t) => (
             <button
               key={t}
-              onClick={() => setTemplate(t)}
+              onClick={() => {
+                setTemplate(t);
+                // القسم يتبع نوع التقرير (صفقات ↔ تجديدات)
+                if (TEMPLATES[t].entity !== TEMPLATES[template].entity) setScope(TEMPLATES[t].entity === "renewal" ? "renewals" : "support");
+              }}
               className={`text-right rounded-[10px] px-3 py-2 border transition-colors ${template === t ? "bg-teal-500/15 border-teal-500/30" : "bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04]"}`}
             >
               <p className={`text-[13px] font-bold ${template === t ? "text-teal-200" : "text-foreground"}`}>{TEMPLATES[t].label}</p>
@@ -275,7 +279,7 @@ function NewRequestForm({ onCancel, onCreated, onError }: {
         <div>
           <label className="block text-xs font-bold text-muted-foreground mb-1.5">القسم</label>
           <select value={scope} onChange={(e) => setScope(e.target.value as VerifyScope)} className={inputCls}>
-            {(Object.keys(SCOPE_LABELS) as VerifyScope[]).map((s) => <option key={s} value={s} className="bg-card">{SCOPE_LABELS[s]}</option>)}
+            {scopeOptions(TEMPLATES[template].entity).map((o) => <option key={o.value} value={o.value} className="bg-card">{o.label}</option>)}
           </select>
         </div>
         <div>

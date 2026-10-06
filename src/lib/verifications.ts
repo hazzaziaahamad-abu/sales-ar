@@ -2,7 +2,7 @@
 import { STAGES, RENEWAL_STATUSES } from "@/lib/utils/constants";
 
 export type VerifyTemplate = "trial" | "awaiting_payment" | "stale" | "renewals_week" | "renewals_awaiting_payment" | "renewals_following_stale";
-export type VerifyScope = "support" | "office" | "all";
+export type VerifyScope = "support" | "office" | "all" | "renewals";
 export type VerifyStatus = "pending" | "answered" | "reviewed";
 export type EntityType = "deal" | "renewal";
 
@@ -23,7 +23,21 @@ export const SCOPE_LABELS: Record<VerifyScope, string> = {
   support: "مبيعات الدعم",
   office: "مبيعات المكتب",
   all: "الكل",
+  renewals: "التجديدات",
 };
+
+/** خيارات «القسم» حسب نوع التقرير: الصفقات أو التجديدات. */
+export function scopeOptions(entity: EntityType): { value: VerifyScope; label: string }[] {
+  return entity === "renewal"
+    ? [{ value: "renewals", label: "التجديدات (الكل)" }, { value: "support", label: "تجديدات الدعم" }, { value: "office", label: "تجديدات المكتب" }]
+    : [{ value: "support", label: "مبيعات الدعم" }, { value: "office", label: "مبيعات المكتب" }, { value: "all", label: "الكل" }];
+}
+
+/** اسم القسم في عنوان الطلب. */
+export function scopeTitle(template: VerifyTemplate, scope: VerifyScope): string {
+  const entity = TEMPLATES[template].entity;
+  return scopeOptions(entity).find((o) => o.value === scope)?.label ?? SCOPE_LABELS[scope];
+}
 
 export const STATUS_LABELS: Record<VerifyStatus, string> = {
   pending: "بانتظار رد الموظف",
