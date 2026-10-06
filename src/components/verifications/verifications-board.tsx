@@ -8,7 +8,7 @@ import {
 import { fetchEmployees, fetchUserProfiles } from "@/lib/supabase/db";
 import { formatMoneyFull, todayLocal } from "@/lib/utils/format";
 import {
-  TEMPLATES, TEMPLATE_KEYS, SCOPE_LABELS, STATUS_LABELS, NO_CONTACT, statusOptions, matchItem, summarize,
+  TEMPLATES, TEMPLATE_KEYS, SCOPE_LABELS, usesDays, STATUS_LABELS, NO_CONTACT, statusOptions, matchItem, summarize,
   type VerificationRequest, type VerifyTemplate, type VerifyScope, type VerifyResponse, type VerifyExtra, type MatchResult,
 } from "@/lib/verifications";
 
@@ -47,7 +47,7 @@ function waPhone(p?: string | null): string {
 }
 const isLate = (r: VerificationRequest) => r.status === "pending" && !!r.due_at && new Date(r.due_at).getTime() < Date.now();
 const titleOf = (r: VerificationRequest) =>
-  `${TEMPLATES[r.template].label}${r.template === "stale" && r.params?.stale_days ? ` (+${r.params.stale_days} يوم)` : ""} — ${SCOPE_LABELS[r.scope]}`;
+  `${TEMPLATES[r.template].label}${usesDays(r.template) && r.params?.stale_days ? ` (+${r.params.stale_days} يوم)` : ""} — ${SCOPE_LABELS[r.scope]}`;
 
 export function VerificationsBoard({ onPendingChange }: { onPendingChange?: (n: number) => void }) {
   const [requests, setRequests] = useState<VerificationRequest[]>([]);
@@ -291,9 +291,9 @@ function NewRequestForm({ onCancel, onCreated, onError }: {
         </div>
       </div>
 
-      {template === "stale" && (
+      {usesDays(template) && (
         <div className="flex items-center gap-2 text-[13px] text-foreground">
-          بدون تواصل من أكثر من
+          {template === "stale" ? "بدون تواصل من أكثر من" : "بدون تحديث من أكثر من"}
           <input type="number" min={1} max={90} value={staleDays} onChange={(e) => setStaleDays(Number(e.target.value) || 7)} className={`${inputCls} w-20 text-center`} />
           يوم
         </div>

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getTicketAccess } from "@/lib/api/work-ticket-access";
 import { saudiDateStr } from "@/lib/utils/format";
-import { TEMPLATE_KEYS, type VerifyItem, type VerifyScope, type VerifyTemplate } from "@/lib/verifications";
+import { TEMPLATE_KEYS, usesDays, type VerifyItem, type VerifyScope, type VerifyTemplate } from "@/lib/verifications";
 
 export const runtime = "nodejs";
 
@@ -14,6 +14,30 @@ const MAX_ITEMS = 100;
 
 /** يجهّز لقطة القائمة حسب القالب والقسم. */
 async function buildItems(orgId: string, template: VerifyTemplate, scope: VerifyScope, staleDays: number): Promise<VerifyItem[]> {
+  if (template === "renewals_awaiting_payment" || template === "renewals_following_stale") {
+    const status = template === "renewals_awaiting_payment" ? "انتظار الدفع" : "جاري المتابعة";
+    let q = supabaseAdmin.from("renewals")
+      .select("id, customer_name, customer_phone, assigned_rep, plan_name, plan_price, renewal_date, status, updated_at")
+      .eq("org_id", orgId).eq("status", status)
+      .order("updated_at", { ascending: true }).limit(MAX_ITEMS);
+    if (template === "renewals_following_stale") {
+      q = q.lt("updated_at", new Date(Date.now() - staleDays * 86_400_000).toISOString());
+    }
+    if (scope === "support") q = q.eq("sales_type", "support");
+    if (scope === "office") q = q.or("sales_type.eq.office,sales_type.is.null");
+    const { data, error } = await q;
+    if (error) throw error;
+    return (data ?? []).map((r) => {
+      const idle = r.updated_at ? Math.floor((Date.now() - new Date(r.updated_at).getTime()) / 86_400_000) : null;
+      return {
+        entity_type: "renewal" as const, entity_id: r.id, name: r.customer_name, phone: r.customer_phone ?? null,
+        rep: r.assigned_rep ?? null, value: r.plan_price ?? 0, system_status: r.status,
+        last_activity: r.updated_at ?? null,
+        extra: `${r.plan_name ?? ""} · موعد التجديد ${r.renewal_date}${idle !== null ? ` · بدون تحديث ${idle} يوم` : ""}`,
+      };
+    });
+  }
+
   if (template === "renewals_week") {
     const today = saudiDateStr();
     const until = saudiDateStr(new Date(Date.now() + 7 * 86_400_000));
@@ -123,7 +147,7 @@ export async function POST(req: NextRequest) {
   if (items.length === 0) return NextResponse.json({ error: "ما فيه عملاء ينطبق عليهم هالتقرير حالياً" }, { status: 400 });
 
   const { data, error } = await supabaseAdmin.from("verification_requests").insert({
-    org_id: access.orgId, template, scope, params: template === "stale" ? { stale_days: staleDays } : {},
+    org_id: access.orgId, template, scope, params: usesDays(template) ? { stale_days: staleDays } : {},
     assignee_id: assignee.id, assignee_name: assignee.name, note: String(body.note ?? "").trim().slice(0, 1000) || null,
     due_at: dueAt, items, created_by: access.userId, created_by_name: access.name,
   }).select("*").single();

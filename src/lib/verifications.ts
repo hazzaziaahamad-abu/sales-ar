@@ -1,7 +1,7 @@
 // «طلبات التحقق» — المدير يطلب تحقق، الموظف يرد، والنظام يطابق.
 import { STAGES, RENEWAL_STATUSES } from "@/lib/utils/constants";
 
-export type VerifyTemplate = "trial" | "awaiting_payment" | "stale" | "renewals_week";
+export type VerifyTemplate = "trial" | "awaiting_payment" | "stale" | "renewals_week" | "renewals_awaiting_payment" | "renewals_following_stale";
 export type VerifyScope = "support" | "office" | "all";
 export type VerifyStatus = "pending" | "answered" | "reviewed";
 export type EntityType = "deal" | "renewal";
@@ -14,6 +14,8 @@ export const TEMPLATES: Record<VerifyTemplate, { label: string; hint: string; en
   awaiting_payment: { label: "صفقات بانتظار الدفع", hint: "الصفقات في مرحلة «انتظار الدفع»", entity: "deal" },
   stale: { label: "صفقات بدون تواصل", hint: "صفقات مفتوحة بدون تواصل من أكثر من X أيام", entity: "deal" },
   renewals_week: { label: "تجديدات هذا الأسبوع", hint: "تجديدات موعدها خلال ٧ أيام أو متأخرة ولم تكتمل", entity: "renewal" },
+  renewals_awaiting_payment: { label: "تجديدات بانتظار الدفع", hint: "التجديدات في حالة «انتظار الدفع»", entity: "renewal" },
+  renewals_following_stale: { label: "تجديدات جاري المتابعة بدون تحديث", hint: "تجديدات «جاري المتابعة» بدون تحديث من أكثر من X أيام", entity: "renewal" },
 };
 export const TEMPLATE_KEYS = Object.keys(TEMPLATES) as VerifyTemplate[];
 
@@ -47,6 +49,9 @@ export interface VerifyItem {
 export interface VerifyResponse { status: string; note?: string; last_contact?: string }
 export interface VerifyExtra { name: string; status: string; note?: string }
 export interface VerifyApplied { from: string; to: string; by: string | null; at: string }
+
+/** القوالب اللي تحتاج عدد أيام (بدون تواصل/تحديث). */
+export const usesDays = (t: VerifyTemplate) => t === "stale" || t === "renewals_following_stale";
 
 export interface VerificationRequest {
   id: string;
