@@ -78,7 +78,7 @@ export function HuddleManagersButton({ managers, onSave }: {
               </button>
             </div>
             <p className="text-[12px] text-muted-foreground leading-relaxed">
-              المختارين ياخذون صلاحيات المدير داخل المتابعة اليومية فقط: تقييم الجودة، تسجيل الحضور، تعديل أرقام الفريق، وتأكيد/رفض المبيعات. ما يتغيّر شي في باقي النظام.
+              المختارين ياخذون صلاحيات المدير داخل المتابعة اليومية فقط: تقييم الجودة، تعديل أرقام الفريق، وتأكيد/رفض المبيعات. ما يتغيّر شي في باقي النظام.
             </p>
 
             <div className="max-h-[50vh] overflow-y-auto space-y-1">

@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import { getEditableContent, saveEditableContent } from "@/lib/supabase/db";
 
 // مستخدمون يملكون صلاحيات المدير داخل «المتابعة اليومية» فقط
-// (تقييم الجودة، تسجيل الحضور، تعديل أرقام الفريق، تأكيد/رفض المبيعات).
+// (تقييم الجودة، تعديل أرقام الفريق، تأكيد/رفض المبيعات).
 // السوبر أدمن مدير دائماً، وهو الوحيد اللي يعدّل القائمة.
 const KEY = "huddle_managers";
 

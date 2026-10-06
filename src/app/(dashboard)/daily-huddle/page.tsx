@@ -34,6 +34,7 @@ interface Commitment {
 }
 
 interface Entry {
+  /** قديم — أُلغي تسجيل الحضور من الواجهة. */
   attendance?: Attendance;
   commitments?: Commitment[];
   blocker?: string;
@@ -59,12 +60,6 @@ const METRICS = [
   { key: "offers", label: "عروض" },
   { key: "closes", label: "إغلاقات" },
 ] as const;
-
-const ATTENDANCE: { key: Attendance; label: string; cls: string }[] = [
-  { key: "present", label: "حاضر", cls: "bg-emerald-500/15 text-emerald-400 ring-emerald-500/30" },
-  { key: "late", label: "متأخر", cls: "bg-amber-500/15 text-amber-400 ring-amber-500/30" },
-  { key: "absent", label: "غائب", cls: "bg-red-500/15 text-red-400 ring-red-500/30" },
-];
 
 const entryKey = (date: string, member: string) => `${KEY_PREFIX}:${date}:${member}`;
 
@@ -139,7 +134,7 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
     setEntries((prev) => ({ ...prev, [member]: { ...prev[member], ...patch } }));
   }
 
-  // الحضور والجودة يسجّلهما المدير والباقي يسجّله الموظف — نقرأ آخر نسخة قبل الحفظ حتى لا يمسح أحدهما تعديل الآخر.
+  // الحضور والجودة (قديمة) يسجّلهما المدير والباقي يسجّله الموظف — نقرأ آخر نسخة قبل الحفظ حتى لا يمسح أحدهما تعديل الآخر.
   async function save(member: string, patch?: Partial<Entry>, forDate = date) {
     setSaving(member);
     setError(null);
@@ -184,7 +179,6 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
     (acc, m) => ({ ...acc, [m.key]: TEAM.reduce((s, n) => s + (entries[n]?.[m.key] ?? 0), 0) }),
     {} as Record<(typeof METRICS)[number]["key"], number>
   );
-  const attendedCount = TEAM.filter((n) => entries[n]?.attendance === "present" || entries[n]?.attendance === "late").length;
   const winning = METRICS.every((m) => teamTotals[m.key] >= targets[m.key] * TEAM.length);
 
   const yesterday = prevDay(date);
@@ -215,8 +209,6 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
       commitDone: evaluated.filter((c) => c.done).length,
       commitTotal: evaluated.length,
       member,
-      attended: days.filter((d) => d.attendance === "present" || d.attendance === "late").length,
-      late: days.filter((d) => d.attendance === "late").length,
       reported,
       calls: sum("calls"),
       offers: sum("offers"),
@@ -267,7 +259,7 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Users className="w-4 h-4 text-cyan-400" />
-            <span className="text-sm font-bold text-foreground">حضور الاجتماع: {attendedCount}/{TEAM.length}</span>
+            <span className="text-sm font-bold text-foreground">الفريق اليوم</span>
           </div>
           <span className={`text-xs font-bold px-3 py-1 rounded-full ${winning ? "bg-emerald-500/15 text-emerald-400" : "bg-amber-500/15 text-amber-400"}`}>
             {winning ? "الفريق محقق هدف اليوم 🎯" : "الفريق لم يحقق هدف اليوم بعد"}
@@ -336,20 +328,6 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
                     </div>
                     <span className="font-bold text-foreground">{member}</span>
                     {metGoal && <Trophy className="w-4 h-4 text-emerald-400" />}
-                  </div>
-                  <div className="flex gap-1">
-                    {ATTENDANCE.map((a) => (
-                      <button
-                        key={a.key}
-                        disabled={!isManager || saving === member}
-                        onClick={() => save(member, { attendance: e.attendance === a.key ? undefined : a.key })}
-                        className={`px-2 py-1 rounded-lg text-[11px] font-medium transition-all ${
-                          e.attendance === a.key ? `${a.cls} ring-1` : "bg-white/[0.04] text-muted-foreground"
-                        } ${isManager ? "hover:bg-white/[0.08]" : "cursor-default"}`}
-                      >
-                        {a.label}
-                      </button>
-                    ))}
                   </div>
                 </div>
 
@@ -492,8 +470,6 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
               <tr className="text-xs text-muted-foreground border-b border-white/[0.06]">
                 <th className="text-right py-2 font-medium">#</th>
                 <th className="text-right py-2 font-medium">الموظف</th>
-                <th className="text-center py-2 font-medium">حضور</th>
-                <th className="text-center py-2 font-medium">تأخير</th>
                 <th className="text-center py-2 font-medium">أيام التحديث</th>
                 <th className="text-center py-2 font-medium">الالتزام</th>
                 {METRICS.map((m) => <th key={m.key} className="text-center py-2 font-medium">{m.label}</th>)}
@@ -504,8 +480,6 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
                 <tr key={r.member} className="border-b border-white/[0.04] last:border-0">
                   <td className="py-2 text-muted-foreground">{i + 1}</td>
                   <td className="py-2 font-bold text-foreground">{r.member}</td>
-                  <td className="py-2 text-center">{r.attended}</td>
-                  <td className={`py-2 text-center ${r.late ? "text-amber-400" : ""}`}>{r.late}</td>
                   <td className="py-2 text-center">{r.reported}</td>
                   <td className={`py-2 text-center font-bold ${r.commitRate !== null ? rateColor(r.commitRate) : "text-muted-foreground"}`}>
                     {r.commitRate !== null ? <span title={`${r.commitDone} من ${r.commitTotal}`}>{r.commitRate}%</span> : "—"}
