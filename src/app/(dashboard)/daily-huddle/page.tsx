@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
   getEditableContent, saveEditableContent, getEditableContentRange, fetchClosedDealsOn,
@@ -14,13 +15,14 @@ import { ChallengesHub } from "@/components/daily-huddle/challenges-hub";
 import { WorkTicketsBoard } from "@/components/work-tickets/work-tickets-board";
 import { MeetingsBoard } from "@/components/meetings/meetings-board";
 import { AchievementsBoard } from "@/components/achievements/achievements-board";
+import { VerificationsBoard } from "@/components/verifications/verifications-board";
 import { TargetingQualityTab } from "@/components/daily-huddle/targeting-quality";
 import { TEAM, KEY_PREFIX, weekStart, type QualityScores } from "@/components/daily-huddle/huddle-shared";
 import { HuddleManagersButton } from "@/components/daily-huddle/huddle-managers-button";
 import { useHuddleManagers } from "@/lib/huddle-managers";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CalendarClock, Users, Trophy, Save, Check, Settings2, Compass, HeartPulse, Activity, BadgeCheck, ShieldQuestion, Star } from "lucide-react";
+import { CalendarClock, Users, Trophy, Save, Check, Settings2, Compass, HeartPulse, Activity, BadgeCheck, ShieldQuestion, Star, ClipboardCheck } from "lucide-react";
 
 // النموذج: اجتماع يومي قصير (Daily Huddle) + لوحة نتائج بمقاييس الأفعال (4DX).
 const TARGETS_KEY = `${KEY_PREFIX}_targets`;
@@ -512,6 +514,7 @@ const TABS = [
   { key: "quality", label: "جودة الاستهداف", icon: Star },
   { key: "compass", label: "بوصلة اليوم", icon: Compass },
   { key: "confirmations", label: "تأكيدات المبيعات", icon: BadgeCheck },
+  { key: "verify", label: "طلبات التحقق", icon: ClipboardCheck },
   { key: "health", label: "صحة الأقسام", icon: HeartPulse },
   { key: "activity", label: "نشاط الفريق", icon: Activity },
   { key: "challenges", label: "التحديات والطلبات والتطويرات", icon: ShieldQuestion },
@@ -520,9 +523,35 @@ const TABS = [
 type TabKey = (typeof TABS)[number]["key"];
 
 export default function DailyHuddlePage() {
-  const [tab, setTab] = useState<TabKey>("team");
+  return (
+    <Suspense fallback={<Skeleton className="h-72 rounded-2xl" />}>
+      <DailyHuddleTabs />
+    </Suspense>
+  );
+}
+
+function DailyHuddleTabs() {
+  // ?tab=verify — رابط مباشر لتبويب (مثلاً من رسالة واتساب لطلب تحقق)
+  const searchParams = useSearchParams();
+  const initialTab = TABS.find((t) => t.key === searchParams.get("tab"))?.key ?? "team";
+  const [tab, setTab] = useState<TabKey>(initialTab);
+  const [verifyPending, setVerifyPending] = useState(0);
   const huddleManagers = useHuddleManagers();
   const { isManager } = huddleManagers;
+
+  // عدّاد على تبويب «طلبات التحقق»: للموظف = طلبات تنتظر رده، للمدير = ردود تنتظر المطابقة
+  useEffect(() => {
+    fetch("/api/verifications")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d?.me) return;
+        const list = (d.requests ?? []) as { status: string; assignee_id: string }[];
+        setVerifyPending(d.me.isManager
+          ? list.filter((x) => x.status === "answered").length
+          : list.filter((x) => x.status === "pending" && x.assignee_id === d.me.id).length);
+      })
+      .catch(() => undefined);
+  }, []);
 
   return (
     <div className="space-y-5">
@@ -532,7 +561,7 @@ export default function DailyHuddlePage() {
         </div>
         <div>
           <h1 className="text-lg font-bold text-foreground">المتابعة اليومية</h1>
-          <p className="text-xs text-muted-foreground">الفريق · جودة الاستهداف · بوصلة اليوم · تأكيدات المبيعات · صحة الأقسام · نشاط الفريق · التحديات والطلبات</p>
+          <p className="text-xs text-muted-foreground">الفريق · جودة الاستهداف · بوصلة اليوم · تأكيدات المبيعات · طلبات التحقق · صحة الأقسام · نشاط الفريق · التحديات والطلبات</p>
         </div>
         {huddleManagers.isOwner && (
           <div className="mr-auto">
@@ -554,6 +583,9 @@ export default function DailyHuddlePage() {
           >
             <Icon className="w-4 h-4" />
             {label}
+            {key === "verify" && verifyPending > 0 && (
+              <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-teal-500 text-white text-[10px] font-bold flex items-center justify-center">{verifyPending}</span>
+            )}
           </button>
         ))}
       </div>
@@ -562,6 +594,7 @@ export default function DailyHuddlePage() {
       {tab === "quality" && <TargetingQualityTab isManager={isManager} />}
       {tab === "compass" && <SecretaryView embedded sections={["compass", "yesterday", "priorities", "tasks", "quickTasks"]} />}
       {tab === "confirmations" && <SalesConfirmations canConfirm={isManager} />}
+      {tab === "verify" && <VerificationsBoard onPendingChange={setVerifyPending} />}
       {tab === "health" && <SecretaryView embedded sections={["hotCold", "supportHealth", "renewalHealth"]} />}
       {tab === "activity" && <RecentUpdatesView embedded tabs={["updates", "log"]} />}
       {tab === "challenges" && <ChallengesTab />}
