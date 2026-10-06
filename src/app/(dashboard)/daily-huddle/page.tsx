@@ -13,6 +13,7 @@ import { SalesConfirmations } from "@/components/daily-huddle/sales-confirmation
 import { ChallengesHub } from "@/components/daily-huddle/challenges-hub";
 import { WorkTicketsBoard } from "@/components/work-tickets/work-tickets-board";
 import { MeetingsBoard } from "@/components/meetings/meetings-board";
+import { AchievementsBoard } from "@/components/achievements/achievements-board";
 import { TargetingQualityTab } from "@/components/daily-huddle/targeting-quality";
 import { TEAM, KEY_PREFIX, weekStart, type QualityScores } from "@/components/daily-huddle/huddle-shared";
 import { HuddleManagersButton } from "@/components/daily-huddle/huddle-managers-button";
@@ -594,17 +595,17 @@ export default function DailyHuddlePage() {
   );
 }
 
-/** تبويب «التحديات والطلبات والتطويرات»: الطلبات والتطويرات + الاجتماعات + التحديات (كل واحد في قسم). */
+/** تبويب «التحديات والطلبات والتطويرات»: الطلبات والتطويرات + الاجتماعات + الإنجازات + التحديات (كل واحد في قسم). */
 function ChallengesTab() {
-  const [view, setView] = useState<"tickets" | "meetings" | "challenges">("tickets");
+  const [view, setView] = useState<"tickets" | "meetings" | "achievements" | "challenges">("tickets");
   return (
     <div className="space-y-4">
-      <div className="flex gap-0.5 rounded-xl bg-white/[0.04] border border-white/[0.06] p-1 w-fit">
-        {([["tickets", "الطلبات والتطويرات"], ["meetings", "الاجتماعات"], ["challenges", "التحديات"]] as const).map(([k, l]) => (
+      <div className="flex gap-0.5 rounded-xl bg-white/[0.04] border border-white/[0.06] p-1 w-fit max-w-full overflow-x-auto">
+        {([["tickets", "الطلبات والتطويرات"], ["meetings", "الاجتماعات"], ["achievements", "الإنجازات"], ["challenges", "التحديات"]] as const).map(([k, l]) => (
           <button
             key={k}
             onClick={() => setView(k)}
-            className={`px-4 py-1.5 rounded-lg text-[13px] font-bold transition-colors ${view === k ? "bg-violet-500/20 text-violet-300" : "text-muted-foreground hover:text-foreground"}`}
+            className={`px-4 py-1.5 rounded-lg text-[13px] font-bold whitespace-nowrap transition-colors ${view === k ? "bg-violet-500/20 text-violet-300" : "text-muted-foreground hover:text-foreground"}`}
           >
             {l}
           </button>
@@ -612,6 +613,7 @@ function ChallengesTab() {
       </div>
       {view === "tickets" && <WorkTicketsBoard embedded />}
       {view === "meetings" && <MeetingsBoard embedded />}
+      {view === "achievements" && <AchievementsBoard embedded />}
       {view === "challenges" && <ChallengesHub />}
     </div>
   );

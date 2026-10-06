@@ -50,6 +50,7 @@ import {
   Share2,
   Ticket,
   CalendarDays,
+  Trophy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
@@ -88,6 +89,7 @@ export const NAV_ITEMS = [
   { label: "بوكس الهدايا", href: "/gifts", slug: "gifts", icon: Gift, color: "amber", group: "العملاء" },
   { label: "الطلبات والتطويرات", href: "/work-tickets", slug: "work-tickets", icon: Ticket, color: "amber", group: "المهام" },
   { label: "الاجتماعات", href: "/meetings", slug: "meetings", icon: CalendarDays, color: "indigo", group: "المهام" },
+  { label: "الإنجازات", href: "/achievements", slug: "achievements", icon: Trophy, color: "amber", group: "المهام" },
   { label: "إدارة المهام", href: "/tasks", slug: "tasks", icon: ListTodo, color: "indigo", group: "المهام" },
   { label: "مهامي", href: "/my-tasks", slug: "my-tasks", icon: UserCheck, color: "cyan", group: "المهام" },
   // انتقلت إلى تبويب «التحديات والطلبات والتطويرات» في المتابعة اليومية
