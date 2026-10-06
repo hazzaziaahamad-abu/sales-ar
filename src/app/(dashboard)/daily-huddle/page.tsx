@@ -12,6 +12,7 @@ import { RecentUpdatesView } from "@/components/recent-updates/recent-updates-vi
 import { SalesConfirmations } from "@/components/daily-huddle/sales-confirmations";
 import { ChallengesHub } from "@/components/daily-huddle/challenges-hub";
 import { WorkTicketsBoard } from "@/components/work-tickets/work-tickets-board";
+import { MeetingsBoard } from "@/components/meetings/meetings-board";
 import { TargetingQualityTab } from "@/components/daily-huddle/targeting-quality";
 import { TEAM, KEY_PREFIX, weekStart, type QualityScores } from "@/components/daily-huddle/huddle-shared";
 import { HuddleManagersButton } from "@/components/daily-huddle/huddle-managers-button";
@@ -593,13 +594,13 @@ export default function DailyHuddlePage() {
   );
 }
 
-/** تبويب «التحديات والطلبات والتطويرات»: تذاكر الطلبات والتطويرات + التحديات (كل واحد في قسم). */
+/** تبويب «التحديات والطلبات والتطويرات»: الطلبات والتطويرات + الاجتماعات + التحديات (كل واحد في قسم). */
 function ChallengesTab() {
-  const [view, setView] = useState<"tickets" | "challenges">("tickets");
+  const [view, setView] = useState<"tickets" | "meetings" | "challenges">("tickets");
   return (
     <div className="space-y-4">
       <div className="flex gap-0.5 rounded-xl bg-white/[0.04] border border-white/[0.06] p-1 w-fit">
-        {([["tickets", "الطلبات والتطويرات"], ["challenges", "التحديات"]] as const).map(([k, l]) => (
+        {([["tickets", "الطلبات والتطويرات"], ["meetings", "الاجتماعات"], ["challenges", "التحديات"]] as const).map(([k, l]) => (
           <button
             key={k}
             onClick={() => setView(k)}
@@ -609,7 +610,9 @@ function ChallengesTab() {
           </button>
         ))}
       </div>
-      {view === "tickets" ? <WorkTicketsBoard embedded /> : <ChallengesHub />}
+      {view === "tickets" && <WorkTicketsBoard embedded />}
+      {view === "meetings" && <MeetingsBoard embedded />}
+      {view === "challenges" && <ChallengesHub />}
     </div>
   );
 }
