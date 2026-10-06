@@ -11,16 +11,15 @@ import { SecretaryView } from "@/components/secretary/secretary-view";
 import { RecentUpdatesView } from "@/components/recent-updates/recent-updates-view";
 import { SalesConfirmations } from "@/components/daily-huddle/sales-confirmations";
 import { ChallengesHub } from "@/components/daily-huddle/challenges-hub";
+import { TargetingQualityTab } from "@/components/daily-huddle/targeting-quality";
+import { TEAM, KEY_PREFIX, weekStart, type QualityScores } from "@/components/daily-huddle/huddle-shared";
 import { HuddleManagersButton } from "@/components/daily-huddle/huddle-managers-button";
 import { useHuddleManagers } from "@/lib/huddle-managers";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CalendarClock, Users, Trophy, Save, Check, Settings2, Compass, HeartPulse, Activity, BadgeCheck, ShieldQuestion } from "lucide-react";
+import { CalendarClock, Users, Trophy, Save, Check, Settings2, Compass, HeartPulse, Activity, BadgeCheck, ShieldQuestion, Star } from "lucide-react";
 
-// تجربة أولية: فريق «قائمة الطلبات» فقط.
 // النموذج: اجتماع يومي قصير (Daily Huddle) + لوحة نتائج بمقاييس الأفعال (4DX).
-const TEAM = ["علي", "مريم", "تغريد", "منال", "عواطف"];
-const KEY_PREFIX = "huddle_menu";
 const TARGETS_KEY = `${KEY_PREFIX}_targets`;
 
 type Attendance = "present" | "late" | "absent";
@@ -38,7 +37,8 @@ interface Entry {
   calls?: number;
   offers?: number;
   closes?: number;
-  quality?: Partial<Record<QualityKey, number>>;
+  /** تقييمات يومية قديمة — صار التقييم أسبوعياً في تبويب «جودة الاستهداف». */
+  quality?: QualityScores;
   updated_by?: string;
   updated_at?: string;
 }
@@ -57,23 +57,6 @@ const METRICS = [
   { key: "closes", label: "إغلاقات" },
 ] as const;
 
-// جودة الاستهداف — يقيّمها المدير من 1 إلى 5 بعد الاستماع لمكالمة للموظف.
-const QUALITY = [
-  { key: "clarity", label: "وضوح العرض" },
-  { key: "response", label: "الرد المثالي" },
-  { key: "technique", label: "تطبيق أساليب المبيعات" },
-  { key: "knowledge", label: "الإلمام" },
-] as const;
-type QualityKey = (typeof QUALITY)[number]["key"];
-
-/** متوسط التقييمات المُدخلة (من 5)، أو null إن لم يُقيَّم شيء. */
-function qualityAvg(q?: Entry["quality"]): number | null {
-  const vals = QUALITY.map((c) => q?.[c.key]).filter((v): v is number => !!v);
-  return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
-}
-
-const qualityColor = (v: number) => (v >= 4 ? "text-emerald-400" : v >= 3 ? "text-amber-400" : "text-red-400");
-
 const ATTENDANCE: { key: Attendance; label: string; cls: string }[] = [
   { key: "present", label: "حاضر", cls: "bg-emerald-500/15 text-emerald-400 ring-emerald-500/30" },
   { key: "late", label: "متأخر", cls: "bg-amber-500/15 text-amber-400 ring-amber-500/30" },
@@ -81,13 +64,6 @@ const ATTENDANCE: { key: Attendance; label: string; cls: string }[] = [
 ];
 
 const entryKey = (date: string, member: string) => `${KEY_PREFIX}:${date}:${member}`;
-
-/** أول يوم (الأحد) من أسبوع التاريخ المعطى. */
-function weekStart(date: string): string {
-  const d = new Date(`${date}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() - d.getUTCDay());
-  return d.toISOString().slice(0, 10);
-}
 
 function prevDay(date: string): string {
   const d = new Date(`${date}T00:00:00Z`);
@@ -231,12 +207,10 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
     const evaluated = days.flatMap((d) => d.commitments ?? []).filter((c) => c.done !== undefined);
     const sum = (k: (typeof METRICS)[number]["key"]) => days.reduce((s, d) => s + (d[k] ?? 0), 0);
     const reported = days.filter((d) => METRICS.some((m) => (d[m.key] ?? 0) > 0)).length;
-    const qualityDays = days.map((d) => qualityAvg(d.quality)).filter((v): v is number => v !== null);
     return {
       commitRate: evaluated.length ? Math.round((evaluated.filter((c) => c.done).length / evaluated.length) * 100) : null,
       commitDone: evaluated.filter((c) => c.done).length,
       commitTotal: evaluated.length,
-      quality: qualityDays.length ? qualityDays.reduce((a, b) => a + b, 0) / qualityDays.length : null,
       member,
       attended: days.filter((d) => d.attendance === "present" || d.attendance === "late").length,
       late: days.filter((d) => d.attendance === "late").length,
@@ -486,44 +460,6 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
                   })}
                 </div>
 
-                {/* تقييم الجودة خاص: يظهر للمدير وللموظف نفسه فقط */}
-                {editable && (
-                <div className="mt-3 rounded-xl bg-white/[0.02] border border-white/[0.06] p-3">
-                  <div className="flex items-center justify-between text-xs mb-2">
-                    <span className="font-bold text-foreground">جودة الاستهداف</span>
-                    {qualityAvg(e.quality) !== null ? (
-                      <span className={`font-bold ${qualityColor(qualityAvg(e.quality)!)}`}>{qualityAvg(e.quality)!.toFixed(1)} / 5</span>
-                    ) : (
-                      <span className="text-muted-foreground">لم يُقيَّم</span>
-                    )}
-                  </div>
-                  <div className="space-y-1.5">
-                    {QUALITY.map((c) => {
-                      const v = e.quality?.[c.key];
-                      return (
-                        <div key={c.key} className="flex items-center justify-between gap-2">
-                          <span className="text-xs text-muted-foreground">{c.label}</span>
-                          <div className="flex gap-1">
-                            {[1, 2, 3, 4, 5].map((n) => (
-                              <button
-                                key={n}
-                                disabled={!isManager || saving === member}
-                                onClick={() => save(member, { quality: { ...e.quality, [c.key]: v === n ? undefined : n } })}
-                                className={`w-6 h-6 rounded-md text-[11px] font-bold transition-all ${
-                                  v && n <= v ? `bg-violet-500/20 ${qualityColor(v)}` : "bg-white/[0.04] text-muted-foreground"
-                                } ${isManager ? "hover:bg-white/[0.1]" : "cursor-default"}`}
-                              >
-                                {n}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-                )}
-
                 {editable && (
                   <div className="flex items-center justify-between mt-3">
                     <span className="text-[11px] text-muted-foreground">
@@ -557,7 +493,6 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
                 <th className="text-center py-2 font-medium">تأخير</th>
                 <th className="text-center py-2 font-medium">أيام التحديث</th>
                 <th className="text-center py-2 font-medium">الالتزام</th>
-                {isManager && <th className="text-center py-2 font-medium">الجودة</th>}
                 {METRICS.map((m) => <th key={m.key} className="text-center py-2 font-medium">{m.label}</th>)}
               </tr>
             </thead>
@@ -572,11 +507,6 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
                   <td className={`py-2 text-center font-bold ${r.commitRate !== null ? rateColor(r.commitRate) : "text-muted-foreground"}`}>
                     {r.commitRate !== null ? <span title={`${r.commitDone} من ${r.commitTotal}`}>{r.commitRate}%</span> : "—"}
                   </td>
-                  {isManager && (
-                    <td className={`py-2 text-center font-bold ${r.quality !== null ? qualityColor(r.quality) : "text-muted-foreground"}`}>
-                      {r.quality !== null ? r.quality.toFixed(1) : "—"}
-                    </td>
-                  )}
                   {METRICS.map((m) => {
                     const ok = r.reported > 0 && r[m.key] >= targets[m.key] * r.reported;
                     return (
@@ -590,7 +520,7 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
             </tbody>
           </table>
         </div>
-        <p className="text-[11px] text-muted-foreground mt-2">الأخضر: المعدّل اليومي يحقق الهدف في الأيام التي حُدّثت فيها الأرقام. الالتزام: نسبة «أهم 3 أشياء» المنفّذة فعلاً.{isManager && " الجودة: متوسط تقييم المدير من 5 (4+ ممتاز، أقل من 3 يحتاج تدريب) — تظهر لمدراء المتابعة فقط."}</p>
+        <p className="text-[11px] text-muted-foreground mt-2">الأخضر: المعدّل اليومي يحقق الهدف في الأيام التي حُدّثت فيها الأرقام. الالتزام: نسبة «أهم 3 أشياء» المنفّذة فعلاً.</p>
       </div>
     </div>
   );
@@ -602,6 +532,7 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
 ═══════════════════════════════════════════════════════════════ */
 const TABS = [
   { key: "team", label: "الفريق اليوم", icon: Users },
+  { key: "quality", label: "جودة الاستهداف", icon: Star },
   { key: "compass", label: "بوصلة اليوم", icon: Compass },
   { key: "confirmations", label: "تأكيدات المبيعات", icon: BadgeCheck },
   { key: "health", label: "صحة الأقسام", icon: HeartPulse },
@@ -624,7 +555,7 @@ export default function DailyHuddlePage() {
         </div>
         <div>
           <h1 className="text-lg font-bold text-foreground">المتابعة اليومية</h1>
-          <p className="text-xs text-muted-foreground">الفريق · بوصلة اليوم · تأكيدات المبيعات · صحة الأقسام · نشاط الفريق · التحديات والطلبات</p>
+          <p className="text-xs text-muted-foreground">الفريق · جودة الاستهداف · بوصلة اليوم · تأكيدات المبيعات · صحة الأقسام · نشاط الفريق · التحديات والطلبات</p>
         </div>
         {huddleManagers.isOwner && (
           <div className="mr-auto">
@@ -651,6 +582,7 @@ export default function DailyHuddlePage() {
       </div>
 
       {tab === "team" && <TeamTodayTab isManager={isManager} />}
+      {tab === "quality" && <TargetingQualityTab isManager={isManager} />}
       {tab === "compass" && <SecretaryView embedded sections={["compass", "yesterday", "priorities", "tasks", "quickTasks"]} />}
       {tab === "confirmations" && <SalesConfirmations canConfirm={isManager} />}
       {tab === "health" && <SecretaryView embedded sections={["hotCold", "supportHealth", "renewalHealth"]} />}
