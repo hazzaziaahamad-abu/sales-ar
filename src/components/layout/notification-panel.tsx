@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import type { AppNotification } from "@/types";
 import { Button } from "@/components/ui/button";
 import { X, CheckCheck } from "lucide-react";
-import { markSingleMentionRead } from "@/lib/supabase/db";
+import { markSingleMentionRead, resolveClientProfileQuery } from "@/lib/supabase/db";
 
 interface NotificationPanelProps {
   notifications: AppNotification[];
@@ -56,10 +56,19 @@ export function NotificationPanel({
     if (n.type === "mention" && n.metadata?.mentionNotifId) {
       markSingleMentionRead(n.metadata.mentionNotifId).catch(console.error);
       const base = SECTION_PATH[n.section] || "/sales";
-      const params = new URLSearchParams();
-      if (n.metadata.entityName) params.set("profile", n.metadata.entityName);
-      if (n.metadata.noteId) params.set("noteId", n.metadata.noteId);
-      router.push(`${base}?${params.toString()}`);
+      const { entityType, entityId, entityName, noteId } = n.metadata;
+      const go = (profile?: string) => {
+        const params = new URLSearchParams();
+        if (profile) params.set("profile", profile);
+        if (noteId) params.set("noteId", noteId);
+        router.push(`${base}?${params.toString()}`);
+      };
+      // نفتح الملخص بجوال العميل بدل الاسم (الاسم ممكن يكون رمز مثل «*» فيطابق كل العملاء)
+      if (entityId && (entityType === "deal" || entityType === "renewal" || entityType === "ticket")) {
+        resolveClientProfileQuery(entityType, entityId, entityName).then(go);
+      } else {
+        go(entityName);
+      }
     } else {
       const path = SECTION_PATH[n.section];
       if (path) router.push(path);

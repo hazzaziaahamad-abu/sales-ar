@@ -225,12 +225,67 @@ export interface ClientProfileData {
   notes: FollowUpNote[];
 }
 
+// يحوّل نص البحث لصيغة آمنة داخل فلتر .or() في PostgREST:
+// «*» و«%» عندهم wildcard (اسم عميل «*» كان يرجّع كل بيانات الشركة)،
+// و«, ( ) " \» تكسر صياغة الفلتر، ورموز الاتجاه (⁦ ⁩) غير مرئية.
+export function sanitizeClientSearch(query: string): string {
+  return query
+    .replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, "")
+    .replace(/[*%,()"\\]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// اسم عميل لازم يحتوي حرف أو رقم واحد على الأقل (يمنع أسماء مثل «*» أو «/»)
+export function isValidClientName(name: string | null | undefined): boolean {
+  return /[\p{L}\p{N}]/u.test(name ?? "");
+}
+
+// اسم من رموز فقط (مثل «.» أو «*») يُستبدل بجوال العميل — عشان يبقى قابل للبحث وما يكسر الملخص.
+// بدون جوال: عند الإنشاء نرفض، وعند التعديل نخلي القيمة كما هي (ما نكسر تعديل سجلات قديمة).
+function normalizeClientName(
+  name: string | null | undefined,
+  phone: string | null | undefined,
+  mode: "create" | "update",
+): string | null | undefined {
+  if (isValidClientName(name)) return name!.trim();
+  const cleanPhone = sanitizeClientSearch(phone || "");
+  if (/\d/.test(cleanPhone)) return cleanPhone;
+  if (mode === "create") {
+    throw new Error("اسم العميل لازم يحتوي حروف أو أرقام — الرموز وحدها مثل «*» أو «/» غير مقبولة (أو أضف رقم الجوال)");
+  }
+  return name;
+}
+
+// يرجّع أفضل نص لفتح ملخص العميل لكيان معيّن: الجوال أولاً (أدق من الاسم)، وإلا الاسم
+export async function resolveClientProfileQuery(
+  entityType: "deal" | "renewal" | "ticket",
+  entityId: string,
+  fallbackName = "",
+): Promise<string> {
+  const supabase = createClient();
+  const table = entityType === "deal" ? "deals" : entityType === "renewal" ? "renewals" : "tickets";
+  const phoneCol = entityType === "renewal" ? "customer_phone" : "client_phone";
+  const nameCol = entityType === "renewal" ? "customer_name" : "client_name";
+  try {
+    const { data } = await supabase.from(table).select(`${phoneCol}, ${nameCol}`)
+      .eq("org_id", getOrgId()).eq("id", entityId).maybeSingle();
+    const row = data as Record<string, string | null> | null;
+    const phone = sanitizeClientSearch(row?.[phoneCol] || "");
+    if (phone) return phone;
+    return row?.[nameCol] || fallbackName;
+  } catch {
+    return fallbackName;
+  }
+}
+
 export async function fetchClientProfile(query: string): Promise<ClientProfileData> {
   const supabase = createClient();
   const orgId = getOrgId();
-  const q = query.trim();
+  const q = sanitizeClientSearch(query);
 
-  const isPhone = /^\d+$/.test(q.replace(/[\s\-+()]/g, ""));
+  // بحث بدون أي حرف أو رقم كان يطابق كل السجلات — نرجّع نتيجة فاضية بدل بيانات الشركة كاملة
+  if (!/[\p{L}\p{N}]/u.test(q)) return { deals: [], renewals: [], tickets: [], notes: [] };
 
   const [dealsRes, renewalsRes, ticketsRes] = await Promise.all([
     supabase.from("deals").select("*").eq("org_id", orgId)
@@ -497,6 +552,7 @@ export async function createDeal(
 ): Promise<Deal> {
   const supabase = createClient();
   const prefix = deal.sales_type === "support" ? "D" : "S";
+  deal = { ...deal, client_name: normalizeClientName(deal.client_name, deal.client_phone, "create") as string };
   const client_code = await getNextClientCode("deals", prefix);
   // Auto-trim name fields to prevent duplicates
   const trimmed = {
@@ -523,6 +579,7 @@ export async function updateDeal(
   const supabase = createClient();
   // Auto-trim name fields
   const trimmed = { ...deal };
+  if (deal.client_name !== undefined) trimmed.client_name = normalizeClientName(deal.client_name, deal.client_phone, "update") as string;
   if (trimmed.client_name) trimmed.client_name = trimmed.client_name.trim();
   if (trimmed.assigned_rep_name) trimmed.assigned_rep_name = trimmed.assigned_rep_name.trim();
   if (trimmed.marketer_name) trimmed.marketer_name = trimmed.marketer_name.trim();
@@ -841,6 +898,7 @@ export async function createRenewal(
   renewal: Omit<Renewal, "id" | "org_id" | "created_at" | "updated_at">
 ): Promise<Renewal> {
   const supabase = createClient();
+  renewal = { ...renewal, customer_name: normalizeClientName(renewal.customer_name, renewal.customer_phone, "create") as string };
   const client_code = await getNextClientCode("renewals", "R");
   // Auto-trim name fields
   const trimmed = {
@@ -866,6 +924,7 @@ export async function updateRenewal(
   const supabase = createClient();
   // Auto-trim name fields
   const trimmed = { ...renewal };
+  if (renewal.customer_name !== undefined) trimmed.customer_name = normalizeClientName(renewal.customer_name, renewal.customer_phone, "update") as string;
   if (trimmed.customer_name) trimmed.customer_name = trimmed.customer_name.trim();
   if (trimmed.assigned_rep) trimmed.assigned_rep = trimmed.assigned_rep.trim();
   const { data, error } = await supabase

@@ -15,7 +15,7 @@ import { WelcomePopup } from "@/components/layout/welcome-popup";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { OrgProvider } from "@/lib/org-context";
 import { Skeleton } from "@/components/ui/skeleton";
-import { fetchDeals, fetchSalesTargets, fetchSalesActivities, fetchTickets, fetchRenewals, fetchEmployeeTasks, fetchMentionNotifications, markMentionNotificationsRead, markSingleMentionRead, fetchRecentFollowUpNotes, fetchDueReminders, dismissReminder } from "@/lib/supabase/db";
+import { fetchDeals, fetchSalesTargets, fetchSalesActivities, fetchTickets, fetchRenewals, fetchEmployeeTasks, fetchMentionNotifications, markMentionNotificationsRead, markSingleMentionRead, fetchRecentFollowUpNotes, fetchDueReminders, dismissReminder, resolveClientProfileQuery } from "@/lib/supabase/db";
 import { createClient } from "@/lib/supabase/client";
 import type { Reminder } from "@/lib/supabase/db";
 import type { AppNotification, MentionNotification, Deal, Ticket, Renewal, EmployeeTask } from "@/types";
@@ -194,10 +194,12 @@ const MENTION_SECTION_PATH: Record<string, string> = {
   renewal: "/renewals",
 };
 
-function buildMentionUrl(m: MentionNotification): string {
+// يفتح ملخص العميل بجواله (من السجل نفسه) بدل الاسم — الاسم ممكن يكون عام أو رمز مثل «*»
+async function buildMentionUrl(m: MentionNotification): Promise<string> {
   const base = MENTION_SECTION_PATH[m.entity_type] || "/sales";
   const params = new URLSearchParams();
-  if (m.entity_name) params.set("profile", m.entity_name);
+  const profile = await resolveClientProfileQuery(m.entity_type, m.entity_id, m.entity_name);
+  if (profile) params.set("profile", profile);
   if (m.note_id) params.set("noteId", m.note_id);
   return `${base}?${params.toString()}`;
 }
@@ -254,7 +256,7 @@ function MentionAlertBanner({ mentions, onRefresh }: { mentions: MentionNotifica
               key={m.id}
               onClick={() => {
                 if (isNew) markRead([m.id]);
-                router.push(buildMentionUrl(m));
+                buildMentionUrl(m).then((url) => router.push(url));
               }}
               className={`w-full text-right px-4 py-2.5 flex items-center gap-3 hover:bg-white/[0.04] transition-colors ${isNew ? "" : "opacity-50"}`}
             >
