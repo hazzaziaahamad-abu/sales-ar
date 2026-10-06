@@ -8,7 +8,7 @@ import {
 import { fetchEmployees, fetchUserProfiles } from "@/lib/supabase/db";
 import { formatMoneyFull, todayLocal } from "@/lib/utils/format";
 import {
-  TEMPLATES, TEMPLATE_KEYS, usesDays, scopeOptions, scopeTitle, STATUS_LABELS, NO_CONTACT, statusOptions, matchItem, summarize,
+  TEMPLATES, TEMPLATE_KEYS, usesDays, scopeOptions, scopeTitle, repLabel, REP_ALL, REP_NONE, STATUS_LABELS, NO_CONTACT, statusOptions, matchItem, summarize,
   type VerificationRequest, type VerifyTemplate, type VerifyScope, type VerifyResponse, type VerifyExtra, type MatchResult,
 } from "@/lib/verifications";
 
@@ -47,7 +47,7 @@ function waPhone(p?: string | null): string {
 }
 const isLate = (r: VerificationRequest) => r.status === "pending" && !!r.due_at && new Date(r.due_at).getTime() < Date.now();
 const titleOf = (r: VerificationRequest) =>
-  `${TEMPLATES[r.template].label}${usesDays(r.template) && r.params?.stale_days ? ` (+${r.params.stale_days} يوم)` : ""} — ${scopeTitle(r.template, r.scope)}`;
+  `${TEMPLATES[r.template].label}${usesDays(r.template) && r.params?.stale_days ? ` (+${r.params.stale_days} يوم)` : ""} — ${scopeTitle(r.template, r.scope)}${r.params?.rep ? ` — ${repLabel(r.params.rep)}` : ""}`;
 
 export function VerificationsBoard({ onPendingChange }: { onPendingChange?: (n: number) => void }) {
   const [requests, setRequests] = useState<VerificationRequest[]>([]);
@@ -225,6 +225,16 @@ function NewRequestForm({ onCancel, onCreated, onError }: {
   const [staleDays, setStaleDays] = useState(7);
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
   const [assignee, setAssignee] = useState("");
+  const [rep, setRep] = useState<string>(REP_ALL);
+  const isRenewal = TEMPLATES[template].entity === "renewal";
+  const assigneeName = users.find((u) => u.id === assignee)?.name ?? "";
+
+  // التجديدات مقسومة حسب المسؤول — نخلي القائمة على عملاء الموظف المختار تلقائياً
+  function pickAssignee(id: string) {
+    setAssignee(id);
+    const name = users.find((u) => u.id === id)?.name ?? "";
+    if (isRenewal && name) setRep(name);
+  }
   const [due, setDue] = useState(`${todayLocal()}T16:00`);
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
@@ -239,7 +249,7 @@ function NewRequestForm({ onCancel, onCreated, onError }: {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          template, scope, stale_days: staleDays, assignee_id: assignee, note,
+          template, scope, stale_days: staleDays, assignee_id: assignee, note, rep,
           due_at: due ? new Date(`${due}:00+03:00`).toISOString() : null,
         }),
       });
@@ -263,6 +273,8 @@ function NewRequestForm({ onCancel, onCreated, onError }: {
               key={t}
               onClick={() => {
                 setTemplate(t);
+                // التجديدات: عملاء الموظف المختار؛ الصفقات: الكل
+                setRep(TEMPLATES[t].entity === "renewal" && assigneeName ? assigneeName : REP_ALL);
                 // القسم يتبع نوع التقرير (صفقات ↔ تجديدات)
                 if (TEMPLATES[t].entity !== TEMPLATES[template].entity) setScope(TEMPLATES[t].entity === "renewal" ? "renewals" : "support");
               }}
@@ -284,7 +296,7 @@ function NewRequestForm({ onCancel, onCreated, onError }: {
         </div>
         <div>
           <label className="block text-xs font-bold text-muted-foreground mb-1.5">الموظف</label>
-          <select value={assignee} onChange={(e) => setAssignee(e.target.value)} className={inputCls}>
+          <select value={assignee} onChange={(e) => pickAssignee(e.target.value)} className={inputCls}>
             <option value="" className="bg-card">— اختر —</option>
             {users.map((u) => <option key={u.id} value={u.id} className="bg-card">{u.name}</option>)}
           </select>
@@ -293,6 +305,18 @@ function NewRequestForm({ onCancel, onCreated, onError }: {
           <label className="block text-xs font-bold text-muted-foreground mb-1.5">المطلوب قبل</label>
           <input type="datetime-local" value={due} onChange={(e) => setDue(e.target.value)} className={inputCls} />
         </div>
+      </div>
+
+      <div>
+        <label className="block text-xs font-bold text-muted-foreground mb-1.5">عملاء مين؟</label>
+        <select value={rep} onChange={(e) => setRep(e.target.value)} className={inputCls}>
+          <option value={REP_ALL} className="bg-card">كل العملاء</option>
+          {users.map((u) => <option key={u.id} value={u.name} className="bg-card">عملاء {u.name}</option>)}
+          <option value={REP_NONE} className="bg-card">بدون مسؤول</option>
+        </select>
+        <p className="text-[11px] text-muted-foreground mt-1">
+          {isRenewal ? "حسب «المسؤول» في قسم التجديدات" : "حسب «المسؤول» عن الصفقة — اتركها «كل العملاء» لو الموظف يتابع القسم كامل"}
+        </p>
       </div>
 
       {usesDays(template) && (

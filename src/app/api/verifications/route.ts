@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getTicketAccess } from "@/lib/api/work-ticket-access";
 import { saudiDateStr } from "@/lib/utils/format";
-import { TEMPLATES, TEMPLATE_KEYS, usesDays, type VerifyItem, type VerifyScope, type VerifyTemplate } from "@/lib/verifications";
+import { TEMPLATES, TEMPLATE_KEYS, usesDays, REP_ALL, REP_NONE, type VerifyItem, type VerifyScope, type VerifyTemplate } from "@/lib/verifications";
 
 export const runtime = "nodejs";
 
@@ -13,7 +13,7 @@ const CLOSED_RENEWAL = ["مكتمل", "ملغي بسبب"];
 const MAX_ITEMS = 100;
 
 /** يجهّز لقطة القائمة حسب القالب والقسم. */
-async function buildItems(orgId: string, template: VerifyTemplate, scope: VerifyScope, staleDays: number): Promise<VerifyItem[]> {
+async function buildItems(orgId: string, template: VerifyTemplate, scope: VerifyScope, staleDays: number, rep: string): Promise<VerifyItem[]> {
   if (template === "renewals_awaiting_payment" || template === "renewals_following_stale") {
     const status = template === "renewals_awaiting_payment" ? "انتظار الدفع" : "جاري المتابعة";
     let q = supabaseAdmin.from("renewals")
@@ -25,6 +25,8 @@ async function buildItems(orgId: string, template: VerifyTemplate, scope: Verify
     }
     if (scope === "support") q = q.eq("sales_type", "support");
     if (scope === "office") q = q.or("sales_type.eq.office,sales_type.is.null");
+    if (rep === REP_NONE) q = q.is("assigned_rep", null);
+    else if (rep) q = q.eq("assigned_rep", rep);
     const { data, error } = await q;
     if (error) throw error;
     return (data ?? []).map((r) => {
@@ -49,6 +51,8 @@ async function buildItems(orgId: string, template: VerifyTemplate, scope: Verify
       .order("renewal_date", { ascending: true }).limit(MAX_ITEMS);
     if (scope === "support") q = q.eq("sales_type", "support");
     if (scope === "office") q = q.or("sales_type.eq.office,sales_type.is.null");
+    if (rep === REP_NONE) q = q.is("assigned_rep", null);
+    else if (rep) q = q.eq("assigned_rep", rep);
     const { data, error } = await q;
     if (error) throw error;
     return (data ?? []).map((r) => ({
@@ -64,6 +68,8 @@ async function buildItems(orgId: string, template: VerifyTemplate, scope: Verify
     .eq("org_id", orgId);
   if (scope === "support") q = q.eq("sales_type", "support");
   if (scope === "office") q = q.or("sales_type.eq.office,sales_type.is.null");
+  if (rep === REP_NONE) q = q.is("assigned_rep_name", null);
+  else if (rep) q = q.eq("assigned_rep_name", rep);
   if (template === "trial") q = q.eq("stage", "تجريبي");
   else if (template === "awaiting_payment") q = q.eq("stage", "انتظار الدفع");
   else q = q.in("stage", ACTIVE_DEAL);
@@ -133,6 +139,7 @@ export async function POST(req: NextRequest) {
   // «التجديدات» = كل التجديدات؛ مع قوالب الصفقات تعني الكل
   const scope: VerifyScope = template && TEMPLATES[template].entity === "deal" && rawScope === "renewals" ? "all" : rawScope;
   const staleDays = Math.min(Math.max(Number(body.stale_days) || 7, 1), 90);
+  const rep = typeof body.rep === "string" ? body.rep.trim().slice(0, 120) : REP_ALL;
   const assigneeId = typeof body.assignee_id === "string" ? body.assignee_id : "";
   const dueAt = typeof body.due_at === "string" && !Number.isNaN(Date.parse(body.due_at)) ? new Date(body.due_at).toISOString() : null;
   if (!template || !assigneeId) return NextResponse.json({ error: "اختر نوع التقرير والموظف" }, { status: 400 });
@@ -142,14 +149,14 @@ export async function POST(req: NextRequest) {
 
   let items: VerifyItem[];
   try {
-    items = await buildItems(access.orgId, template, scope, staleDays);
+    items = await buildItems(access.orgId, template, scope, staleDays, rep);
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "تعذّر تجهيز القائمة" }, { status: 500 });
   }
   if (items.length === 0) return NextResponse.json({ error: "ما فيه عملاء ينطبق عليهم هالتقرير حالياً" }, { status: 400 });
 
   const { data, error } = await supabaseAdmin.from("verification_requests").insert({
-    org_id: access.orgId, template, scope, params: usesDays(template) ? { stale_days: staleDays } : {},
+    org_id: access.orgId, template, scope, params: { ...(usesDays(template) ? { stale_days: staleDays } : {}), ...(rep ? { rep } : {}) },
     assignee_id: assignee.id, assignee_name: assignee.name, note: String(body.note ?? "").trim().slice(0, 1000) || null,
     due_at: dueAt, items, created_by: access.userId, created_by_name: access.name,
   }).select("*").single();

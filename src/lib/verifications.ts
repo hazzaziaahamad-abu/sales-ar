@@ -45,6 +45,11 @@ export const STATUS_LABELS: Record<VerifyStatus, string> = {
   reviewed: "تمت المراجعة",
 };
 
+/** فلتر «عملاء مين؟»: كل العملاء، أو بدون مسؤول، أو مسؤول محدد. */
+export const REP_ALL = "";
+export const REP_NONE = "__none__";
+export const repLabel = (rep?: string) => (!rep ? "" : rep === REP_NONE ? "بدون مسؤول" : `عملاء ${rep}`);
+
 /** خيارات الحالة اللي يختار منها الموظف حسب نوع العنصر. */
 export const statusOptions = (entity: EntityType): readonly string[] => (entity === "deal" ? STAGES : RENEWAL_STATUSES);
 
@@ -72,7 +77,7 @@ export interface VerificationRequest {
   request_number: number;
   template: VerifyTemplate;
   scope: VerifyScope;
-  params: { stale_days?: number };
+  params: { stale_days?: number; rep?: string };
   assignee_id: string;
   assignee_name: string | null;
   note: string | null;
