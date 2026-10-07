@@ -33,7 +33,7 @@ function waPhone(p?: string | null): string {
 }
 const isLate = (r: VerificationRequest) => r.status === "pending" && !!r.due_at && new Date(r.due_at).getTime() < Date.now();
 const titleOf = (r: VerificationRequest) =>
-  `${TEMPLATES[r.template].label}${usesDays(r.template) && r.params?.stale_days ? ` (+${r.params.stale_days} يوم)` : ""} — ${scopeTitle(r.template, r.scope)}${r.params?.rep ? ` — ${repLabel(r.params.rep)}` : ""}`;
+  `${TEMPLATES[r.template].label}${r.params?.stale_days ? ` (+${r.params.stale_days} يوم)` : ""} — ${scopeTitle(r.template, r.scope)}${r.params?.rep ? ` — ${repLabel(r.params.rep)}` : ""}`;
 
 export function VerificationsBoard({ onPendingChange }: { onPendingChange?: (n: number) => void }) {
   const [requests, setRequests] = useState<VerificationRequest[]>([]);
@@ -198,7 +198,8 @@ function NewRequestForm({ onCancel, onCreated, onError }: {
 }) {
   const [template, setTemplate] = useState<VerifyTemplate>("trial");
   const [scope, setScope] = useState<VerifyScope>("support");
-  const [staleDays, setStaleDays] = useState(7);
+  // فاضي = بدون شرط مدة (للقوالب اللي المدة فيها اختيارية)
+  const [staleDays, setStaleDays] = useState("");
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
   const [assignee, setAssignee] = useState("");
   const [rep, setRep] = useState<string>(REP_ALL);
@@ -223,7 +224,7 @@ function NewRequestForm({ onCancel, onCreated, onError }: {
   useEffect(() => {
     let cancelled = false;
     setPreviewing(true);
-    const qs = new URLSearchParams({ preview: "1", template, scope, rep, stale_days: String(staleDays) });
+    const qs = new URLSearchParams({ preview: "1", template, scope, rep, stale_days: staleDays });
     const t = setTimeout(() => {
       fetch(`/api/verifications?${qs}`)
         .then((res) => (res.ok ? res.json() : null))
@@ -242,7 +243,7 @@ function NewRequestForm({ onCancel, onCreated, onError }: {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          template, scope, stale_days: staleDays, assignee_id: assignee, note, rep,
+          template, scope, stale_days: Number(staleDays) || null, assignee_id: assignee, note, rep,
           due_at: due ? new Date(`${due}:00+03:00`).toISOString() : null,
         }),
       });
@@ -266,6 +267,8 @@ function NewRequestForm({ onCancel, onCreated, onError }: {
               key={t}
               onClick={() => {
                 setTemplate(t);
+                // قوالب «بدون تواصل/تحديث» تحتاج عدد أيام — افتراضي 7
+                if (usesDays(t) && !staleDays) setStaleDays("7");
                 // التجديدات: عملاء الموظف المختار؛ الصفقات: الكل
                 setRep(TEMPLATES[t].entity === "renewal" && assigneeName ? assigneeName : REP_ALL);
                 // القسم يتبع نوع التقرير (صفقات ↔ تجديدات)
@@ -312,13 +315,19 @@ function NewRequestForm({ onCancel, onCreated, onError }: {
         </p>
       </div>
 
-      {usesDays(template) && (
-        <div className="flex items-center gap-2 text-[13px] text-foreground">
+      <div>
+        <div className="flex items-center gap-2 text-[13px] text-foreground flex-wrap">
           {template === "stale" ? "بدون تواصل من أكثر من" : "بدون تحديث من أكثر من"}
-          <input type="number" min={1} max={90} value={staleDays} onChange={(e) => setStaleDays(Number(e.target.value) || 7)} className={`${inputCls} w-20 text-center`} />
+          <input
+            type="number" min={1} max={365} value={staleDays}
+            placeholder={usesDays(template) ? "7" : "الكل"}
+            onChange={(e) => setStaleDays(e.target.value.replace(/\D/g, ""))}
+            className={`${inputCls} w-20 text-center`}
+          />
           يوم
         </div>
-      )}
+        {!usesDays(template) && <p className="text-[11px] text-muted-foreground mt-1">اتركها فاضية عشان يجيك الكل بدون شرط مدة</p>}
+      </div>
 
       <div>
         <label className="block text-xs font-bold text-muted-foreground mb-1.5">ملاحظة للموظف <span className="font-normal">(اختياري)</span></label>

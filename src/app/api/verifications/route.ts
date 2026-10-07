@@ -13,16 +13,14 @@ const CLOSED_RENEWAL = ["مكتمل", "ملغي بسبب"];
 const MAX_ITEMS = 1000;
 
 /** يجهّز لقطة القائمة حسب القالب والقسم. */
-async function buildItems(orgId: string, template: VerifyTemplate, scope: VerifyScope, staleDays: number, rep: string): Promise<VerifyItem[]> {
+async function buildItems(orgId: string, template: VerifyTemplate, scope: VerifyScope, staleDays: number | null, rep: string): Promise<VerifyItem[]> {
   if (template === "renewals_awaiting_payment" || template === "renewals_following_stale") {
     const status = template === "renewals_awaiting_payment" ? "انتظار الدفع" : "جاري المتابعة";
     let q = supabaseAdmin.from("renewals")
       .select("id, customer_name, customer_phone, assigned_rep, plan_name, plan_price, renewal_date, status, updated_at")
       .eq("org_id", orgId).eq("status", status)
       .order("updated_at", { ascending: true }).limit(MAX_ITEMS);
-    if (template === "renewals_following_stale") {
-      q = q.lt("updated_at", new Date(Date.now() - staleDays * 86_400_000).toISOString());
-    }
+    if (staleDays) q = q.lt("updated_at", new Date(Date.now() - staleDays * 86_400_000).toISOString());
     if (scope === "support") q = q.eq("sales_type", "support");
     if (scope === "office") q = q.or("sales_type.eq.office,sales_type.is.null");
     if (rep === REP_NONE) q = q.is("assigned_rep", null);
@@ -49,6 +47,7 @@ async function buildItems(orgId: string, template: VerifyTemplate, scope: Verify
       .eq("org_id", orgId).gte("renewal_date", since).lte("renewal_date", until)
       .not("status", "in", `(${CLOSED_RENEWAL.map((s) => `"${s}"`).join(",")})`)
       .order("renewal_date", { ascending: true }).limit(MAX_ITEMS);
+    if (staleDays) q = q.lt("updated_at", new Date(Date.now() - staleDays * 86_400_000).toISOString());
     if (scope === "support") q = q.eq("sales_type", "support");
     if (scope === "office") q = q.or("sales_type.eq.office,sales_type.is.null");
     if (rep === REP_NONE) q = q.is("assigned_rep", null);
@@ -78,9 +77,11 @@ async function buildItems(orgId: string, template: VerifyTemplate, scope: Verify
 
   let rows = (data ?? []).filter((d) => !CLOSED_DEAL.includes(d.stage));
   const lastOf = (d: (typeof rows)[number]) => d.last_contact || d.updated_at || d.created_at;
-  if (template === "stale") {
+  if (staleDays) {
+    // «بدون تواصل»: حسب آخر تواصل؛ الباقي: حسب آخر تحديث على الصفقة
     const cutoff = Date.now() - staleDays * 86_400_000;
-    rows = rows.filter((d) => new Date(lastOf(d)).getTime() < cutoff);
+    const since = (d: (typeof rows)[number]) => (template === "stale" ? lastOf(d) : d.updated_at || d.created_at);
+    rows = rows.filter((d) => new Date(since(d)).getTime() < cutoff);
   }
   return rows.slice(0, MAX_ITEMS).map((d) => ({
     entity_type: "deal", entity_id: d.id, name: d.client_name, phone: d.client_phone ?? null,
@@ -112,7 +113,9 @@ function parseFilters(src: { template?: unknown; scope?: unknown; stale_days?: u
   const rawScope: VerifyScope = ["support", "office", "all", "renewals"].includes(src.scope as string) ? (src.scope as VerifyScope) : "all";
   // «التجديدات» = كل التجديدات؛ مع قوالب الصفقات تعني الكل
   const scope: VerifyScope = template && TEMPLATES[template].entity === "deal" && rawScope === "renewals" ? "all" : rawScope;
-  const staleDays = Math.min(Math.max(Number(src.stale_days) || 7, 1), 90);
+  // عدد الأيام: إجباري لقوالب «بدون تواصل/تحديث» (افتراضي 7)، واختياري للباقي (فاضي = الكل)
+  const days = Math.min(Math.max(Math.round(Number(src.stale_days)) || 0, 0), 365);
+  const staleDays = template && usesDays(template) ? days || 7 : days || null;
   const rep = typeof src.rep === "string" ? src.rep.trim().slice(0, 120) : REP_ALL;
   return { template, scope, staleDays, rep };
 }
@@ -186,7 +189,7 @@ export async function POST(req: NextRequest) {
   if (items.length === 0) return NextResponse.json({ error: "ما فيه عملاء ينطبق عليهم هالتقرير حالياً" }, { status: 400 });
 
   const { data, error } = await supabaseAdmin.from("verification_requests").insert({
-    org_id: access.orgId, template, scope, params: { ...(usesDays(template) ? { stale_days: staleDays } : {}), ...(rep ? { rep } : {}) },
+    org_id: access.orgId, template, scope, params: { ...(staleDays ? { stale_days: staleDays } : {}), ...(rep ? { rep } : {}) },
     assignee_id: assignee.id, assignee_name: assignee.name, note: String(body.note ?? "").trim().slice(0, 1000) || null,
     due_at: dueAt, items, created_by: access.userId, created_by_name: access.name,
   }).select("*").single();
