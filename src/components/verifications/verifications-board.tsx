@@ -9,7 +9,7 @@ import { fetchEmployees, fetchUserProfiles } from "@/lib/supabase/db";
 import { formatMoneyFull, todayLocal } from "@/lib/utils/format";
 import {
   TEMPLATES, TEMPLATE_KEYS, usesDays, scopeOptions, scopeTitle, repLabel, REP_ALL, REP_NONE, STATUS_LABELS, NO_CONTACT, statusOptions, matchItem, summarize,
-  type VerificationRequest, type VerifyTemplate, type VerifyScope, type VerifyResponse, type VerifyExtra, type MatchResult,
+  type VerificationRequest, type VerifyItem, type VerifyTemplate, type VerifyScope, type VerifyResponse, type VerifyExtra, type MatchResult,
 } from "@/lib/verifications";
 
 const inputCls = "w-full rounded-[10px] bg-white/[0.04] border border-border px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-teal-500/40";
@@ -359,6 +359,7 @@ function ManagerCard({ r, open, onToggle, onUpdated, onDeleted, onWhatsApp, flas
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [onlyIssues, setOnlyIssues] = useState(false);
+  const [historyFor, setHistoryFor] = useState<string | null>(null);
   const s = summarize(r);
   const answered = r.status !== "pending";
   const late = isLate(r);
@@ -468,15 +469,23 @@ function ManagerCard({ r, open, onToggle, onUpdated, onDeleted, onWhatsApp, flas
               const applied = r.applied?.[it.entity_id];
               return (
                 <div key={it.entity_id} className="rounded-lg bg-white/[0.02] border border-white/[0.06] px-3 py-2">
-                  <div className="flex items-start justify-between gap-2 flex-wrap">
+                  <button
+                    onClick={() => setHistoryFor((v) => (v === it.entity_id ? null : it.entity_id))}
+                    className="w-full text-right flex items-start justify-between gap-2 flex-wrap"
+                  >
                     <div className="min-w-0">
                       <p className="text-[13px] font-bold text-foreground">{it.name}</p>
                       <p className="text-[11px] text-muted-foreground">
                         {[it.rep, it.extra, it.value ? formatMoneyFull(it.value) : null].filter(Boolean).join(" · ")}
                       </p>
                     </div>
-                    {answered && <span className={`cc-badge ${RESULT_UI[result].cls}`}>{RESULT_UI[result].label}</span>}
-                  </div>
+                    <div className="flex items-center gap-1.5">
+                      {answered && <span className={`cc-badge ${RESULT_UI[result].cls}`}>{RESULT_UI[result].label}</span>}
+                      <span className={`flex items-center gap-1 text-[11px] ${historyFor === it.entity_id ? "text-cyan-300" : "text-muted-foreground"}`}>
+                        <History className="w-3.5 h-3.5" /> السجل
+                      </span>
+                    </div>
+                  </button>
                   <div className="mt-1.5 grid grid-cols-2 gap-2 text-[12px]">
                     <div><span className="text-muted-foreground">النظام: </span><span className="text-foreground">{cur ?? "—"}</span></div>
                     {answered && (
@@ -503,6 +512,7 @@ function ManagerCard({ r, open, onToggle, onUpdated, onDeleted, onWhatsApp, flas
                   {applied && (
                     <p className="text-[11px] text-emerald-400 mt-1">✓ تم التحديث: {applied.from} ← {applied.to} ({applied.by}، {fmtDateTime(applied.at)})</p>
                   )}
+                  {historyFor === it.entity_id && <ItemHistory r={r} item={it} resp={resp} />}
                 </div>
               );
             })}
@@ -533,6 +543,46 @@ function ManagerCard({ r, open, onToggle, onUpdated, onDeleted, onWhatsApp, flas
             </button>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+/** سجل عميل داخل طلب التحقق: أحداث الطلب نفسه + عمليات النظام وملاحظات المتابعة. */
+function ItemHistory({ r, item, resp }: { r: VerificationRequest; item: VerifyItem; resp: VerifyResponse | undefined }) {
+  const [entries, setEntries] = useState<{ kind: string; at: string; by: string | null; text: string }[] | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/verifications/${r.id}/history?entity_id=${encodeURIComponent(item.entity_id)}`)
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then((d) => setEntries(d.entries ?? []))
+      .catch(() => setFailed(true));
+  }, [r.id, item.entity_id]);
+
+  // أحداث طلب التحقق — موجودة في الطلب نفسه
+  const own: { kind: string; at: string; by: string | null; text: string }[] = [
+    { kind: "verify", at: r.created_at, by: r.created_by_name, text: `أُرسل للتحقق في الطلب #${r.request_number} إلى ${r.assignee_name ?? "الموظف"} (حالة النظام وقتها: ${item.system_status ?? "—"})` },
+  ];
+  if (r.responded_at && resp) {
+    own.push({ kind: "verify", at: r.responded_at, by: r.assignee_name, text: `رد الموظف: ${resp.status === NO_CONTACT ? "تعذّر التواصل" : resp.status}${resp.note ? ` — ${resp.note}` : ""}` });
+  }
+  const all = [...own, ...(entries ?? [])].sort((a, b) => (a.at < b.at ? 1 : -1));
+
+  return (
+    <div className="mt-2 rounded-lg bg-black/20 border border-white/[0.06] p-2.5">
+      <p className="text-[11px] font-bold text-cyan-300 mb-1.5 flex items-center gap-1"><History className="w-3.5 h-3.5" /> سجل العميل</p>
+      {entries === null && !failed && <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> جاري التحميل…</p>}
+      {failed && <p className="text-[11px] text-red-400">تعذّر تحميل سجل النظام — تحت أحداث طلب التحقق فقط.</p>}
+      {(entries !== null || failed) && (
+        <ul className="space-y-1.5">
+          {all.map((e, i) => (
+            <li key={i} className="text-[11px] leading-relaxed border-r-2 pr-2 border-white/[0.08]">
+              <span className="text-muted-foreground">{fmtDateTime(e.at)}{e.by ? ` · ${e.by}` : ""}{e.kind === "note" ? " · ملاحظة" : ""}</span>
+              <p className="text-foreground">{e.text}</p>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
