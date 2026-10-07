@@ -56,7 +56,7 @@ export async function middleware(request: NextRequest) {
       const user = await getUserWithTimeout(supabase);
       if (user) {
         const dashUrl = request.nextUrl.clone();
-        dashUrl.pathname = "/dashboard";
+        dashUrl.pathname = "/daily-huddle";
         return NextResponse.redirect(dashUrl);
       }
     }
