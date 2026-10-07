@@ -10,7 +10,7 @@ const CLOSED_DEAL = ["مكتملة", "مرفوض مع سبب", "استهداف �
 // «بدون تواصل»: نركّز على المراحل النشطة في خط المبيعات
 const ACTIVE_DEAL = ["عميل جديد", "تفاوض", "تجهيز", "انتظار الدفع", "تم إرسال العرض", "تجريبي"];
 const CLOSED_RENEWAL = ["مكتمل", "ملغي بسبب"];
-const MAX_ITEMS = 100;
+const MAX_ITEMS = 1000;
 
 /** يجهّز لقطة القائمة حسب القالب والقسم. */
 async function buildItems(orgId: string, template: VerifyTemplate, scope: VerifyScope, staleDays: number, rep: string): Promise<VerifyItem[]> {
@@ -89,27 +89,55 @@ async function buildItems(orgId: string, template: VerifyTemplate, scope: Verify
   }));
 }
 
-/** الحالة الحالية في النظام لكل عنصر في الطلبات. */
-async function currentStatuses(orgId: string, rows: { items: VerifyItem[] }[]) {
+/** الحالة وآخر تحديث في النظام لكل عنصر في الطلبات (العنصر المحذوف ما يرجع). */
+async function currentState(orgId: string, rows: { items: VerifyItem[] }[]) {
   const dealIds = new Set<string>(), renewalIds = new Set<string>();
   for (const r of rows) for (const it of r.items) (it.entity_type === "deal" ? dealIds : renewalIds).add(it.entity_id);
-  const map: Record<string, string | null> = {};
+  const map: Record<string, { status: string | null; updated_at: string | null }> = {};
   const chunk = <T,>(arr: T[], n: number) => Array.from({ length: Math.ceil(arr.length / n) }, (_, i) => arr.slice(i * n, i * n + n));
   for (const ids of chunk([...dealIds], 200)) {
-    const { data } = await supabaseAdmin.from("deals").select("id, stage").eq("org_id", orgId).in("id", ids);
-    for (const d of data ?? []) map[d.id] = d.stage;
+    const { data } = await supabaseAdmin.from("deals").select("id, stage, updated_at").eq("org_id", orgId).in("id", ids);
+    for (const d of data ?? []) map[d.id] = { status: d.stage, updated_at: d.updated_at };
   }
   for (const ids of chunk([...renewalIds], 200)) {
-    const { data } = await supabaseAdmin.from("renewals").select("id, status").eq("org_id", orgId).in("id", ids);
-    for (const r of data ?? []) map[r.id] = r.status;
+    const { data } = await supabaseAdmin.from("renewals").select("id, status, updated_at").eq("org_id", orgId).in("id", ids);
+    for (const r of data ?? []) map[r.id] = { status: r.status, updated_at: r.updated_at };
   }
   return map;
 }
 
-/** GET /api/verifications → المدير: كل الطلبات مع الحالة الحالية؛ الموظف: طلباته فقط. */
-export async function GET() {
+/** الإعدادات المشتركة بين المعاينة وإنشاء الطلب. */
+function parseFilters(src: { template?: unknown; scope?: unknown; stale_days?: unknown; rep?: unknown }) {
+  const template = TEMPLATE_KEYS.includes(src.template as VerifyTemplate) ? (src.template as VerifyTemplate) : null;
+  const rawScope: VerifyScope = ["support", "office", "all", "renewals"].includes(src.scope as string) ? (src.scope as VerifyScope) : "all";
+  // «التجديدات» = كل التجديدات؛ مع قوالب الصفقات تعني الكل
+  const scope: VerifyScope = template && TEMPLATES[template].entity === "deal" && rawScope === "renewals" ? "all" : rawScope;
+  const staleDays = Math.min(Math.max(Number(src.stale_days) || 7, 1), 90);
+  const rep = typeof src.rep === "string" ? src.rep.trim().slice(0, 120) : REP_ALL;
+  return { template, scope, staleDays, rep };
+}
+
+/**
+ * GET /api/verifications → المدير: كل الطلبات؛ الموظف: طلباته فقط. مع تقدّم كل طلب
+ * (كم عميل تحدّث في النظام بعد إرسال الطلب).
+ * GET /api/verifications?preview=1&template=… → المدير: عدد العملاء اللي ينطبق عليهم التقرير.
+ */
+export async function GET(req: NextRequest) {
   const access = await getTicketAccess();
   if (!access) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const sp = req.nextUrl.searchParams;
+  if (sp.get("preview")) {
+    if (!access.isManager) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const f = parseFilters(Object.fromEntries(sp));
+    if (!f.template) return NextResponse.json({ error: "اختر نوع التقرير" }, { status: 400 });
+    try {
+      const items = await buildItems(access.orgId, f.template, f.scope, f.staleDays, f.rep);
+      return NextResponse.json({ count: items.length, value: items.reduce((a, it) => a + (Number(it.value) || 0), 0) });
+    } catch (e) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : "تعذّر الحساب" }, { status: 500 });
+    }
+  }
 
   let q = supabaseAdmin.from("verification_requests").select("*").eq("org_id", access.orgId)
     .order("created_at", { ascending: false }).limit(60);
@@ -117,11 +145,18 @@ export async function GET() {
   const { data, error } = await q;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const rows = (data ?? []) as { items: VerifyItem[] }[];
-  if (access.isManager && rows.length) {
-    const current = await currentStatuses(access.orgId, rows);
-    for (const r of rows as (typeof rows[number] & { current?: Record<string, string | null> })[]) {
-      r.current = Object.fromEntries(r.items.map((it) => [it.entity_id, current[it.entity_id] ?? null]));
+  const rows = (data ?? []) as { items: VerifyItem[]; created_at: string; updated_ids?: string[] }[];
+  if (rows.length) {
+    const state = await currentState(access.orgId, rows);
+    for (const r of rows) {
+      const sentAt = new Date(r.created_at).getTime();
+      // «تحدّث» = تغيّرت حالته، أو انعدّل بعد إرسال الطلب، أو انحذف
+      r.updated_ids = r.items.filter((it) => {
+        const s = state[it.entity_id];
+        if (!s) return true;
+        if (s.status !== it.system_status) return true;
+        return !!s.updated_at && new Date(s.updated_at).getTime() > sentAt;
+      }).map((it) => it.entity_id);
     }
   }
   return NextResponse.json({ requests: rows, me: { id: access.userId, isManager: access.isManager } });
@@ -134,12 +169,7 @@ export async function POST(req: NextRequest) {
   if (!access.isManager) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json().catch(() => ({}));
-  const template = TEMPLATE_KEYS.includes(body.template) ? (body.template as VerifyTemplate) : null;
-  const rawScope: VerifyScope = ["support", "office", "all", "renewals"].includes(body.scope) ? body.scope : "all";
-  // «التجديدات» = كل التجديدات؛ مع قوالب الصفقات تعني الكل
-  const scope: VerifyScope = template && TEMPLATES[template].entity === "deal" && rawScope === "renewals" ? "all" : rawScope;
-  const staleDays = Math.min(Math.max(Number(body.stale_days) || 7, 1), 90);
-  const rep = typeof body.rep === "string" ? body.rep.trim().slice(0, 120) : REP_ALL;
+  const { template, scope, staleDays, rep } = parseFilters(body);
   const assigneeId = typeof body.assignee_id === "string" ? body.assignee_id : "";
   const dueAt = typeof body.due_at === "string" && !Number.isNaN(Date.parse(body.due_at)) ? new Date(body.due_at).toISOString() : null;
   if (!template || !assigneeId) return NextResponse.json({ error: "اختر نوع التقرير والموظف" }, { status: 400 });

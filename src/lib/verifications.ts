@@ -1,13 +1,10 @@
-// «طلبات التحقق» — المدير يطلب تحقق، الموظف يرد، والنظام يطابق.
-import { STAGES, RENEWAL_STATUSES } from "@/lib/utils/constants";
+// «طلبات التحقق» — المدير يرسل عدد العملاء اللي يحتاجون تحديث، الموظف يحدّثهم في النظام،
+// والنظام يحسب التقدّم تلقائياً (كم عميل تحدّث بعد إرسال الطلب).
 
 export type VerifyTemplate = "trial" | "awaiting_payment" | "stale" | "renewals_week" | "renewals_awaiting_payment" | "renewals_following_stale";
 export type VerifyScope = "support" | "office" | "all" | "renewals";
 export type VerifyStatus = "pending" | "answered" | "reviewed";
 export type EntityType = "deal" | "renewal";
-
-/** رد «تعذّر التواصل» — لا يُعدّ مطابقة ولا اختلاف. */
-export const NO_CONTACT = "__no_contact__";
 
 export const TEMPLATES: Record<VerifyTemplate, { label: string; hint: string; entity: EntityType }> = {
   trial: { label: "العملاء في التجربة حالياً", hint: "الصفقات في مرحلة «تجريبي»", entity: "deal" },
@@ -40,8 +37,8 @@ export function scopeTitle(template: VerifyTemplate, scope: VerifyScope): string
 }
 
 export const STATUS_LABELS: Record<VerifyStatus, string> = {
-  pending: "بانتظار رد الموظف",
-  answered: "تم الرد — جاهز للمطابقة",
+  pending: "بانتظار التحديث",
+  answered: "الموظف خلّص — بانتظار مراجعتك",
   reviewed: "تمت المراجعة",
 };
 
@@ -49,9 +46,6 @@ export const STATUS_LABELS: Record<VerifyStatus, string> = {
 export const REP_ALL = "";
 export const REP_NONE = "__none__";
 export const repLabel = (rep?: string) => (!rep ? "" : rep === REP_NONE ? "بدون مسؤول" : `عملاء ${rep}`);
-
-/** خيارات الحالة اللي يختار منها الموظف حسب نوع العنصر. */
-export const statusOptions = (entity: EntityType): readonly string[] => (entity === "deal" ? STAGES : RENEWAL_STATUSES);
 
 export interface VerifyItem {
   entity_type: EntityType;
@@ -64,10 +58,6 @@ export interface VerifyItem {
   last_activity: string | null;
   extra: string | null;       // معلومة إضافية (الباقة، تاريخ التجديد...)
 }
-
-export interface VerifyResponse { status: string; note?: string; last_contact?: string }
-export interface VerifyExtra { name: string; status: string; note?: string }
-export interface VerifyApplied { from: string; to: string; by: string | null; at: string }
 
 /** القوالب اللي تحتاج عدد أيام (بدون تواصل/تحديث). */
 export const usesDays = (t: VerifyTemplate) => t === "stale" || t === "renewals_following_stale";
@@ -84,29 +74,24 @@ export interface VerificationRequest {
   due_at: string | null;
   status: VerifyStatus;
   items: VerifyItem[];
-  responses: Record<string, VerifyResponse>;
-  extras: VerifyExtra[];
-  applied: Record<string, VerifyApplied>;
   responded_at: string | null;
   reviewed_at: string | null;
   created_by_name: string | null;
   created_at: string;
   updated_at: string;
-  /** الحالة الحالية في النظام لكل عنصر (تُحسب عند القراءة للمدراء). */
-  current?: Record<string, string | null>;
+  /** العناصر اللي تحدّثت في النظام بعد إرسال الطلب (تُحسب عند القراءة). */
+  updated_ids?: string[];
 }
 
-export type MatchResult = "match" | "mismatch" | "no_answer" | "no_contact";
-
-export function matchItem(item: VerifyItem, response: VerifyResponse | undefined, current: string | null | undefined): MatchResult {
-  if (!response?.status) return "no_answer";
-  if (response.status === NO_CONTACT) return "no_contact";
-  return response.status === (current ?? item.system_status) ? "match" : "mismatch";
-}
-
-export function summarize(req: VerificationRequest) {
-  const counts: Record<MatchResult, number> = { match: 0, mismatch: 0, no_answer: 0, no_contact: 0 };
-  for (const it of req.items) counts[matchItem(it, req.responses[it.entity_id], req.current?.[it.entity_id])]++;
+/** تقدّم الطلب: كم عميل تحدّث من الإجمالي. */
+export function progressOf(req: VerificationRequest) {
   const total = req.items.length;
-  return { ...counts, total, extras: req.extras.length, pct: total ? Math.round((counts.match / total) * 100) : 100 };
+  const done = req.updated_ids?.length ?? 0;
+  return { total, done, left: Math.max(total - done, 0), pct: total ? Math.round((done / total) * 100) : 100 };
+}
+
+/** الصفحة اللي يحدّث منها الموظف حسب نوع التقرير والقسم. */
+export function updatePageOf(template: VerifyTemplate, scope: VerifyScope): { href: string; label: string } {
+  if (TEMPLATES[template].entity === "renewal") return { href: "/renewals", label: "التجديدات" };
+  return scope === "support" ? { href: "/support-sales", label: "مبيعات الدعم" } : { href: "/sales", label: "المبيعات" };
 }
