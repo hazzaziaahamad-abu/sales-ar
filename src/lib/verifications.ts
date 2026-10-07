@@ -91,6 +91,7 @@ export interface VerificationRequest {
   reviewed_at: string | null;
   created_by_name: string | null;
   created_at: string;
+  updated_at: string;
   /** الحالة الحالية في النظام لكل عنصر (تُحسب عند القراءة للمدراء). */
   current?: Record<string, string | null>;
 }

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ClipboardCheck, Plus, Send, Loader2, ChevronDown, ChevronUp, MessageCircle, Trash2, CheckCircle2,
-  AlertTriangle, Clock, Phone, RefreshCw, UserRound, X,
+  AlertTriangle, Clock, Phone, RefreshCw, UserRound, X, CalendarPlus, History,
 } from "lucide-react";
 import { fetchEmployees, fetchUserProfiles } from "@/lib/supabase/db";
 import { formatMoneyFull, todayLocal } from "@/lib/utils/format";
@@ -425,6 +425,8 @@ function ManagerCard({ r, open, onToggle, onUpdated, onDeleted, onWhatsApp, flas
               <span>{r.items.length} عميل</span>
               {r.due_at && <span className={`flex items-center gap-1 ${late ? "text-red-400 font-bold" : ""}`}><Clock className="w-3 h-3" /> قبل {fmtDateTime(r.due_at)}{late ? " — متأخر" : ""}</span>}
               {r.responded_at && <span>ردّ {fmtDateTime(r.responded_at)}</span>}
+              <span className="flex items-center gap-1"><CalendarPlus className="w-3 h-3" /> أُنشئ {fmtDateTime(r.created_at)}</span>
+              {r.updated_at && <span className="flex items-center gap-1"><History className="w-3 h-3" /> آخر تحديث {fmtDateTime(r.updated_at)}</span>}
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
