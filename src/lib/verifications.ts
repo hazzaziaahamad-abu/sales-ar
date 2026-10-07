@@ -2,6 +2,9 @@
 // والنظام يحسب التقدّم تلقائياً من السجل (كم عميل انضاف له تعليق بعد إرسال الطلب).
 
 export type VerifyTemplate = "trial" | "awaiting_payment" | "stale" | "renewals_week" | "renewals_awaiting_payment" | "renewals_following_stale";
+/** «طلب عام»: المدير يرسل بدون نوع تقرير، والموظف يختار من الأنواع. */
+export const GENERAL = "general";
+export type RequestTemplate = VerifyTemplate | typeof GENERAL;
 export type VerifyScope = "support" | "office" | "all" | "renewals";
 export type VerifyStatus = "pending" | "answered" | "reviewed";
 export type EntityType = "deal" | "renewal";
@@ -31,7 +34,8 @@ export function scopeOptions(entity: EntityType): { value: VerifyScope; label: s
 }
 
 /** اسم القسم في عنوان الطلب. */
-export function scopeTitle(template: VerifyTemplate, scope: VerifyScope): string {
+export function scopeTitle(template: RequestTemplate, scope: VerifyScope): string {
+  if (template === GENERAL) return "يختار الموظف";
   const entity = TEMPLATES[template].entity;
   return scopeOptions(entity).find((o) => o.value === scope)?.label ?? SCOPE_LABELS[scope];
 }
@@ -65,9 +69,10 @@ export const usesDays = (t: VerifyTemplate) => t === "stale" || t === "renewals_
 export interface VerificationRequest {
   id: string;
   request_number: number;
-  template: VerifyTemplate;
+  template: RequestTemplate;
   scope: VerifyScope;
-  params: { stale_days?: number; rep?: string };
+  /** general: كان طلب عام والموظف اختار نوعه؛ chosen_at: وقت الاختيار (بداية حساب التقدّم). */
+  params: { stale_days?: number; rep?: string; general?: boolean; chosen_at?: string };
   assignee_id: string;
   assignee_name: string | null;
   note: string | null;
@@ -91,7 +96,8 @@ export function progressOf(req: VerificationRequest) {
 }
 
 /** الصفحة اللي يحدّث منها الموظف حسب نوع التقرير والقسم. */
-export function updatePageOf(template: VerifyTemplate, scope: VerifyScope): { href: string; label: string } {
+export function updatePageOf(template: RequestTemplate, scope: VerifyScope): { href: string; label: string } {
+  if (template === GENERAL) return { href: "/daily-huddle?tab=verify", label: "طلبات التحقق" };
   if (TEMPLATES[template].entity === "renewal") return { href: "/renewals", label: "التجديدات" };
   return scope === "support" ? { href: "/support-sales", label: "مبيعات الدعم" } : { href: "/sales", label: "المبيعات" };
 }

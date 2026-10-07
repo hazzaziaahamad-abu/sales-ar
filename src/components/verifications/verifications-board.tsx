@@ -9,8 +9,8 @@ import {
 import { fetchEmployees, fetchUserProfiles } from "@/lib/supabase/db";
 import { formatMoneyFull, todayLocal } from "@/lib/utils/format";
 import {
-  TEMPLATES, TEMPLATE_KEYS, usesDays, scopeOptions, scopeTitle, repLabel, REP_ALL, REP_NONE, STATUS_LABELS, progressOf, updatePageOf,
-  type VerificationRequest, type VerifyTemplate, type VerifyScope,
+  TEMPLATES, TEMPLATE_KEYS, GENERAL, usesDays, scopeOptions, scopeTitle, repLabel, REP_ALL, REP_NONE, STATUS_LABELS, progressOf, updatePageOf,
+  type VerificationRequest, type VerifyTemplate, type RequestTemplate, type VerifyScope,
 } from "@/lib/verifications";
 
 const inputCls = "w-full rounded-[10px] bg-white/[0.04] border border-border px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-teal-500/40";
@@ -33,7 +33,7 @@ function waPhone(p?: string | null): string {
 }
 const isLate = (r: VerificationRequest) => r.status === "pending" && !!r.due_at && new Date(r.due_at).getTime() < Date.now();
 const titleOf = (r: VerificationRequest) =>
-  `${TEMPLATES[r.template].label}${r.params?.stale_days ? ` (+${r.params.stale_days} يوم)` : ""} — ${scopeTitle(r.template, r.scope)}${r.params?.rep ? ` — ${repLabel(r.params.rep)}` : ""}`;
+  `${r.template === GENERAL ? "طلب عام" : TEMPLATES[r.template].label}${r.params?.stale_days ? ` (+${r.params.stale_days} يوم)` : ""} — ${scopeTitle(r.template, r.scope)}${r.params?.rep ? ` — ${repLabel(r.params.rep)}` : ""}`;
 
 export function VerificationsBoard({ onPendingChange }: { onPendingChange?: (n: number) => void }) {
   const [requests, setRequests] = useState<VerificationRequest[]>([]);
@@ -89,15 +89,21 @@ export function VerificationsBoard({ onPendingChange }: { onPendingChange?: (n: 
       `السلام عليكم ${r.assignee_name ?? ""}`,
       reminder ? `تذكير بطلب التحقق #${r.request_number}:` : `عندك طلب تحقق جديد #${r.request_number}:`,
       `📋 ${titleOf(r)}`,
-      reminder && p.done ? `🔢 باقي ${p.left} من ${p.total} عميل يحتاجون تحديث` : `🔢 العدد: ${p.total} عميل يحتاجون تحديث`,
+      r.template === GENERAL
+        ? "🧭 ادخل واختر النوع اللي بتشتغل عليه (تجربة، بانتظار الدفع، تجديدات…) — يطلع لك عدد كل نوع"
+        : reminder && p.done ? `🔢 باقي ${p.left} من ${p.total} عميل يحتاجون تحديث` : `🔢 العدد: ${p.total} عميل يحتاجون تحديث`,
       ...(r.due_at ? [`⏰ المطلوب قبل: ${fmtDateTime(r.due_at)}`] : []),
       ...(r.note ? [`📝 ${r.note}`] : []),
       "",
-      `حدّث حالة كل عميل من قسم «${page.label}»:`,
-      `${window.location.origin}${page.href}`,
-      "",
-      "ولما تخلص اضغط «خلّصت التحديث» من هنا:",
-      `${window.location.origin}/daily-huddle?tab=verify`,
+      ...(r.template === GENERAL
+        ? ["اختر من هنا:", `${window.location.origin}/daily-huddle?tab=verify`]
+        : [
+          `حدّث حالة كل عميل من قسم «${page.label}» (أضف تعليق في سجله):`,
+          `${window.location.origin}${page.href}`,
+          "",
+          "ولما تخلص اضغط «خلّصت التحديث» من هنا:",
+          `${window.location.origin}/daily-huddle?tab=verify`,
+        ]),
     ];
     const phone = waPhone(phones.get((r.assignee_name ?? "").trim()));
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(lines.join("\n"))}`, "_blank");
@@ -196,21 +202,22 @@ function NewRequestForm({ onCancel, onCreated, onError }: {
   onCreated: (r: VerificationRequest) => void;
   onError: (m: string) => void;
 }) {
-  const [template, setTemplate] = useState<VerifyTemplate>("trial");
+  const [template, setTemplate] = useState<RequestTemplate>("trial");
+  const isGeneral = template === GENERAL;
   const [scope, setScope] = useState<VerifyScope>("support");
   // فاضي = بدون شرط مدة (للقوالب اللي المدة فيها اختيارية)
   const [staleDays, setStaleDays] = useState("");
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
   const [assignee, setAssignee] = useState("");
   const [rep, setRep] = useState<string>(REP_ALL);
-  const isRenewal = TEMPLATES[template].entity === "renewal";
+  const isRenewal = !isGeneral && TEMPLATES[template].entity === "renewal";
   const assigneeName = users.find((u) => u.id === assignee)?.name ?? "";
 
   // التجديدات مقسومة حسب المسؤول — نخلي القائمة على عملاء الموظف المختار تلقائياً
   function pickAssignee(id: string) {
     setAssignee(id);
     const name = users.find((u) => u.id === id)?.name ?? "";
-    if (isRenewal && name) setRep(name);
+    if ((isRenewal || isGeneral) && name) setRep(name);
   }
   const [due, setDue] = useState(`${todayLocal()}T16:00`);
   const [note, setNote] = useState("");
@@ -222,6 +229,7 @@ function NewRequestForm({ onCancel, onCreated, onError }: {
   const [preview, setPreview] = useState<{ count: number; value: number } | null>(null);
   const [previewing, setPreviewing] = useState(false);
   useEffect(() => {
+    if (isGeneral) return;
     let cancelled = false;
     setPreviewing(true);
     const qs = new URLSearchParams({ preview: "1", template, scope, rep, stale_days: staleDays });
@@ -233,7 +241,7 @@ function NewRequestForm({ onCancel, onCreated, onError }: {
         .finally(() => { if (!cancelled) setPreviewing(false); });
     }, 250);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [template, scope, rep, staleDays]);
+  }, [template, isGeneral, scope, rep, staleDays]);
 
   async function submit() {
     if (!assignee || saving) return;
@@ -262,6 +270,17 @@ function NewRequestForm({ onCancel, onCreated, onError }: {
       <div>
         <label className="block text-xs font-bold text-muted-foreground mb-1.5">نوع التقرير</label>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <button
+            onClick={() => {
+              setTemplate(GENERAL);
+              // الطلب العام: افتراضياً عملاء الموظف المختار
+              setRep(assigneeName || REP_ALL);
+            }}
+            className={`sm:col-span-2 text-right rounded-[10px] px-3 py-2 border transition-colors ${isGeneral ? "bg-violet-500/15 border-violet-500/30" : "bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04]"}`}
+          >
+            <p className={`text-[13px] font-bold ${isGeneral ? "text-violet-200" : "text-foreground"}`}>🧭 طلب عام — الموظف يختار</p>
+            <p className="text-[11px] text-muted-foreground">يوصله طلب عام ويختار هو النوع اللي بيشتغل عليه، ويشوف عدد كل نوع قبل ما يختار</p>
+          </button>
           {TEMPLATE_KEYS.map((t) => (
             <button
               key={t}
@@ -272,7 +291,7 @@ function NewRequestForm({ onCancel, onCreated, onError }: {
                 // التجديدات: عملاء الموظف المختار؛ الصفقات: الكل
                 setRep(TEMPLATES[t].entity === "renewal" && assigneeName ? assigneeName : REP_ALL);
                 // القسم يتبع نوع التقرير (صفقات ↔ تجديدات)
-                if (TEMPLATES[t].entity !== TEMPLATES[template].entity) setScope(TEMPLATES[t].entity === "renewal" ? "renewals" : "support");
+                if (isGeneral || TEMPLATES[t].entity !== TEMPLATES[template].entity) setScope(TEMPLATES[t].entity === "renewal" ? "renewals" : "support");
               }}
               className={`text-right rounded-[10px] px-3 py-2 border transition-colors ${template === t ? "bg-teal-500/15 border-teal-500/30" : "bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04]"}`}
             >
@@ -286,9 +305,13 @@ function NewRequestForm({ onCancel, onCreated, onError }: {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
           <label className="block text-xs font-bold text-muted-foreground mb-1.5">القسم</label>
-          <select value={scope} onChange={(e) => setScope(e.target.value as VerifyScope)} className={inputCls}>
-            {scopeOptions(TEMPLATES[template].entity).map((o) => <option key={o.value} value={o.value} className="bg-card">{o.label}</option>)}
-          </select>
+          {isGeneral ? (
+            <p className={`${inputCls} text-muted-foreground`}>الكل</p>
+          ) : (
+            <select value={scope} onChange={(e) => setScope(e.target.value as VerifyScope)} className={inputCls}>
+              {scopeOptions(TEMPLATES[template].entity).map((o) => <option key={o.value} value={o.value} className="bg-card">{o.label}</option>)}
+            </select>
+          )}
         </div>
         <div>
           <label className="block text-xs font-bold text-muted-foreground mb-1.5">الموظف</label>
@@ -311,7 +334,7 @@ function NewRequestForm({ onCancel, onCreated, onError }: {
           <option value={REP_NONE} className="bg-card">بدون مسؤول</option>
         </select>
         <p className="text-[11px] text-muted-foreground mt-1">
-          {isRenewal ? "حسب «المسؤول» في قسم التجديدات" : "حسب «المسؤول» عن الصفقة — اتركها «كل العملاء» لو الموظف يتابع القسم كامل"}
+          {isGeneral ? "افتراضياً عملاء الموظف نفسه — حسب «المسؤول» في الصفقات والتجديدات" : isRenewal ? "حسب «المسؤول» في قسم التجديدات" : "حسب «المسؤول» عن الصفقة — اتركها «كل العملاء» لو الموظف يتابع القسم كامل"}
         </p>
       </div>
 
@@ -320,14 +343,14 @@ function NewRequestForm({ onCancel, onCreated, onError }: {
           آخر تعليق في سجل العميل أقدم من
           <input
             type="number" min={1} max={365} value={staleDays}
-            placeholder={usesDays(template) ? "7" : "الكل"}
+            placeholder={!isGeneral && usesDays(template) ? "7" : "الكل"}
             onChange={(e) => setStaleDays(e.target.value.replace(/\D/g, ""))}
             className={`${inputCls} w-20 text-center`}
           />
           يوم
         </div>
         <p className="text-[11px] text-muted-foreground mt-1">
-          العميل اللي ما عليه ولا تعليق ينحسب من تاريخ إضافته.{!usesDays(template) && " اتركها فاضية عشان يجيك الكل بدون شرط مدة."}
+          العميل اللي ما عليه ولا تعليق ينحسب من تاريخ إضافته.{isGeneral ? " فاضية = الكل (و«بدون تواصل» تبقى 7 أيام)." : !usesDays(template) && " اتركها فاضية عشان يجيك الكل بدون شرط مدة."}
         </p>
       </div>
 
@@ -338,19 +361,19 @@ function NewRequestForm({ onCancel, onCreated, onError }: {
 
       <div className="rounded-[12px] bg-teal-500/[0.06] border border-teal-500/20 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <p className="text-[12px] text-muted-foreground">{TEMPLATES[template].label}</p>
+          <p className="text-[12px] text-muted-foreground">{isGeneral ? "طلب عام" : TEMPLATES[template].label}</p>
           <p className="text-sm font-bold text-foreground mt-0.5">
-            {previewing && !preview ? "جاري الحساب…" : preview ? (preview.count ? <>العدد <span className="font-mono text-teal-300 text-lg">{preview.count}</span> عميل — تحتاج تحديث</> : "ما فيه عملاء ينطبق عليهم هالتقرير حالياً") : "تعذّر حساب العدد"}
+            {isGeneral ? "الموظف بيختار النوع، ويطلع له العدد حسب اختياره" : previewing && !preview ? "جاري الحساب…" : preview ? (preview.count ? <>العدد <span className="font-mono text-teal-300 text-lg">{preview.count}</span> عميل — تحتاج تحديث</> : "ما فيه عملاء ينطبق عليهم هالتقرير حالياً") : "تعذّر حساب العدد"}
           </p>
         </div>
-        {!!preview?.value && <span className="text-[12px] text-muted-foreground">القيمة {formatMoneyFull(preview.value)}</span>}
+        {!isGeneral && !!preview?.value && <span className="text-[12px] text-muted-foreground">القيمة {formatMoneyFull(preview.value)}</span>}
       </div>
 
       <div className="flex items-center justify-end gap-2">
         <button onClick={onCancel} className="rounded-[10px] px-4 py-2 text-sm font-semibold text-muted-foreground hover:text-foreground">إلغاء</button>
         <button
           onClick={submit}
-          disabled={!assignee || saving || preview?.count === 0}
+          disabled={!assignee || saving || (!isGeneral && preview?.count === 0)}
           className="flex items-center gap-2 rounded-[10px] bg-teal-500/20 hover:bg-teal-500/30 disabled:opacity-40 text-teal-100 border border-teal-500/30 px-5 py-2 text-sm font-bold"
         >
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
@@ -374,6 +397,7 @@ function RequestCard({ r, isManager, onUpdated, onDeleted, onWhatsApp, flash }: 
   const p = progressOf(r);
   const page = updatePageOf(r.template, r.scope);
   const late = isLate(r);
+  const general = r.template === GENERAL;
 
   async function patch(body: Record<string, unknown>, okMsg?: string) {
     setBusy(true);
@@ -433,7 +457,14 @@ function RequestCard({ r, isManager, onUpdated, onDeleted, onWhatsApp, flash }: 
 
       {r.note && <p className={`text-[12px] ${isManager ? "text-muted-foreground" : "text-amber-200 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2"}`}>📝 {r.note}</p>}
 
-      {/* العدد والتقدّم */}
+      {general ? (
+        isManager ? (
+          <p className="text-[12px] text-violet-300 rounded-[12px] bg-violet-500/[0.06] border border-violet-500/20 px-3 py-2.5">🧭 طلب عام — بانتظار {r.assignee_name} يختار النوع اللي بيشتغل عليه</p>
+        ) : (
+          <GeneralChooser r={r} onChosen={onUpdated} flash={flash} />
+        )
+      ) : (
+      /* العدد والتقدّم */
       <div className="rounded-[12px] bg-white/[0.02] border border-white/[0.06] p-3 space-y-2">
         <div className="flex items-end justify-between gap-3 flex-wrap">
           <p className="text-sm text-foreground">
@@ -450,9 +481,10 @@ function RequestCard({ r, isManager, onUpdated, onDeleted, onWhatsApp, flash }: 
           <p className="text-[11px] text-amber-300 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> الموظف قال خلّص، بس النظام يقول باقي {p.left} ما تحدّثوا</p>
         )}
       </div>
+      )}
 
       <div className="flex flex-wrap gap-2">
-        {!isManager && r.status !== "reviewed" && (
+        {!isManager && !general && r.status !== "reviewed" && (
           <>
             <Link href={page.href} className="flex items-center gap-1.5 text-[12px] font-bold px-3 py-1.5 rounded-lg bg-sky-500/15 text-sky-200 border border-sky-500/25">
               <ExternalLink className="w-3.5 h-3.5" /> افتح «{page.label}» وحدّث
@@ -468,7 +500,7 @@ function RequestCard({ r, isManager, onUpdated, onDeleted, onWhatsApp, flash }: 
           <>
             {r.status !== "reviewed" && (
               <button onClick={() => onWhatsApp(r.status !== "pending" || p.done > 0)} className="flex items-center gap-1.5 text-[12px] font-bold px-3 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/20">
-                <MessageCircle className="w-3.5 h-3.5" /> {p.done > 0 ? "تذكير واتساب" : "إرسال واتساب للموظف"}
+                <MessageCircle className="w-3.5 h-3.5" /> {p.done > 0 || r.params?.general ? "تذكير واتساب" : "إرسال واتساب للموظف"}
               </button>
             )}
             {r.status !== "reviewed" && (
@@ -481,6 +513,71 @@ function RequestCard({ r, isManager, onUpdated, onDeleted, onWhatsApp, flash }: 
             </button>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** «طلب عام»: الموظف يشوف عدد كل نوع ويختار اللي بيشتغل عليه. */
+function GeneralChooser({ r, onChosen, flash }: {
+  r: VerificationRequest;
+  onChosen: (r: VerificationRequest) => void;
+  flash: (m: string, ok?: boolean) => void;
+}) {
+  const [options, setOptions] = useState<{ template: VerifyTemplate; count: number }[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [busy, setBusy] = useState<VerifyTemplate | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/verifications/${r.id}/options`)
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then((d) => setOptions(d.options ?? []))
+      .catch(() => setFailed(true));
+  }, [r.id]);
+
+  async function choose(t: VerifyTemplate, count: number) {
+    if (!confirm(`تشتغل على «${TEMPLATES[t].label}» (${count} عميل)؟ ما تقدر تغيّره بعدين.`)) return;
+    setBusy(t);
+    try {
+      const res = await fetch(`/api/verifications/${r.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ choose: t }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "تعذّر الاختيار");
+      onChosen(data.request);
+      flash(`تمام — «${TEMPLATES[t].label}»: ${data.request.items.length} عميل يحتاجون تحديث`);
+    } catch (e) {
+      flash(e instanceof Error ? e.message : "تعذّر الاختيار", false);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  if (failed) return <p className="text-[12px] text-red-400">تعذّر تحميل الخيارات</p>;
+  if (!options) return <p className="text-[12px] text-muted-foreground flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" /> جاري حساب الأعداد…</p>;
+
+  return (
+    <div className="space-y-2">
+      <p className="text-[12px] text-violet-300">🧭 اختر النوع اللي بتشتغل عليه:</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {options.map(({ template: t, count }) => (
+          <button
+            key={t}
+            onClick={() => choose(t, count)}
+            disabled={!count || busy !== null}
+            className="text-right rounded-[10px] px-3 py-2 border bg-white/[0.02] border-white/[0.06] hover:bg-violet-500/10 hover:border-violet-500/30 disabled:opacity-40 disabled:hover:bg-white/[0.02] transition-colors"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[13px] font-bold text-foreground">{TEMPLATES[t].label}</p>
+              {busy === t ? <Loader2 className="w-4 h-4 animate-spin text-violet-300" /> : (
+                <span className={`font-mono font-extrabold ${count ? "text-violet-200" : "text-muted-foreground"}`}>{count}</span>
+              )}
+            </div>
+            <p className="text-[11px] text-muted-foreground">{TEMPLATES[t].hint}</p>
+          </button>
+        ))}
       </div>
     </div>
   );

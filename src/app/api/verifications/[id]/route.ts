@@ -1,16 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getTicketAccess } from "@/lib/api/work-ticket-access";
+import { GENERAL, TEMPLATE_KEYS, usesDays, type VerifyTemplate } from "@/lib/verifications";
+import { buildItems, generalScope } from "@/lib/verifications-server";
 
 export const runtime = "nodejs";
 
 async function load(id: string, orgId: string) {
   const { data } = await supabaseAdmin.from("verification_requests").select("*").eq("id", id).eq("org_id", orgId).maybeSingle();
-  return data as (Record<string, unknown> & { assignee_id: string; status: string }) | null;
+  return data as (Record<string, unknown> & { assignee_id: string; status: string; template: string; params: Record<string, unknown> | null }) | null;
 }
 
 /**
  * PATCH /api/verifications/[id]
+ *  - الموظف المكلَّف: { choose: template } — «طلب عام»: يختار النوع اللي بيشتغل عليه وتنبني القائمة
  *  - الموظف المكلَّف: { submit: true } — «خلّصت التحديث» (يرسله للمدير يراجع)
  *  - المدير: { reviewed: true }
  */
@@ -34,6 +37,29 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   if (existing.assignee_id !== access.userId) return NextResponse.json({ error: "هذا الطلب مو لك" }, { status: 403 });
   if (existing.status === "reviewed") return NextResponse.json({ error: "الطلب تمت مراجعته ومقفل" }, { status: 400 });
 
+  if (typeof body.choose === "string") {
+    if (existing.template !== GENERAL || existing.status !== "pending") return NextResponse.json({ error: "الطلب مو عام أو تم اختيار نوعه" }, { status: 400 });
+    const template = TEMPLATE_KEYS.includes(body.choose as VerifyTemplate) ? (body.choose as VerifyTemplate) : null;
+    if (!template) return NextResponse.json({ error: "نوع غير صالح" }, { status: 400 });
+    const params = (existing.params ?? {}) as { rep?: string; stale_days?: number };
+    const staleDays = params.stale_days ?? (usesDays(template) ? 7 : null);
+    const scope = generalScope(template);
+    let items;
+    try {
+      items = await buildItems(access.orgId, template, scope, staleDays, params.rep ?? "");
+    } catch (e) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : "تعذّر تجهيز القائمة" }, { status: 500 });
+    }
+    if (items.length === 0) return NextResponse.json({ error: "ما فيه عملاء في هالنوع — اختر غيره" }, { status: 400 });
+    const { data, error } = await supabaseAdmin.from("verification_requests").update({
+      template, scope, items, updated_at: now,
+      params: { ...params, ...(staleDays ? { stale_days: staleDays } : {}), general: true, chosen_at: now },
+    }).eq("id", id).eq("template", GENERAL).select("*").single();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ request: { ...data, updated_ids: [] } });
+  }
+
+  if (existing.template === GENERAL) return NextResponse.json({ error: "اختر أول النوع اللي بتشتغل عليه" }, { status: 400 });
   if (body.submit !== true) return NextResponse.json({ error: "طلب غير صالح" }, { status: 400 });
   const patch = { status: "answered", responded_at: now, updated_at: now };
   const { data, error } = await supabaseAdmin.from("verification_requests").update(patch).eq("id", id).select("*").single();
