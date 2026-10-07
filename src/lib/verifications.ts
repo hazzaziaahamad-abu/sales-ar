@@ -1,5 +1,5 @@
 // «طلبات التحقق» — المدير يرسل عدد العملاء اللي يحتاجون تحديث، الموظف يحدّثهم في النظام،
-// والنظام يحسب التقدّم تلقائياً (كم عميل تحدّث بعد إرسال الطلب).
+// والنظام يحسب التقدّم تلقائياً من السجل (كم عميل انضاف له تعليق بعد إرسال الطلب).
 
 export type VerifyTemplate = "trial" | "awaiting_payment" | "stale" | "renewals_week" | "renewals_awaiting_payment" | "renewals_following_stale";
 export type VerifyScope = "support" | "office" | "all" | "renewals";
@@ -9,10 +9,10 @@ export type EntityType = "deal" | "renewal";
 export const TEMPLATES: Record<VerifyTemplate, { label: string; hint: string; entity: EntityType }> = {
   trial: { label: "العملاء في التجربة حالياً", hint: "الصفقات في مرحلة «تجريبي»", entity: "deal" },
   awaiting_payment: { label: "صفقات بانتظار الدفع", hint: "الصفقات في مرحلة «انتظار الدفع»", entity: "deal" },
-  stale: { label: "صفقات بدون تواصل", hint: "صفقات مفتوحة بدون تواصل من أكثر من X أيام", entity: "deal" },
+  stale: { label: "صفقات بدون تواصل", hint: "صفقات مفتوحة بدون تعليق في السجل من أكثر من X أيام", entity: "deal" },
   renewals_week: { label: "تجديدات هذا الأسبوع", hint: "تجديدات موعدها خلال ٧ أيام أو متأخرة ولم تكتمل", entity: "renewal" },
   renewals_awaiting_payment: { label: "تجديدات بانتظار الدفع", hint: "التجديدات في حالة «انتظار الدفع»", entity: "renewal" },
-  renewals_following_stale: { label: "تجديدات جاري المتابعة بدون تحديث", hint: "تجديدات «جاري المتابعة» بدون تحديث من أكثر من X أيام", entity: "renewal" },
+  renewals_following_stale: { label: "تجديدات جاري المتابعة بدون تحديث", hint: "تجديدات «جاري المتابعة» بدون تعليق في السجل من أكثر من X أيام", entity: "renewal" },
 };
 export const TEMPLATE_KEYS = Object.keys(TEMPLATES) as VerifyTemplate[];
 

@@ -12,99 +12,121 @@ const ACTIVE_DEAL = ["عميل جديد", "تفاوض", "تجهيز", "انتظ�
 const CLOSED_RENEWAL = ["مكتمل", "ملغي بسبب"];
 const MAX_ITEMS = 1000;
 
-/** يجهّز لقطة القائمة حسب القالب والقسم. */
-async function buildItems(orgId: string, template: VerifyTemplate, scope: VerifyScope, staleDays: number | null, rep: string): Promise<VerifyItem[]> {
-  if (template === "renewals_awaiting_payment" || template === "renewals_following_stale") {
-    const status = template === "renewals_awaiting_payment" ? "انتظار الدفع" : "جاري المتابعة";
-    let q = supabaseAdmin.from("renewals")
-      .select("id, customer_name, customer_phone, assigned_rep, plan_name, plan_price, renewal_date, status, updated_at")
-      .eq("org_id", orgId).eq("status", status)
-      .order("updated_at", { ascending: true }).limit(MAX_ITEMS);
-    if (staleDays) q = q.lt("updated_at", new Date(Date.now() - staleDays * 86_400_000).toISOString());
-    if (scope === "support") q = q.eq("sales_type", "support");
-    if (scope === "office") q = q.or("sales_type.eq.office,sales_type.is.null");
-    if (rep === REP_NONE) q = q.is("assigned_rep", null);
-    else if (rep) q = q.eq("assigned_rep", rep);
-    const { data, error } = await q;
-    if (error) throw error;
-    return (data ?? []).map((r) => {
-      const idle = r.updated_at ? Math.floor((Date.now() - new Date(r.updated_at).getTime()) / 86_400_000) : null;
-      return {
-        entity_type: "renewal" as const, entity_id: r.id, name: r.customer_name, phone: r.customer_phone ?? null,
-        rep: r.assigned_rep ?? null, value: r.plan_price ?? 0, system_status: r.status,
-        last_activity: r.updated_at ?? null,
-        extra: `${r.plan_name ?? ""} · موعد التجديد ${r.renewal_date}${idle !== null ? ` · بدون تحديث ${idle} يوم` : ""}`,
-      };
-    });
-  }
+const DAY = 86_400_000;
+const chunk = <T,>(arr: T[], n: number) => Array.from({ length: Math.ceil(arr.length / n) }, (_, i) => arr.slice(i * n, i * n + n));
 
-  if (template === "renewals_week") {
-    const today = saudiDateStr();
-    const until = saudiDateStr(new Date(Date.now() + 7 * 86_400_000));
-    const since = saudiDateStr(new Date(Date.now() - 30 * 86_400_000));
+/** وقت آخر تعليق (ملاحظة متابعة) في سجل كل عميل. اللي ما عليه تعليقات ما يرجع. */
+async function lastNoteTimes(orgId: string, ids: string[]): Promise<Map<string, string>> {
+  const last = new Map<string, string>();
+  for (const part of chunk(ids, 100)) {
+    // الترتيب تنازلي — أول ظهور لكل عميل هو آخر تعليق
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await supabaseAdmin.from("follow_up_notes").select("entity_id, created_at")
+        .eq("org_id", orgId).in("entity_id", part)
+        .order("created_at", { ascending: false }).range(from, from + 999);
+      if (error) throw error;
+      for (const n of data ?? []) if (!last.has(n.entity_id)) last.set(n.entity_id, n.created_at);
+      if ((data ?? []).length < 1000) break;
+    }
+  }
+  return last;
+}
+
+const idleDays = (iso: string | null) => (iso ? Math.floor((Date.now() - new Date(iso).getTime()) / DAY) : null);
+
+/**
+ * يجهّز لقطة القائمة حسب القالب والقسم.
+ * «بدون تحديث من X يوم» = آخر تعليق في سجل العميل أقدم من X يوم
+ * (وإذا ما عليه ولا تعليق: من تاريخ إضافته).
+ */
+async function buildItems(orgId: string, template: VerifyTemplate, scope: VerifyScope, staleDays: number | null, rep: string): Promise<VerifyItem[]> {
+  type Row = { item: VerifyItem; created_at: string | null; extra: (lastNote: string | null) => string | null };
+  let rows: Row[];
+
+  if (TEMPLATES[template].entity === "renewal") {
     let q = supabaseAdmin.from("renewals")
-      .select("id, customer_name, customer_phone, assigned_rep, plan_name, plan_price, renewal_date, status, updated_at")
-      .eq("org_id", orgId).gte("renewal_date", since).lte("renewal_date", until)
-      .not("status", "in", `(${CLOSED_RENEWAL.map((s) => `"${s}"`).join(",")})`)
-      .order("renewal_date", { ascending: true }).limit(MAX_ITEMS);
-    if (staleDays) q = q.lt("updated_at", new Date(Date.now() - staleDays * 86_400_000).toISOString());
+      .select("id, customer_name, customer_phone, assigned_rep, plan_name, plan_price, renewal_date, status, created_at")
+      .eq("org_id", orgId);
+    if (template === "renewals_week") {
+      q = q.gte("renewal_date", saudiDateStr(new Date(Date.now() - 30 * DAY)))
+        .lte("renewal_date", saudiDateStr(new Date(Date.now() + 7 * DAY)))
+        .not("status", "in", `(${CLOSED_RENEWAL.map((s) => `"${s}"`).join(",")})`);
+    } else {
+      q = q.eq("status", template === "renewals_awaiting_payment" ? "انتظار الدفع" : "جاري المتابعة");
+    }
     if (scope === "support") q = q.eq("sales_type", "support");
     if (scope === "office") q = q.or("sales_type.eq.office,sales_type.is.null");
     if (rep === REP_NONE) q = q.is("assigned_rep", null);
     else if (rep) q = q.eq("assigned_rep", rep);
-    const { data, error } = await q;
+    const { data, error } = await q.order("renewal_date", { ascending: true }).limit(2000);
     if (error) throw error;
-    return (data ?? []).map((r) => ({
-      entity_type: "renewal", entity_id: r.id, name: r.customer_name, phone: r.customer_phone ?? null,
-      rep: r.assigned_rep ?? null, value: r.plan_price ?? 0, system_status: r.status,
-      last_activity: r.updated_at ?? null,
-      extra: `${r.plan_name ?? ""} · موعد التجديد ${r.renewal_date}${r.renewal_date < today ? " (متأخر)" : ""}`,
+    const today = saudiDateStr();
+    rows = (data ?? []).map((r) => ({
+      created_at: r.created_at ?? null,
+      item: {
+        entity_type: "renewal", entity_id: r.id, name: r.customer_name, phone: r.customer_phone ?? null,
+        rep: r.assigned_rep ?? null, value: r.plan_price ?? 0, system_status: r.status, last_activity: null, extra: null,
+      },
+      extra: (lastNote) => {
+        const idle = idleDays(lastNote);
+        return `${r.plan_name ?? ""} · موعد التجديد ${r.renewal_date}${r.renewal_date < today ? " (متأخر)" : ""} · ${idle === null ? "بدون تعليقات" : `آخر تعليق قبل ${idle} يوم`}`;
+      },
+    }));
+  } else {
+    let q = supabaseAdmin.from("deals")
+      .select("id, client_name, client_phone, assigned_rep_name, deal_value, plan, stage, created_at")
+      .eq("org_id", orgId);
+    if (scope === "support") q = q.eq("sales_type", "support");
+    if (scope === "office") q = q.or("sales_type.eq.office,sales_type.is.null");
+    if (rep === REP_NONE) q = q.is("assigned_rep_name", null);
+    else if (rep) q = q.eq("assigned_rep_name", rep);
+    if (template === "trial") q = q.eq("stage", "تجريبي");
+    else if (template === "awaiting_payment") q = q.eq("stage", "انتظار الدفع");
+    else q = q.in("stage", ACTIVE_DEAL);
+    const { data, error } = await q.order("created_at", { ascending: true }).limit(2000);
+    if (error) throw error;
+    rows = (data ?? []).filter((d) => !CLOSED_DEAL.includes(d.stage)).map((d) => ({
+      created_at: d.created_at ?? null,
+      item: {
+        entity_type: "deal", entity_id: d.id, name: d.client_name, phone: d.client_phone ?? null,
+        rep: d.assigned_rep_name ?? null, value: d.deal_value ?? 0, system_status: d.stage, last_activity: null, extra: null,
+      },
+      extra: (lastNote) => {
+        const idle = idleDays(lastNote);
+        return [d.plan, idle === null ? "بدون تعليقات" : `آخر تعليق قبل ${idle} يوم`].filter(Boolean).join(" · ");
+      },
     }));
   }
 
-  let q = supabaseAdmin.from("deals")
-    .select("id, client_name, client_phone, assigned_rep_name, deal_value, plan, stage, last_contact, updated_at, created_at")
-    .eq("org_id", orgId);
-  if (scope === "support") q = q.eq("sales_type", "support");
-  if (scope === "office") q = q.or("sales_type.eq.office,sales_type.is.null");
-  if (rep === REP_NONE) q = q.is("assigned_rep_name", null);
-  else if (rep) q = q.eq("assigned_rep_name", rep);
-  if (template === "trial") q = q.eq("stage", "تجريبي");
-  else if (template === "awaiting_payment") q = q.eq("stage", "انتظار الدفع");
-  else q = q.in("stage", ACTIVE_DEAL);
-  const { data, error } = await q.order("updated_at", { ascending: true }).limit(2000);
-  if (error) throw error;
-
-  let rows = (data ?? []).filter((d) => !CLOSED_DEAL.includes(d.stage));
-  const lastOf = (d: (typeof rows)[number]) => d.last_contact || d.updated_at || d.created_at;
+  const notes = await lastNoteTimes(orgId, rows.map((r) => r.item.entity_id));
+  const sinceOf = (r: Row) => notes.get(r.item.entity_id) ?? r.created_at;
   if (staleDays) {
-    // «بدون تواصل»: حسب آخر تواصل؛ الباقي: حسب آخر تحديث على الصفقة
-    const cutoff = Date.now() - staleDays * 86_400_000;
-    const since = (d: (typeof rows)[number]) => (template === "stale" ? lastOf(d) : d.updated_at || d.created_at);
-    rows = rows.filter((d) => new Date(since(d)).getTime() < cutoff);
+    const cutoff = Date.now() - staleDays * DAY;
+    rows = rows.filter((r) => { const t = sinceOf(r); return !t || new Date(t).getTime() < cutoff; });
   }
-  return rows.slice(0, MAX_ITEMS).map((d) => ({
-    entity_type: "deal", entity_id: d.id, name: d.client_name, phone: d.client_phone ?? null,
-    rep: d.assigned_rep_name ?? null, value: d.deal_value ?? 0, system_status: d.stage,
-    last_activity: lastOf(d) ?? null, extra: d.plan ?? null,
-  }));
+  // الأقدم تعليقاً أولاً
+  rows.sort((a, b) => (sinceOf(a) ?? "").localeCompare(sinceOf(b) ?? ""));
+  return rows.slice(0, MAX_ITEMS).map((r) => {
+    const lastNote = notes.get(r.item.entity_id) ?? null;
+    return { ...r.item, last_activity: lastNote, extra: r.extra(lastNote) };
+  });
 }
 
-/** الحالة وآخر تحديث في النظام لكل عنصر في الطلبات (العنصر المحذوف ما يرجع). */
+/** الحالة الحالية وآخر تعليق لكل عنصر في الطلبات (العنصر المحذوف ما يرجع حالته). */
 async function currentState(orgId: string, rows: { items: VerifyItem[] }[]) {
   const dealIds = new Set<string>(), renewalIds = new Set<string>();
   for (const r of rows) for (const it of r.items) (it.entity_type === "deal" ? dealIds : renewalIds).add(it.entity_id);
-  const map: Record<string, { status: string | null; updated_at: string | null }> = {};
-  const chunk = <T,>(arr: T[], n: number) => Array.from({ length: Math.ceil(arr.length / n) }, (_, i) => arr.slice(i * n, i * n + n));
+  const status: Record<string, string | null> = {};
   for (const ids of chunk([...dealIds], 200)) {
-    const { data } = await supabaseAdmin.from("deals").select("id, stage, updated_at").eq("org_id", orgId).in("id", ids);
-    for (const d of data ?? []) map[d.id] = { status: d.stage, updated_at: d.updated_at };
+    const { data } = await supabaseAdmin.from("deals").select("id, stage").eq("org_id", orgId).in("id", ids);
+    for (const d of data ?? []) status[d.id] = d.stage;
   }
   for (const ids of chunk([...renewalIds], 200)) {
-    const { data } = await supabaseAdmin.from("renewals").select("id, status, updated_at").eq("org_id", orgId).in("id", ids);
-    for (const r of data ?? []) map[r.id] = { status: r.status, updated_at: r.updated_at };
+    const { data } = await supabaseAdmin.from("renewals").select("id, status").eq("org_id", orgId).in("id", ids);
+    for (const r of data ?? []) status[r.id] = r.status;
   }
-  return map;
+  const notes = await lastNoteTimes(orgId, [...dealIds, ...renewalIds]);
+  return { status, notes };
 }
 
 /** الإعدادات المشتركة بين المعاينة وإنشاء الطلب. */
@@ -150,15 +172,15 @@ export async function GET(req: NextRequest) {
 
   const rows = (data ?? []) as { items: VerifyItem[]; created_at: string; updated_ids?: string[] }[];
   if (rows.length) {
-    const state = await currentState(access.orgId, rows);
+    const { status, notes } = await currentState(access.orgId, rows);
     for (const r of rows) {
       const sentAt = new Date(r.created_at).getTime();
-      // «تحدّث» = تغيّرت حالته، أو انعدّل بعد إرسال الطلب، أو انحذف
+      // «تحدّث» = انضاف تعليق في سجله بعد إرسال الطلب، أو تغيّرت حالته، أو انحذف
       r.updated_ids = r.items.filter((it) => {
-        const s = state[it.entity_id];
-        if (!s) return true;
-        if (s.status !== it.system_status) return true;
-        return !!s.updated_at && new Date(s.updated_at).getTime() > sentAt;
+        if (!(it.entity_id in status)) return true;
+        if (status[it.entity_id] !== it.system_status) return true;
+        const note = notes.get(it.entity_id);
+        return !!note && new Date(note).getTime() > sentAt;
       }).map((it) => it.entity_id);
     }
   }

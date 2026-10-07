@@ -317,7 +317,7 @@ function NewRequestForm({ onCancel, onCreated, onError }: {
 
       <div>
         <div className="flex items-center gap-2 text-[13px] text-foreground flex-wrap">
-          {template === "stale" ? "بدون تواصل من أكثر من" : "بدون تحديث من أكثر من"}
+          آخر تعليق في سجل العميل أقدم من
           <input
             type="number" min={1} max={365} value={staleDays}
             placeholder={usesDays(template) ? "7" : "الكل"}
@@ -326,7 +326,9 @@ function NewRequestForm({ onCancel, onCreated, onError }: {
           />
           يوم
         </div>
-        {!usesDays(template) && <p className="text-[11px] text-muted-foreground mt-1">اتركها فاضية عشان يجيك الكل بدون شرط مدة</p>}
+        <p className="text-[11px] text-muted-foreground mt-1">
+          العميل اللي ما عليه ولا تعليق ينحسب من تاريخ إضافته.{!usesDays(template) && " اتركها فاضية عشان يجيك الكل بدون شرط مدة."}
+        </p>
       </div>
 
       <div>
