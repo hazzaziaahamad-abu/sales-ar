@@ -17,12 +17,14 @@ import { MeetingsBoard } from "@/components/meetings/meetings-board";
 import { AchievementsBoard } from "@/components/achievements/achievements-board";
 import { VerificationsBoard } from "@/components/verifications/verifications-board";
 import { TargetingQualityTab } from "@/components/daily-huddle/targeting-quality";
+import { IdeasGarden } from "@/components/ideas/ideas-garden";
+import { canUseIdeas } from "@/lib/ideas";
 import { TEAM, KEY_PREFIX, weekStart, type QualityScores } from "@/components/daily-huddle/huddle-shared";
 import { HuddleManagersButton } from "@/components/daily-huddle/huddle-managers-button";
 import { useHuddleManagers } from "@/lib/huddle-managers";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CalendarClock, Users, Trophy, Save, Check, Settings2, Compass, HeartPulse, Activity, BadgeCheck, ShieldQuestion, Star, ClipboardCheck } from "lucide-react";
+import { CalendarClock, Users, Trophy, Save, Check, Settings2, Compass, HeartPulse, Activity, BadgeCheck, ShieldQuestion, Star, ClipboardCheck, Sprout } from "lucide-react";
 
 // النموذج: اجتماع يومي قصير (Daily Huddle) + لوحة نتائج بمقاييس الأفعال (4DX).
 const TARGETS_KEY = `${KEY_PREFIX}_targets`;
@@ -518,6 +520,7 @@ const TABS = [
   { key: "health", label: "صحة الأقسام", icon: HeartPulse },
   { key: "activity", label: "نشاط الفريق", icon: Activity },
   { key: "challenges", label: "التحديات والطلبات والتطويرات", icon: ShieldQuestion },
+  { key: "ideas", label: "البذور", icon: Sprout },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -533,7 +536,10 @@ export default function DailyHuddlePage() {
 function DailyHuddleTabs() {
   // ?tab=verify — رابط مباشر لتبويب (مثلاً من رسالة واتساب لطلب تحقق)
   const searchParams = useSearchParams();
-  const initialTab = TABS.find((t) => t.key === searchParams.get("tab"))?.key ?? "team";
+  const { user } = useAuth();
+  // «البذور» للمدير ومنال فقط
+  const tabs = TABS.filter((t) => t.key !== "ideas" || canUseIdeas(user));
+  const initialTab = tabs.find((t) => t.key === searchParams.get("tab"))?.key ?? "team";
   const [tab, setTab] = useState<TabKey>(initialTab);
   const [verifyPending, setVerifyPending] = useState(0);
   const huddleManagers = useHuddleManagers();
@@ -571,7 +577,7 @@ function DailyHuddleTabs() {
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-        {TABS.map(({ key, label, icon: Icon }) => (
+        {tabs.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
             onClick={() => setTab(key)}
@@ -598,6 +604,7 @@ function DailyHuddleTabs() {
       {tab === "health" && <SecretaryView embedded sections={["hotCold", "supportHealth", "renewalHealth"]} />}
       {tab === "activity" && <RecentUpdatesView embedded tabs={["updates", "log"]} />}
       {tab === "challenges" && <ChallengesTab />}
+      {tab === "ideas" && canUseIdeas(user) && <IdeasGarden />}
     </div>
   );
 }
