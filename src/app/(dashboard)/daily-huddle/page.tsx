@@ -18,6 +18,7 @@ import { AchievementsBoard } from "@/components/achievements/achievements-board"
 import { VerificationsBoard } from "@/components/verifications/verifications-board";
 import { TargetingQualityTab } from "@/components/daily-huddle/targeting-quality";
 import { IdeasGarden } from "@/components/ideas/ideas-garden";
+import { canUseIdeas } from "@/lib/ideas";
 import { TEAM, KEY_PREFIX, weekStart, type QualityScores } from "@/components/daily-huddle/huddle-shared";
 import { HuddleManagersButton } from "@/components/daily-huddle/huddle-managers-button";
 import { useHuddleManagers } from "@/lib/huddle-managers";
@@ -535,7 +536,10 @@ export default function DailyHuddlePage() {
 function DailyHuddleTabs() {
   // ?tab=verify — رابط مباشر لتبويب (مثلاً من رسالة واتساب لطلب تحقق)
   const searchParams = useSearchParams();
-  const initialTab = TABS.find((t) => t.key === searchParams.get("tab"))?.key ?? "team";
+  const { user } = useAuth();
+  // «البذور» للمدير ومنال فقط
+  const tabs = TABS.filter((t) => t.key !== "ideas" || canUseIdeas(user));
+  const initialTab = tabs.find((t) => t.key === searchParams.get("tab"))?.key ?? "team";
   const [tab, setTab] = useState<TabKey>(initialTab);
   const [verifyPending, setVerifyPending] = useState(0);
   const huddleManagers = useHuddleManagers();
@@ -563,7 +567,7 @@ function DailyHuddleTabs() {
         </div>
         <div>
           <h1 className="text-lg font-bold text-foreground">المتابعة اليومية</h1>
-          <p className="text-xs text-muted-foreground">الفريق · جودة الاستهداف · بوصلة اليوم · تأكيدات المبيعات · طلبات التحقق · صحة الأقسام · نشاط الفريق · التحديات والطلبات · البذور</p>
+          <p className="text-xs text-muted-foreground">الفريق · جودة الاستهداف · بوصلة اليوم · تأكيدات المبيعات · طلبات التحقق · صحة الأقسام · نشاط الفريق · التحديات والطلبات</p>
         </div>
         {huddleManagers.isOwner && (
           <div className="mr-auto">
@@ -573,7 +577,7 @@ function DailyHuddleTabs() {
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-        {TABS.map(({ key, label, icon: Icon }) => (
+        {tabs.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
             onClick={() => setTab(key)}
@@ -600,7 +604,7 @@ function DailyHuddleTabs() {
       {tab === "health" && <SecretaryView embedded sections={["hotCold", "supportHealth", "renewalHealth"]} />}
       {tab === "activity" && <RecentUpdatesView embedded tabs={["updates", "log"]} />}
       {tab === "challenges" && <ChallengesTab />}
-      {tab === "ideas" && <IdeasGarden />}
+      {tab === "ideas" && canUseIdeas(user) && <IdeasGarden />}
     </div>
   );
 }

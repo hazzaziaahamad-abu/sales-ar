@@ -50,3 +50,11 @@ export function sanitizePlan(raw: unknown): PlanStep[] {
     .filter((s) => s.text)
     .slice(0, 30);
 }
+
+/** «البذور» متاحة للمدير (السوبر أدمن) ومنال فقط — منال تُطابق بالاسم الأول مثل باقي المتابعة اليومية. */
+const IDEAS_MEMBERS = ["منال"];
+export function canUseIdeas(user: { name?: string | null; isSuperAdmin?: boolean | null } | null | undefined): boolean {
+  if (!user) return false;
+  if (user.isSuperAdmin) return true;
+  return IDEAS_MEMBERS.includes((user.name ?? "").trim().split(/\s+/)[0]);
+}

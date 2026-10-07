@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { getTicketAccess } from "@/lib/api/work-ticket-access";
+import { getIdeasAccess } from "@/lib/api/ideas-access";
 import { generateJSON } from "@/lib/ai/gemini";
 import { sanitizePlan } from "@/lib/ideas";
 
@@ -8,8 +8,8 @@ export const runtime = "nodejs";
 
 /** POST /api/ideas/[id]/plan → يقترح خطة تنفيذ للفكرة (ما تنحفظ — المستخدم يعدّلها ويعتمدها). */
 export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const access = await getTicketAccess();
-  if (!access) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const access = await getIdeasAccess();
+  if (access instanceof NextResponse) return access;
   const { id } = await ctx.params;
 
   const { data: idea } = await supabaseAdmin

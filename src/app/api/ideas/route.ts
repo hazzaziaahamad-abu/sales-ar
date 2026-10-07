@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { getTicketAccess } from "@/lib/api/work-ticket-access";
+import { getIdeasAccess } from "@/lib/api/ideas-access";
 
 export const runtime = "nodejs";
 
 /** GET /api/ideas → أفكار المستخدم نفسه (البذور خاصة بصاحبها). */
 export async function GET() {
-  const access = await getTicketAccess();
-  if (!access) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const access = await getIdeasAccess();
+  if (access instanceof NextResponse) return access;
 
   const { data, error } = await supabaseAdmin
     .from("ideas")
@@ -21,8 +21,8 @@ export async function GET() {
 
 /** POST /api/ideas → رمي بذرة جديدة. */
 export async function POST(req: NextRequest) {
-  const access = await getTicketAccess();
-  if (!access) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const access = await getIdeasAccess();
+  if (access instanceof NextResponse) return access;
 
   const body = await req.json().catch(() => ({}));
   const text = String(body.text ?? "").trim();

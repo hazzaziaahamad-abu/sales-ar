@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { getTicketAccess } from "@/lib/api/work-ticket-access";
+import { getIdeasAccess } from "@/lib/api/ideas-access";
 import { IDEA_STAGES, sanitizePlan } from "@/lib/ideas";
 
 export const runtime = "nodejs";
@@ -8,8 +8,8 @@ export const runtime = "nodejs";
 const COLUMNS = "id, text, notes, stage, plan, touches, last_touched_at, wilted_at, created_at";
 
 async function ownIdea(id: string) {
-  const access = await getTicketAccess();
-  if (!access) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  const access = await getIdeasAccess();
+  if (access instanceof NextResponse) return { error: access };
   const { data } = await supabaseAdmin
     .from("ideas").select("id, touches").eq("id", id).eq("org_id", access.orgId).eq("user_id", access.userId).maybeSingle();
   if (!data) return { error: NextResponse.json({ error: "غير موجودة" }, { status: 404 }) };

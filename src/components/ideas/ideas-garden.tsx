@@ -163,7 +163,7 @@ export function IdeasGarden() {
         </div>
         <div>
           <h2 className="text-base font-extrabold text-foreground">البذور</h2>
-          <p className="text-[12px] text-muted-foreground mt-0.5">ارمِ أي فكرة تجيك، وارجع لها وقت ما تبي — تكبر من بذرة إلى شجرة لها خطة، ثم ثمرة. أفكارك خاصة فيك.</p>
+          <p className="text-[12px] text-muted-foreground mt-0.5">ارمِ أي فكرة تجيك، وارجع لها وقت ما تبي — تكبر من بذرة إلى شجرة لها خطة، ثم ثمرة. أفكارك خاصة فيك (متاحة للمدير ومنال فقط).</p>
         </div>
       </div>
 
