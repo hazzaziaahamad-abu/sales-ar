@@ -19,6 +19,7 @@ import { formatMoney, formatMoneyFull, formatDate, formatPhone, todayLocal, date
 import { FollowUpLogButton } from "@/components/follow-up-log";
 import { WatchlistPinButton } from "@/components/watchlist-pin-button";
 import { ClientProfilePanel } from "@/components/client-profile-panel";
+import { UrgentFollowupBanner } from "@/components/urgent-followup/urgent-followup-banner";
 import { AchievementSummary } from "@/components/achievement-summary";
 import SalesKPIDashboard from "@/components/sales/SalesKPIDashboard";
 import { getKpiStatus, KPI_STATUS_STYLES, KPI_TARGETS } from "@/lib/utils/constants";
@@ -1290,6 +1291,9 @@ export function SalesSection({ salesType }: SalesPageProps) {
 
   return (
     <div className="space-y-6">
+      {/* ─── هام جداً للمتابعة اليومية — حالات هذا القسم فقط ─── */}
+      <UrgentFollowupBanner salesType={salesType} />
+
       {/* ─── Page Header ─── */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">

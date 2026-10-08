@@ -2,16 +2,30 @@
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
-import { Siren, CreditCard, FlaskConical, Settings, Phone, MessageCircle, RefreshCw, ExternalLink, User } from "lucide-react";
+import { Siren, CreditCard, FlaskConical, Settings, Phone, MessageCircle, RefreshCw, ExternalLink, User, Users, Hourglass, StickyNote } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { fetchDeals, URGENT_FOLLOWUP_STAGES } from "@/lib/supabase/db";
 import { formatMoney, tableDateBounds } from "@/lib/utils/format";
 import { FollowUpLogButton } from "@/components/follow-up-log";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { Deal } from "@/types";
+import {
+  fetchUrgentDeals,
+  isUrgentAdmin,
+  summarizeByRep,
+  URGENT_FOLLOWUP_STAGES,
+  STALE_DAYS,
+  CRITICAL_DAYS,
+  type UrgentDeal,
+} from "@/lib/urgent-followup";
 
 type Period = "اليوم" | "الأسبوع" | "الشهر" | "الكل";
 const PERIODS: Period[] = ["اليوم", "الأسبوع", "الشهر", "الكل"];
+
+type TypeFilter = "" | "office" | "support";
+const TYPES: { key: TypeFilter; label: string }[] = [
+  { key: "", label: "كل الأقسام" },
+  { key: "office", label: "المبيعات" },
+  { key: "support", label: "مبيعات الدعم" },
+];
 
 const STAGE_CFG: Record<string, { label: string; hint: string; icon: typeof CreditCard; text: string; bg: string; border: string }> = {
   "انتظار الدفع": { label: "انتظار الدفع", hint: "اجمع الفلوس اليوم — كل يوم تأخير يقلل فرصة الدفع", icon: CreditCard, text: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/40" },
@@ -19,16 +33,8 @@ const STAGE_CFG: Record<string, { label: string; hint: string; icon: typeof Cred
   "تجهيز": { label: "تجهيز", hint: "أسرع في التجهيز وأبلغ العميل بالتقدم", icon: Settings, text: "text-cyan-400", bg: "bg-cyan-500/10", border: "border-cyan-500/40" },
 };
 
-const DAY_MS = 86400000;
-
-/** أيام بدون أي تحديث على الصفقة */
-function staleDays(d: Deal): number {
-  const ref = d.updated_at || d.created_at;
-  return ref ? Math.max(0, Math.floor((Date.now() - new Date(ref).getTime()) / DAY_MS)) : 0;
-}
-
-function dealDay(d: Deal): string {
-  return (d.deal_date || d.created_at || "").slice(0, 10);
+function dealDay(i: UrgentDeal): string {
+  return (i.deal.deal_date || i.deal.created_at || "").slice(0, 10);
 }
 
 function whatsappLink(phone: string): string {
@@ -37,55 +43,64 @@ function whatsappLink(phone: string): string {
   return `https://wa.me/${p}`;
 }
 
+function shortDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("ar-SA-u-ca-gregory", { day: "numeric", month: "short" });
+}
+
 export default function UrgentFollowupPage() {
   const { user, activeOrgId } = useAuth();
-  const isAdmin = user?.isSuperAdmin || user?.roleName === "مدير" || user?.roleName === "admin";
-  const [deals, setDeals] = useState<Deal[]>([]);
+  const isAdmin = isUrgentAdmin(user);
+  const [items, setItems] = useState<UrgentDeal[]>([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<Period>("الكل");
   const [repFilter, setRepFilter] = useState<string>("");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("");
+
+  // البانر في كل قسم يفتح الصفحة على قسمه: /urgent-followup?type=office
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("type");
+    if (t === "office" || t === "support") setTypeFilter(t);
+  }, []);
 
   const load = useCallback(async () => {
+    if (!user) return;
     setLoading(true);
     try {
-      const all = await fetchDeals();
-      setDeals(all.filter((d) => (URGENT_FOLLOWUP_STAGES as readonly string[]).includes(d.stage)));
+      // الموظف يجيب صفقاته فقط — المدير يجيب الكل
+      setItems(await fetchUrgentDeals({ repName: isAdmin ? undefined : user.name }));
     } catch {
-      setDeals([]);
+      setItems([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user, isAdmin]);
 
   useEffect(() => { load(); }, [load, activeOrgId]);
 
-  // الموظف يشوف صفقاته فقط — المدير يشوف الكل ويقدر يفلتر بالموظف
-  const scoped = useMemo(() => {
-    if (!user) return [];
-    if (!isAdmin) return deals.filter((d) => d.assigned_rep_name?.trim() === user.name.trim());
-    return repFilter ? deals.filter((d) => d.assigned_rep_name === repFilter) : deals;
-  }, [deals, user, isAdmin, repFilter]);
-
   const reps = useMemo(
-    () => Array.from(new Set(deals.map((d) => d.assigned_rep_name).filter(Boolean) as string[])).sort(),
-    [deals],
+    () => Array.from(new Set(items.map((i) => i.deal.assigned_rep_name).filter(Boolean) as string[])).sort(),
+    [items],
   );
 
   const filtered = useMemo(() => {
     const bounds = period === "الكل" ? null : tableDateBounds(period);
-    const list = bounds ? scoped.filter((d) => { const day = dealDay(d); return day >= bounds[0] && day <= bounds[1]; }) : scoped;
-    // الأقدم بدون تحديث أولاً
-    return [...list].sort((a, b) => staleDays(b) - staleDays(a));
-  }, [scoped, period]);
+    return items
+      .filter((i) => !typeFilter || (i.deal.sales_type ?? "office") === typeFilter)
+      .filter((i) => !repFilter || i.deal.assigned_rep_name === repFilter)
+      .filter((i) => { if (!bounds) return true; const day = dealDay(i); return day >= bounds[0] && day <= bounds[1]; })
+      // الأقدم بدون تحديث أولاً
+      .sort((a, b) => b.staleDays - a.staleDays || b.stageDays - a.stageDays);
+  }, [items, period, typeFilter, repFilter]);
 
   const byStage = useMemo(() => {
-    const m: Record<string, Deal[]> = {};
+    const m: Record<string, UrgentDeal[]> = {};
     for (const s of URGENT_FOLLOWUP_STAGES) m[s] = [];
-    for (const d of filtered) m[d.stage]?.push(d);
+    for (const i of filtered) m[i.deal.stage]?.push(i);
     return m;
   }, [filtered]);
 
-  const staleCount = filtered.filter((d) => staleDays(d) >= 3).length;
+  const staleCount = filtered.filter((i) => i.staleDays >= STALE_DAYS).length;
+  const repSummary = useMemo(() => (isAdmin ? summarizeByRep(filtered) : []), [isAdmin, filtered]);
 
   return (
     <div className="space-y-5" dir="rtl">
@@ -99,7 +114,7 @@ export default function UrgentFollowupPage() {
           <div className="min-w-0 flex-1">
             <h1 className="text-2xl font-extrabold text-red-400">هام جداً للمتابعة اليومية</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              هذي الحالات لازم تتابع كل يوم — لا تخلّي عميل يطوف بدون تحديث.
+              هذي الحالات لازم تتابع كل يوم — سجّل تعليق في سجل المتابعة بعد كل تواصل عشان تنحسب الصفقة محدّثة.
               {!isAdmin && " (تظهر لك صفقاتك أنت فقط)"}
             </p>
           </div>
@@ -114,7 +129,7 @@ export default function UrgentFollowupPage() {
 
         {!loading && staleCount > 0 && (
           <div className="mt-4 rounded-[12px] bg-red-600 px-4 py-2.5 text-sm font-bold text-white">
-            ⚠️ عندك {staleCount} صفقة بدون أي تحديث من 3 أيام أو أكثر — ابدأ فيها الحين
+            ⚠️ {staleCount} صفقة بدون أي تحديث في السجل من {STALE_DAYS} أيام أو أكثر — ابدأ فيها الحين
           </div>
         )}
       </div>
@@ -131,6 +146,19 @@ export default function UrgentFollowupPage() {
               }`}
             >
               {p}
+            </button>
+          ))}
+        </div>
+        <div className="flex rounded-[12px] border border-border bg-card p-1">
+          {TYPES.map((t) => (
+            <button
+              key={t.key || "all"}
+              onClick={() => setTypeFilter(t.key)}
+              className={`rounded-[10px] px-3 py-1.5 text-sm font-semibold transition-colors ${
+                typeFilter === t.key ? "bg-white/[0.12] text-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {t.label}
             </button>
           ))}
         </div>
@@ -153,12 +181,14 @@ export default function UrgentFollowupPage() {
           const c = STAGE_CFG[s];
           const Icon = c.icon;
           const list = byStage[s] || [];
-          const value = list.reduce((sum, d) => sum + (d.deal_value || 0), 0);
+          const value = list.reduce((sum, i) => sum + (i.deal.deal_value || 0), 0);
+          const stale = list.filter((i) => i.staleDays >= STALE_DAYS).length;
           return (
             <div key={s} className={`rounded-[14px] border ${c.border} ${c.bg} p-4`}>
               <div className="flex items-center gap-2">
                 <Icon className={`h-5 w-5 ${c.text}`} />
                 <span className={`font-bold ${c.text}`}>{c.label}</span>
+                {stale > 0 && <span className="mr-auto rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold text-white">{stale} متأخرة</span>}
               </div>
               <div className="mt-2 flex items-baseline gap-2">
                 <span className="text-3xl font-extrabold text-foreground">{loading ? "…" : list.length}</span>
@@ -168,6 +198,47 @@ export default function UrgentFollowupPage() {
           );
         })}
       </div>
+
+      {/* ─── ملخص المدير لكل موظف ─── */}
+      {isAdmin && !loading && repSummary.length > 0 && (
+        <section className="cc-card overflow-hidden">
+          <header className="flex items-center gap-2 border-b border-border px-4 py-3">
+            <Users className="h-5 w-5 text-red-400" />
+            <h2 className="font-extrabold text-foreground">ملخص اليوم لكل موظف</h2>
+            <span className="text-[12px] text-muted-foreground">— اضغط على الموظف لعرض صفقاته</span>
+          </header>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] text-sm">
+              <thead>
+                <tr className="text-[12px] text-muted-foreground">
+                  <th className="px-4 py-2 text-right font-semibold">الموظف</th>
+                  <th className="px-2 py-2 text-center font-semibold">💳 انتظار الدفع</th>
+                  <th className="px-2 py-2 text-center font-semibold">🧪 تجريبي</th>
+                  <th className="px-2 py-2 text-center font-semibold">⚙️ تجهيز</th>
+                  <th className="px-2 py-2 text-center font-semibold">بدون تحديث {STALE_DAYS}+</th>
+                  <th className="px-2 py-2 text-center font-semibold">{CRITICAL_DAYS}+ أيام</th>
+                </tr>
+              </thead>
+              <tbody>
+                {repSummary.map((r) => (
+                  <tr
+                    key={r.rep}
+                    onClick={() => setRepFilter(repFilter === r.rep ? "" : r.rep)}
+                    className={`cursor-pointer border-t border-border hover:bg-white/[0.04] ${repFilter === r.rep ? "bg-white/[0.06]" : ""}`}
+                  >
+                    <td className="px-4 py-2 font-bold text-foreground">{r.rep}</td>
+                    <td className="px-2 py-2 text-center">{r.byStage["انتظار الدفع"] ?? 0}</td>
+                    <td className="px-2 py-2 text-center">{r.byStage["تجريبي"] ?? 0}</td>
+                    <td className="px-2 py-2 text-center">{r.byStage["تجهيز"] ?? 0}</td>
+                    <td className={`px-2 py-2 text-center font-bold ${r.stale > 0 ? "text-amber-400" : "text-muted-foreground"}`}>{r.stale}</td>
+                    <td className={`px-2 py-2 text-center font-bold ${r.critical > 0 ? "text-red-400" : "text-muted-foreground"}`}>{r.critical}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {/* ─── Lists per stage ─── */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -192,13 +263,14 @@ export default function UrgentFollowupPage() {
                 ) : list.length === 0 ? (
                   <p className="py-8 text-center text-sm text-muted-foreground">لا توجد صفقات ✅</p>
                 ) : (
-                  list.map((d) => {
-                    const days = staleDays(d);
+                  list.map((i) => {
+                    const d = i.deal;
+                    const days = i.staleDays;
                     const salesHref = d.sales_type === "support" ? "/support-sales" : "/sales";
                     return (
                       <div
                         key={d.id}
-                        className={`rounded-[12px] border p-3 ${days >= 7 ? "border-red-500/60 bg-red-500/[0.07]" : days >= 3 ? "border-amber-500/50 bg-amber-500/[0.05]" : "border-border bg-white/[0.02]"}`}
+                        className={`rounded-[12px] border p-3 ${days >= CRITICAL_DAYS ? "border-red-500/60 bg-red-500/[0.07]" : days >= STALE_DAYS ? "border-amber-500/50 bg-amber-500/[0.05]" : "border-border bg-white/[0.02]"}`}
                       >
                         <div className="flex items-start gap-2">
                           <div className="min-w-0 flex-1">
@@ -209,18 +281,32 @@ export default function UrgentFollowupPage() {
                               )}
                               {d.deal_value > 0 && <span>{formatMoney(d.deal_value)}</span>}
                               {d.plan && <span>{d.plan}</span>}
-                              <span>{d.sales_type === "support" ? "مبيعات الدعم" : "المكتب"}</span>
+                              <span>{d.sales_type === "support" ? "مبيعات الدعم" : "المبيعات"}</span>
                             </div>
                           </div>
                           <span
-                            className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${days >= 7 ? "bg-red-500 text-white" : days >= 3 ? "bg-amber-500 text-white" : "bg-emerald-500/20 text-emerald-400"}`}
-                            title="أيام بدون تحديث"
+                            className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${days >= CRITICAL_DAYS ? "bg-red-500 text-white" : days >= STALE_DAYS ? "bg-amber-500 text-white" : "bg-emerald-500/20 text-emerald-400"}`}
+                            title={`آخر تحديث: ${shortDate(i.lastActivity)}`}
                           >
                             {days === 0 ? "محدّث اليوم" : `${days} يوم بدون تحديث`}
                           </span>
                         </div>
 
-                        {d.notes && <p className="mt-2 line-clamp-2 text-[12px] text-muted-foreground">{d.notes}</p>}
+                        <p className="mt-1.5 flex items-center gap-1 text-[12px] text-muted-foreground">
+                          <Hourglass className="h-3 w-3" />
+                          له <b className={i.stageDays >= CRITICAL_DAYS ? "text-red-400" : "text-foreground"}>{i.stageDays} يوم</b> في «{d.stage}» (من {shortDate(i.stageSince)})
+                        </p>
+
+                        {i.lastNote ? (
+                          <p className="mt-1.5 flex items-start gap-1 rounded-lg bg-white/[0.03] px-2 py-1 text-[12px] text-muted-foreground">
+                            <StickyNote className="mt-0.5 h-3 w-3 shrink-0" />
+                            <span className="line-clamp-2">
+                              <b className="text-foreground">{i.lastNote.author_name}</b> · {shortDate(i.lastNote.created_at)}: {i.lastNote.note}
+                            </span>
+                          </p>
+                        ) : (
+                          <p className="mt-1.5 text-[12px] font-semibold text-red-400">لا يوجد أي تعليق في سجل المتابعة</p>
+                        )}
 
                         <div className="mt-2 flex flex-wrap items-center gap-1.5">
                           {d.client_phone && (

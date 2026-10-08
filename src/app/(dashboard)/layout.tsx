@@ -12,6 +12,7 @@ import { LastSaleBanner } from "@/components/layout/last-sale-banner";
 import { ImpersonationBanner } from "@/components/layout/impersonation-banner";
 import { SaleCelebration } from "@/components/layout/sale-celebration";
 import { WelcomePopup } from "@/components/layout/welcome-popup";
+import { UrgentFollowupPopup } from "@/components/urgent-followup/urgent-followup-popup";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { OrgProvider } from "@/lib/org-context";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -828,6 +829,7 @@ export default function DashboardLayout({
       <PageTracker />
       <SaleCelebration />
       <WelcomePopup />
+      <UrgentFollowupPopup />
       <div className="min-h-screen bg-background panel-grid">
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
