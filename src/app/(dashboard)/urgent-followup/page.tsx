@@ -266,7 +266,7 @@ export default function UrgentFollowupPage() {
                   list.map((i) => {
                     const d = i.deal;
                     const days = i.staleDays;
-                    const salesHref = d.sales_type === "support" ? "/support-sales" : "/sales";
+                    const salesHref = `${d.sales_type === "support" ? "/support-sales" : "/sales"}?deal=${d.id}&edit=1`;
                     return (
                       <div
                         key={d.id}

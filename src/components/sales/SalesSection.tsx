@@ -845,6 +845,8 @@ export function SalesSection({ salesType }: SalesPageProps) {
       document.getElementById(`deal-row-${dealId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 350);
     const clearTimer = setTimeout(() => setHighlightDealId(null), 4000);
+    // ?edit=1 (من «هام جداً للمتابعة اليومية»): نفتح نافذة تعديل الصفقة مباشرة عشان يحدّث الحالة
+    if (searchParams.get("edit") === "1") openEditModal(target);
     return () => { clearTimeout(scrollTimer); clearTimeout(clearTimer); };
   }, [searchParams, deals]);
 
