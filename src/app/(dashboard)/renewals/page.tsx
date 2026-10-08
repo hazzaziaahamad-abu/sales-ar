@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import type { Renewal, Employee } from "@/types";
+import { revenueCutoff, visibleAmount } from "@/lib/revenue-visibility";
 import { triggerSaleCelebration } from "@/components/layout/sale-celebration";
 import {
   fetchRenewals,
@@ -207,6 +208,14 @@ function getPlanRecommendation(planName: string): { text: string; color: string;
 
 export default function RenewalsPage() {
   const { activeOrgId: orgId, user: authUser } = useAuth();
+  // المبالغ المجمّعة: الموظف يشوف آخر 3 شهور فقط (العدد كامل)
+  const isSuperAdminUser = !!authUser?.isSuperAdmin;
+  const moneyCutoff = useMemo(() => revenueCutoff({ isSuperAdmin: isSuperAdminUser }), [isSuperAdminUser]);
+  const rv = useCallback((r: Renewal) => visibleAmount(
+    r.plan_price,
+    r.status === "مكتمل" ? (r.payment_date || r.updated_at?.slice(0, 10) || r.renewal_date) : r.renewal_date,
+    moneyCutoff,
+  ), [moneyCutoff]);
   const isAdmin = authUser?.isSuperAdmin || authUser?.roleName === "مدير" || authUser?.roleName === "admin";
   const [renewals, setRenewals] = useState<Renewal[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -540,10 +549,10 @@ export default function RenewalsPage() {
     const churnRate = total > 0 ? Math.round((cancelled / total) * 100) : 0;
     const revenueLoss = analyticsBase
       .filter((r) => r.status === "ملغي بسبب")
-      .reduce((sum, r) => sum + r.plan_price, 0);
+      .reduce((sum, r) => sum + rv(r), 0);
     const totalRevenue = analyticsBase
       .filter((r) => r.status === "مكتمل")
-      .reduce((sum, r) => sum + r.plan_price, 0);
+      .reduce((sum, r) => sum + rv(r), 0);
 
     // Cancellation reasons breakdown
     const cancelReasons = analyticsBase
@@ -595,7 +604,7 @@ export default function RenewalsPage() {
       cancelReasonsArr,
       monthlyTrend,
     };
-  }, [renewals, analyticsBase]);
+  }, [renewals, analyticsBase, rv]);
 
   /* ─── Achievement Summary (filtered by period) ─── */
   const achievementSummary = useMemo(() => {
@@ -650,8 +659,8 @@ export default function RenewalsPage() {
     const completed = periodRenewals.filter(r => r.status === "مكتمل");
     const cancelled = periodRenewals.filter(r => r.status === "ملغي بسبب");
     const contacted = periodRenewals.filter(r => r.status === "جاري المتابعة" || r.status === "انتظار الدفع");
-    const completedRevenue = completed.reduce((s, r) => s + r.plan_price, 0);
-    const lostRevenue = cancelled.reduce((s, r) => s + r.plan_price, 0);
+    const completedRevenue = completed.reduce((s, r) => s + rv(r), 0);
+    const lostRevenue = cancelled.reduce((s, r) => s + rv(r), 0);
     const avgDealValue = completed.length > 0 ? Math.round(completedRevenue / completed.length) : 0;
     const successRate = periodRenewals.length > 0 ? Math.round((completed.length / periodRenewals.length) * 100) : 0;
 
@@ -666,7 +675,7 @@ export default function RenewalsPage() {
       const plan = r.plan_name || "بدون باقة";
       if (!planMap[plan]) planMap[plan] = { count: 0, revenue: 0 };
       planMap[plan].count += 1;
-      planMap[plan].revenue += r.plan_price;
+      planMap[plan].revenue += rv(r);
     });
     const planBreakdown = Object.entries(planMap)
       .map(([plan, data]) => ({ plan, ...data }))
@@ -707,7 +716,7 @@ export default function RenewalsPage() {
       contactedIds: new Set(contacted.map(r => r.id)),
       allPeriodIds: new Set(periodRenewals.map(r => r.id)),
     };
-  }, [renewals, summaryPeriod, customRange]);
+  }, [renewals, summaryPeriod, customRange, rv]);
 
   // Apply summary filter if active (overrides base filter to show matching renewals)
   const filteredRenewals_summary = summaryFilter

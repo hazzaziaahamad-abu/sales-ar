@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { revenueCutoff, visibleAmount } from "@/lib/revenue-visibility";
 import {
   fetchEmployeeTasks,
   createEmployeeTask,
@@ -409,7 +410,8 @@ export default function MyTasksPage() {
       setSalesStats({
         totalDeals: myDeals.length,
         closedDeals: closedDeals.length,
-        revenue: closedDeals.reduce((s, d) => s + d.deal_value, 0),
+        // المبلغ: آخر 3 شهور فقط للموظف (العدد كامل)
+        revenue: closedDeals.reduce((s, d) => s + visibleAmount(d.deal_value, d.close_date || d.deal_date || d.created_at, revenueCutoff(user)), 0),
         pendingApproval: pending,
         approved,
         rejected,
@@ -1063,7 +1065,7 @@ export default function MyTasksPage() {
             </div>
             <div className="bg-white/[0.05] rounded-[14px] p-3 text-center border border-white/[0.06]">
               <p className="text-2xl font-bold text-cyan-400">{formatMoney(salesStats.revenue)}</p>
-              <p className="text-gray-400 text-xs mt-1">إجمالي الإيرادات</p>
+              <p className="text-gray-400 text-xs mt-1">{revenueCutoff(user) ? "الإيرادات (آخر 3 شهور)" : "إجمالي الإيرادات"}</p>
             </div>
             <div className="bg-white/[0.05] rounded-[14px] p-3 text-center border border-white/[0.06]">
               <p className={`text-2xl font-bold ${salesStats.conversionRate >= 70 ? "text-emerald-400" : salesStats.conversionRate >= 40 ? "text-amber-400" : "text-red-400"}`}>

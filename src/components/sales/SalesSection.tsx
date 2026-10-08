@@ -15,6 +15,7 @@ import { useTopbarControls } from "@/components/layout/topbar-context";
 import { STAGES, SOURCES, SOURCE_COLORS, PLANS } from "@/lib/utils/constants";
 
 import SalesKPIsView from "@/components/SalesKPIsView";
+import { revenueCutoff, visibleAmount } from "@/lib/revenue-visibility";
 import { formatMoney, formatMoneyFull, formatDate, formatPhone, todayLocal, dateToLocal, dateToTimestamp, saudiTimestamp, tableDateBounds } from "@/lib/utils/format";
 import { FollowUpLogButton } from "@/components/follow-up-log";
 import { WatchlistPinButton } from "@/components/watchlist-pin-button";
@@ -290,6 +291,12 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const clientCodePrefix = isOffice ? "S" : "D";
   const { activeOrgId: orgId, user: authUser } = useAuth();
   const isAdmin = authUser?.isSuperAdmin || authUser?.roleName === "مدير" || authUser?.roleName === "admin";
+  // المبالغ المجمّعة: الموظف يشوف آخر 3 شهور فقط (عدد الصفقات يبقى كامل)
+  const isSuperAdminUser = !!authUser?.isSuperAdmin;
+  const moneyCutoff = useMemo(() => revenueCutoff({ isSuperAdmin: isSuperAdminUser }), [isSuperAdminUser]);
+  const dv = useCallback((d: Deal) => visibleAmount(d.deal_value, dealSaleDate(d), moneyCutoff), [moneyCutoff]);
+  // نسخة للعرض فقط (لوحات المؤشرات) — لا تُستخدم للتعديل أو الحفظ
+  const withVisibleAmounts = (list: Deal[]) => (moneyCutoff ? list.map((d) => ({ ...d, deal_value: dv(d) })) : list);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [packages, setPackages] = useState<Package[]>([]);
   const [marketers, setMarketers] = useState<Marketer[]>([]);
@@ -492,7 +499,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
     report += `📅 ${todayStr}\n`;
     report += `${"─".repeat(35)}\n`;
     report += `📊 عدد العملاء: ${followUpDeals.length}\n`;
-    report += `💰 إجمالي القيمة: ${followUpDeals.reduce((s, d) => s + d.deal_value, 0).toLocaleString()} ر.س\n\n`;
+    report += `💰 إجمالي القيمة: ${followUpDeals.reduce((s, d) => s + dv(d), 0).toLocaleString()} ر.س\n\n`;
     followUpDeals.forEach((d, i) => {
       const rec = getRecommendation(d);
       report += `${i + 1}. ${d.client_name}\n`;
@@ -521,7 +528,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
     const remaining = targetDeals.filter((d) => d.stage !== "مكتملة");
     const total = targetDeals.length;
     const rate = total > 0 ? Math.round((closed.length / total) * 100) : 0;
-    const totalValue = closed.reduce((s, d) => s + d.deal_value, 0);
+    const totalValue = closed.reduce((s, d) => s + dv(d), 0);
     const todayStr = new Date().toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
     // Fetch latest follow-up notes for all target deals
@@ -582,7 +589,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
         const name = d.assigned_rep_name!;
         if (!repCount[name]) repCount[name] = { count: 0, value: 0 };
         repCount[name].count++;
-        repCount[name].value += d.deal_value;
+        repCount[name].value += dv(d);
       });
       const sorted = Object.entries(repCount).sort((a, b) => b[1].count - a[1].count || b[1].value - a[1].value);
       const top3 = sorted.slice(0, 3);
@@ -758,13 +765,13 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const achievementItems = useMemo(() => repOnlyDeals.map(d => ({
     id: d.id,
     updated_at: d.updated_at,
-    value: d.deal_value,
+    value: dv(d),
     isCompleted: d.stage === "مكتملة",
     isCancelled: d.stage === "مرفوض مع سبب" || d.stage === "كنسل التجربة",
     isContacted: d.stage === "قيد التواصل" || d.stage === "تفاوض" || d.stage === "انتظار الدفع",
     repName: d.assigned_rep_name || undefined,
     planName: d.plan || undefined,
-  })), [repOnlyDeals]);
+  })), [repOnlyDeals, dv]);
 
   // Apply achievement filter or stage filter
   const baseFilteredDeals = achieveFilter
@@ -898,13 +905,13 @@ export function SalesSection({ salesType }: SalesPageProps) {
 
   /* ─── Computed values ─── */
   const totalDeals = repFilteredDeals.length;
-  const totalValue = repFilteredDeals.reduce((s, d) => s + d.deal_value, 0);
+  const totalValue = repFilteredDeals.reduce((s, d) => s + dv(d), 0);
   const avgDealValue = totalDeals > 0 ? Math.round(totalValue / totalDeals) : 0;
 
   const stageCounts = repFilteredDeals.reduce<Record<string, { count: number; value: number }>>((acc, d) => {
     if (!acc[d.stage]) acc[d.stage] = { count: 0, value: 0 };
     acc[d.stage].count++;
-    acc[d.stage].value += d.deal_value;
+    acc[d.stage].value += dv(d);
     return acc;
   }, {});
 
@@ -915,7 +922,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
 
   /* KPI calculations */
   const avgCycleDays = totalDeals > 0 ? Math.round(repFilteredDeals.reduce((s, d) => s + d.cycle_days, 0) / totalDeals) : 0;
-  const pipelineValue = repFilteredDeals.filter((d) => d.stage !== "مكتملة").reduce((s, d) => s + d.deal_value, 0);
+  const pipelineValue = repFilteredDeals.filter((d) => d.stage !== "مكتملة").reduce((s, d) => s + dv(d), 0);
 
   /* Rep performance */
   // Build price map from packages
@@ -981,7 +988,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
       const rep = d.assigned_rep_name || "غير محدد";
       if (!repMap[rep]) repMap[rep] = { deals: 0, closed: 0, value: 0, cycleDays: 0, plans: {}, fullPrice: 0, discounted: 0, discountTotal: 0 };
       repMap[rep].deals++;
-      repMap[rep].value += d.deal_value;
+      repMap[rep].value += dv(d);
       repMap[rep].cycleDays += d.cycle_days;
       if (d.stage === "مكتملة") {
         repMap[rep].closed++;
@@ -1070,10 +1077,10 @@ export function SalesSection({ salesType }: SalesPageProps) {
     const reason = d.loss_reason || "أخرى";
     if (!acc[reason]) acc[reason] = { count: 0, value: 0 };
     acc[reason].count++;
-    acc[reason].value += d.deal_value;
+    acc[reason].value += dv(d);
     return acc;
   }, {});
-  const totalLostValue = lostDeals.reduce((s, d) => s + d.deal_value, 0);
+  const totalLostValue = lostDeals.reduce((s, d) => s + dv(d), 0);
 
   /* Source ROI data */
   const sourceData = SOURCES.map((src) => {
@@ -1082,7 +1089,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
     return {
       source: src,
       count: srcDeals.length,
-      value: srcDeals.reduce((s, d) => s + d.deal_value, 0),
+      value: srcDeals.reduce((s, d) => s + dv(d), 0),
       won: srcWon.length,
       winRate: srcDeals.length > 0 ? Math.round((srcWon.length / srcDeals.length) * 100) : 0,
     };
@@ -1476,7 +1483,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
           try { return dateToLocal(new Date(ts)) === todayStr; } catch { return false; }
         });
         const todayClosedCount = todayClosedDeals.length;
-        const todayRevenue = todayClosedDeals.reduce((s, d) => s + d.deal_value, 0);
+        const todayRevenue = todayClosedDeals.reduce((s, d) => s + dv(d), 0);
         const pct = kpiGoal > 0 ? Math.min(100, Math.round((todayClosedCount / kpiGoal) * 100)) : 0;
         const goalReached = todayClosedCount >= kpiGoal && kpiGoal > 0;
 
@@ -1687,7 +1694,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
         const configs = isOffice ? OFFICE_STAGE_BOXES : SUPPORT_STAGE_BOXES;
         const boxes = configs.map(cfg => {
           const stageDeals = dateFilteredDeals.filter(d => d.stage === cfg.key);
-          const value = stageDeals.reduce((s, d) => s + d.deal_value, 0);
+          const value = stageDeals.reduce((s, d) => s + dv(d), 0);
           let sublabel = cfg.sublabel;
           let badge: number | null = null;
           if (cfg.key === "تجريبي") {
@@ -2250,7 +2257,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
                   (() => { const ts = d.close_date || d.updated_at; if (!ts) return false; try { return dateToLocal(new Date(ts)) === todayStr; } catch { return false; } })()
                 );
                 const closedCount = todayClosed.length;
-                const revenue = todayClosed.reduce((s, d) => s + d.deal_value, 0);
+                const revenue = todayClosed.reduce((s, d) => s + dv(d), 0);
                 const pct = goal ? Math.min(100, Math.round((closedCount / goal) * 100)) : 0;
                 const goalReached = goal !== null && closedCount >= goal;
 
@@ -2342,7 +2349,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="cc-card rounded-[14px] p-5 text-center">
             <p className="text-2xl font-extrabold text-cyan">{formatMoney(totalValue)}</p>
-            <p className="text-xs text-muted-foreground mt-1">إجمالي قيمة المبيعات</p>
+            <p className="text-xs text-muted-foreground mt-1">إجمالي قيمة المبيعات{moneyCutoff ? " (آخر 3 شهور)" : ""}</p>
           </div>
           <div className="cc-card rounded-2xl p-5 text-center" style={{ borderColor: "rgba(16,185,129,0.3)" }}>
             <p className="text-2xl font-extrabold text-cc-green">{totalDeals}</p>
@@ -2473,7 +2480,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
                     </button>
                     <button onClick={clearFollowUp} className="text-[12px] text-muted-foreground hover:text-cc-red transition-colors">مسح التحديد</button>
                     <span className="text-[12px] text-muted-foreground mr-auto">
-                      {followUpIds.size} عميل | {formatMoney(deals.filter((d) => followUpIds.has(d.id)).reduce((s, d) => s + d.deal_value, 0))}
+                      {followUpIds.size} عميل | {formatMoney(deals.filter((d) => followUpIds.has(d.id)).reduce((s, d) => s + dv(d), 0))}
                     </span>
                   </>
                 )}
@@ -2544,7 +2551,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
         const remaining = total - closed;
         const rate = total > 0 ? Math.round((closed / total) * 100) : 0;
         const allDone = remaining === 0 && total > 0;
-        const closedValue = targetDeals.filter((d) => d.stage === "مكتملة").reduce((s, d) => s + d.deal_value, 0);
+        const closedValue = targetDeals.filter((d) => d.stage === "مكتملة").reduce((s, d) => s + dv(d), 0);
 
         const { h: hoursLeft, m: minutesLeft, s: secondsLeft, timeUp } = countdown;
 
@@ -2643,7 +2650,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
                 const name = d.assigned_rep_name!;
                 if (!repCount[name]) repCount[name] = { count: 0, value: 0 };
                 repCount[name].count++;
-                repCount[name].value += d.deal_value;
+                repCount[name].value += dv(d);
               });
               const sorted = Object.entries(repCount).sort((a, b) => b[1].count - a[1].count || b[1].value - a[1].value);
               const top3 = sorted.slice(0, 3);
@@ -3024,7 +3031,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
 
         {/* Tab: Full KPIs Dashboard */}
         <TabsContent value="kpis-full" className="space-y-6">
-          <SalesKPIsView deals={monthDeals} lostDeals={lostDeals} />
+          <SalesKPIsView deals={withVisibleAmounts(monthDeals)} lostDeals={withVisibleAmounts(lostDeals)} />
         </TabsContent>
 
         {/* Tab 2: Renewals link */}
@@ -3068,7 +3075,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
         {/* Tab: KPI مبيعات الدعم — support only */}
         {!isOffice && (
           <TabsContent value="sales-kpi" className="space-y-6">
-            <SalesKPIDashboard deals={deals} />
+            <SalesKPIDashboard deals={withVisibleAmounts(deals)} />
           </TabsContent>
         )}
       </Tabs>
