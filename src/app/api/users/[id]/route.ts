@@ -16,19 +16,26 @@ async function verifySuperAdmin() {
   return profile?.is_super_admin ? user : null;
 }
 
+/** المنظمات الإضافية: معرّفات نصية فقط، بدون المنظمة الأساسية وبدون تكرار. */
+function cleanExtraOrgs(v: unknown, orgId?: string): string[] {
+  if (!Array.isArray(v)) return [];
+  return [...new Set(v.filter((x): x is string => typeof x === "string" && !!x && x !== orgId))];
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const admin = await verifySuperAdmin();
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
   const { id } = await params;
   const body = await req.json();
-  const { name, email, org_id, allowed_pages, is_super_admin, password } = body;
+  const { name, email, org_id, allowed_pages, is_super_admin, password, extra_org_ids } = body;
 
   const profileUpdates: Record<string, unknown> = {};
   if (name !== undefined) profileUpdates.name = name;
   if (email !== undefined) profileUpdates.email = email;
   if (org_id !== undefined) profileUpdates.org_id = org_id;
   if (is_super_admin !== undefined) profileUpdates.is_super_admin = is_super_admin;
+  if (extra_org_ids !== undefined) profileUpdates.extra_org_ids = cleanExtraOrgs(extra_org_ids, org_id);
 
   // Update auth email and/or password if changed
   const authUpdates: Record<string, string> = {};

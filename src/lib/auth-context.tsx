@@ -102,32 +102,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }).then(() => {});
     }
 
+    // Load orgs — all for super admin; for others: own org + extra orgs granted in «إدارة المستخدمين»
+    const allowedOrgIds: string[] = [profile.org_id, ...((profile.extra_org_ids as string[] | null) ?? [])];
+    let orgQuery = supabase.from("organizations").select("id, name, name_ar").order("created_at");
+    if (!profile.is_super_admin) orgQuery = orgQuery.in("id", allowedOrgIds);
+    const { data: orgData } = await orgQuery;
+    if (orgData) {
+      setOrgs(orgData.map((o) => ({ id: o.id, name: o.name, nameAr: o.name_ar || o.name })));
+    }
+
     // Set org_id in localStorage for db.ts compatibility
     const orgId = localStorage.getItem("cc_org_id") || profile.org_id;
-    // Non-super-admin always uses their own org
-    const effectiveOrgId = profile.is_super_admin ? orgId : profile.org_id;
+    // Non-super-admin stays within their allowed orgs
+    const effectiveOrgId = profile.is_super_admin || allowedOrgIds.includes(orgId) ? orgId : profile.org_id;
     setActiveOrgId(effectiveOrgId);
     localStorage.setItem("cc_org_id", effectiveOrgId);
-
-    // Load orgs — all for super admin, own org for others
-    if (profile.is_super_admin) {
-      const { data: orgData } = await supabase
-        .from("organizations")
-        .select("id, name, name_ar")
-        .order("created_at");
-      if (orgData) {
-        setOrgs(orgData.map((o) => ({ id: o.id, name: o.name, nameAr: o.name_ar || o.name })));
-      }
-    } else {
-      const { data: orgData } = await supabase
-        .from("organizations")
-        .select("id, name, name_ar")
-        .eq("id", profile.org_id)
-        .single();
-      if (orgData) {
-        setOrgs([{ id: orgData.id, name: orgData.name, nameAr: orgData.name_ar || orgData.name }]);
-      }
-    }
 
     // استرجاع وضع «العرض كموظف» (للسوبر أدمن فقط) بعد ضبط المنظمة الافتراضية
     if (authUserData.isSuperAdmin && typeof sessionStorage !== "undefined") {

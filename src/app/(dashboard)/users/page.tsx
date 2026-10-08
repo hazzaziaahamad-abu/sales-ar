@@ -41,6 +41,7 @@ interface UserProfile {
   org_id: string;
   role_id: string;
   is_super_admin: boolean;
+  extra_org_ids?: string[] | null;
   roles: { id: string; name: string; slug: string; allowed_pages: string[] };
   organizations: { name: string; name_ar: string };
 }
@@ -80,6 +81,7 @@ export default function UsersPage() {
   const [userEmail, setUserEmail] = useState("");
   const [userPassword, setUserPassword] = useState("");
   const [userOrgId, setUserOrgId] = useState("");
+  const [userExtraOrgs, setUserExtraOrgs] = useState<string[]>([]);
   const [userPages, setUserPages] = useState<string[]>(["dashboard"]);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
@@ -143,6 +145,7 @@ export default function UsersPage() {
       setUserEmail(u.email);
       setUserPassword("");
       setUserOrgId(u.org_id);
+      setUserExtraOrgs(u.extra_org_ids ?? []);
       setUserPages(u.roles?.allowed_pages || ["dashboard"]);
     } else {
       setEditingUser(null);
@@ -150,6 +153,7 @@ export default function UsersPage() {
       setUserEmail("");
       setUserPassword("");
       setUserOrgId(orgs[0]?.id || "");
+      setUserExtraOrgs([]);
       setUserPages(["dashboard"]);
     }
     setDialogOpen(true);
@@ -163,6 +167,7 @@ export default function UsersPage() {
       name: userName,
       email: userEmail,
       org_id: userOrgId,
+      extra_org_ids: userExtraOrgs.filter((id) => id !== userOrgId),
       allowed_pages: userPages,
     };
 
@@ -463,6 +468,32 @@ export default function UsersPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* منظمات إضافية: يقدر يتنقّل لها من القائمة الجانبية */}
+            {orgs.some((o) => o.id !== userOrgId) && (
+              <div className="space-y-1.5">
+                <Label>منظمات إضافية يقدر يفتحها</Label>
+                <div className="flex flex-wrap gap-2">
+                  {orgs.filter((o) => o.id !== userOrgId).map((o) => {
+                    const on = userExtraOrgs.includes(o.id);
+                    return (
+                      <button
+                        key={o.id}
+                        type="button"
+                        onClick={() => setUserExtraOrgs((prev) => (on ? prev.filter((x) => x !== o.id) : [...prev, o.id]))}
+                        className={cn(
+                          "flex items-center gap-1.5 rounded-[14px] border px-3 py-2 text-xs font-medium transition-all",
+                          on ? "bg-cyan/15 border-cyan/30 text-cyan" : "bg-white/[0.02] border-border text-muted-foreground hover:bg-white/[0.04]"
+                        )}
+                      >
+                        {on && <Check className="w-3.5 h-3.5" />}
+                        {o.nameAr}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Page permissions — directly in user dialog */}
             <div className="space-y-2">

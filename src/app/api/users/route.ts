@@ -16,6 +16,12 @@ async function verifySuperAdmin() {
   return profile?.is_super_admin ? user : null;
 }
 
+/** المنظمات الإضافية: معرّفات نصية فقط، بدون المنظمة الأساسية وبدون تكرار. */
+function cleanExtraOrgs(v: unknown, orgId?: string): string[] {
+  if (!Array.isArray(v)) return [];
+  return [...new Set(v.filter((x): x is string => typeof x === "string" && !!x && x !== orgId))];
+}
+
 export async function GET() {
   const admin = await verifySuperAdmin();
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
@@ -34,7 +40,7 @@ export async function POST(req: NextRequest) {
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
   const body = await req.json();
-  const { email, password, name, org_id, allowed_pages, is_super_admin } = body;
+  const { email, password, name, org_id, allowed_pages, is_super_admin, extra_org_ids } = body;
 
   if (!email || !password || !name || !org_id || !allowed_pages?.length) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -95,6 +101,7 @@ export async function POST(req: NextRequest) {
       org_id,
       role_id: role.id,
       is_super_admin: is_super_admin || false,
+      extra_org_ids: cleanExtraOrgs(extra_org_ids, org_id),
     })
     .select("*, roles(id, name, slug, allowed_pages), organizations(name, name_ar)")
     .single();

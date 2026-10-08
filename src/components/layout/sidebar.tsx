@@ -219,8 +219,8 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             </button>
           </div>
 
-          {/* Org switcher — super admin only */}
-          {isSuperAdmin && orgs.length > 0 ? (
+          {/* Org switcher — super admin, or users granted more than one org */}
+          {(isSuperAdmin && orgs.length > 0) || orgs.length > 1 ? (
             <div className="mt-3 relative">
               <button
                 onClick={() => setOrgMenuOpen((v) => !v)}
