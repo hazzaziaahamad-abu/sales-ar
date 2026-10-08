@@ -28,7 +28,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { id } = await params;
   const body = await req.json();
-  const { name, email, org_id, allowed_pages, is_super_admin, password, extra_org_ids } = body;
+  const { name, email, org_id, allowed_pages, is_super_admin, password, extra_org_ids, is_active } = body;
 
   const profileUpdates: Record<string, unknown> = {};
   if (name !== undefined) profileUpdates.name = name;
@@ -36,6 +36,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (org_id !== undefined) profileUpdates.org_id = org_id;
   if (is_super_admin !== undefined) profileUpdates.is_super_admin = is_super_admin;
   if (extra_org_ids !== undefined) profileUpdates.extra_org_ids = cleanExtraOrgs(extra_org_ids, org_id);
+
+  // إيقاف/تفعيل الحساب: نحظر الدخول في Supabase Auth (يمنع تسجيل الدخول وتجديد الجلسة)
+  if (typeof is_active === "boolean") {
+    if (!is_active && id === admin.id) {
+      return NextResponse.json({ error: "ما تقدر توقف حسابك" }, { status: 400 });
+    }
+    const { error: banError } = await supabaseAdmin.auth.admin.updateUserById(id, {
+      ban_duration: is_active ? "none" : "876000h",
+    });
+    if (banError) return NextResponse.json({ error: banError.message }, { status: 500 });
+    profileUpdates.is_active = is_active;
+  }
 
   // Update auth email and/or password if changed
   const authUpdates: Record<string, string> = {};

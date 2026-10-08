@@ -22,7 +22,9 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
-      setError("البريد الإلكتروني أو كلمة المرور غير صحيحة");
+      setError(error.code === "user_banned" || /banned/i.test(error.message)
+        ? "حسابك موقوف — تواصل مع المدير"
+        : "البريد الإلكتروني أو كلمة المرور غير صحيحة");
       setLoading(false);
       return;
     }

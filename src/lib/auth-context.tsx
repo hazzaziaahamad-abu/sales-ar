@@ -75,6 +75,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // حساب موقوف من «إدارة المستخدمين»: نطلّعه حتى لو جلسته القديمة لسا صالحة
+    if (profile.is_active === false) {
+      await supabase.auth.signOut();
+      setRealUser(null);
+      setLoading(false);
+      router.push("/login");
+      return;
+    }
+
     const role = profile.roles as { id: string; name: string; slug: string; allowed_pages: string[] };
 
     const authUserData: AuthUser = {
@@ -135,7 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     setLoading(false);
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     loadUser();

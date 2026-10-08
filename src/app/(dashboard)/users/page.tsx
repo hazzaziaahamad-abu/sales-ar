@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
-import { Shield, Plus, Pencil, Trash2, ChevronDown, Link2, Share2, MessageCircle, Mail, Copy, Check, LogIn } from "lucide-react";
+import { Shield, Plus, Pencil, Trash2, ChevronDown, Link2, Share2, MessageCircle, Mail, Copy, Check, LogIn, Power } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,6 +42,7 @@ interface UserProfile {
   role_id: string;
   is_super_admin: boolean;
   extra_org_ids?: string[] | null;
+  is_active?: boolean | null;
   roles: { id: string; name: string; slug: string; allowed_pages: string[] };
   organizations: { name: string; name_ar: string };
 }
@@ -196,6 +197,22 @@ export default function UsersPage() {
     setSaving(false);
   }
 
+  // إيقاف/تفعيل حساب الموظف
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  async function toggleActive(u: UserProfile) {
+    const active = u.is_active !== false;
+    if (active && !window.confirm(`إيقاف حساب ${u.name}؟ ما راح يقدر يدخل المنصة لين تفعّله مرة ثانية.`)) return;
+    setTogglingId(u.id);
+    const res = await fetch(`/api/users/${u.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ is_active: !active }),
+    });
+    if (res.ok) fetchData();
+    else window.alert((await res.json().catch(() => ({}))).error || "تعذّر تغيير حالة الحساب");
+    setTogglingId(null);
+  }
+
   async function handleDelete() {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -265,6 +282,9 @@ export default function UsersPage() {
                         {u.is_super_admin && (
                           <Badge variant="outline" className="text-[12px] border-cyan/30 text-cyan">مدير عام</Badge>
                         )}
+                        {u.is_active === false && (
+                          <Badge variant="outline" className="text-[12px] border-red-500/30 text-red-400">موقوف</Badge>
+                        )}
                       </div>
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                         <span className="text-[13px] text-muted-foreground">{u.email}</span>
@@ -323,6 +343,17 @@ export default function UsersPage() {
                           onClick={(e) => { e.stopPropagation(); enterAsUser(u); }}
                         >
                           <LogIn className="w-3.5 h-3.5 text-amber-400" />
+                        </Button>
+                      )}
+                      {u.id !== user?.id && (
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          disabled={togglingId === u.id}
+                          title={u.is_active === false ? "تفعيل الحساب" : "إيقاف الحساب"}
+                          onClick={(e) => { e.stopPropagation(); toggleActive(u); }}
+                        >
+                          <Power className={cn("w-3.5 h-3.5", u.is_active === false ? "text-emerald-400" : "text-red-400")} />
                         </Button>
                       )}
                       <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); openDialog(u); }}>
