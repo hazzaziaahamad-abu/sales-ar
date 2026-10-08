@@ -69,6 +69,16 @@ const FOLLOWUP_BANNER_PATHS = new Set<string>([
   "/sales-guide",
 ]);
 
+/** المنشنات اللي تنعرض: كل غير المقروء من آخر 7 أيام (عشان اللي غاب يوم أو ويكند ما يضيع عليه شي) + المقروء من آخر 24 ساعة */
+const MENTION_UNREAD_DAYS = 7;
+function visibleMentions(mentions: MentionNotification[]): MentionNotification[] {
+  const now = Date.now();
+  return mentions.filter((m) => {
+    const age = now - new Date(m.created_at).getTime();
+    return age < 24 * 60 * 60 * 1000 || (!m.is_read && age < MENTION_UNREAD_DAYS * 24 * 60 * 60 * 1000);
+  });
+}
+
 function MentionNotifLoader({ onLoad, onMentions }: { onLoad: (n: AppNotification[]) => void; onMentions: (m: MentionNotification[]) => void }) {
   const { user } = useAuth();
   const pathname = usePathname();
@@ -95,8 +105,7 @@ function MentionNotifLoader({ onLoad, onMentions }: { onLoad: (n: AppNotificatio
   const loadMentions = useCallback(() => {
     if (!user?.name) return;
     fetchMentionNotifications(user.name).then((mentions) => {
-      const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
-      const recent = mentions.filter((m) => new Date(m.created_at).getTime() > oneDayAgo);
+      const recent = visibleMentions(mentions);
       onMentions(recent);
       const notifs = buildAppNotifs(recent);
       if (notifs.length > 0) onLoad(notifs);
@@ -129,7 +138,7 @@ function MentionNotifLoader({ onLoad, onMentions }: { onLoad: (n: AppNotificatio
         (payload) => {
           const m = payload.new as MentionNotification;
           // Re-fetch to keep list consistent (simpler than managing prev state across closure)
-          if (user?.name) fetchMentionNotifications(user.name).then(onMentions).catch(console.error);
+          if (user?.name) fetchMentionNotifications(user.name).then((all) => onMentions(visibleMentions(all))).catch(console.error);
           const notif: AppNotification = {
             id: `mention-${m.id}`,
             type: "mention",
@@ -232,7 +241,7 @@ function MentionAlertBanner({ mentions, onRefresh }: { mentions: MentionNotifica
           </div>
           <div>
             <p className="text-sm font-bold text-foreground">
-              منشنات آخر 24 ساعة ({mentions.length})
+              منشناتك ({mentions.length})
               {unreadCount > 0 && <span className="text-amber-400 mr-2">— {unreadCount} جديد</span>}
             </p>
             <p className="text-[12px] text-muted-foreground">موظفين أشاروا إليك في سجل المتابعة</p>
@@ -843,6 +852,10 @@ export default function DashboardLayout({
           />
           <main className="px-4 sm:px-6 pb-8 pt-5">
             <AuthGate>
+              {/* المنشن غير المقروء يطلع في كل الصفحات — مو بس صفحات المتابعة */}
+              {!showFollowupBanners && recentMentions.some((m) => !m.is_read) && (
+                <MentionAlertBanner mentions={recentMentions.filter((m) => !m.is_read)} onRefresh={() => {}} />
+              )}
               {showFollowupBanners && (
                 <>
                   <MentionAlertBanner mentions={recentMentions} onRefresh={() => {}} />
