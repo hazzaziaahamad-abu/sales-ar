@@ -536,9 +536,9 @@ export default function DailyHuddlePage() {
 function DailyHuddleTabs() {
   // ?tab=verify — رابط مباشر لتبويب (مثلاً من رسالة واتساب لطلب تحقق)
   const searchParams = useSearchParams();
-  const { user } = useAuth();
-  // «البذور» للمدير ومنال فقط
-  const tabs = TABS.filter((t) => t.key !== "ideas" || canUseIdeas(user));
+  const { user, isImpersonating } = useAuth();
+  // «البذور» و«التحديات والطلبات والتطويرات» للمدير ومنال فقط
+  const tabs = TABS.filter((t) => (t.key !== "ideas" && t.key !== "challenges") || canUseIdeas(user));
   const initialTab = tabs.find((t) => t.key === searchParams.get("tab"))?.key ?? "team";
   const [tab, setTab] = useState<TabKey>(initialTab);
   const [verifyPending, setVerifyPending] = useState(0);
@@ -552,12 +552,14 @@ function DailyHuddleTabs() {
       .then((d) => {
         if (!d?.me) return;
         const list = (d.requests ?? []) as { status: string; assignee_id: string }[];
-        setVerifyPending(d.me.isManager
+        // «الدخول كموظف»: نحسب على الموظف المعروض لا على جلسة الأدمن
+        const me = isImpersonating && user ? { id: user.id, isManager } : d.me;
+        setVerifyPending(me.isManager
           ? list.filter((x) => x.status === "answered").length
-          : list.filter((x) => x.status === "pending" && x.assignee_id === d.me.id).length);
+          : list.filter((x) => x.status === "pending" && x.assignee_id === me.id).length);
       })
       .catch(() => undefined);
-  }, []);
+  }, [isImpersonating, user, isManager]);
 
   return (
     <div className="space-y-5">
@@ -567,7 +569,7 @@ function DailyHuddleTabs() {
         </div>
         <div>
           <h1 className="text-lg font-bold text-foreground">المتابعة اليومية</h1>
-          <p className="text-xs text-muted-foreground">الفريق · جودة الاستهداف · بوصلة اليوم · تأكيدات المبيعات · طلبات التحقق · صحة الأقسام · نشاط الفريق · التحديات والطلبات</p>
+          <p className="text-xs text-muted-foreground">الفريق · جودة الاستهداف · بوصلة اليوم · تأكيدات المبيعات · طلبات التحقق · صحة الأقسام · نشاط الفريق{canUseIdeas(user) ? " · التحديات والطلبات" : ""}</p>
         </div>
         {huddleManagers.isOwner && (
           <div className="mr-auto">
@@ -603,7 +605,7 @@ function DailyHuddleTabs() {
       {tab === "verify" && <VerificationsBoard onPendingChange={setVerifyPending} />}
       {tab === "health" && <SecretaryView embedded sections={["hotCold", "supportHealth", "renewalHealth"]} />}
       {tab === "activity" && <RecentUpdatesView embedded tabs={["updates", "log"]} />}
-      {tab === "challenges" && <ChallengesTab />}
+      {tab === "challenges" && canUseIdeas(user) && <ChallengesTab />}
       {tab === "ideas" && canUseIdeas(user) && <IdeasGarden />}
     </div>
   );

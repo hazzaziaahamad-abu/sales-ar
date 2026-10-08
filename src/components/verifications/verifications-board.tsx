@@ -7,6 +7,8 @@ import {
   AlertTriangle, Clock, UserRound, CalendarPlus, ExternalLink,
 } from "lucide-react";
 import { fetchEmployees, fetchUserProfiles } from "@/lib/supabase/db";
+import { useAuth } from "@/lib/auth-context";
+import { useHuddleManagers } from "@/lib/huddle-managers";
 import { formatMoneyFull, todayLocal } from "@/lib/utils/format";
 import {
   TEMPLATES, TEMPLATE_KEYS, GENERAL, usesDays, scopeOptions, scopeTitle, repLabel, REP_ALL, REP_NONE, STATUS_LABELS, progressOf, updatePageOf,
@@ -37,7 +39,7 @@ const titleOf = (r: VerificationRequest) =>
 
 export function VerificationsBoard({ onPendingChange }: { onPendingChange?: (n: number) => void }) {
   const [requests, setRequests] = useState<VerificationRequest[]>([]);
-  const [me, setMe] = useState<{ id: string; isManager: boolean } | null>(null);
+  const [apiMe, setMe] = useState<{ id: string; isManager: boolean } | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
@@ -67,12 +69,24 @@ export function VerificationsBoard({ onPendingChange }: { onPendingChange?: (n: 
       .catch(() => undefined);
   }, []);
 
+  // «الدخول كموظف»: الـAPI يرجع بجلسة الأدمن، فنعرض فقط اللي يخص الموظف المعروض
+  const { user, isImpersonating } = useAuth();
+  const { isManager: viewAsManager } = useHuddleManagers();
+  const me = useMemo(
+    () => (isImpersonating && user ? { id: user.id, isManager: viewAsManager } : apiMe),
+    [isImpersonating, user, viewAsManager, apiMe],
+  );
+  const shown = useMemo(
+    () => (me && !me.isManager ? requests.filter((r) => r.assignee_id === me.id) : requests),
+    [requests, me],
+  );
+
   const pendingForMe = useMemo(() => {
     if (!me) return 0;
     return me.isManager
-      ? requests.filter((r) => r.status === "answered").length
-      : requests.filter((r) => r.status === "pending" && r.assignee_id === me.id).length;
-  }, [requests, me]);
+      ? shown.filter((r) => r.status === "answered").length
+      : shown.filter((r) => r.status === "pending" && r.assignee_id === me.id).length;
+  }, [shown, me]);
   useEffect(() => { onPendingChange?.(pendingForMe); }, [pendingForMe, onPendingChange]);
 
   function flash(msg: string, ok = true) {
@@ -109,7 +123,7 @@ export function VerificationsBoard({ onPendingChange }: { onPendingChange?: (n: 
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(lines.join("\n"))}`, "_blank");
   }
 
-  const visible = requests.filter((r) => (filter === "reviewed" ? r.status === "reviewed" : r.status !== "reviewed"));
+  const visible = shown.filter((r) => (filter === "reviewed" ? r.status === "reviewed" : r.status !== "reviewed"));
   const isManager = !!me?.isManager;
 
   return (
