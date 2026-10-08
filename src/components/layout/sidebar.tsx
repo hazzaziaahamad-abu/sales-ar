@@ -51,12 +51,15 @@ import {
   Ticket,
   CalendarDays,
   Trophy,
+  Siren,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
-import { countPendingDeals } from "@/lib/supabase/db";
+import { countPendingDeals, countUrgentFollowupDeals } from "@/lib/supabase/db";
 
 export const NAV_ITEMS = [
+  // هام جداً — ظاهرة لكل الموظفين دائماً (بدون صلاحية) عشان ما تضيع متابعة انتظار الدفع / التجريبي / التجهيز
+  { label: "هام جداً للمتابعة اليومية", href: "/urgent-followup", slug: "urgent-followup", icon: Siren, color: "red", group: "عام", alwaysVisible: true, urgent: true },
   { label: "المتابعة اليومية", href: "/daily-huddle", slug: "daily-huddle", icon: CalendarCheck, color: "violet", group: "عام" },
   { label: "نظرة عامة", href: "/dashboard", slug: "dashboard", icon: LayoutDashboard, color: "cyan", group: "عام" },
   { label: "غرفة العمليات", href: "/operations", slug: "operations", icon: BrainCircuit, color: "violet", group: "عام" },
@@ -144,6 +147,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const { user, loading, signOut, activeOrgId, switchOrg, orgs } = useAuth();
   const [orgMenuOpen, setOrgMenuOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
+  const [urgentCount, setUrgentCount] = useState(0);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
 
   const toggleGroup = (group: string) => {
@@ -156,11 +160,23 @@ export function Sidebar({ open, onClose }: SidebarProps) {
     return () => clearInterval(id);
   }, [activeOrgId]);
 
+  // الموظف يشوف عدد صفقاته فقط، المدير يشوف عدد الكل
+  const isAdminUser = user?.isSuperAdmin || user?.roleName === "مدير" || user?.roleName === "admin";
+  const urgentRepName = isAdminUser ? undefined : user?.name;
+  useEffect(() => {
+    if (!user) return;
+    const load = () => countUrgentFollowupDeals(urgentRepName).then(setUrgentCount).catch(() => {});
+    load();
+    const id = setInterval(load, 60000);
+    return () => clearInterval(id);
+  }, [activeOrgId, user, urgentRepName]);
+
   const isSuperAdmin = user?.isSuperAdmin ?? false;
 
   // Filter nav items by user permissions
   const visibleItems = NAV_ITEMS.filter((item) => {
     if (isSuperAdmin) return true;
+    if ((item as { alwaysVisible?: boolean }).alwaysVisible) return !!user;
     return user?.allowedPages.includes(item.slug);
   });
 
@@ -315,6 +331,34 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                     const Icon = item.icon;
                     const c = COLOR_MAP[item.color] || COLOR_MAP.cyan;
                     const isExternal = (item as { external?: boolean }).external === true;
+
+                    if ((item as { urgent?: boolean }).urgent) {
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={onClose}
+                          className={cn(
+                            "group relative flex items-center gap-3.5 overflow-hidden rounded-[12px] px-3.5 py-3 text-[14px] transition-all duration-200 border",
+                            isActive
+                              ? "bg-red-500/25 border-red-500/60 text-foreground font-bold shadow-[0_0_24px_rgba(239,68,68,0.35)]"
+                              : "bg-red-500/10 border-red-500/40 text-red-300 hover:bg-red-500/20 hover:text-foreground"
+                          )}
+                        >
+                          <span className="absolute inset-y-2 right-0.5 w-[3px] rounded-full bg-gradient-to-b from-red-400 via-red-500 to-red-600" />
+                          <span className="relative flex h-10 w-10 items-center justify-center rounded-[14px] bg-red-500 text-white ring-2 ring-red-400/50">
+                            {urgentCount > 0 && <span className="absolute inset-0 rounded-[14px] bg-red-500 animate-ping opacity-40" />}
+                            <Icon className="relative w-5 h-5" />
+                          </span>
+                          <span className="flex-1 font-bold leading-tight">{item.label}</span>
+                          {urgentCount > 0 && (
+                            <span className="min-w-[24px] h-[24px] flex items-center justify-center rounded-full bg-red-600 text-white text-[13px] font-extrabold px-1.5 ring-2 ring-red-300/40 animate-pulse">
+                              {urgentCount}
+                            </span>
+                          )}
+                        </Link>
+                      );
+                    }
 
                     return (
                       <Link

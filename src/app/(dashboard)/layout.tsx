@@ -23,6 +23,8 @@ import { CCThemeProvider } from "@/lib/theme-context";
 import { saudiDateStr } from "@/lib/utils/format";
 import { PageTracker } from "@/components/layout/page-tracker";
 
+const ALWAYS_ALLOWED_SLUGS = ["urgent-followup"];
+
 const PAGE_SLUG_MAP: Record<string, string> = {
   "/dashboard": "dashboard",
   "/sales": "sales",
@@ -370,6 +372,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!loading && user && !user.isSuperAdmin) {
       const slug = PAGE_SLUG_MAP[pathname] || pathname.split("/")[1];
+      // صفحات مفتوحة لكل الموظفين بدون صلاحية
+      if (slug && ALWAYS_ALLOWED_SLUGS.includes(slug)) return;
       if (slug && !user.allowedPages.includes(slug)) {
         const firstAllowed = user.allowedPages[0] || "dashboard";
         router.replace(`/${firstAllowed}`);
