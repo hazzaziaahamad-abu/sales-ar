@@ -524,6 +524,7 @@ const TABS = [
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
+const MANAL_ONLY_TABS: TabKey[] = ["health", "activity", "challenges", "ideas"];
 
 export default function DailyHuddlePage() {
   return (
@@ -537,8 +538,8 @@ function DailyHuddleTabs() {
   // ?tab=verify — رابط مباشر لتبويب (مثلاً من رسالة واتساب لطلب تحقق)
   const searchParams = useSearchParams();
   const { user, isImpersonating } = useAuth();
-  // «البذور» و«التحديات والطلبات والتطويرات» للمدير ومنال فقط
-  const tabs = TABS.filter((t) => (t.key !== "ideas" && t.key !== "challenges") || canUseIdeas(user));
+  // «البذور» و«صحة الأقسام» و«نشاط الفريق» و«التحديات والطلبات والتطويرات» للمدير ومنال فقط
+  const tabs = TABS.filter((t) => !MANAL_ONLY_TABS.includes(t.key) || canUseIdeas(user));
   const initialTab = tabs.find((t) => t.key === searchParams.get("tab"))?.key ?? "team";
   const [tab, setTab] = useState<TabKey>(initialTab);
   const [verifyPending, setVerifyPending] = useState(0);
@@ -569,7 +570,7 @@ function DailyHuddleTabs() {
         </div>
         <div>
           <h1 className="text-lg font-bold text-foreground">المتابعة اليومية</h1>
-          <p className="text-xs text-muted-foreground">الفريق · جودة الاستهداف · بوصلة اليوم · تأكيدات المبيعات · طلبات التحقق · صحة الأقسام · نشاط الفريق{canUseIdeas(user) ? " · التحديات والطلبات" : ""}</p>
+          <p className="text-xs text-muted-foreground">الفريق · جودة الاستهداف · بوصلة اليوم · تأكيدات المبيعات · طلبات التحقق{canUseIdeas(user) ? " · صحة الأقسام · نشاط الفريق · التحديات والطلبات" : ""}</p>
         </div>
         {huddleManagers.isOwner && (
           <div className="mr-auto">
@@ -603,8 +604,8 @@ function DailyHuddleTabs() {
       {tab === "compass" && <SecretaryView embedded sections={["compass", "yesterday", "priorities", "tasks", "quickTasks"]} />}
       {tab === "confirmations" && <SalesConfirmations canConfirm={isManager} />}
       {tab === "verify" && <VerificationsBoard onPendingChange={setVerifyPending} />}
-      {tab === "health" && <SecretaryView embedded sections={["hotCold", "supportHealth", "renewalHealth"]} />}
-      {tab === "activity" && <RecentUpdatesView embedded tabs={["updates", "log"]} />}
+      {tab === "health" && canUseIdeas(user) && <SecretaryView embedded sections={["hotCold", "supportHealth", "renewalHealth"]} />}
+      {tab === "activity" && canUseIdeas(user) && <RecentUpdatesView embedded tabs={["updates", "log"]} />}
       {tab === "challenges" && canUseIdeas(user) && <ChallengesTab />}
       {tab === "ideas" && canUseIdeas(user) && <IdeasGarden />}
     </div>
