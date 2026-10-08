@@ -524,7 +524,7 @@ const TABS = [
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
-const MANAL_ONLY_TABS: TabKey[] = ["health", "activity", "challenges", "ideas"];
+const MANAL_ONLY_TABS: TabKey[] = ["compass", "health", "activity", "challenges", "ideas"];
 
 export default function DailyHuddlePage() {
   return (
@@ -538,7 +538,7 @@ function DailyHuddleTabs() {
   // ?tab=verify — رابط مباشر لتبويب (مثلاً من رسالة واتساب لطلب تحقق)
   const searchParams = useSearchParams();
   const { user, isImpersonating } = useAuth();
-  // «البذور» و«صحة الأقسام» و«نشاط الفريق» و«التحديات والطلبات والتطويرات» للمدير ومنال فقط
+  // «البذور» و«بوصلة اليوم» و«صحة الأقسام» و«نشاط الفريق» و«التحديات والطلبات والتطويرات» للمدير ومنال فقط
   const tabs = TABS.filter((t) => !MANAL_ONLY_TABS.includes(t.key) || canUseIdeas(user));
   const initialTab = tabs.find((t) => t.key === searchParams.get("tab"))?.key ?? "team";
   const [tab, setTab] = useState<TabKey>(initialTab);
@@ -570,7 +570,7 @@ function DailyHuddleTabs() {
         </div>
         <div>
           <h1 className="text-lg font-bold text-foreground">المتابعة اليومية</h1>
-          <p className="text-xs text-muted-foreground">الفريق · جودة الاستهداف · بوصلة اليوم · تأكيدات المبيعات · طلبات التحقق{canUseIdeas(user) ? " · صحة الأقسام · نشاط الفريق · التحديات والطلبات" : ""}</p>
+          <p className="text-xs text-muted-foreground">الفريق · جودة الاستهداف · تأكيدات المبيعات · طلبات التحقق{canUseIdeas(user) ? " · بوصلة اليوم · صحة الأقسام · نشاط الفريق · التحديات والطلبات" : ""}</p>
         </div>
         {huddleManagers.isOwner && (
           <div className="mr-auto">
@@ -601,7 +601,7 @@ function DailyHuddleTabs() {
 
       {tab === "team" && <TeamTodayTab isManager={isManager} />}
       {tab === "quality" && <TargetingQualityTab isManager={isManager} />}
-      {tab === "compass" && <SecretaryView embedded sections={["compass", "yesterday", "priorities", "tasks", "quickTasks"]} />}
+      {tab === "compass" && canUseIdeas(user) && <SecretaryView embedded sections={["compass", "yesterday", "priorities", "tasks", "quickTasks"]} />}
       {tab === "confirmations" && <SalesConfirmations canConfirm={isManager} />}
       {tab === "verify" && <VerificationsBoard onPendingChange={setVerifyPending} />}
       {tab === "health" && canUseIdeas(user) && <SecretaryView embedded sections={["hotCold", "supportHealth", "renewalHealth"]} />}
