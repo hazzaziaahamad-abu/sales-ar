@@ -35,6 +35,12 @@ const TOPIC_OPTIONS = [
   { key: "followup", title: "المتابعة" },
   { key: "discounts", title: "الخصومات" },
   { key: "cashier_pos", title: "نظام الكاشير (POS)" },
+  { key: "res_booking_system", title: "نحجز — شرح نظام الحجوزات" },
+  { key: "res_no_show", title: "نحجز — عدم الحضور" },
+  { key: "res_paper_to_digital", title: "نحجز — من الدفتر للنظام" },
+  { key: "res_hesitant", title: "نحجز — العميل المتردد" },
+  { key: "res_loyalty", title: "نحجز — الهدايا والولاء" },
+  { key: "res_contact_flow", title: "نحجز — تسلسل الاتصال" },
   { key: "_product_knowledge", title: "المعرفة العامة بالمنتج" },
   { key: "_system_wrapper", title: "قواعد سلوك المدرب AI" },
 ];
