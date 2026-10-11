@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Marhey } from "next/font/google";
-import { Heart, Search, Trash2, X, Loader2, Dices, Sparkles, GripVertical } from "lucide-react";
+import { Heart, Search, Trash2, X, Loader2, Dices, Sparkles, GripVertical, Check, CalendarClock, Plus, Rocket } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { STICKER_KINDS, stickerKind, type IdeaSticker, type StickerKind } from "@/lib/idea-stickers";
+import { STICKER_KINDS, stickerKind, timelineOf, type IdeaSticker, type StickerKind, type TimelineStep } from "@/lib/idea-stickers";
 
 // خط يدوي مرح للاستكرات — يعطي إحساس الكتابة بالقلم على ورق لاصق.
 const hand = Marhey({ subsets: ["arabic"], weight: ["400", "600", "700"], display: "swap", variable: "--font-hand" });
@@ -127,6 +127,29 @@ const CSS = `
   .ib-grid .ib-tape { width:62px; height:20px; }
   .ib-pad { width:auto; height:40px; padding:0 14px; font-size:12px; }
 }
+/* ─── تقدّم التنفيذ على الاستكر ─── */
+.ib-prog { display:inline-flex; align-items:center; gap:4px; padding:2px 7px; border-radius:999px; background:rgba(255,255,255,.55); font-weight:700; white-space:nowrap; }
+.ib-prog.ib-late { background:#fee2e2; color:#b91c1c; }
+.ib-prog.ib-done { background:#d1fae5; color:#065f46; }
+.ib-meter { width:26px; height:4px; border-radius:99px; background:rgba(0,0,0,.12); overflow:hidden; }
+.ib-meter > i { display:block; height:100%; border-radius:inherit; background:currentColor; }
+@media (max-width: 640px) { .ib-grid .ib-meter { display:none; } }
+
+/* ─── تايم لاين التنفيذ (نافذة الفكرة) ─── */
+.tl-row { position:relative; display:flex; gap:12px; padding-bottom:16px; }
+.tl-row:last-child { padding-bottom:0; }
+.tl-row::before { content:""; position:absolute; top:28px; bottom:-2px; right:13px; width:2px; background:rgba(255,255,255,.09); }
+.tl-row:last-child::before { display:none; }
+.tl-row.tl-done::before { background:#059669; }
+.tl-dot { position:relative; z-index:1; flex-shrink:0; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  border:2px solid rgba(255,255,255,.18); background:rgba(255,255,255,.03); color:#fff; transition: transform .15s ease, background .2s ease; }
+.tl-done .tl-dot { background:#059669; border-color:#059669; }
+.tl-next .tl-dot { border-color:#60a5fa; box-shadow:0 0 0 4px rgba(96,165,250,.15); }
+button.tl-dot:not(:disabled):hover { transform:scale(1.1); }
+.tl-del { opacity:0; transition:opacity .15s; }
+.tl-row:hover .tl-del { opacity:.6; }
+@media (hover:none) { .tl-del { opacity:.45; } }
+
 .ib-cta { background: linear-gradient(135deg, #facc15, #f472b6 55%, #34d399); color:#1e1b16; }
 .ib-cta:hover { filter: brightness(1.08) saturate(1.1); }
 `;
@@ -235,6 +258,17 @@ export function IdeasBoard() {
     const json = await res.json().catch(() => ({}));
     if (res.ok) replace(json.sticker);
     else replace(s);
+  };
+
+  /** تحديث تايم لاين التنفيذ — يرجع الاستكر المحدّث ويحدّث اللوحة والنافذة. */
+  const updateTimeline = async (id: string, body: Record<string, unknown>) => {
+    const res = await fetch(`/api/idea-stickers/${id}/timeline`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.error || "تعذّر تحديث التنفيذ");
+    replace(json.sticker);
+    setOpen((o) => (o?.id === id ? json.sticker : o));
   };
 
   // ─── السحب والإفلات: الترتيب يتغير مباشرة أثناء السحب ويُحفظ عند الإفلات ───
@@ -469,12 +503,14 @@ export function IdeasBoard() {
                         {s.created_by_name && (
                           <>
                             <span className="ib-avatar">{initial(s.created_by_name)}</span>
-                            <span className="opacity-70 truncate max-w-[90px]">{s.created_by_name}</span>
+                            <span className="opacity-70 truncate max-w-[70px] ml-auto">{s.created_by_name}</span>
                           </>
                         )}
+                        {!s.created_by_name && <span className="ml-auto" />}
+                        <ProgressChip sticker={s} />
                         <button
                           onClick={(e) => { e.stopPropagation(); toggleLike(s); }}
-                          className={cn("ib-like mr-auto", liked && "ib-on")}
+                          className={cn("ib-like", liked && "ib-on")}
                           title={liked ? "إلغاء الإعجاب" : "أعجبتني"}
                         >
                           <Heart className={cn("w-3.5 h-3.5", liked ? "fill-rose-500 text-rose-500" : "opacity-60")} />
@@ -502,6 +538,7 @@ export function IdeasBoard() {
           onClose={() => setOpen(null)}
           onSave={async (d) => { await save(open.id, d); setOpen(null); }}
           onDelete={() => remove(open.id)}
+          onTimeline={(body) => updateTimeline(open.id, body)}
         />
       )}
     </div>
@@ -571,9 +608,10 @@ function EmptyBoard({ filtering }: { filtering: boolean }) {
 
 // ─── نافذة الاستكر: نفس الشكل بحجم أكبر، والكتابة عليه مباشرة ─────────────────
 
-function StickerDialog({ sticker, canEdit, liked, onLike, onClose, onSave, onDelete }: {
+function StickerDialog({ sticker, canEdit, liked, onLike, onClose, onSave, onDelete, onTimeline }: {
   sticker: IdeaSticker; canEdit: boolean; liked: boolean; onLike: () => void;
   onClose: () => void; onSave: (d: Draft) => Promise<void>; onDelete: () => void;
+  onTimeline: (body: Record<string, unknown>) => Promise<void>;
 }) {
   const [form, setForm] = useState<Draft>({ kind: sticker.kind, tag: sticker.tag, title: sticker.title, body: sticker.body });
   const [saving, setSaving] = useState(false);
@@ -645,6 +683,164 @@ function StickerDialog({ sticker, canEdit, liked, onLike, onClose, onSave, onDel
                 <Trash2 className="w-3.5 h-3.5" /> حذف
               </button>
             </div>
+          )}
+        </div>
+
+        <TimelinePanel sticker={sticker} canEdit={canEdit} onTimeline={onTimeline} />
+      </div>
+    </div>
+  );
+}
+
+// ─── تايم لاين التنفيذ ────────────────────────────────────────────────────────
+
+const DAY = 86_400_000;
+const fmtStamp = (iso: string) =>
+  new Date(iso).toLocaleString("ar-SA-u-ca-gregory", { day: "numeric", month: "long", hour: "numeric", minute: "2-digit" });
+const fmtDate = (ymd: string) =>
+  new Date(`${ymd}T00:00:00`).toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "long", day: "numeric", month: "long" });
+const num = (n: number) => n.toLocaleString("ar-SA");
+const days = (n: number) => (n === 1 ? "يوم" : n === 2 ? "يومين" : `${num(n)} ${n <= 10 ? "أيام" : "يوم"}`);
+
+/** حالة الالتزام بالموعد: باقي / اليوم / متأخرة / تمت في الموعد / تمت متأخرة. */
+function dueStatus(due: string | null | undefined, steps: TimelineStep[]) {
+  if (!due) return null;
+  const end = new Date(`${due}T23:59:59`).getTime();
+  const allDone = steps.every((s) => s.done_at);
+  if (allDone) {
+    const finished = Math.max(...steps.map((s) => new Date(s.done_at!).getTime()));
+    const late = Math.ceil((finished - end) / DAY);
+    return late > 0
+      ? { tone: "late" as const, text: `اكتملت متأخرة ${days(late)}` }
+      : { tone: "ok" as const, text: "اكتملت في الموعد ✓" };
+  }
+  const left = Math.floor((end - Date.now()) / DAY);
+  if (left < 0) return { tone: "late" as const, text: `متأخرة ${days(-left)}` };
+  if (left === 0) return { tone: "warn" as const, text: "الموعد اليوم" };
+  return { tone: left <= 2 ? ("warn" as const) : ("ok" as const), text: `باقي ${days(left)}` };
+}
+
+function ProgressChip({ sticker }: { sticker: IdeaSticker }) {
+  const steps = timelineOf(sticker);
+  const done = steps.filter((s) => s.done_at).length;
+  if (done <= 1 && !sticker.due_at) return null; // فكرة لسا مطروحة فقط — لا نزحم الاستكر
+  const status = dueStatus(sticker.due_at, steps);
+  const complete = done === steps.length;
+  return (
+    <span className={cn("ib-prog", status?.tone === "late" && !complete && "ib-late", complete && "ib-done")} title={status?.text ?? "تقدّم التنفيذ"}>
+      {complete ? <Check className="w-3 h-3" /> : <Rocket className="w-3 h-3" />}
+      {num(done)}/{num(steps.length)}
+      {!complete && <span className="ib-meter"><i style={{ width: `${(done / steps.length) * 100}%` }} /></span>}
+    </span>
+  );
+}
+
+function TimelinePanel({ sticker, canEdit, onTimeline }: {
+  sticker: IdeaSticker; canEdit: boolean; onTimeline: (body: Record<string, unknown>) => Promise<void>;
+}) {
+  const steps = timelineOf(sticker);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [newStep, setNewStep] = useState("");
+  const done = steps.filter((s) => s.done_at).length;
+  const nextIdx = steps.findIndex((s) => !s.done_at);
+  const last = [...steps].filter((s) => s.done_at).sort((a, b) => b.done_at!.localeCompare(a.done_at!))[0];
+  const status = dueStatus(sticker.due_at, steps);
+
+  const run = async (tag: string, body: Record<string, unknown>) => {
+    setBusy(tag);
+    try { await onTimeline(body); } catch (e) { alert((e as Error).message); } finally { setBusy(null); }
+  };
+  const addStep = async () => {
+    const label = newStep.trim();
+    if (!label) return;
+    await run("add", { action: "add", label });
+    setNewStep("");
+  };
+
+  return (
+    <div className="w-[min(92vw,420px)] rounded-2xl glass-surface border border-border p-4 space-y-4 hover:translate-y-0 text-right">
+      {/* الحالة الحالية */}
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground mb-2">حالة التنفيذ</p>
+        <div className="flex items-center gap-3">
+          <span className={cn("w-2.5 h-2.5 rounded-full shrink-0", done === steps.length ? "bg-emerald-400" : "bg-blue-400")} />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-foreground truncate">{done === steps.length ? "اكتمل التنفيذ 🎉" : last ? last.label : "لم يبدأ"}</p>
+            {nextIdx >= 0 && <p className="text-[11px] text-muted-foreground truncate">التالي: {steps[nextIdx].label}</p>}
+          </div>
+          <span className="ib-hand text-xl font-bold text-foreground">{num(Math.round((done / steps.length) * 100))}٪</span>
+        </div>
+        <div className="mt-2.5 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+          <div className="h-full rounded-full bg-gradient-to-l from-emerald-400 to-emerald-600 transition-all duration-500" style={{ width: `${(done / steps.length) * 100}%` }} />
+        </div>
+      </div>
+
+      {/* خطوات التنفيذ */}
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground mb-3">خطوات التنفيذ</p>
+        <div className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-3.5">
+          {steps.map((s, i) => {
+            return (
+              <div key={s.key} className={cn("tl-row", s.done_at && "tl-done", i === nextIdx && "tl-next")}>
+                <button
+                  type="button"
+                  onClick={() => run(s.key, { action: "toggle", key: s.key })}
+                  disabled={!canEdit || !!busy}
+                  title={canEdit ? (s.done_at ? "تراجع عن الإنجاز" : "تم إنجاز الخطوة") : undefined}
+                  className={cn("tl-dot", !canEdit && "cursor-default")}
+                >
+                  {busy === s.key ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : s.done_at ? <Check className="w-4 h-4" strokeWidth={3} /> : null}
+                </button>
+                <div className="flex-1 min-w-0 pt-0.5">
+                  <p className={cn("text-sm font-bold", s.done_at || i === nextIdx ? "text-foreground" : "text-muted-foreground")}>{s.label}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    {s.done_at ? `${fmtStamp(s.done_at)}${s.done_by ? ` · ${s.done_by}` : ""}` : i === nextIdx ? "الخطوة الحالية" : "بانتظار التنفيذ"}
+                  </p>
+                </div>
+                {canEdit && steps.length > 1 && (
+                  <button onClick={() => { if (confirm(`حذف خطوة «${s.label}»؟`)) run(`del-${s.key}`, { action: "remove", key: s.key }); }}
+                    disabled={!!busy} className="tl-del self-start p-1 text-muted-foreground hover:text-red-400" title="حذف الخطوة">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+          {canEdit && (
+            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/[0.06]">
+              <input value={newStep} onChange={(e) => setNewStep(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addStep(); }}
+                placeholder="أضف خطوة..." maxLength={80}
+                className="flex-1 min-w-0 rounded-full bg-white/[0.04] border border-border px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-emerald-400/40" />
+              <button onClick={addStep} disabled={!newStep.trim() || !!busy}
+                className="p-1.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-400/25 disabled:opacity-40">
+                {busy === "add" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* الالتزام بموعد التنفيذ */}
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground mb-2">الالتزام بموعد التنفيذ</p>
+        <div className="flex items-center gap-3 rounded-xl bg-white/[0.02] border border-white/[0.06] p-3">
+          <span className="w-9 h-9 rounded-full bg-blue-500/15 text-blue-300 flex items-center justify-center shrink-0"><CalendarClock className="w-4 h-4" /></span>
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] text-muted-foreground">الموعد المستهدف</p>
+            {canEdit ? (
+              <input type="date" value={sticker.due_at ?? ""} disabled={busy === "due"}
+                onChange={(e) => run("due", { action: "due", due_at: e.target.value || null })}
+                className="bg-transparent text-sm font-bold text-foreground focus:outline-none [color-scheme:dark] max-w-full" />
+            ) : (
+              <p className="text-sm font-bold text-foreground">{sticker.due_at ? fmtDate(sticker.due_at) : "غير محدد"}</p>
+            )}
+            {canEdit && sticker.due_at && <p className="text-[11px] text-muted-foreground">{fmtDate(sticker.due_at)}</p>}
+          </div>
+          {status && (
+            <span className={cn("text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap",
+              status.tone === "late" ? "bg-red-500/15 text-red-300" : status.tone === "warn" ? "bg-amber-500/15 text-amber-300" : "bg-emerald-500/15 text-emerald-300")}>
+              {status.text}
+            </span>
           )}
         </div>
       </div>
