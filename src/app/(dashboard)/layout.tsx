@@ -14,6 +14,7 @@ import { SaleCelebration } from "@/components/layout/sale-celebration";
 import { WelcomePopup } from "@/components/layout/welcome-popup";
 import { UrgentFollowupPopup } from "@/components/urgent-followup/urgent-followup-popup";
 import { TeamRemindersPopup } from "@/components/team-reminders/team-reminders-popup";
+import { TeamCelebrationToast } from "@/components/team-reminders/team-celebration-toast";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { OrgProvider } from "@/lib/org-context";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -842,6 +843,7 @@ export default function DashboardLayout({
       <WelcomePopup />
       <UrgentFollowupPopup />
       <TeamRemindersPopup />
+      <TeamCelebrationToast />
       <div className="min-h-screen bg-background panel-grid">
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 

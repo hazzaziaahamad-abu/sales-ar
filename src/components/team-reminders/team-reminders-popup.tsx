@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { BellRing, Check, X } from "lucide-react";
+import { BellRing, Check, Trophy, X } from "lucide-react";
+import { Confetti } from "./confetti";
 import { useAuth } from "@/lib/auth-context";
 import { isUrgentAdmin } from "@/lib/urgent-followup";
 import { saudiDateStr } from "@/lib/utils/format";
@@ -16,6 +17,10 @@ import {
   START_DELAY_MIN,
   MIN_GAP_MIN,
   SLOT_LABEL,
+  PRAISE_FOR_ACHIEVER,
+  TEAM_SAW_LINE,
+  broadcastCelebration,
+  pickPhrase,
   type ReminderItem,
   type ReminderSlot,
 } from "@/lib/team-reminders";
@@ -41,6 +46,7 @@ export function TeamRemindersPopup() {
   const [slot, setSlot] = useState<ReminderSlot | null>(null);
   const [items, setItems] = useState<ReminderItem[]>([]);
   const [handled, setHandled] = useState<Record<string, "done" | "dismissed">>({});
+  const [celebration, setCelebration] = useState<string | null>(null);
   const busy = useRef(false);
 
   const eligible = !!user && !isImpersonating && !isUrgentAdmin(user);
@@ -88,6 +94,7 @@ export function TeamRemindersPopup() {
         return;
       }
       setHandled({});
+      setCelebration(null);
       setItems(built);
       setSlot(due);
     } catch {
@@ -123,19 +130,51 @@ export function TeamRemindersPopup() {
     void saveAck(user, slot, it, status);
   };
 
-  // كل التذكيرات اتعاملت معها ⇒ نقفل بعد لحظة
-  const allDone = items.length > 0 && items.every((it) => handled[it.key]);
+  // خلّص كل التذكيرات بـ«تم» ⇒ احتفال له + إعلان لكل الفريق
+  const taskItems = items.filter((it) => it.key !== "cheer");
+  const allTasksDone = taskItems.length > 0 && taskItems.every((it) => handled[it.key] === "done");
   useEffect(() => {
-    if (!allDone || !slot) return;
-    const t = setTimeout(() => {
-      markSlotHandled(slot);
-      setSlot(null);
-      setItems([]);
-    }, 1400);
-    return () => clearTimeout(t);
-  }, [allDone, slot, markSlotHandled]);
+    if (!allTasksDone || !slot || !user || celebration) return;
+    const cheerItem = items.find((it) => it.key === "cheer");
+    if (cheerItem && !handled[cheerItem.key]) {
+      setHandled((h) => ({ ...h, [cheerItem.key]: "done" }));
+      void saveAck(user, slot, cheerItem, "done");
+    }
+    const phrase = pickPhrase(PRAISE_FOR_ACHIEVER, `${user.id}-${saudiDateStr()}-${slot}`);
+    setCelebration(phrase);
+    void broadcastCelebration(user, slot, phrase);
+  }, [allTasksDone, slot, user, celebration, items, handled]);
+
+  const finish = useCallback(() => {
+    if (slot) markSlotHandled(slot);
+    setSlot(null);
+    setItems([]);
+    setCelebration(null);
+  }, [slot, markSlotHandled]);
 
   if (!slot || !user || items.length === 0) return null;
+
+  if (celebration) {
+    return (
+      <>
+        <Confetti count={70} />
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" dir="rtl">
+          <div className="w-full max-w-sm overflow-hidden rounded-[22px] border-2 border-yellow-400/50 bg-gradient-to-b from-yellow-400/15 via-card to-card p-6 text-center shadow-[0_0_70px_rgba(250,204,21,0.3)]">
+            <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-yellow-400/20">
+              <Trophy className="h-9 w-9 text-yellow-400" />
+            </div>
+            <p className="text-sm font-bold text-yellow-400">أنجزت كل تذكيرات {SLOT_LABEL[slot]} 🎉</p>
+            <h2 className="mt-1 text-2xl font-black text-foreground">ما شاء الله يا {user.name.split(" ")[0]}!</h2>
+            <p className="mt-3 text-[15px] leading-relaxed text-foreground/90">{celebration}</p>
+            <p className="mt-3 rounded-[12px] bg-violet-500/10 px-3 py-2 text-[13px] font-bold text-violet-300">{TEAM_SAW_LINE}</p>
+            <button onClick={finish} className="mt-5 w-full rounded-[12px] bg-yellow-400 py-2.5 font-extrabold text-black hover:bg-yellow-300">
+              يا سلام 💜
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   const tasks = items.filter((i) => i.key !== "cheer");
   const cheer = items.find((i) => i.key === "cheer");
@@ -209,7 +248,6 @@ export function TeamRemindersPopup() {
             </div>
           )}
 
-          {allDone && <p className="text-center text-sm font-bold text-emerald-400">أحسنت! 👏</p>}
         </div>
       </div>
     </div>

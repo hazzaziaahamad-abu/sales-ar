@@ -284,3 +284,75 @@ export async function fetchAcksForDate(date: string): Promise<AckRow[]> {
   if (error) throw error;
   return (data ?? []) as AckRow[];
 }
+
+/* ───────────── الاحتفال بالإنجاز ─────────────
+   لما يخلّص الموظف كل تذكيرات الفترة بـ«تم»: تطلع له شاشة احتفال،
+   ويوصل إعلان لكل الفريق (مباشرة للمتصلين، وعند الدخول لمن كان غايب). */
+
+/** للموظف المنجز */
+export const PRAISE_FOR_ACHIEVER = [
+  "كلنا فخورين فيك — التزامك اليوم يرفع الفريق كله 💜",
+  "إنجاز كامل! هذا الشغل اللي نفخر فيه ونتباهى فيه 👏",
+  "ما شاء الله عليك — خلّصت كل المطلوب، ووجودك يفرق معنا 🌟",
+  "فخورين فيك وبحرصك — أنت قدوة للفريق اليوم 🏆",
+  "يعطيك العافية! هالالتزام هو اللي يقفل الصفقات ويبني ثقة العملاء 💪",
+  "رفعت راسنا اليوم — كمّل على نفس النَفَس 🔥",
+  "شغلك مرتب ومتابعتك حاضرة — هذا بالضبط اللي يصنع الفرق 🙌",
+  "كل تذكير خلّصته اليوم خطوة لصفقة جاية — فخورين فيك 🎯",
+];
+
+export const TEAM_SAW_LINE = "📣 وترا كل الفريق شاف هالرسالة";
+
+/** للفريق — صيغ محايدة تناسب الموظف والموظفة */
+export const PRAISE_FOR_TEAM = [
+  "كلنا فخورين بـ{name} 👏",
+  "إنجاز كامل من {name} — يستاهل التصفيق 👏",
+  "{name} قدوة الفريق اليوم 🌟",
+  "التزام {name} اليوم يرفع الراس 🏆",
+  "شغل مرتب من {name} — كذا نبيها 💪",
+];
+
+export function pickPhrase(list: string[], seed: string): string {
+  let h = 0;
+  for (const c of seed) h = (h * 31 + c.charCodeAt(0)) | 0;
+  return list[Math.abs(h) % list.length];
+}
+
+export interface CelebrationRow {
+  id: string;
+  user_id: string;
+  user_name: string;
+  celebration_date: string;
+  slot: ReminderSlot;
+  message: string;
+  created_at: string;
+}
+
+/** يعلن إنجاز الموظف للفريق (مرة وحدة لكل فترة) */
+export async function broadcastCelebration(user: { id: string; name: string }, slot: ReminderSlot, message: string): Promise<void> {
+  const supabase = createClient();
+  await supabase.from("team_celebrations").upsert(
+    {
+      org_id: getOrgId(),
+      user_id: user.id,
+      user_name: user.name,
+      celebration_date: saudiDateStr(),
+      slot,
+      message,
+    },
+    { onConflict: "org_id,user_id,celebration_date,slot", ignoreDuplicates: true }
+  );
+}
+
+/** احتفالات اليوم (لمن فتح النظام بعد ما صارت) */
+export async function fetchTodayCelebrations(): Promise<CelebrationRow[]> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("team_celebrations")
+    .select("id, user_id, user_name, celebration_date, slot, message, created_at")
+    .eq("org_id", getOrgId())
+    .eq("celebration_date", saudiDateStr())
+    .order("created_at", { ascending: false })
+    .limit(10);
+  return (data ?? []) as CelebrationRow[];
+}

@@ -33,6 +33,7 @@ export default function TeamRemindersPage() {
   );
   const [date, setDate] = useState(days[0]);
   const [acks, setAcks] = useState<AckRow[]>([]);
+  const [champs, setChamps] = useState<Map<string, number>>(new Map());
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [tick, setTick] = useState(0);
@@ -57,6 +58,18 @@ export default function TeamRemindersPage() {
       .then(([a, m]) => {
         if (!alive) return;
         setAcks(a);
+        // الاحتفالات = الفترات اللي خلّص فيها الموظف كل تذكيراته بـ«تم»
+        supabase
+          .from("team_celebrations")
+          .select("user_id")
+          .eq("org_id", orgId)
+          .eq("celebration_date", date)
+          .then(({ data }) => {
+            if (!alive) return;
+            const c = new Map<string, number>();
+            ((data ?? []) as { user_id: string }[]).forEach((r) => c.set(r.user_id, (c.get(r.user_id) ?? 0) + 1));
+            setChamps(c);
+          });
         setMembers(m.sort((x, y) => x.name.localeCompare(y.name, "ar")));
       })
       .catch(console.error)
@@ -154,7 +167,7 @@ export default function TeamRemindersPage() {
                 const list = byUser.get(m.id) ?? [];
                 return (
                   <tr key={m.id} className="border-b border-border/60 last:border-0 align-top">
-                    <td className="p-3 font-bold text-foreground">{m.name}</td>
+                    <td className="p-3 font-bold text-foreground">{m.name}{(champs.get(m.id) ?? 0) > 0 && <span className="mr-1.5" title="خلّص كل تذكيرات الفترة">{"🏆".repeat(champs.get(m.id) ?? 0)}</span>}</td>
                     {SLOTS.map((s) => {
                       const slotAcks = list.filter((a) => a.slot === s);
                       if (slotAcks.length === 0) {
@@ -195,7 +208,7 @@ export default function TeamRemindersPage() {
       )}
 
       <p className="text-[12px] text-muted-foreground">
-        ✓ = ضغط «تم» أو فتح الرابط · ✗ = اطّلع وقفل بدون إنجاز · الرقم بين القوسين = العدد اللي ظهر له وقت التذكير. التذكير ما يطلع إذا ما عنده شي يحتاج متابعة.
+        🏆 = خلّص كل تذكيرات الفترة واحتفل معه الفريق · ✓ = ضغط «تم» أو فتح الرابط · ✗ = اطّلع وقفل بدون إنجاز · الرقم بين القوسين = العدد اللي ظهر له وقت التذكير. التذكير ما يطلع إذا ما عنده شي يحتاج متابعة.
       </p>
     </div>
   );
