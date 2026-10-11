@@ -1830,15 +1830,14 @@ export async function markSingleMentionRead(id: string): Promise<void> {
 
 // ─── PENDING DEALS ──────────────────────────────────────────────────────────
 
-export async function submitPendingDeal(orgId: string, deal: Omit<PendingDeal, "id" | "status" | "reviewed_at" | "reviewed_by" | "created_at" | "updated_at">): Promise<PendingDeal> {
+// تُستخدم أيضاً من صفحة /submit العامة (بدون تسجيل دخول): إضافة فقط بدون قراءة الصف بعدها،
+// لأن الزائر غير المسجّل لا يملك صلاحية قراءة جدول الطلبات المعلّقة.
+export async function submitPendingDeal(orgId: string, deal: Omit<PendingDeal, "id" | "status" | "reviewed_at" | "reviewed_by" | "created_at" | "updated_at">): Promise<void> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("pending_deals")
-    .insert({ ...deal, org_id: orgId, status: "pending" })
-    .select()
-    .single();
+    .insert({ ...deal, org_id: orgId, status: "pending" });
   if (error) throw error;
-  return data as PendingDeal;
 }
 
 export async function fetchPendingDeals(status?: string): Promise<PendingDeal[]> {
