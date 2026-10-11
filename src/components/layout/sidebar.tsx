@@ -53,6 +53,7 @@ import {
   Trophy,
   Lightbulb,
   Siren,
+  BellRing,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
@@ -68,6 +69,7 @@ export const NAV_ITEMS = [
   // { label: "انضباط الإغلاق", href: "/discipline", slug: "discipline", icon: ShieldAlert, color: "amber", group: "عام" },
   { label: "سجل الأكاديمية", href: "/recent-updates", slug: "recent-updates", icon: History, color: "cyan", group: "عام" },
   { label: "مشرف AI", href: "/ai-supervisor", slug: "ai-supervisor", icon: ShieldCheck, color: "cyan", group: "الإدارة التنفيذية" },
+  { label: "تذكيرات الفريق", href: "/team-reminders", slug: "team-reminders", icon: BellRing, color: "violet", group: "الإدارة التنفيذية" },
   { label: "نحجز هب", href: "/requests", slug: "requests", icon: Inbox, color: "violet", group: "الإدارة التنفيذية" },
   { label: "السكرتير التنفيذي", href: "/secretary", slug: "secretary", icon: BrainCircuit, color: "violet", group: "الإدارة التنفيذية" },
   { label: "معالجة التحديات", href: "/challenges", slug: "challenges", icon: ShieldAlert, color: "red", group: "الإدارة التنفيذية" },

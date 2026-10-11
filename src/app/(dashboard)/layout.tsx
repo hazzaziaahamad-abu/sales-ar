@@ -13,6 +13,7 @@ import { ImpersonationBanner } from "@/components/layout/impersonation-banner";
 import { SaleCelebration } from "@/components/layout/sale-celebration";
 import { WelcomePopup } from "@/components/layout/welcome-popup";
 import { UrgentFollowupPopup } from "@/components/urgent-followup/urgent-followup-popup";
+import { TeamRemindersPopup } from "@/components/team-reminders/team-reminders-popup";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { OrgProvider } from "@/lib/org-context";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -840,6 +841,7 @@ export default function DashboardLayout({
       <SaleCelebration />
       <WelcomePopup />
       <UrgentFollowupPopup />
+      <TeamRemindersPopup />
       <div className="min-h-screen bg-background panel-grid">
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
