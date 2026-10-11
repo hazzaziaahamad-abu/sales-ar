@@ -5,9 +5,14 @@ import { useRouter } from "next/navigation";
 import { markMentionNotificationsRead, resolveClientProfileQuery } from "@/lib/supabase/db";
 import type { MentionNotification } from "@/types";
 
+/** مدراء يبقى لهم البانر أعلى الصفحة مثل باقي الفريق */
+const KEEP_MENTION_BANNER = ["منال"];
+
 /** المدير يشوف منشناته من قسم «منشناتي» بالقائمة الجانبية بدل البانر أعلى الصفحة */
-export function isMentionsManager(user: { isSuperAdmin?: boolean; roleName?: string } | null | undefined): boolean {
-  return !!user && (!!user.isSuperAdmin || user.roleName === "مدير" || user.roleName === "admin");
+export function isMentionsManager(user: { name?: string; isSuperAdmin?: boolean; roleName?: string } | null | undefined): boolean {
+  if (!user) return false;
+  if (KEEP_MENTION_BANNER.some((n) => user.name?.includes(n))) return false;
+  return !!user.isSuperAdmin || user.roleName === "مدير" || user.roleName === "admin";
 }
 
 /** يُطلق بعد تعليم منشن كمقروء عشان عدّاد القائمة الجانبية يتحدّث فوراً */
