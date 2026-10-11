@@ -484,7 +484,10 @@ interface TrainingSessionProps {
   platform?: "menu" | "reservations";
 }
 
-export function TrainingSession({ onBack, platform = "menu" }: TrainingSessionProps) {
+export function TrainingSession({ onBack, platform: initialPlatform = "menu" }: TrainingSessionProps) {
+  // المنصة تبدأ حسب المؤسسة المفتوحة، والمتدرب يقدر يبدّلها (المنيو / نحجز)
+  const [platform, setPlatform] = useState<"menu" | "reservations">(initialPlatform);
+  useEffect(() => { setPlatform(initialPlatform); }, [initialPlatform]);
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [resumeMessages, setResumeMessages] = useState<UIMessage[] | undefined>(undefined);
   const [sessionCleared, setSessionCleared] = useState(false);
@@ -553,6 +556,30 @@ export function TrainingSession({ onBack, platform = "menu" }: TrainingSessionPr
             </div>
           </div>
         )}
+
+        {/* Platform switch */}
+        <div className="cc-card rounded-[14px] p-2 flex gap-2" role="tablist" aria-label="منصة التدريب">
+          {([
+            { key: "menu", label: "قائمة الطلبات (المنيو)", emoji: "🍽️" },
+            { key: "reservations", label: "نحجز هب (الحجوزات)", emoji: "📅" },
+          ] as const).map((p) => (
+            <button
+              key={p.key}
+              role="tab"
+              aria-selected={platform === p.key}
+              onClick={() => setPlatform(p.key)}
+              className={cn(
+                "flex-1 rounded-xl px-3 py-2.5 text-sm font-bold transition-all border",
+                platform === p.key
+                  ? "bg-cyan/15 text-cyan border-cyan/30"
+                  : "text-muted-foreground border-transparent hover:text-foreground hover:bg-white/[0.03]"
+              )}
+            >
+              <span className="ml-1.5">{p.emoji}</span>
+              {p.label}
+            </button>
+          ))}
+        </div>
 
         {/* How it works */}
         <div className="cc-card rounded-[14px] p-5 border border-cyan/10 bg-gradient-to-l from-cyan/[0.03] to-transparent">
