@@ -4,11 +4,24 @@ export type ContentKind = "video" | "reel" | "post" | "carousel" | "story";
 export type ContentItemStatus = "idea" | "writing" | "ready" | "published";
 export type ContentPlanStatus = "draft" | "in_progress" | "done" | "archived";
 export type ShareMode = "view" | "edit";
+export type ContentPlanType = "creation" | "publishing";
+
+/** مرحلة تنفيذ في المحتوى (مثل: كتابة السكربت → التصوير → المونتاج → النشر). */
+export interface ContentStep {
+  id: string;
+  title: string;
+  note: string;
+  done: boolean;
+  done_at: string | null;  // ISO — يُسجَّل على الخادم لحظة الإكمال
+  done_by: string | null;  // اسم من أكمل المرحلة
+}
 
 export interface ContentPlan {
   id: string;
   org_id: string;
   title: string;
+  plan_type: ContentPlanType;
+  step_template: string[];
   description: string;
   audience: string;
   related_product: string;
@@ -44,6 +57,9 @@ export interface ContentItem {
   focus_points: string[];
   platform: string;
   publish_date: string | null;
+  publish_time: string;
+  post_url: string;
+  steps: ContentStep[];
   status: ContentItemStatus;
   source: "manual" | "ai";
   sort_order: number;
@@ -104,6 +120,30 @@ export const PLATFORMS: { value: string; label: string }[] = [
   { value: "youtube", label: "يوتيوب" },
   { value: "linkedin", label: "لينكدإن" },
 ];
+
+export const PLAN_TYPES: { value: ContentPlanType; label: string; desc: string; color: string }[] = [
+  { value: "creation", label: "خطة إنشاء محتوى", desc: "بوستات وفيديوهات — فكرة وسكربت ومراحل تنفيذ لكل محتوى", color: "bg-violet-500/15 text-violet-400" },
+  { value: "publishing", label: "خطة نشر محتوى", desc: "جدول نشر بالتاريخ والوقت والمنصة لكل منشور", color: "bg-sky-500/15 text-sky-400" },
+];
+export const planTypeOf = (p: { plan_type?: string | null }): ContentPlanType => (p.plan_type === "publishing" ? "publishing" : "creation");
+
+/** مراحل التنفيذ الافتراضية — تُستخدم إذا ما حددت الخطة قالبها الخاص. */
+export const DEFAULT_STEPS: Record<"video" | "design" | "publishing", string[]> = {
+  video: ["اعتماد الفكرة", "كتابة السكربت", "اعتماد السكربت", "التصوير", "المونتاج", "المراجعة والتعديلات", "الاعتماد النهائي", "النشر"],
+  design: ["اعتماد الفكرة", "كتابة نص التصميم", "التصميم", "المراجعة والتعديلات", "الاعتماد النهائي", "النشر"],
+  publishing: ["تجهيز الملف النهائي", "كتابة الكابشن والهاشتاقات", "جدولة المنشور", "النشر", "متابعة التفاعل والرد على التعليقات"],
+};
+
+export function defaultStepTitles(planType: ContentPlanType, kind: string, template?: string[] | null): string[] {
+  const custom = (template ?? []).map((t) => t.trim()).filter(Boolean);
+  if (custom.length) return custom;
+  if (planType === "publishing") return DEFAULT_STEPS.publishing;
+  return isVideoKind(kind) ? DEFAULT_STEPS.video : DEFAULT_STEPS.design;
+}
+
+const newStepId = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+
+export const makeStep = (title: string): ContentStep => ({ id: newStepId(), title, note: "", done: false, done_at: null, done_by: null });
 
 export const kindLabel = (k: string) => CONTENT_KINDS.find((c) => c.value === k)?.label ?? k;
 export const platformLabel = (p: string) => PLATFORMS.find((x) => x.value === p)?.label ?? p;

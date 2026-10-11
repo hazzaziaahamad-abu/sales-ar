@@ -4,13 +4,16 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getOrgId } from "@/lib/supabase/db";
-import { PLAN_STATUSES, PLATFORMS, platformLabel, orgContentProfile, type ContentPlan } from "@/lib/content-plans/types";
+import {
+  PLAN_STATUSES, PLAN_TYPES, PLATFORMS, platformLabel, orgContentProfile, planTypeOf,
+  type ContentPlan, type ContentPlanType,
+} from "@/lib/content-plans/types";
 import { MarketingTabs } from "@/components/content-plans/MarketingTabs";
-import { Plus, Clapperboard, Trash2, Link2, FileText } from "lucide-react";
+import { Plus, Clapperboard, Trash2, Link2, FileText, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const inputCls = "w-full rounded-lg bg-white/[0.06] border border-border px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-violet-500/50";
-const EMPTY = { title: "", description: "", audience: "", related_product: "", tone: "", platforms: [] as string[] };
+const EMPTY = { title: "", plan_type: "creation" as ContentPlanType, description: "", audience: "", related_product: "", tone: "", platforms: [] as string[] };
 
 export default function ContentMarketingPage() {
   const router = useRouter();
@@ -18,6 +21,7 @@ export default function ContentMarketingPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY);
+  const [typeFilter, setTypeFilter] = useState<ContentPlanType | "all">("all");
   const openForm = () => {
     // الجمهور الافتراضي حسب المنظمة (حجوزات: الصالونات والشاليهات)
     if (!showForm && !form.audience) setForm((f) => ({ ...f, audience: orgContentProfile(getOrgId()).audience }));
@@ -66,7 +70,7 @@ export default function ContentMarketingPage() {
             <Clapperboard className="w-6 h-6 text-violet-400" />
             التسويق بالمحتوى
           </h1>
-          <p className="text-muted-foreground text-sm mt-0.5">خطط محتوى للفيديوهات وتصاميم البوستات — عنوان وفكرة وسكربت، مع توليد أفكار بالذكاء الاصطناعي ورابط مشاركة</p>
+          <p className="text-muted-foreground text-sm mt-0.5">خطط إنشاء المحتوى (فيديوهات وبوستات بمراحل تنفيذ) وخطط النشر (جدول بالتاريخ والوقت) — مع توليد أفكار بالذكاء الاصطناعي ورابط مشاركة</p>
         </div>
         <button
           onClick={openForm}
@@ -80,10 +84,30 @@ export default function ContentMarketingPage() {
       {showForm && (
         <div className="glass-surface rounded-[14px] border border-violet-500/20 p-5 space-y-4">
           <h3 className="text-sm font-bold text-foreground">إنشاء خطة محتوى</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {PLAN_TYPES.map((t) => {
+              const on = form.plan_type === t.value;
+              const Icon = t.value === "publishing" ? CalendarDays : Clapperboard;
+              return (
+                <button
+                  key={t.value}
+                  onClick={() => setForm({ ...form, plan_type: t.value })}
+                  className={cn("flex items-start gap-3 p-3 rounded-xl border text-right transition-colors",
+                    on ? "bg-violet-500/10 border-violet-500/50" : "bg-white/[0.03] border-border hover:border-violet-500/30")}
+                >
+                  <span className={cn("w-9 h-9 shrink-0 rounded-lg flex items-center justify-center", t.color)}><Icon className="w-4 h-4" /></span>
+                  <span>
+                    <span className="block text-sm font-bold text-foreground">{t.label}</span>
+                    <span className="block text-[11px] text-muted-foreground mt-0.5">{t.desc}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-semibold text-muted-foreground block mb-1">العنوان *</label>
-              <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className={inputCls} placeholder="مثال: محتوى أكتوبر – الكافيهات" />
+              <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className={inputCls} placeholder={form.plan_type === "publishing" ? "مثال: جدول نشر نوفمبر" : "مثال: محتوى أكتوبر – الكافيهات"} />
             </div>
             <div>
               <label className="text-xs font-semibold text-muted-foreground block mb-1">الجمهور المستهدف</label>
@@ -129,6 +153,24 @@ export default function ContentMarketingPage() {
         </div>
       )}
 
+      {!loading && plans.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {([["all", "الكل"], ...PLAN_TYPES.map((t) => [t.value, t.label])] as [ContentPlanType | "all", string][]).map(([v, label]) => {
+            const n = v === "all" ? plans.length : plans.filter((p) => planTypeOf(p) === v).length;
+            return (
+              <button
+                key={v}
+                onClick={() => setTypeFilter(v)}
+                className={cn("px-3 py-1 rounded-full text-xs font-semibold border transition-colors",
+                  typeFilter === v ? "bg-violet-500/20 text-violet-300 border-violet-500/40" : "bg-white/[0.03] text-muted-foreground border-border hover:text-foreground")}
+              >
+                {label} ({n})
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[...Array(3)].map((_, i) => <div key={i} className="h-40 rounded-[14px] bg-white/[0.04] animate-pulse" />)}
@@ -141,8 +183,9 @@ export default function ContentMarketingPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {plans.map((plan) => {
+          {plans.filter((p) => typeFilter === "all" || planTypeOf(p) === typeFilter).map((plan) => {
             const st = PLAN_STATUSES.find((s) => s.value === plan.status) ?? PLAN_STATUSES[0];
+            const pt = PLAN_TYPES.find((t) => t.value === planTypeOf(plan)) ?? PLAN_TYPES[0];
             return (
               <div key={plan.id} className="glass-surface rounded-[14px] border border-border p-5 hover:border-violet-500/30 transition-colors group relative">
                 <button onClick={() => handleDelete(plan.id)} className="absolute top-3 left-3 opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-all">
@@ -151,6 +194,7 @@ export default function ContentMarketingPage() {
                 <Link href={`/marketing-plans/content/${plan.id}`} className="block">
                   <h3 className="text-sm font-bold text-foreground leading-snug mb-3">{plan.title}</h3>
                   <div className="flex flex-wrap gap-2 mb-3">
+                    <span className={cn("text-[11px] font-bold px-2.5 py-0.5 rounded-full", pt.color)}>{pt.label}</span>
                     <span className={cn("text-[11px] font-bold px-2.5 py-0.5 rounded-full", st.color)}>{st.label}</span>
                     {plan.platforms?.slice(0, 3).map((p) => (
                       <span key={p} className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-violet-500/15 text-violet-400">{platformLabel(p)}</span>
@@ -158,7 +202,7 @@ export default function ContentMarketingPage() {
                   </div>
                   {plan.description && <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{plan.description}</p>}
                   <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/40 text-[11px] text-muted-foreground">
-                    <span className="flex items-center gap-1"><FileText className="w-3 h-3" />{plan.items_count ?? 0} محتوى</span>
+                    <span className="flex items-center gap-1"><FileText className="w-3 h-3" />{plan.items_count ?? 0} {planTypeOf(plan) === "publishing" ? "منشور" : "محتوى"}</span>
                     {plan.share_enabled && (
                       <span className="flex items-center gap-1 text-cyan-400"><Link2 className="w-3 h-3" />مشاركة {plan.share_mode === "edit" ? "وتعديل" : "للعرض"}</span>
                     )}

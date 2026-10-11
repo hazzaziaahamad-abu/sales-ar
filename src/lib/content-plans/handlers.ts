@@ -4,8 +4,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
   type PlanAccess, loadPlanPayload, sanitizePlanPatch, sanitizeItem, touchPlan,
-  publicPlan, generateIdeas, generateScript,
+  publicPlan, generateIdeas, generateScript, initialSteps, stampSteps,
 } from "./server";
+import type { ContentStep } from "./types";
 
 type Resolver = () => Promise<PlanAccess>;
 const readOnly = () => NextResponse.json({ error: "هذا الرابط للعرض فقط" }, { status: 403 });
@@ -50,12 +51,14 @@ export async function handleItems(req: NextRequest, resolve: Resolver) {
       .from("content_items").select("sort_order").eq("plan_id", planId)
       .order("sort_order", { ascending: false }).limit(1).maybeSingle();
     let order = (last?.sort_order ?? -1) + 1;
-    const rows = list.slice(0, 20).map((it) => ({
-      ...sanitizeItem(it),
-      plan_id: planId,
-      sort_order: order++,
-      updated_by_name: access.actorName,
-    }));
+    const rows = list.slice(0, 20).map((it) => {
+      const clean = sanitizeItem(it);
+      // محتوى جديد بدون مراحل → مراحل الخطة الافتراضية
+      const steps = Array.isArray(clean.steps) && clean.steps.length
+        ? stampSteps(clean.steps as ContentStep[], [], access.actorName)
+        : initialSteps(access.plan, typeof clean.kind === "string" ? clean.kind : "video");
+      return { ...clean, steps, plan_id: planId, sort_order: order++, updated_by_name: access.actorName };
+    });
     const { data, error } = await supabaseAdmin.from("content_items").insert(rows).select("*");
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     // عناصر مصدرها اقتراح محفوظ → نعلّم الاقتراح «أُضيف»
@@ -71,9 +74,15 @@ export async function handleItems(req: NextRequest, resolve: Resolver) {
     const b = await body(req);
     const itemId = String(b.id ?? "");
     if (!itemId) return NextResponse.json({ error: "id مطلوب" }, { status: 400 });
+    const patch = sanitizeItem(b);
+    if (Array.isArray(patch.steps)) {
+      const { data: current } = await supabaseAdmin
+        .from("content_items").select("steps").eq("id", itemId).eq("plan_id", planId).maybeSingle();
+      patch.steps = stampSteps(patch.steps as ContentStep[], (current?.steps as ContentStep[] | null) ?? [], access.actorName);
+    }
     const { data, error } = await supabaseAdmin
       .from("content_items")
-      .update({ ...sanitizeItem(b), updated_by_name: access.actorName, updated_at: new Date().toISOString() })
+      .update({ ...patch, updated_by_name: access.actorName, updated_at: new Date().toISOString() })
       .eq("id", itemId)
       .eq("plan_id", planId)
       .select("*")

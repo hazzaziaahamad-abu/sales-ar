@@ -7,7 +7,8 @@ import { generateJSON } from "@/lib/ai/gemini";
 import { CONTENT_IDEAS_PROMPT, CONTENT_SCRIPT_PROMPT } from "@/lib/ai/prompts";
 import {
   CONTENT_KINDS, ITEM_STATUSES, PLAN_STATUSES, PLATFORMS, kindLabel, platformLabel, orgContentProfile,
-  type ContentItem, type ContentPlan, type ContentSuggestion, type ContentKind, type TimelineRow,
+  defaultStepTitles, makeStep, planTypeOf,
+  type ContentItem, type ContentPlan, type ContentSuggestion, type ContentKind, type TimelineRow, type ContentStep,
 } from "./types";
 
 const KINDS = CONTENT_KINDS.map((k) => k.value) as string[];
@@ -34,6 +35,48 @@ export function cleanTimeline(v: unknown): TimelineRow[] {
 export function cleanFocusPoints(v: unknown): string[] {
   if (!Array.isArray(v)) return [];
   return v.slice(0, 20).map((x) => String(x ?? "").slice(0, 500));
+}
+
+/** يطبّع مراحل التنفيذ القادمة من الواجهة (بدون ختم وقت/اسم الإكمال — هذا يتم في stampSteps). */
+export function cleanSteps(v: unknown): ContentStep[] {
+  if (!Array.isArray(v)) return [];
+  return v.slice(0, 40).map((r) => {
+    const row = (r ?? {}) as Record<string, unknown>;
+    const id = typeof row.id === "string" && row.id.trim() ? row.id.slice(0, 40) : makeStep("").id;
+    return {
+      id,
+      title: String(row.title ?? "").slice(0, 300),
+      note: String(row.note ?? "").slice(0, 2000),
+      done: row.done === true,
+      done_at: typeof row.done_at === "string" ? row.done_at : null,
+      done_by: typeof row.done_by === "string" ? row.done_by.slice(0, 200) : null,
+    };
+  });
+}
+
+/**
+ * يختم وقت واسم الإكمال على الخادم: المرحلة المكتملة سابقاً تحتفظ بوقتها ومن أكملها،
+ * والمكتملة الآن تأخذ الوقت الحالي واسم المنفّذ، وغير المكتملة تُمسح بياناتها.
+ */
+export function stampSteps(next: ContentStep[], prev: ContentStep[] | null | undefined, actor: string): ContentStep[] {
+  const before = new Map((prev ?? []).map((s) => [s.id, s]));
+  const now = new Date().toISOString();
+  return next.map((s) => {
+    if (!s.done) return { ...s, done_at: null, done_by: null };
+    const old = before.get(s.id);
+    if (old?.done && old.done_at) return { ...s, done_at: old.done_at, done_by: old.done_by };
+    return { ...s, done_at: now, done_by: actor || null };
+  });
+}
+
+export function cleanStepTemplate(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v.map((x) => String(x ?? "").trim().slice(0, 300)).filter(Boolean).slice(0, 40);
+}
+
+/** مراحل افتراضية لمحتوى جديد حسب قالب الخطة ونوع المحتوى. */
+export function initialSteps(plan: ContentPlan, kind: string): ContentStep[] {
+  return defaultStepTitles(planTypeOf(plan), kind, plan.step_template).map(makeStep);
 }
 
 // ─── سياق الوصول ─────────────────────────────────────────────────────────────
@@ -134,6 +177,8 @@ export function sanitizePlanPatch(body: Record<string, unknown>, isOwner: boolea
     patch.platforms = body.platforms.filter((p): p is string => typeof p === "string" && PLATFORM_VALUES.includes(p));
   }
   if (typeof body.status === "string" && PLAN_STATUS_VALUES.includes(body.status)) patch.status = body.status;
+  if (body.plan_type === "creation" || body.plan_type === "publishing") patch.plan_type = body.plan_type;
+  if (Array.isArray(body.step_template)) patch.step_template = cleanStepTemplate(body.step_template);
   if (isOwner) {
     if (typeof body.share_enabled === "boolean") patch.share_enabled = body.share_enabled;
     if (body.share_mode === "view" || body.share_mode === "edit") patch.share_mode = body.share_mode;
@@ -149,6 +194,9 @@ export function sanitizeItem(body: Record<string, unknown>) {
   }
   if (Array.isArray(body.timeline)) item.timeline = cleanTimeline(body.timeline);
   if (Array.isArray(body.focus_points)) item.focus_points = cleanFocusPoints(body.focus_points);
+  if (Array.isArray(body.steps)) item.steps = cleanSteps(body.steps);
+  if (typeof body.publish_time === "string") item.publish_time = /^\d{2}:\d{2}$/.test(body.publish_time) ? body.publish_time : "";
+  if (typeof body.post_url === "string") item.post_url = body.post_url.trim().slice(0, 1000);
   if (typeof body.kind === "string" && KINDS.includes(body.kind)) item.kind = body.kind;
   if (typeof body.status === "string" && ITEM_STATUS_VALUES.includes(body.status)) item.status = body.status;
   if (typeof body.platform === "string" && (body.platform === "" || PLATFORM_VALUES.includes(body.platform))) item.platform = body.platform;

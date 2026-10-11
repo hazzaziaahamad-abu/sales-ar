@@ -4,12 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Sparkles, Plus, Trash2, Copy, Check, Link2, Video, Image as ImageIcon, Layers, Film, Smartphone,
   X, Loader2, RefreshCw, Pencil, Eye, Calendar, ChevronDown, ChevronUp, Wand2, FileText,
-  Clock, Target,
+  Clock, Target, ListChecks, CalendarDays, ExternalLink, LayoutGrid, StickyNote,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  CONTENT_KINDS, ITEM_STATUSES, PLAN_STATUSES, PLATFORMS, kindLabel, platformLabel, isVideoKind,
-  type ContentItem, type ContentKind, type ContentPlan, type SavedSuggestion, type TimelineRow,
+  CONTENT_KINDS, ITEM_STATUSES, PLAN_STATUSES, PLAN_TYPES, PLATFORMS, kindLabel, platformLabel, isVideoKind,
+  planTypeOf, defaultStepTitles, makeStep,
+  type ContentItem, type ContentKind, type ContentPlan, type SavedSuggestion, type TimelineRow, type ContentStep,
 } from "@/lib/content-plans/types";
 
 const KIND_STYLE: Record<ContentKind, { icon: typeof Video; color: string }> = {
@@ -35,6 +36,7 @@ export default function ContentPlanEditor({ apiBase }: { apiBase: string }) {
   const [filter, setFilter] = useState<ContentKind | "all">("all");
   const [editing, setEditing] = useState<ContentItem | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [view, setView] = useState<"cards" | "schedule" | null>(null);
 
   const api = useCallback(
     async <T,>(path: string, init?: RequestInit): Promise<T> => {
@@ -93,6 +95,13 @@ export default function ContentPlanEditor({ apiBase }: { apiBase: string }) {
     setEditing(null);
   };
 
+  /** حفظ مراحل التنفيذ مباشرة (بدون زر حفظ) — الخادم يختم وقت الإكمال واسم المنفّذ. */
+  const saveSteps = async (itemId: string, steps: ContentStep[]) => {
+    const res = await api<{ item: ContentItem }>("/items", { method: "PATCH", body: JSON.stringify({ id: itemId, steps }) });
+    setData((d) => (d ? { ...d, items: d.items.map((i) => (i.id === itemId ? res.item : i)) } : d));
+    return res.item;
+  };
+
   const quickStatus = async (item: ContentItem, status: ContentItem["status"]) => {
     try { await saveItem({ ...item, status }); } catch (e) { alert((e as Error).message); }
   };
@@ -121,6 +130,9 @@ export default function ContentPlanEditor({ apiBase }: { apiBase: string }) {
   }
 
   const { plan, canEdit, isOwner } = data;
+  const planType = planTypeOf(plan);
+  const typeInfo = PLAN_TYPES.find((t) => t.value === planType) ?? PLAN_TYPES[0];
+  const currentView = view ?? (planType === "publishing" ? "schedule" : "cards");
   const counts = CONTENT_KINDS.map((k) => ({ ...k, n: data.items.filter((i) => i.kind === k.value).length }));
 
   return (
@@ -156,6 +168,7 @@ export default function ContentPlanEditor({ apiBase }: { apiBase: string }) {
                   {PLAN_STATUSES.find((s) => s.value === plan.status)?.label}
                 </span>
               )}
+              <span className={cn("text-[11px] font-bold px-2.5 py-0.5 rounded-full", typeInfo.color)}>{typeInfo.label}</span>
               {plan.platforms?.map((p) => (
                 <span key={p} className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-violet-500/15 text-violet-400">{platformLabel(p)}</span>
               ))}
@@ -212,6 +225,19 @@ export default function ContentPlanEditor({ apiBase }: { apiBase: string }) {
               <FilterChip key={k.value} active={filter === k.value} onClick={() => setFilter(k.value)} label={k.label} />
             ))}
           </div>
+          <div className="flex flex-wrap gap-2">
+            <div className="flex gap-1 p-0.5 rounded-lg bg-white/[0.04] border border-border">
+              {([["cards", "البطاقات", LayoutGrid], ["schedule", "جدول النشر", CalendarDays]] as const).map(([v, label, Icon]) => (
+                <button
+                  key={v}
+                  onClick={() => setView(v)}
+                  className={cn("flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold",
+                    currentView === v ? "bg-violet-500/20 text-violet-300" : "text-muted-foreground hover:text-foreground")}
+                >
+                  <Icon className="w-3.5 h-3.5" /> {label}
+                </button>
+              ))}
+            </div>
           {canEdit && (
             <div className="flex gap-2">
               <button
@@ -238,6 +264,7 @@ export default function ContentPlanEditor({ apiBase }: { apiBase: string }) {
               </button>
             </div>
           )}
+          </div>
         </div>
 
         {items.length === 0 ? (
@@ -246,6 +273,8 @@ export default function ContentPlanEditor({ apiBase }: { apiBase: string }) {
             <p className="text-sm font-semibold">لا يوجد محتوى بعد</p>
             {canEdit && <p className="text-xs mt-1">أضف فيديو أو بوست، أو خلّ الذكاء الاصطناعي يقترح لك أفكار</p>}
           </div>
+        ) : currentView === "schedule" ? (
+          <ScheduleView items={items} onOpen={setEditing} />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {items.map((item, idx) => (
@@ -268,6 +297,8 @@ export default function ContentPlanEditor({ apiBase }: { apiBase: string }) {
           item={editing}
           canEdit={canEdit}
           api={api}
+          stepTitles={defaultStepTitles(planType, editing.kind, plan.step_template)}
+          onSaveSteps={(steps) => saveSteps(editing.id, steps)}
           onClose={() => setEditing(null)}
           onSave={async (it) => { await saveItem(it); setEditing(null); }}
           onDelete={() => deleteItem(editing.id)}
@@ -280,14 +311,18 @@ export default function ContentPlanEditor({ apiBase }: { apiBase: string }) {
 // ─── تفاصيل الخطة ─────────────────────────────────────────────────────────────
 
 function PlanDetails({ plan, canEdit, onSave }: { plan: ContentPlan; canEdit: boolean; onSave: (p: Partial<ContentPlan>) => void }) {
+  const templateText = (plan.step_template ?? []).join("\n");
   const [form, setForm] = useState({
     description: plan.description, audience: plan.audience, related_product: plan.related_product,
-    tone: plan.tone, platforms: plan.platforms ?? [],
+    tone: plan.tone, platforms: plan.platforms ?? [], template: templateText,
   });
   const dirty =
     form.description !== plan.description || form.audience !== plan.audience ||
     form.related_product !== plan.related_product || form.tone !== plan.tone ||
-    form.platforms.join() !== (plan.platforms ?? []).join();
+    form.platforms.join() !== (plan.platforms ?? []).join() || form.template !== templateText;
+  const defaults = planTypeOf(plan) === "publishing"
+    ? defaultStepTitles("publishing", "post")
+    : defaultStepTitles("creation", "video");
 
   return (
     <div className="mt-4 pt-4 border-t border-border/40 space-y-3">
@@ -323,8 +358,23 @@ function PlanDetails({ plan, canEdit, onSave }: { plan: ContentPlan; canEdit: bo
           })}
         </div>
       </Field>
+      <Field label="مراحل التنفيذ الافتراضية (مرحلة في كل سطر) — تُضاف تلقائياً لكل محتوى جديد">
+        <textarea
+          rows={5}
+          disabled={!canEdit}
+          value={form.template}
+          onChange={(e) => setForm({ ...form, template: e.target.value })}
+          className={cn(inputCls, "resize-y leading-relaxed")}
+          placeholder={"فاضي = القالب الافتراضي حسب نوع المحتوى:\n" + defaults.join("\n")}
+        />
+      </Field>
       {canEdit && dirty && (
-        <button onClick={() => onSave(form)} className="px-4 py-1.5 rounded-lg bg-violet-500 text-white text-xs font-semibold hover:bg-violet-600">
+        <button
+          onClick={() => {
+            const { template, ...rest } = form;
+            onSave({ ...rest, step_template: template.split("\n").map((t) => t.trim()).filter(Boolean) });
+          }}
+          className="px-4 py-1.5 rounded-lg bg-violet-500 text-white text-xs font-semibold hover:bg-violet-600">
           حفظ التفاصيل
         </button>
       )}
@@ -479,7 +529,7 @@ function AIIdeasPanel({ api, suggestions, setSuggestions, onItemsAdded }: {
 
       {open && (
         <div className="mt-3 space-y-3">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
             <select value={kind} onChange={(e) => setKind(e.target.value as ContentKind | "")} className={inputCls}>
               <option value="">كل الأنواع (منوّع)</option>
               {CONTENT_KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
@@ -622,13 +672,14 @@ function ItemCard({ item, index, canEdit, onOpen, onDelete, onStatus }: {
       </div>
       <button onClick={onOpen} className="block w-full text-right">
         <h4 className="text-sm font-bold text-foreground mb-1">{item.title || "بدون عنوان"}</h4>
+        <StepsProgress steps={item.steps ?? []} />
         {item.idea && <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{item.idea}</p>}
         {item.script && (
           <p className="text-[11px] text-foreground/70 line-clamp-3 bg-black/15 rounded-md p-2 whitespace-pre-wrap">{item.script}</p>
         )}
         <div className="flex items-center gap-3 mt-2 text-[11px] text-muted-foreground">
           {item.platform && <span>{platformLabel(item.platform)}</span>}
-          {item.publish_date && <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{item.publish_date}</span>}
+          {item.publish_date && <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{item.publish_date}{item.publish_time && ` · ${item.publish_time}`}</span>}
           {(item.timeline?.length ?? 0) > 0 && <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{item.timeline.length} مشاهد</span>}
           {(item.focus_points?.length ?? 0) > 0 && <span className="flex items-center gap-1"><Target className="w-3 h-3" />{item.focus_points.length} نقاط تركيز</span>}
           <span className="mr-auto text-violet-400 font-semibold flex items-center gap-1">
@@ -642,12 +693,29 @@ function ItemCard({ item, index, canEdit, onOpen, onDelete, onStatus }: {
 
 // ─── محرر العنصر ──────────────────────────────────────────────────────────────
 
-function ItemEditor({ item, canEdit, api, onClose, onSave, onDelete }: {
-  item: ContentItem; canEdit: boolean; api: ApiFn;
+function ItemEditor({ item, canEdit, api, stepTitles, onSaveSteps, onClose, onSave, onDelete }: {
+  item: ContentItem; canEdit: boolean; api: ApiFn; stepTitles: string[];
+  onSaveSteps: (steps: ContentStep[]) => Promise<ContentItem>;
   onClose: () => void; onSave: (i: ContentItem) => Promise<void>; onDelete: () => void;
 }) {
   // عناصر قديمة قد لا تحمل الحقول الجديدة
-  const base = useMemo<ContentItem>(() => ({ ...item, timeline: item.timeline ?? [], focus_points: item.focus_points ?? [] }), [item]);
+  const base = useMemo<ContentItem>(
+    () => ({ ...item, timeline: item.timeline ?? [], focus_points: item.focus_points ?? [], publish_time: item.publish_time ?? "", post_url: item.post_url ?? "" }),
+    [item]
+  );
+  // المراحل تُحفظ فوراً عند كل تغيير، منفصلة عن نموذج الحفظ
+  const [steps, setSteps] = useState<ContentStep[]>(item.steps ?? []);
+  const changeSteps = async (next: ContentStep[]) => {
+    const prev = steps;
+    setSteps(next);
+    try {
+      const saved = await onSaveSteps(next);
+      setSteps(saved.steps ?? next);
+    } catch (e) {
+      alert((e as Error).message);
+      setSteps(prev);
+    }
+  };
   const [form, setForm] = useState<ContentItem>(base);
   const [saving, setSaving] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
@@ -685,7 +753,8 @@ function ItemEditor({ item, canEdit, api, onClose, onSave, onDelete }: {
 
   const save = async () => {
     setSaving(true);
-    try { await onSave(form); } catch (e) { alert((e as Error).message); setSaving(false); }
+    // المراحل لها حفظها الخاص — لا نرسلها هنا حتى لا نرجّع حالة قديمة
+    try { await onSave({ ...form, steps: undefined } as unknown as ContentItem); } catch (e) { alert((e as Error).message); setSaving(false); }
   };
 
   const dirty = JSON.stringify(form) !== JSON.stringify(base);
@@ -720,7 +789,14 @@ function ItemEditor({ item, canEdit, api, onClose, onSave, onDelete }: {
           <Field label="تاريخ النشر">
             <input type="date" disabled={!canEdit} value={form.publish_date ?? ""} onChange={(e) => set("publish_date", e.target.value || null)} className={inputCls} />
           </Field>
+          <Field label="وقت النشر">
+            <input type="time" disabled={!canEdit} value={form.publish_time} onChange={(e) => set("publish_time", e.target.value)} className={inputCls} />
+          </Field>
         </div>
+
+        <Field label="مراحل التنفيذ" action={<span className="text-[10px] text-muted-foreground">تُحفظ تلقائياً</span>}>
+          <StepsTimeline steps={steps} canEdit={canEdit} defaultTitles={stepTitles} onChange={changeSteps} />
+        </Field>
 
         <Field label="العنوان">
           <input disabled={!canEdit} value={form.title} onChange={(e) => set("title", e.target.value)} className={inputCls} />
@@ -803,6 +879,19 @@ function ItemEditor({ item, canEdit, api, onClose, onSave, onDelete }: {
           <textarea disabled={!canEdit} rows={3} value={form.caption} onChange={(e) => set("caption", e.target.value)} className={cn(inputCls, "resize-y")} />
         </Field>
 
+        <Field
+          label="رابط المنشور (بعد النشر)"
+          action={
+            form.post_url && /^https?:\/\//.test(form.post_url) ? (
+              <a href={form.post_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-[11px] text-cyan-400 hover:text-cyan-300">
+                <ExternalLink className="w-3 h-3" /> فتح
+              </a>
+            ) : null
+          }
+        >
+          <input disabled={!canEdit} dir="ltr" value={form.post_url} onChange={(e) => set("post_url", e.target.value)} className={cn(inputCls, "text-left")} placeholder="https://..." />
+        </Field>
+
         <div className="flex items-center gap-2 pt-1">
           {canEdit ? (
             <>
@@ -822,6 +911,260 @@ function ItemEditor({ item, canEdit, api, onClose, onSave, onDelete }: {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── مراحل التنفيذ ────────────────────────────────────────────────────────────
+
+const fmtStepTime = (iso: string) => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const day = d.toLocaleDateString("ar-SA-u-ca-gregory", { day: "numeric", month: "long" });
+  const time = d.toLocaleTimeString("ar-SA-u-ca-gregory", { hour: "numeric", minute: "2-digit" });
+  return `${day}، ${time}`;
+};
+
+/** شريط تقدّم مختصر للبطاقة: كم مرحلة اكتملت + المرحلة الحالية. */
+function StepsProgress({ steps }: { steps: ContentStep[] }) {
+  if (!steps.length) return null;
+  const done = steps.filter((s) => s.done).length;
+  const current = steps.find((s) => !s.done);
+  const pct = Math.round((done / steps.length) * 100);
+  return (
+    <div className="mb-2">
+      <div className="flex items-center justify-between text-[10px] mb-1">
+        <span className="flex items-center gap-1 text-muted-foreground">
+          <ListChecks className="w-3 h-3" />
+          {current ? <>المرحلة الحالية: <b className="text-foreground">{current.title || "بدون اسم"}</b></> : <b className="text-emerald-400">اكتملت كل المراحل</b>}
+        </span>
+        <span className="font-mono text-muted-foreground">{done}/{steps.length}</span>
+      </div>
+      <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+        <div className={cn("h-full rounded-full transition-all", done === steps.length ? "bg-emerald-500" : "bg-violet-500")} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * مراحل التنفيذ بشكل خط زمني عمودي: دائرة خضراء ✓ للمكتملة مع وقت الإكمال ومن أكملها،
+ * والمرحلة الحالية مميّزة. كل مرحلة اسمها وملاحظتها نص حر، ويمكن الإضافة والحذف والترتيب.
+ */
+function StepsTimeline({ steps, canEdit, defaultTitles, onChange }: {
+  steps: ContentStep[]; canEdit: boolean; defaultTitles: string[];
+  onChange: (steps: ContentStep[]) => void;
+}) {
+  const [draft, setDraft] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [noteOpen, setNoteOpen] = useState<string | null>(null);
+  const currentId = steps.find((s) => !s.done)?.id;
+  const done = steps.filter((s) => s.done).length;
+
+  const patch = (id: string, p: Partial<ContentStep>) => onChange(steps.map((s) => (s.id === id ? { ...s, ...p } : s)));
+  const move = (i: number, d: -1 | 1) => {
+    const j = i + d;
+    if (j < 0 || j >= steps.length) return;
+    const next = [...steps];
+    [next[i], next[j]] = [next[j], next[i]];
+    onChange(next);
+  };
+  const add = () => {
+    const t = draft.trim();
+    if (!t) return;
+    onChange([...steps, makeStep(t)]);
+    setDraft("");
+  };
+
+  if (!steps.length && !canEdit) return <p className="text-xs text-muted-foreground">لا توجد مراحل تنفيذ</p>;
+
+  return (
+    <div className="rounded-[12px] bg-white/[0.02] border border-border p-4">
+      {steps.length > 0 && (
+        <div className="flex items-center justify-between mb-3 text-[11px]">
+          <span className="text-muted-foreground">خطوات التنفيذ</span>
+          <span className={cn("font-bold", done === steps.length ? "text-emerald-400" : "text-violet-300")}>
+            {done === steps.length ? "مكتملة ✓" : `${done} من ${steps.length}`}
+          </span>
+        </div>
+      )}
+
+      {steps.length === 0 && canEdit && (
+        <div className="text-center py-3">
+          <p className="text-xs text-muted-foreground mb-2">ما فيه مراحل لهذا المحتوى بعد</p>
+          <button
+            onClick={() => onChange(defaultTitles.map(makeStep))}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-violet-500/20 text-violet-300 hover:bg-violet-500/30 text-xs font-semibold"
+          >
+            <ListChecks className="w-3.5 h-3.5" /> إضافة المراحل الافتراضية ({defaultTitles.length})
+          </button>
+        </div>
+      )}
+
+      <ol>
+        {steps.map((s, i) => {
+          const last = i === steps.length - 1;
+          const isCurrent = s.id === currentId;
+          return (
+            <li key={s.id} className="relative flex gap-3 group">
+              {/* الخط الواصل بين المراحل */}
+              {!last && (
+                <span className={cn("absolute top-9 bottom-0 right-[15px] w-0.5", s.done ? "bg-emerald-600" : "bg-border")} />
+              )}
+              <button
+                disabled={!canEdit}
+                onClick={() => patch(s.id, { done: !s.done })}
+                title={canEdit ? (s.done ? "إلغاء الإكمال" : "تعليم كمكتملة") : undefined}
+                className={cn(
+                  "relative z-10 shrink-0 w-8 h-8 rounded-full flex items-center justify-center border-2 transition-colors",
+                  s.done
+                    ? "bg-emerald-600 border-emerald-600 text-white"
+                    : isCurrent
+                      ? "border-violet-400 bg-violet-500/10 text-violet-300"
+                      : "border-border bg-background text-muted-foreground",
+                  canEdit && !s.done && "hover:border-emerald-500 hover:text-emerald-400"
+                )}
+              >
+                {s.done ? <Check className="w-4 h-4" strokeWidth={3} /> : <span className="text-[11px] font-bold">{i + 1}</span>}
+              </button>
+
+              <div className={cn("flex-1 min-w-0", last ? "pb-1" : "pb-5")}>
+                <div className="flex items-start gap-2 min-h-8">
+                  {canEdit && editingId === s.id ? (
+                    <input
+                      autoFocus
+                      defaultValue={s.title}
+                      onBlur={(e) => { setEditingId(null); if (e.target.value.trim() && e.target.value !== s.title) patch(s.id, { title: e.target.value.trim() }); }}
+                      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setEditingId(null); }}
+                      className="flex-1 rounded-md bg-white/[0.06] border border-border px-2 py-1 text-sm font-bold text-foreground focus:outline-none focus:ring-1 focus:ring-violet-500/50"
+                    />
+                  ) : (
+                    <button
+                      disabled={!canEdit}
+                      onClick={() => setEditingId(s.id)}
+                      className={cn("flex-1 text-right text-sm font-bold pt-1.5 leading-snug",
+                        s.done ? "text-foreground" : isCurrent ? "text-violet-200" : "text-foreground/70")}
+                    >
+                      {s.title || "بدون اسم"}
+                      {isCurrent && <span className="mr-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 align-middle">الحالية</span>}
+                    </button>
+                  )}
+                  {canEdit && (
+                    <div className="flex items-center gap-0.5 pt-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => setNoteOpen(noteOpen === s.id ? null : s.id)} title="ملاحظة" className={cn("p-1 rounded hover:text-foreground", s.note ? "text-amber-400" : "text-muted-foreground")}>
+                        <StickyNote className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={() => move(i, -1)} disabled={i === 0} className="p-1 rounded text-muted-foreground hover:text-foreground disabled:opacity-30"><ChevronUp className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => move(i, 1)} disabled={last} className="p-1 rounded text-muted-foreground hover:text-foreground disabled:opacity-30"><ChevronDown className="w-3.5 h-3.5" /></button>
+                      <button
+                        onClick={() => (!s.done || confirm("حذف مرحلة مكتملة؟")) && onChange(steps.filter((x) => x.id !== s.id))}
+                        className="p-1 rounded text-muted-foreground hover:text-red-400"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {s.done && s.done_at && (
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    {fmtStepTime(s.done_at)}{s.done_by && <> · {s.done_by}</>}
+                  </p>
+                )}
+                {noteOpen === s.id && canEdit ? (
+                  <textarea
+                    autoFocus
+                    rows={2}
+                    defaultValue={s.note}
+                    onBlur={(e) => { setNoteOpen(null); if (e.target.value !== s.note) patch(s.id, { note: e.target.value }); }}
+                    placeholder="ملاحظة على هذه المرحلة..."
+                    className="mt-1.5 w-full rounded-md bg-white/[0.05] border border-border px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-amber-500/50 resize-y"
+                  />
+                ) : s.note ? (
+                  <p className="text-[11px] text-amber-300/90 mt-1 whitespace-pre-wrap">{s.note}</p>
+                ) : null}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+
+      {canEdit && (
+        <div className="flex gap-2 mt-3 pt-3 border-t border-border/50">
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && add()}
+            placeholder="أضف مرحلة: مثال اعتماد العميل، تجهيز الموقع للتصوير..."
+            className="flex-1 rounded-md bg-white/[0.05] border border-border px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-violet-500/50"
+          />
+          <button onClick={add} disabled={!draft.trim()} className="flex items-center gap-1 px-3 rounded-md bg-violet-500/20 text-violet-300 text-xs font-semibold disabled:opacity-50">
+            <Plus className="w-3.5 h-3.5" /> إضافة
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── جدول النشر ───────────────────────────────────────────────────────────────
+
+/** عرض المحتوى مجمّعاً حسب تاريخ النشر (مرتب بالوقت)، وغير المجدول في الأسفل. */
+function ScheduleView({ items, onOpen }: { items: ContentItem[]; onOpen: (i: ContentItem) => void }) {
+  const today = new Date().toLocaleDateString("en-CA");
+  const groups = useMemo(() => {
+    const map = new Map<string, ContentItem[]>();
+    for (const it of items) {
+      const k = it.publish_date || "";
+      map.set(k, [...(map.get(k) ?? []), it]);
+    }
+    return [...map.entries()]
+      .sort(([a], [b]) => (!a ? 1 : !b ? -1 : a.localeCompare(b)))
+      .map(([date, list]) => [date, list.sort((x, y) => (x.publish_time || "99").localeCompare(y.publish_time || "99"))] as const);
+  }, [items]);
+
+  const dayLabel = (d: string) =>
+    new Date(d + "T00:00:00").toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "long", day: "numeric", month: "long" });
+
+  return (
+    <div className="space-y-4">
+      {groups.map(([date, list]) => (
+        <div key={date || "none"}>
+          <div className={cn("flex items-center gap-2 mb-2 text-xs font-bold",
+            !date ? "text-muted-foreground" : date === today ? "text-emerald-400" : date < today ? "text-muted-foreground" : "text-foreground")}>
+            <CalendarDays className="w-3.5 h-3.5" />
+            {date ? dayLabel(date) : "بدون موعد نشر"}
+            {date === today && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/20">اليوم</span>}
+            <span className="text-muted-foreground font-normal">({list.length})</span>
+          </div>
+          <div className="space-y-1.5">
+            {list.map((it) => {
+              const S = KIND_STYLE[it.kind] ?? KIND_STYLE.video;
+              const st = ITEM_STATUSES.find((x) => x.value === it.status) ?? ITEM_STATUSES[0];
+              const steps = it.steps ?? [];
+              const doneN = steps.filter((x) => x.done).length;
+              return (
+                <button
+                  key={it.id}
+                  onClick={() => onOpen(it)}
+                  className="w-full flex items-center gap-3 p-2.5 rounded-lg bg-white/[0.03] border border-border hover:border-violet-500/30 text-right transition-colors"
+                >
+                  <span className="w-12 shrink-0 text-center font-mono text-xs font-bold text-violet-300" dir="ltr">{it.publish_time || "—"}</span>
+                  <span className={cn("w-7 h-7 shrink-0 rounded-lg flex items-center justify-center", S.color)}><S.icon className="w-3.5 h-3.5" /></span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-sm font-semibold text-foreground truncate">{it.title || "بدون عنوان"}</span>
+                    <span className="block text-[11px] text-muted-foreground">
+                      {kindLabel(it.kind)}{it.platform && ` · ${platformLabel(it.platform)}`}
+                      {steps.length > 0 && ` · ${doneN}/${steps.length} مراحل`}
+                    </span>
+                  </span>
+                  {it.post_url && <ExternalLink className="w-3.5 h-3.5 text-cyan-400 shrink-0" />}
+                  <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0", st.color)}>{st.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
