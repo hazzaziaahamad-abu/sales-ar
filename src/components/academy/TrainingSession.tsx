@@ -24,6 +24,9 @@ import {
   MessageCircle,
   BadgePercent,
   Monitor,
+  Gift,
+  ListOrdered,
+  Hourglass,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -198,6 +201,36 @@ const TOPICS = [
     color: "text-cyan-400",
     bg: "bg-cyan-400/10 border-cyan-400/20 hover:bg-cyan-400/15",
     gradient: "from-cyan-400/20 to-cyan-400/5",
+    platform: "reservations" as const,
+  },
+  {
+    key: "res_hesitant",
+    title: "العميل المتردد «أفكر فيها»",
+    desc: "حوّل «أرجع لك» إلى خطوة صغيرة بموعد محدد",
+    icon: Hourglass,
+    color: "text-amber-400",
+    bg: "bg-amber-400/10 border-amber-400/20 hover:bg-amber-400/15",
+    gradient: "from-amber-400/20 to-amber-400/5",
+    platform: "reservations" as const,
+  },
+  {
+    key: "res_loyalty",
+    title: "بيع بطاقات الهدايا والولاء",
+    desc: "اشرح الميزة التسويقية البارزة واربطها بنمو الصالون",
+    icon: Gift,
+    color: "text-fuchsia-400",
+    bg: "bg-fuchsia-400/10 border-fuchsia-400/20 hover:bg-fuchsia-400/15",
+    gradient: "from-fuchsia-400/20 to-fuchsia-400/5",
+    platform: "reservations" as const,
+  },
+  {
+    key: "res_contact_flow",
+    title: "تسلسل الاتصال (٨ خطوات)",
+    desc: "طبّق مسار الاتصال المعتمد من التحية حتى موعد التنفيذ",
+    icon: ListOrdered,
+    color: "text-indigo-400",
+    bg: "bg-indigo-400/10 border-indigo-400/20 hover:bg-indigo-400/15",
+    gradient: "from-indigo-400/20 to-indigo-400/5",
     platform: "reservations" as const,
   },
 ];
