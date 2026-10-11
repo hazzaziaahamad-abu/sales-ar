@@ -9,16 +9,17 @@ export interface IdeaSticker {
   title: string;
   body: string;
   sort_order: number;
+  likes: string[];
   created_by: string | null;
   created_by_name: string | null;
   created_at: string;
   updated_at: string;
 }
 
-export const STICKER_KINDS: { value: StickerKind; label: string; tag: string; swatch: string }[] = [
-  { value: "star", label: "فكرة خاطفة", tag: "⚡ فكرة خاطفة", swatch: "#fef08a" },
-  { value: "note", label: "تذكير", tag: "📌 تذكير", swatch: "#fbcfe8" },
-  { value: "circle", label: "اقتراح", tag: "💡 اقتراح", swatch: "#a7f3d0" },
+export const STICKER_KINDS: { value: StickerKind; label: string; tag: string; swatch: string; ink: string }[] = [
+  { value: "star", label: "فكرة خاطفة", tag: "⚡ فكرة خاطفة", swatch: "#fef08a", ink: "#713f12" },
+  { value: "note", label: "تذكير", tag: "📌 تذكير", swatch: "#fbcfe8", ink: "#831843" },
+  { value: "circle", label: "اقتراح", tag: "💡 اقتراح", swatch: "#a7f3d0", ink: "#064e3b" },
 ];
 
 export const isStickerKind = (v: unknown): v is StickerKind => v === "star" || v === "note" || v === "circle";
