@@ -35,6 +35,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth-context";
 import { useOrg } from "@/lib/org-context";
 import ScheduledTasksTab from "./_components/ScheduledTasksTab";
 
@@ -90,7 +91,10 @@ const SUGGESTED_PROMPTS = [
 ];
 
 export default function AgentPage() {
-  const { orgId } = useOrg();
+  const { orgId: ctxOrgId } = useOrg();
+  const { activeOrgId } = useAuth();
+  // المؤسسة الفعلية من auth (تتحدّث عند التبديل)؛ useOrg قد يبقى على قيمة قديمة
+  const orgId = activeOrgId || ctxOrgId;
   const { messages, sendMessage, status, error, setMessages, addToolApprovalResponse } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/agent",

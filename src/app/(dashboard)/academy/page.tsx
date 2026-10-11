@@ -266,7 +266,9 @@ export default function AcademyPage() {
   const isSuperAdmin = user?.isSuperAdmin ?? false;
 
   // Map org to platform: org ...001 = menu, org ...002 = reservations
-  const platformSection: SectionKey = currentOrgId === "00000000-0000-0000-0000-000000000002" ? "reservations" : "menu";
+  // المؤسسة الفعلية من auth (تتحدّث عند التبديل)؛ useOrg قد يبقى على قيمة قديمة
+  const platformOrgId = orgId || currentOrgId;
+  const platformSection: SectionKey = platformOrgId === "00000000-0000-0000-0000-000000000002" ? "reservations" : "menu";
 
   const [showTraining, setShowTraining] = useState(false);
   const [showKnowledgeEditor, setShowKnowledgeEditor] = useState(false);
