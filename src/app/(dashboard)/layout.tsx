@@ -18,15 +18,16 @@ import { TeamCelebrationToast } from "@/components/team-reminders/team-celebrati
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { OrgProvider } from "@/lib/org-context";
 import { Skeleton } from "@/components/ui/skeleton";
-import { fetchDeals, fetchSalesTargets, fetchSalesActivities, fetchTickets, fetchRenewals, fetchEmployeeTasks, fetchMentionNotifications, markMentionNotificationsRead, markSingleMentionRead, fetchRecentFollowUpNotes, fetchDueReminders, dismissReminder, resolveClientProfileQuery } from "@/lib/supabase/db";
+import { fetchDeals, fetchSalesTargets, fetchSalesActivities, fetchTickets, fetchRenewals, fetchEmployeeTasks, fetchMentionNotifications, markMentionNotificationsRead, markSingleMentionRead, fetchRecentFollowUpNotes, fetchDueReminders, dismissReminder } from "@/lib/supabase/db";
 import { createClient } from "@/lib/supabase/client";
 import type { Reminder } from "@/lib/supabase/db";
 import type { AppNotification, MentionNotification, Deal, Ticket, Renewal, EmployeeTask } from "@/types";
 import { CCThemeProvider } from "@/lib/theme-context";
 import { saudiDateStr } from "@/lib/utils/format";
 import { PageTracker } from "@/components/layout/page-tracker";
+import { MentionAlertBanner, isMentionsManager } from "@/components/mentions/mention-alert-banner";
 
-const ALWAYS_ALLOWED_SLUGS = ["urgent-followup"];
+const ALWAYS_ALLOWED_SLUGS = ["urgent-followup", "mentions"];
 
 const PAGE_SLUG_MAP: Record<string, string> = {
   "/dashboard": "dashboard",
@@ -203,110 +204,13 @@ function ManagementChatNotifLoader({ onLoad }: { onLoad: (n: AppNotification[]) 
   return null;
 }
 
-const MENTION_SECTION_PATH: Record<string, string> = {
-  deal: "/sales",
-  ticket: "/support",
-  renewal: "/renewals",
-};
-
-// يفتح ملخص العميل بجواله (من السجل نفسه) بدل الاسم — الاسم ممكن يكون عام أو رمز مثل «*»
-async function buildMentionUrl(m: MentionNotification): Promise<string> {
-  const base = MENTION_SECTION_PATH[m.entity_type] || "/sales";
-  const params = new URLSearchParams();
-  const profile = await resolveClientProfileQuery(m.entity_type, m.entity_id, m.entity_name);
-  if (profile) params.set("profile", profile);
-  if (m.note_id) params.set("noteId", m.note_id);
-  return `${base}?${params.toString()}`;
-}
-
-function MentionAlertBanner({ mentions, onRefresh }: { mentions: MentionNotification[]; onRefresh: () => void }) {
-  const router = useRouter();
-  const [markedIds, setMarkedIds] = useState<Set<string>>(new Set());
-
-  if (mentions.length === 0) return null;
-
-  const unreadCount = mentions.filter((m) => !m.is_read && !markedIds.has(m.id)).length;
-
-  const markRead = (ids: string[]) => {
-    markMentionNotificationsRead(ids).catch(console.error);
-    setMarkedIds((prev) => { const next = new Set(prev); ids.forEach((id) => next.add(id)); return next; });
-  };
-
-  return (
-    <div className="mb-4 rounded-[14px] border border-amber-500/30 bg-gradient-to-l from-amber-500/[0.08] to-amber-500/[0.02] overflow-hidden animate-in slide-in-from-top-2 duration-300">
-      <div className="px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-amber-500/15 flex items-center justify-center relative shrink-0">
-            <span className="text-lg">@</span>
-            <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-amber-500 text-white text-[11px] font-bold flex items-center justify-center">
-              {mentions.length}
-            </span>
-          </div>
-          <div>
-            <p className="text-sm font-bold text-foreground">
-              منشناتك ({mentions.length})
-              {unreadCount > 0 && <span className="text-amber-400 mr-2">— {unreadCount} جديد</span>}
-            </p>
-            <p className="text-[12px] text-muted-foreground">موظفين أشاروا إليك في سجل المتابعة</p>
-          </div>
-        </div>
-        {unreadCount > 0 && (
-          <button
-            onClick={() => {
-              const unreadIds = mentions.filter((m) => !m.is_read && !markedIds.has(m.id)).map((m) => m.id);
-              markRead(unreadIds);
-              onRefresh();
-            }}
-            className="text-[12px] px-3 py-1.5 rounded-lg border border-amber-500/30 text-amber-400 hover:bg-amber-500/10 transition-colors shrink-0"
-          >
-            تم القراءة ✓
-          </button>
-        )}
-      </div>
-      <div className="divide-y divide-border/20 max-h-[420px] overflow-y-auto">
-        {mentions.map((m) => {
-          const isNew = !m.is_read && !markedIds.has(m.id);
-          return (
-            <button
-              key={m.id}
-              onClick={() => {
-                if (isNew) markRead([m.id]);
-                buildMentionUrl(m).then((url) => router.push(url));
-              }}
-              className={`w-full text-right px-4 py-2.5 flex items-center gap-3 hover:bg-white/[0.04] transition-colors ${isNew ? "" : "opacity-50"}`}
-            >
-              <div className={`w-7 h-7 rounded-full border flex items-center justify-center text-xs font-bold shrink-0 ${isNew ? "bg-amber-500/10 border-amber-500/20 text-amber-400" : "bg-muted/10 border-border/30 text-muted-foreground"}`}>
-                {m.author_name.charAt(0)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-foreground truncate">
-                  <span className={`font-bold ${isNew ? "text-amber-400" : "text-muted-foreground"}`}>{m.author_name}</span>
-                  {" أشار إليك في "}
-                  <span className="font-semibold">{m.entity_name}</span>
-                </p>
-                <p className="text-[11px] text-muted-foreground truncate mt-0.5">{m.note_text.slice(0, 80)}</p>
-              </div>
-              <div className="flex flex-col items-end gap-1 shrink-0">
-                {isNew && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-bold animate-pulse">جديد</span>
-                )}
-                <span className="text-[11px] text-muted-foreground/60">
-                  {(() => {
-                    const diff = Date.now() - new Date(m.created_at).getTime();
-                    const mins = Math.floor(diff / 60000);
-                    if (mins < 60) return `${mins}د`;
-                    const hrs = Math.floor(mins / 60);
-                    if (hrs < 24) return `${hrs}س`;
-                    return `${Math.floor(hrs / 24)}ي`;
-                  })()}
-                </span>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
+/** بانر المنشنات أعلى الصفحة — للفريق فقط؛ المدير يشوفها من قسم «منشناتي» */
+function MentionBannerSlot({ mentions, unreadOnly }: { mentions: MentionNotification[]; unreadOnly: boolean }) {
+  const { user } = useAuth();
+  if (isMentionsManager(user)) return null;
+  const list = unreadOnly ? mentions.filter((m) => !m.is_read) : mentions;
+  if (unreadOnly && list.length === 0) return null;
+  return <MentionAlertBanner mentions={list} onRefresh={() => {}} />;
 }
 
 function BrowserNotifBanner() {
@@ -858,12 +762,10 @@ export default function DashboardLayout({
           <main className="px-4 sm:px-6 pb-8 pt-5">
             <AuthGate>
               {/* المنشن غير المقروء يطلع في كل الصفحات — مو بس صفحات المتابعة */}
-              {!showFollowupBanners && recentMentions.some((m) => !m.is_read) && (
-                <MentionAlertBanner mentions={recentMentions.filter((m) => !m.is_read)} onRefresh={() => {}} />
-              )}
+              {!showFollowupBanners && <MentionBannerSlot mentions={recentMentions} unreadOnly />}
               {showFollowupBanners && (
                 <>
-                  <MentionAlertBanner mentions={recentMentions} onRefresh={() => {}} />
+                  <MentionBannerSlot mentions={recentMentions} unreadOnly={false} />
                   <RemindersBanner reminders={dueReminders} onDismiss={(id) => {
                     dismissReminder(id).catch(() => {});
                     setDueReminders((prev) => prev.filter((r) => r.id !== id));

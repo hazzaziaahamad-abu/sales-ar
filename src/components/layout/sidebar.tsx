@@ -54,15 +54,19 @@ import {
   Lightbulb,
   Siren,
   BellRing,
+  AtSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
-import { countPendingDeals, countUrgentFollowupDeals } from "@/lib/supabase/db";
+import { countPendingDeals, countUrgentFollowupDeals, fetchMentionNotifications } from "@/lib/supabase/db";
+import { isMentionsManager, MENTIONS_UPDATED_EVENT } from "@/components/mentions/mention-alert-banner";
 
 export const NAV_ITEMS = [
   // هام جداً — ظاهرة لكل الموظفين دائماً (بدون صلاحية) عشان ما تضيع متابعة انتظار الدفع / التجريبي / التجهيز
   { label: "هام جداً للمتابعة اليومية", href: "/urgent-followup", slug: "urgent-followup", icon: Siren, color: "red", group: "عام", alwaysVisible: true, urgent: true },
   { label: "المتابعة اليومية", href: "/daily-huddle", slug: "daily-huddle", icon: CalendarCheck, color: "violet", group: "عام" },
+  // للمدير فقط — بدل بانر المنشنات أعلى الصفحة
+  { label: "منشناتي", href: "/mentions", slug: "mentions", icon: AtSign, color: "amber", group: "عام", managerOnly: true },
   { label: "نظرة عامة", href: "/dashboard", slug: "dashboard", icon: LayoutDashboard, color: "cyan", group: "عام" },
   { label: "غرفة العمليات", href: "/operations", slug: "operations", icon: BrainCircuit, color: "violet", group: "عام" },
   // مخفية — استُبدلت بـ«بوصلة اليوم» في السكرتير التنفيذي (نظام موجّه للنتائج)
@@ -152,6 +156,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const [orgMenuOpen, setOrgMenuOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [urgentCount, setUrgentCount] = useState(0);
+  const [mentionCount, setMentionCount] = useState(0);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
 
   const toggleGroup = (group: string) => {
@@ -175,10 +180,22 @@ export function Sidebar({ open, onClose }: SidebarProps) {
     return () => clearInterval(id);
   }, [activeOrgId, user, urgentRepName]);
 
+  const isManager = isMentionsManager(user);
+  const userName = user?.name;
+  useEffect(() => {
+    if (!isManager || !userName) return;
+    const load = () => fetchMentionNotifications(userName).then((m) => setMentionCount(m.filter((x) => !x.is_read).length)).catch(() => {});
+    load();
+    const id = setInterval(load, 60000);
+    window.addEventListener(MENTIONS_UPDATED_EVENT, load);
+    return () => { clearInterval(id); window.removeEventListener(MENTIONS_UPDATED_EVENT, load); };
+  }, [activeOrgId, isManager, userName]);
+
   const isSuperAdmin = user?.isSuperAdmin ?? false;
 
   // Filter nav items by user permissions
   const visibleItems = NAV_ITEMS.filter((item) => {
+    if ((item as { managerOnly?: boolean }).managerOnly) return isManager;
     if (isSuperAdmin) return true;
     if ((item as { alwaysVisible?: boolean }).alwaysVisible) return !!user;
     return user?.allowedPages.includes(item.slug);
@@ -390,6 +407,11 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                           <Icon className="w-5 h-5" />
                         </span>
                         <span className="flex-1 font-semibold">{item.label}</span>
+                        {item.slug === "mentions" && mentionCount > 0 && (
+                          <span className="min-w-[22px] h-[22px] flex items-center justify-center rounded-full bg-amber-500 text-white text-[13px] font-bold px-1.5">
+                            {mentionCount}
+                          </span>
+                        )}
                         {item.slug === "requests" && pendingCount > 0 && (
                           <span className="min-w-[22px] h-[22px] flex items-center justify-center rounded-full bg-red-500 text-white text-[13px] font-bold px-1.5 animate-pulse">
                             {pendingCount}

@@ -28,7 +28,7 @@ import { NAV_ITEMS } from "@/components/layout/sidebar";
 
 // Derive pages from sidebar nav items automatically + extra hidden pages
 const ALL_PAGES = [
-  ...NAV_ITEMS.map((item) => ({ slug: item.slug, label: item.label })),
+  ...NAV_ITEMS.filter((item) => !(item as { managerOnly?: boolean }).managerOnly).map((item) => ({ slug: item.slug, label: item.label })),
   // Pages not in sidebar but need permission control
   { slug: "sales-guide", label: "دليل المبيعات" },
   { slug: "agent", label: "المساعد الذكي" },
