@@ -18,6 +18,7 @@ import { ClientProfilePanel } from "@/components/client-profile-panel";
 import { YesterdaySummary } from "@/components/secretary/yesterday-summary";
 import type { ActivityLog } from "@/types";
 import { useAuth } from "@/lib/auth-context";
+import { isSupportSalesMerged } from "@/lib/sales-merge";
 import { formatMoneyFull, todayLocal, dateToLocal, saudiDateStr } from "@/lib/utils/format";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -606,10 +607,12 @@ function RepAction({ repName, phoneMap, message }: { repName?: string; phoneMap:
 }
 
 function SourceBadge({ deal: d }: { deal: Deal }) {
-  const support = d.sales_type === "support";
+  const { activeOrgId } = useAuth();
+  const merged = isSupportSalesMerged(activeOrgId);
+  const support = d.sales_type === "support" && !merged;
   return (
     <span className={`text-[10px] px-1.5 py-0.5 rounded-full border shrink-0 ${support ? "bg-orange-500/10 text-orange-300 border-orange-500/20" : "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"}`}>
-      {support ? "مبيعات الدعم" : "مبيعات المكتب"}
+      {support ? "مبيعات الدعم" : merged ? "المبيعات" : "مبيعات المكتب"}
     </span>
   );
 }
@@ -947,7 +950,9 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
   embedded?: boolean;
 } = {}) {
   const show = (key: SecretarySection) => (!sections || sections.includes(key)) && !exclude?.includes(key);
-  const { user } = useAuth();
+  const { user, activeOrgId } = useAuth();
+  // نحجز: «مبيعات الدعم» مدموجة مع «المبيعات» — قسم مبيعات واحد
+  const salesMerged = isSupportSalesMerged(activeOrgId);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [renewals, setRenewals] = useState<Renewal[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -1156,7 +1161,7 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
         const items = recentStageDeals
           // ٧ أيام: نفس فلتر recentStageDeals (بالأيام)؛ ٢٤ ساعة: بالوقت الفعلي لآخر تفاعل.
           .filter(x => windowMs >= 7 * 86400000 || withinWindow(x.intel.lastActivityDate))
-          .filter(x => type === "support" ? x.deal.sales_type === "support" : (x.deal.sales_type === "office" || !x.deal.sales_type));
+          .filter(x => salesMerged ? type === "office" : type === "support" ? x.deal.sales_type === "support" : (x.deal.sales_type === "office" || !x.deal.sales_type));
         const map = new Map<string, StateGroup>();
         for (const x of items) {
           const st = x.deal.stage;
@@ -1198,6 +1203,13 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
         return Array.from(map.values()).sort((a, b) => b.count - a.count);
       };
 
+      if (salesMerged) {
+        return [
+          { key: "office", label: "المبيعات", groups: dealGroups("office", "مبيعات") },
+          { key: "renewals", label: "التجديدات", groups: renewalGroups() },
+          { key: "tickets", label: "تذاكر الدعم", groups: ticketGroups() },
+        ];
+      }
       return [
         { key: "support", label: "مبيعات الدعم", groups: dealGroups("support", "دعم") },
         { key: "renewals", label: "التجديدات", groups: renewalGroups() },
@@ -1206,7 +1218,7 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
       ];
     };
     return { "24h": build(86400000), "7d": build(7 * 86400000) };
-  }, [recentStageDeals, renewals, tickets]);
+  }, [recentStageDeals, renewals, tickets, salesMerged]);
 
   // Rep escalation: reps with 3+ stale/cold deals
   const repEscalation = useMemo(() => {
@@ -1371,8 +1383,8 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
     const weekStart = dateToLocal(new Date(Date.now() - 6 * 24 * 60 * 60 * 1000));
 
     // Split deals by sales_type
-    const officeDeals = deals.filter(d => d.sales_type === "office" || !d.sales_type);
-    const supportDeals = deals.filter(d => d.sales_type === "support");
+    const officeDeals = salesMerged ? deals : deals.filter(d => d.sales_type === "office" || !d.sales_type);
+    const supportDeals = salesMerged ? [] : deals.filter(d => d.sales_type === "support");
 
     // Helper: check if a YYYY-MM-DD string falls within [start, end] inclusive
     const inDayRange = (dateStr: string | undefined, start: string, end: string) =>
@@ -1451,7 +1463,7 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
       todayNew: 0,
       todayTotalRev: today.totalRev,
     };
-  }, [deals, renewals, tickets, selectedMonth, selectedYear]);
+  }, [deals, renewals, tickets, selectedMonth, selectedYear, salesMerged]);
 
   // Performers — top/bottom per department for the selected period
   const performers = useMemo(() => {
@@ -1483,7 +1495,7 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
       if (d.stage !== "مكتملة") continue;
       if (!matchDate(d.close_date || d.created_at)) continue;
       const name = d.assigned_rep_name?.trim() || "بلا مسؤول";
-      const target = (d.sales_type === "support") ? supportRepMap : officeRepMap;
+      const target = (d.sales_type === "support" && !salesMerged) ? supportRepMap : officeRepMap;
       const cur = target.get(name) || { count: 0, rev: 0 };
       cur.count += 1; cur.rev += d.deal_value;
       target.set(name, cur);
@@ -1558,7 +1570,7 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
       tickets: ticketRank,
       renewals: renewalRank as { top?: RankEntry; bottom?: RankEntry; total: number },
     };
-  }, [deals, renewals, tickets, selectedPeriod, selectedMonth, selectedYear]);
+  }, [deals, renewals, tickets, selectedPeriod, selectedMonth, selectedYear, salesMerged]);
 
   // Weak departments today — used to auto-schedule a 9 PM review meeting
   const weakDepartments = useMemo(() => {
@@ -1571,18 +1583,20 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
     const weak: { key: string; label: string; attendees: string; reason: string }[] = [];
 
     const officeCount = deals.filter(d =>
-      (d.sales_type === "office" || !d.sales_type) &&
+      (salesMerged || d.sales_type === "office" || !d.sales_type) &&
       d.stage === "مكتملة" &&
       inToday(d.close_date || d.created_at)
     ).length;
-    if (officeCount === 0) weak.push({ key: "office", label: "مبيعات المكتب", attendees: "فريق مبيعات المكتب", reason: "لا صفقات مغلقة اليوم" });
+    if (officeCount === 0) weak.push(salesMerged
+      ? { key: "office", label: "المبيعات", attendees: "فريق المبيعات", reason: "لا صفقات مغلقة اليوم" }
+      : { key: "office", label: "مبيعات المكتب", attendees: "فريق مبيعات المكتب", reason: "لا صفقات مغلقة اليوم" });
 
     const supportCount = deals.filter(d =>
       d.sales_type === "support" &&
       d.stage === "مكتملة" &&
       inToday(d.close_date || d.created_at)
     ).length;
-    if (supportCount === 0) weak.push({ key: "support", label: "مبيعات الدعم", attendees: "فريق مبيعات الدعم", reason: "لا صفقات مغلقة اليوم" });
+    if (!salesMerged && supportCount === 0) weak.push({ key: "support", label: "مبيعات الدعم", attendees: "فريق مبيعات الدعم", reason: "لا صفقات مغلقة اليوم" });
 
     const resolvedCount = tickets.filter(t =>
       t.status === "محلول" && inToday(t.resolved_date || t.updated_at)
@@ -1599,7 +1613,7 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
     if (renewCount === 0) weak.push({ key: "renewals", label: "التجديدات", attendees: "فريق التجديدات", reason: "لا تجديدات مكتملة اليوم" });
 
     return weak;
-  }, [deals, tickets, renewals, supportHealth.avgResponse]);
+  }, [deals, tickets, renewals, supportHealth.avgResponse, salesMerged]);
 
   // Auto-schedule 10 PM review meeting for each weak department (once, after data loads)
   useEffect(() => {
@@ -1830,15 +1844,17 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
                     <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
                       <TrendingUp className="w-4 h-4 text-emerald-400 mx-auto mb-1" />
                       <p className="text-xl font-bold text-emerald-400">{s.office}</p>
-                      <p className="text-[12px] text-muted-foreground">مبيعات المكتب</p>
+                      <p className="text-[12px] text-muted-foreground">{salesMerged ? "المبيعات" : "مبيعات المكتب"}</p>
                       {s.officeRev > 0 && <p className="text-[12px] text-emerald-400/70 mt-0.5">{formatMoneyFull(s.officeRev)}</p>}
                     </div>
+                    {!salesMerged && (
                     <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/20 text-center">
                       <TrendingUp className="w-4 h-4 text-orange-400 mx-auto mb-1" />
                       <p className="text-xl font-bold text-orange-400">{s.support}</p>
                       <p className="text-[12px] text-muted-foreground">مبيعات الدعم</p>
                       {s.supportRev > 0 && <p className="text-[12px] text-orange-400/70 mt-0.5">{formatMoneyFull(s.supportRev)}</p>}
                     </div>
+                    )}
                     <div className="p-3 rounded-xl bg-sky-500/10 border border-sky-500/20 text-center">
                       <RefreshCw className="w-4 h-4 text-sky-400 mx-auto mb-1" />
                       <p className="text-xl font-bold text-sky-400">{s.renewals}</p>
@@ -1873,17 +1889,19 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5">
                   <PerformerCard
-                    title="مبيعات المكتب"
+                    title={salesMerged ? "المبيعات" : "مبيعات المكتب"}
                     accent="emerald"
                     unit="صفقة"
                     data={performers.office}
                   />
+                  {!salesMerged && (
                   <PerformerCard
                     title="مبيعات الدعم"
                     accent="orange"
                     unit="صفقة"
                     data={performers.support}
                   />
+                  )}
                   <PerformerCard
                     title="الدعم الفني"
                     accent="rose"
@@ -1929,7 +1947,7 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
               </div>
 
               {/* Office Sales */}
-              <p className="text-[12px] font-bold text-emerald-400 mb-1.5">مبيعات المكتب</p>
+              <p className="text-[12px] font-bold text-emerald-400 mb-1.5">{salesMerged ? "المبيعات" : "مبيعات المكتب"}</p>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
                 <div className="p-2.5 rounded-xl bg-emerald-500/[0.06] border border-emerald-500/15 text-center">
                   <p className="text-lg font-bold text-emerald-400">{briefingStats.closedOffice}</p>
@@ -1945,7 +1963,8 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
                 </div>
               </div>
 
-              {/* Support Sales */}
+              {/* Support Sales — مخفي في نحجز (مدموجة مع المبيعات) */}
+              {!salesMerged && (<>
               <p className="text-[12px] font-bold text-orange-400 mb-1.5">مبيعات الدعم</p>
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div className="p-2.5 rounded-xl bg-orange-500/[0.06] border border-orange-500/15 text-center">
@@ -1957,6 +1976,7 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
                   <p className="text-[12px] text-muted-foreground">الإيرادات</p>
                 </div>
               </div>
+              </>)}
 
               {/* Renewals */}
               <p className="text-[12px] font-bold text-sky-400 mb-1.5">التجديدات</p>

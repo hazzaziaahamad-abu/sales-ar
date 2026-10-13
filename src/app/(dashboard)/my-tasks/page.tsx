@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { isSupportSalesMerged } from "@/lib/sales-merge";
 import { revenueCutoff, visibleAmount } from "@/lib/revenue-visibility";
 import {
   fetchEmployeeTasks,
@@ -214,7 +215,8 @@ function getCountdown(dueDate?: string, dueTime?: string): { label: string; urge
 }
 
 export default function MyTasksPage() {
-  const { user } = useAuth();
+  const { user, activeOrgId } = useAuth();
+  const salesMerged = isSupportSalesMerged(activeOrgId);
   const isAdmin = user?.isSuperAdmin || user?.roleName === "admin" || user?.roleName === "مدير";
   const [tasks, setTasks] = useState<EmployeeTask[]>([]);
   const [loading, setLoading] = useState(true);
@@ -461,7 +463,7 @@ export default function MyTasksPage() {
     try {
       const created = await createEmployeeTask({
         title: `${clientForm.stage} — ${clientForm.client_name}`,
-        description: `${clientForm.sales_type === "office" ? "مبيعات المكتب" : "مبيعات الدعم"} | المصدر: ${clientForm.source}${clientForm.plan ? ` | الباقة: ${clientForm.plan}` : ""}${clientForm.deal_value ? ` | القيمة: ${clientForm.deal_value} ر.س` : ""}`,
+        description: `${clientForm.sales_type === "office" ? (salesMerged ? "المبيعات" : "مبيعات المكتب") : "مبيعات الدعم"} | المصدر: ${clientForm.source}${clientForm.plan ? ` | الباقة: ${clientForm.plan}` : ""}${clientForm.deal_value ? ` | القيمة: ${clientForm.deal_value} ر.س` : ""}`,
         task_type: "followup",
         priority: "medium",
         status: "in_progress",
@@ -1395,7 +1397,8 @@ export default function MyTasksPage() {
             </div>
 
             <div className="space-y-4">
-              {/* Sales type toggle */}
+              {/* Sales type toggle — مخفي في نحجز (مبيعات الدعم مدموجة مع المبيعات) */}
+              {!salesMerged && (
               <div>
                 <label className="text-sm text-gray-400 mb-1.5 block">القسم</label>
                 <div className="flex gap-2">
@@ -1423,6 +1426,7 @@ export default function MyTasksPage() {
                   </button>
                 </div>
               </div>
+              )}
 
               {/* Client name */}
               <div>

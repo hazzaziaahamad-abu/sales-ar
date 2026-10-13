@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import type { PendingDeal } from "@/types";
 import { fetchPendingDeals, approvePendingDeal, rejectPendingDeal } from "@/lib/supabase/db";
 import { useAuth } from "@/lib/auth-context";
+import { isSupportSalesMerged } from "@/lib/sales-merge";
 import { formatMoneyFull, formatDate } from "@/lib/utils/format";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -232,7 +233,7 @@ export default function RequestsPage() {
               <InfoRow label="المرحلة" value={detailDeal.stage || "قيد التواصل"} />
               <InfoRow label="المصدر" value={detailDeal.source || "—"} />
               <InfoRow label="الباقة" value={detailDeal.plan || "—"} />
-              <InfoRow label="القسم" value={detailDeal.sales_type === "support" ? "مبيعات الدعم" : "مبيعات المكتب"} />
+              <InfoRow label="القسم" value={isSupportSalesMerged(orgId) ? "المبيعات" : detailDeal.sales_type === "support" ? "مبيعات الدعم" : "مبيعات المكتب"} />
               <InfoRow label="المسؤول" value={detailDeal.assigned_rep_name || "—"} />
               <InfoRow label="مرسل الطلب" value={detailDeal.submitter_name || "—"} />
               {detailDeal.notes && <InfoRow label="ملاحظات" value={detailDeal.notes} />}

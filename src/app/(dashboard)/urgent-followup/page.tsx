@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
 import { Siren, CreditCard, FlaskConical, Settings, Phone, MessageCircle, RefreshCw, ExternalLink, User, Users, Hourglass, StickyNote } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { isSupportSalesMerged } from "@/lib/sales-merge";
 import { formatMoney, tableDateBounds } from "@/lib/utils/format";
 import { FollowUpLogButton } from "@/components/follow-up-log";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -50,6 +51,8 @@ function shortDate(iso: string): string {
 
 export default function UrgentFollowupPage() {
   const { user, activeOrgId } = useAuth();
+  // نحجز: «مبيعات الدعم» مدموجة مع «المبيعات» — لا فلتر للقسم
+  const salesMerged = isSupportSalesMerged(activeOrgId);
   const isAdmin = isUrgentAdmin(user);
   const [items, setItems] = useState<UrgentDeal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,12 +90,12 @@ export default function UrgentFollowupPage() {
   const filtered = useMemo(() => {
     const bounds = period === "الكل" ? null : tableDateBounds(period);
     return items
-      .filter((i) => !typeFilter || (i.deal.sales_type ?? "office") === typeFilter)
+      .filter((i) => !typeFilter || salesMerged || (i.deal.sales_type ?? "office") === typeFilter)
       .filter((i) => !repFilter || i.deal.assigned_rep_name === repFilter)
       .filter((i) => { if (!bounds) return true; const day = dealDay(i); return day >= bounds[0] && day <= bounds[1]; })
       // الأقدم بدون تحديث أولاً
       .sort((a, b) => b.staleDays - a.staleDays || b.stageDays - a.stageDays);
-  }, [items, period, typeFilter, repFilter]);
+  }, [items, period, typeFilter, repFilter, salesMerged]);
 
   const byStage = useMemo(() => {
     const m: Record<string, UrgentDeal[]> = {};
@@ -152,6 +155,7 @@ export default function UrgentFollowupPage() {
             </button>
           ))}
         </div>
+        {!salesMerged && (
         <div className="flex rounded-[12px] border border-border bg-card p-1">
           {TYPES.map((t) => (
             <button
@@ -165,6 +169,7 @@ export default function UrgentFollowupPage() {
             </button>
           ))}
         </div>
+        )}
         {isAdmin && reps.length > 0 && (
           <select
             value={repFilter}
@@ -284,7 +289,7 @@ export default function UrgentFollowupPage() {
                               )}
                               {d.deal_value > 0 && <span>{formatMoney(d.deal_value)}</span>}
                               {d.plan && <span>{d.plan}</span>}
-                              <span>{d.sales_type === "support" ? "مبيعات الدعم" : "المبيعات"}</span>
+                              <span>{d.sales_type === "support" && !salesMerged ? "مبيعات الدعم" : "المبيعات"}</span>
                             </div>
                           </div>
                           <span

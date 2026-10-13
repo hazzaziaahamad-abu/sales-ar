@@ -69,7 +69,7 @@ function getDateRange(period: string): Date | null {
   return null;
 }
 
-export default function SalesKPIDashboard({ deals: externalDeals }: { deals?: Deal[] }) {
+export default function SalesKPIDashboard({ deals: externalDeals, merged = false }: { deals?: Deal[]; merged?: boolean }) {
   const [deals, setDeals] = useState<DealWithStages[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -168,7 +168,7 @@ export default function SalesKPIDashboard({ deals: externalDeals }: { deals?: De
             <BarChart2 className="w-4 h-4 text-orange-400" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-foreground">KPI مبيعات الدعم</h2>
+            <h2 className="text-lg font-bold text-foreground">{merged ? "KPI المبيعات" : "KPI مبيعات الدعم"}</h2>
             <p className="text-xs text-muted-foreground">تتبع مراحل البيع ونسب الكريديت — مرتبط بالصفقات مباشرة</p>
           </div>
         </div>

@@ -58,6 +58,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
+import { isSupportSalesMerged } from "@/lib/sales-merge";
 import { countPendingDeals, countUrgentFollowupDeals, fetchMentionNotifications, URGENT_ADMIN_DAYS } from "@/lib/supabase/db";
 import { isMentionsManager, MENTIONS_UPDATED_EVENT } from "@/components/mentions/mention-alert-banner";
 
@@ -195,6 +196,8 @@ export function Sidebar({ open, onClose }: SidebarProps) {
 
   // Filter nav items by user permissions
   const visibleItems = NAV_ITEMS.filter((item) => {
+    // نحجز: «مبيعات الدعم» مدموجة مع «المبيعات»
+    if (item.slug === "support-sales" && isSupportSalesMerged(activeOrgId)) return false;
     if ((item as { managerOnly?: boolean }).managerOnly) return isManager;
     if (isSuperAdmin) return true;
     if ((item as { alwaysVisible?: boolean }).alwaysVisible) return !!user;

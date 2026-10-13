@@ -6,6 +6,7 @@
  *   «تغيير المرحلة إلى X»). لو ما فيه سجل نرجع لتاريخ إنشاء الصفقة.
  */
 import { createClient } from "@/lib/supabase/client";
+import { isSupportSalesMerged } from "@/lib/sales-merge";
 import { getOrgId, URGENT_FOLLOWUP_STAGES, URGENT_ADMIN_DAYS, urgentSinceFilter } from "@/lib/supabase/db";
 import type { Deal } from "@/types";
 
@@ -62,7 +63,9 @@ export async function fetchUrgentDeals(opts?: { repName?: string; salesType?: "o
     .eq("org_id", orgId)
     .in("stage", [...URGENT_FOLLOWUP_STAGES]);
   if (opts?.repName) query = query.eq("assigned_rep_name", opts.repName.trim());
-  if (opts?.salesType) query = query.eq("sales_type", opts.salesType);
+  // نحجز: «مبيعات الدعم» مدموجة مع «المبيعات» — بانر المبيعات يشمل كل الصفقات
+  const merged = opts?.salesType === "office" && isSupportSalesMerged(orgId);
+  if (opts?.salesType && !merged) query = query.eq("sales_type", opts.salesType);
   if (opts?.sinceDays) query = query.or(urgentSinceFilter(opts.sinceDays));
   const { data, error } = await query.limit(2000);
   if (error) throw error;

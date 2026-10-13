@@ -27,7 +27,9 @@ export const SCOPE_LABELS: Record<VerifyScope, string> = {
 };
 
 /** خيارات «القسم» حسب نوع التقرير: الصفقات أو التجديدات. */
-export function scopeOptions(entity: EntityType): { value: VerifyScope; label: string }[] {
+export function scopeOptions(entity: EntityType, salesMerged = false): { value: VerifyScope; label: string }[] {
+  // نحجز: مبيعات الدعم مدموجة مع المبيعات — خيار واحد يشمل كل الصفقات
+  if (entity !== "renewal" && salesMerged) return [{ value: "all", label: "المبيعات" }];
   return entity === "renewal"
     ? [{ value: "renewals", label: "التجديدات (الكل)" }, { value: "support", label: "تجديدات الدعم" }, { value: "office", label: "تجديدات المكتب" }]
     : [{ value: "support", label: "مبيعات الدعم" }, { value: "office", label: "مبيعات المكتب" }, { value: "all", label: "الكل" }];

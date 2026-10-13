@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { fetchEmployees, fetchUserProfiles } from "@/lib/supabase/db";
 import { useAuth } from "@/lib/auth-context";
+import { isSupportSalesMerged } from "@/lib/sales-merge";
 import { useHuddleManagers } from "@/lib/huddle-managers";
 import { formatMoneyFull, todayLocal } from "@/lib/utils/format";
 import {
@@ -216,9 +217,11 @@ function NewRequestForm({ onCancel, onCreated, onError }: {
   onCreated: (r: VerificationRequest) => void;
   onError: (m: string) => void;
 }) {
+  const { activeOrgId } = useAuth();
+  const salesMerged = isSupportSalesMerged(activeOrgId);
   const [template, setTemplate] = useState<RequestTemplate>("trial");
   const isGeneral = template === GENERAL;
-  const [scope, setScope] = useState<VerifyScope>("support");
+  const [scope, setScope] = useState<VerifyScope>(() => (salesMerged ? "all" : "support"));
   // فاضي = بدون شرط مدة (للقوالب اللي المدة فيها اختيارية)
   const [staleDays, setStaleDays] = useState("");
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
@@ -305,7 +308,7 @@ function NewRequestForm({ onCancel, onCreated, onError }: {
                 // التجديدات: عملاء الموظف المختار؛ الصفقات: الكل
                 setRep(TEMPLATES[t].entity === "renewal" && assigneeName ? assigneeName : REP_ALL);
                 // القسم يتبع نوع التقرير (صفقات ↔ تجديدات)
-                if (isGeneral || TEMPLATES[t].entity !== TEMPLATES[template].entity) setScope(TEMPLATES[t].entity === "renewal" ? "renewals" : "support");
+                if (isGeneral || TEMPLATES[t].entity !== TEMPLATES[template].entity) setScope(TEMPLATES[t].entity === "renewal" ? "renewals" : salesMerged ? "all" : "support");
               }}
               className={`text-right rounded-[10px] px-3 py-2 border transition-colors ${template === t ? "bg-teal-500/15 border-teal-500/30" : "bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04]"}`}
             >
@@ -323,7 +326,7 @@ function NewRequestForm({ onCancel, onCreated, onError }: {
             <p className={`${inputCls} text-muted-foreground`}>الكل</p>
           ) : (
             <select value={scope} onChange={(e) => setScope(e.target.value as VerifyScope)} className={inputCls}>
-              {scopeOptions(TEMPLATES[template].entity).map((o) => <option key={o.value} value={o.value} className="bg-card">{o.label}</option>)}
+              {scopeOptions(TEMPLATES[template].entity, salesMerged).map((o) => <option key={o.value} value={o.value} className="bg-card">{o.label}</option>)}
             </select>
           )}
         </div>

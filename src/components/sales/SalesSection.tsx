@@ -23,6 +23,7 @@ import { ClientProfilePanel } from "@/components/client-profile-panel";
 import { UrgentFollowupBanner } from "@/components/urgent-followup/urgent-followup-banner";
 import { AchievementSummary } from "@/components/achievement-summary";
 import SalesKPIDashboard from "@/components/sales/SalesKPIDashboard";
+import { isSupportSalesMerged } from "@/lib/sales-merge";
 import { getKpiStatus, KPI_STATUS_STYLES, KPI_TARGETS } from "@/lib/utils/constants";
 import { StatCard } from "@/components/ui/stat-card";
 import { KPICard } from "@/components/ui/kpi-card";
@@ -286,10 +287,12 @@ function starPeriodBounds(filter: string, from?: string, to?: string): [Date, Da
 
 export function SalesSection({ salesType }: SalesPageProps) {
   const isOffice = salesType === "office";
-  const pageTitle = isOffice ? "مبيعات المكتب" : "مبيعات الدعم";
-  const pageDesc = isOffice ? "متابعة مبيعات المكتب وخط الأنابيب" : "متابعة مبيعات الدعم وخط الأنابيب";
-  const clientCodePrefix = isOffice ? "S" : "D";
   const { activeOrgId: orgId, user: authUser } = useAuth();
+  // نحجز: «مبيعات الدعم» مدموجة هنا — صفحة واحدة باسم «المبيعات» وفيها ميزات الدعم (KPI)
+  const mergedSales = isOffice && isSupportSalesMerged(orgId);
+  const pageTitle = mergedSales ? "المبيعات" : isOffice ? "مبيعات المكتب" : "مبيعات الدعم";
+  const pageDesc = mergedSales ? "متابعة المبيعات وخط الأنابيب" : isOffice ? "متابعة مبيعات المكتب وخط الأنابيب" : "متابعة مبيعات الدعم وخط الأنابيب";
+  const clientCodePrefix = isOffice ? "S" : "D";
   const isAdmin = authUser?.isSuperAdmin || authUser?.roleName === "مدير" || authUser?.roleName === "admin";
   // المبالغ المجمّعة: الموظف يشوف آخر 3 شهور فقط (عدد الصفقات يبقى كامل)
   const isSuperAdminUser = !!authUser?.isSuperAdmin;
@@ -1221,8 +1224,8 @@ export function SalesSection({ salesType }: SalesPageProps) {
         });
         setDeals((prev) => [created, ...prev]);
 
-        /* Auto-create KPI stages for support deals */
-        if (!isOffice) {
+        /* Auto-create KPI stages for support deals (and merged sales in نحجز) */
+        if (!isOffice || mergedSales) {
           createDealKpiStages(created.id).catch(console.error);
         }
 
@@ -2859,7 +2862,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
         <TabsList className="bg-card border border-border">
           <TabsTrigger value="kpis">مؤشرات المبيعات</TabsTrigger>
           <TabsTrigger value="kpis-full">مؤشرات الأداء KPIs</TabsTrigger>
-          {!isOffice && <TabsTrigger value="sales-kpi">KPI مبيعات الدعم</TabsTrigger>}
+          {(!isOffice || mergedSales) && <TabsTrigger value="sales-kpi">{mergedSales ? "KPI المبيعات" : "KPI مبيعات الدعم"}</TabsTrigger>}
           <TabsTrigger value="renewals">التجديدات</TabsTrigger>
           <TabsTrigger value="satisfaction">رضا العملاء</TabsTrigger>
         </TabsList>
@@ -3072,10 +3075,10 @@ export function SalesSection({ salesType }: SalesPageProps) {
           </div>
         </TabsContent>
 
-        {/* Tab: KPI مبيعات الدعم — support only */}
-        {!isOffice && (
+        {/* Tab: KPI مبيعات الدعم — support only (+ المبيعات المدموجة في نحجز) */}
+        {(!isOffice || mergedSales) && (
           <TabsContent value="sales-kpi" className="space-y-6">
-            <SalesKPIDashboard deals={withVisibleAmounts(deals)} />
+            <SalesKPIDashboard deals={withVisibleAmounts(deals)} merged={mergedSales} />
           </TabsContent>
         )}
       </Tabs>

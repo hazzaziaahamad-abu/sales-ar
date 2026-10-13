@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import { submitPendingDeal } from "@/lib/supabase/db";
+import { isSupportSalesMerged } from "@/lib/sales-merge";
 import { SOURCES, PLANS } from "@/lib/utils/constants";
 
 const SUBMIT_STAGES = [
@@ -101,7 +102,8 @@ export default function SubmitDealPage() {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-white/[0.08] bg-white/[0.05] p-6 backdrop-blur-sm">
-          {/* Sales type toggle */}
+          {/* Sales type toggle — مخفي في نحجز (مبيعات الدعم مدموجة مع المبيعات) */}
+          {!isSupportSalesMerged(orgId) && (
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-gray-300">القسم</label>
             <div className="flex gap-2">
@@ -129,6 +131,7 @@ export default function SubmitDealPage() {
               </button>
             </div>
           </div>
+          )}
 
           {/* Client name */}
           <div className="space-y-1.5">

@@ -15,6 +15,7 @@ import {
 import type { Deal, Ticket, Renewal, Employee } from "@/types";
 import { EmployeeDetailPanel } from "@/components/employee-detail-panel";
 import { useAuth } from "@/lib/auth-context";
+import { isSupportSalesMerged } from "@/lib/sales-merge";
 import { formatMoney, todayLocal, dateToLocal } from "@/lib/utils/format";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -87,7 +88,9 @@ const KEY_GOALS = "ops_goals";
 
 /* ═══════════════════════════════════════════════════════════════ */
 export default function OperationsPage() {
-  const { user } = useAuth();
+  const { user, activeOrgId } = useAuth();
+  // نحجز: «مبيعات الدعم» مدموجة مع «المبيعات»
+  const salesMerged = isSupportSalesMerged(activeOrgId);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [renewals, setRenewals] = useState<Renewal[]>([]);
@@ -734,10 +737,10 @@ export default function OperationsPage() {
       ══════════════════════════════════════ */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
         {[
-          { label: "مبيعات المكتب",  href: "/sales",         color: "#10B981", icon: <TrendingUp className="w-4 h-4" /> },
+          { label: salesMerged ? "المبيعات" : "مبيعات المكتب", href: "/sales", color: "#10B981", icon: <TrendingUp className="w-4 h-4" /> },
           { label: "التجديدات",       href: "/renewals",      color: "#F59E0B", icon: <RefreshCw className="w-4 h-4" /> },
           { label: "الدعم",           href: "/support",       color: "#F97316", icon: <Headphones className="w-4 h-4" /> },
-          { label: "مبيعات الدعم",   href: "/support-sales", color: "#8B5CF6", icon: <Briefcase className="w-4 h-4" /> },
+          ...(salesMerged ? [] : [{ label: "مبيعات الدعم", href: "/support-sales", color: "#8B5CF6", icon: <Briefcase className="w-4 h-4" /> }]),
         ].map(q => (
           <Link
             key={q.href}

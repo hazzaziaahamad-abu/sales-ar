@@ -1,4 +1,5 @@
 import { createClient } from "./client";
+import { isSupportSalesMerged } from "@/lib/sales-merge";
 import { todayLocal, saudiDateStr } from "@/lib/utils/format";
 import { buildSubscriberCandidates, diffAgainstExisting, type SubscriberCandidate } from "@/lib/targeting-subscribers";
 import type { Deal, Ticket, Employee, Project, Partnership, KPISnapshot, Review, Renewal, Referral, MonthlyExpense, MonthlyBudget, StartupCost, Marketer, SalesActivity, SalesTarget, RepWeeklyScore, PipPlan, SalesGuideSetting, SalesMessage, SalesMessageRating, FollowUpNote, MentionNotification, PendingDeal, TargetClient, TargetClientLog, GiftOffer, EmployeeTask, Package, AcademyContent, LearningStage, LearningLesson, LearningQuiz, ActivityLog, TrainingKnowledge, ProductFeature, TrainingSessionLog, MarketingPlan, PlanAxis, PlanIdea, DealKpiStage } from "@/types";
@@ -528,7 +529,9 @@ export async function fetchDeals(salesType?: "office" | "support"): Promise<Deal
       .from("deals")
       .select("*")
       .eq("org_id", getOrgId());
-    if (salesType) query = query.eq("sales_type", salesType);
+    // نحجز: «مبيعات الدعم» مدموجة مع «المبيعات» — المبيعات تجيب كل الصفقات
+    const merged = salesType === "office" && isSupportSalesMerged(getOrgId());
+    if (salesType && !merged) query = query.eq("sales_type", salesType);
     const { data, error } = await query
       .order("created_at", { ascending: false })
       .order("id", { ascending: true })
@@ -2259,7 +2262,8 @@ export async function transferTargetClient(
       cycle_days: 0,
       month: m,
       year: y,
-      sales_type: "support",
+      // نحجز: مبيعات الدعم مدموجة مع المبيعات
+      sales_type: isSupportSalesMerged(getOrgId()) ? "office" : "support",
     });
     ref = deal.id;
   } else {
