@@ -9,6 +9,7 @@ import { todayLocal } from "@/lib/utils/format";
 import {
   fetchUrgentDeals,
   isUrgentAdmin,
+  URGENT_ADMIN_DAYS,
   summarizeByRep,
   STALE_DAYS,
   CRITICAL_DAYS,
@@ -36,7 +37,7 @@ export function UrgentFollowupPopup() {
       if (localStorage.getItem(storageKey(user.name))) return;
     } catch { /* storage غير متاح — نعرض النافذة عادي */ }
     let alive = true;
-    fetchUrgentDeals({ repName: admin ? undefined : user.name })
+    fetchUrgentDeals({ repName: admin ? undefined : user.name, sinceDays: admin ? URGENT_ADMIN_DAYS : undefined })
       .then((all) => {
         if (!alive) return;
         const stale = all.filter((i) => i.staleDays >= STALE_DAYS);

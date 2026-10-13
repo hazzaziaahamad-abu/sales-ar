@@ -1923,8 +1923,17 @@ export async function countPendingDeals(): Promise<number> {
 /** الحالات اللي لازم تتابع يومياً — صفحة «هام جداً للمتابعة اليومية» */
 export const URGENT_FOLLOWUP_STAGES = ["انتظار الدفع", "تجريبي", "تجهيز"] as const;
 
+/** المدير يشوف صفقات آخر 45 يوم فقط (حسب تاريخ الصفقة، أو تاريخ الإنشاء لو ما له تاريخ) */
+export const URGENT_ADMIN_DAYS = 45;
+
+/** فلتر «تاريخ الصفقة خلال آخر N يوم» لاستعلام deals */
+export function urgentSinceFilter(sinceDays: number): string {
+  const from = new Date(Date.now() - sinceDays * 86400000).toISOString().slice(0, 10);
+  return `deal_date.gte.${from},and(deal_date.is.null,created_at.gte.${from})`;
+}
+
 /** عدد الصفقات في الحالات المهمة — للشارة الحمراء في القائمة الجانبية. repName = صفقات موظف واحد فقط */
-export async function countUrgentFollowupDeals(repName?: string): Promise<number> {
+export async function countUrgentFollowupDeals(repName?: string, sinceDays?: number): Promise<number> {
   const supabase = createClient();
   let query = supabase
     .from("deals")
@@ -1932,6 +1941,7 @@ export async function countUrgentFollowupDeals(repName?: string): Promise<number
     .eq("org_id", getOrgId())
     .in("stage", [...URGENT_FOLLOWUP_STAGES]);
   if (repName) query = query.eq("assigned_rep_name", repName.trim());
+  if (sinceDays) query = query.or(urgentSinceFilter(sinceDays));
   const { count, error } = await query;
   if (error) return 0;
   return count ?? 0;

@@ -6,10 +6,10 @@
  *   «تغيير المرحلة إلى X»). لو ما فيه سجل نرجع لتاريخ إنشاء الصفقة.
  */
 import { createClient } from "@/lib/supabase/client";
-import { getOrgId, URGENT_FOLLOWUP_STAGES } from "@/lib/supabase/db";
+import { getOrgId, URGENT_FOLLOWUP_STAGES, URGENT_ADMIN_DAYS, urgentSinceFilter } from "@/lib/supabase/db";
 import type { Deal } from "@/types";
 
-export { URGENT_FOLLOWUP_STAGES };
+export { URGENT_FOLLOWUP_STAGES, URGENT_ADMIN_DAYS };
 
 /** من كم يوم بدون تحديث تعتبر الصفقة متأخرة */
 export const STALE_DAYS = 3;
@@ -50,8 +50,9 @@ export function isUrgentAdmin(user: { isSuperAdmin?: boolean; roleName?: string 
 /**
  * يجلب صفقات الحالات المهمة مع آخر تحديث ومدة الحالة.
  * repName = صفقات موظف واحد فقط. salesType = قسم واحد (المكتب / الدعم).
+ * sinceDays = صفقات آخر N يوم فقط (حسب تاريخ الصفقة) — للمدير.
  */
-export async function fetchUrgentDeals(opts?: { repName?: string; salesType?: "office" | "support" }): Promise<UrgentDeal[]> {
+export async function fetchUrgentDeals(opts?: { repName?: string; salesType?: "office" | "support"; sinceDays?: number }): Promise<UrgentDeal[]> {
   const supabase = createClient();
   const orgId = getOrgId();
 
@@ -62,6 +63,7 @@ export async function fetchUrgentDeals(opts?: { repName?: string; salesType?: "o
     .in("stage", [...URGENT_FOLLOWUP_STAGES]);
   if (opts?.repName) query = query.eq("assigned_rep_name", opts.repName.trim());
   if (opts?.salesType) query = query.eq("sales_type", opts.salesType);
+  if (opts?.sinceDays) query = query.or(urgentSinceFilter(opts.sinceDays));
   const { data, error } = await query.limit(2000);
   if (error) throw error;
   const deals = (data ?? []) as Deal[];

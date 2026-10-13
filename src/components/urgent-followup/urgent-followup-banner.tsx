@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Siren, ChevronLeft } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { fetchUrgentDeals, isUrgentAdmin, URGENT_FOLLOWUP_STAGES, STALE_DAYS, type UrgentDeal } from "@/lib/urgent-followup";
+import { fetchUrgentDeals, isUrgentAdmin, URGENT_FOLLOWUP_STAGES, URGENT_ADMIN_DAYS, STALE_DAYS, type UrgentDeal } from "@/lib/urgent-followup";
 
 const STAGE_ICON: Record<string, string> = { "انتظار الدفع": "💳", "تجريبي": "🧪", "تجهيز": "⚙️" };
 
@@ -18,11 +18,11 @@ export function UrgentFollowupBanner({ salesType }: { salesType: "office" | "sup
   useEffect(() => {
     if (!user) return;
     let alive = true;
-    const load = () => fetchUrgentDeals({ repName, salesType }).then((r) => { if (alive) setItems(r); }).catch(() => {});
+    const load = () => fetchUrgentDeals({ repName, salesType, sinceDays: admin ? URGENT_ADMIN_DAYS : undefined }).then((r) => { if (alive) setItems(r); }).catch(() => {});
     load();
     const id = setInterval(load, 120000);
     return () => { alive = false; clearInterval(id); };
-  }, [user, repName, salesType, activeOrgId]);
+  }, [user, repName, salesType, activeOrgId, admin]);
 
   if (!items || items.length === 0) return null;
   const stale = items.filter((i) => i.staleDays >= STALE_DAYS).length;

@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   fetchUrgentDeals,
   isUrgentAdmin,
+  URGENT_ADMIN_DAYS,
   summarizeByRep,
   URGENT_FOLLOWUP_STAGES,
   STALE_DAYS,
@@ -67,7 +68,8 @@ export default function UrgentFollowupPage() {
     setLoading(true);
     try {
       // الموظف يجيب صفقاته فقط — المدير يجيب الكل
-      setItems(await fetchUrgentDeals({ repName: isAdmin ? undefined : user.name }));
+      // المدير: آخر 45 يوم فقط
+      setItems(await fetchUrgentDeals({ repName: isAdmin ? undefined : user.name, sinceDays: isAdmin ? URGENT_ADMIN_DAYS : undefined }));
     } catch {
       setItems([]);
     } finally {
@@ -115,6 +117,7 @@ export default function UrgentFollowupPage() {
             <h1 className="text-2xl font-extrabold text-red-400">هام جداً للمتابعة اليومية</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               هذي الحالات لازم تتابع كل يوم — سجّل تعليق في سجل المتابعة بعد كل تواصل عشان تنحسب الصفقة محدّثة.
+              {isAdmin && <span className="block mt-1 text-[11px] opacity-80">تعرض صفقات آخر {URGENT_ADMIN_DAYS} يوم فقط (حسب تاريخ الصفقة)</span>}
               {!isAdmin && " (تظهر لك صفقاتك أنت فقط)"}
             </p>
           </div>

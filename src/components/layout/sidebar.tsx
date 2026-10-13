@@ -58,7 +58,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
-import { countPendingDeals, countUrgentFollowupDeals, fetchMentionNotifications } from "@/lib/supabase/db";
+import { countPendingDeals, countUrgentFollowupDeals, fetchMentionNotifications, URGENT_ADMIN_DAYS } from "@/lib/supabase/db";
 import { isMentionsManager, MENTIONS_UPDATED_EVENT } from "@/components/mentions/mention-alert-banner";
 
 export const NAV_ITEMS = [
@@ -174,7 +174,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const urgentRepName = isAdminUser ? undefined : user?.name;
   useEffect(() => {
     if (!user) return;
-    const load = () => countUrgentFollowupDeals(urgentRepName).then(setUrgentCount).catch(() => {});
+    const load = () => countUrgentFollowupDeals(urgentRepName, isAdminUser ? URGENT_ADMIN_DAYS : undefined).then(setUrgentCount).catch(() => {});
     load();
     const id = setInterval(load, 60000);
     return () => clearInterval(id);
