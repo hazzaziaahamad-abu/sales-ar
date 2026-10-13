@@ -101,35 +101,6 @@ export default function SubmitDealPage() {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-white/[0.08] bg-white/[0.05] p-6 backdrop-blur-sm">
-          {/* Sales type toggle */}
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-gray-300">القسم</label>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setForm({ ...form, sales_type: "office" })}
-                className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                  form.sales_type === "office"
-                    ? "bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/30"
-                    : "bg-white/[0.04] text-gray-400 hover:bg-white/[0.07]"
-                }`}
-              >
-                مبيعات المكتب
-              </button>
-              <button
-                type="button"
-                onClick={() => setForm({ ...form, sales_type: "support" })}
-                className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                  form.sales_type === "support"
-                    ? "bg-orange-500/15 text-orange-400 ring-1 ring-orange-500/30"
-                    : "bg-white/[0.04] text-gray-400 hover:bg-white/[0.07]"
-                }`}
-              >
-                مبيعات الدعم
-              </button>
-            </div>
-          </div>
-
           {/* Client name */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-gray-300">اسم العميل <span className="text-red-400">*</span></label>

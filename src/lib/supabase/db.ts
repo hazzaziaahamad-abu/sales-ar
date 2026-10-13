@@ -2127,7 +2127,7 @@ async function fetchAllRows<T>(table: string, apply?: (q: any) => any): Promise<
 export async function fetchSubscriberCandidates(): Promise<SubscriberCandidate[]> {
   const [renewals, supportDeals, openTickets] = await Promise.all([
     fetchAllRows<Renewal>("renewals"),
-    fetchAllRows<Deal>("deals", (q) => q.eq("sales_type", "support").eq("stage", "مكتملة")),
+    fetchAllRows<Deal>("deals", (q) => q.eq("stage", "مكتملة")),
     fetchAllRows<Ticket>("tickets", (q) => q.neq("status", "محلول")),
   ]);
   return buildSubscriberCandidates(renewals, supportDeals, openTickets);
@@ -2259,7 +2259,7 @@ export async function transferTargetClient(
       cycle_days: 0,
       month: m,
       year: y,
-      sales_type: "support",
+      sales_type: "office",
     });
     ref = deal.id;
   } else {

@@ -82,7 +82,7 @@ export default function SalesKPIDashboard({ deals: externalDeals }: { deals?: De
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const rawDeals = externalDeals ?? await fetchDeals("support");
+      const rawDeals = externalDeals ?? await fetchDeals("office");
       const [allStages, emps] = await Promise.all([
         fetchAllDealKpiStages(rawDeals.map((d) => d.id)),
         fetchEmployees(),
@@ -168,7 +168,7 @@ export default function SalesKPIDashboard({ deals: externalDeals }: { deals?: De
             <BarChart2 className="w-4 h-4 text-orange-400" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-foreground">KPI مبيعات الدعم</h2>
+            <h2 className="text-lg font-bold text-foreground">KPI المبيعات</h2>
             <p className="text-xs text-muted-foreground">تتبع مراحل البيع ونسب الكريديت — مرتبط بالصفقات مباشرة</p>
           </div>
         </div>
@@ -422,7 +422,7 @@ function EmployeeKPICard({ emp, rank }: { emp: ReturnType<typeof aggregateEmploy
         </div>
         <div>
           <p className="font-bold text-foreground text-sm">{emp.userName}</p>
-          <p className="text-xs text-muted-foreground">موظف مبيعات دعم</p>
+          <p className="text-xs text-muted-foreground">موظف مبيعات</p>
         </div>
       </div>
 

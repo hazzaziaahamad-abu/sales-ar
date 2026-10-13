@@ -117,9 +117,7 @@ export async function buildReminderItems(user: RepUser, slot: ReminderSlot): Pro
   const touched = (touchedRows ?? []) as DealRow[];
 
   if (total > 0) {
-    const sample = hot.length ? hot : touched;
-    const supportCount = sample.filter((d) => d.sales_type === "support").length;
-    const dealsHref = sample.length && supportCount > sample.length / 2 ? "/support-sales" : "/sales";
+    const dealsHref = "/sales";
 
     items.push({
       key: "open_deals",

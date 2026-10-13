@@ -19,7 +19,6 @@ const ALL_TYPES: SaleType[] = ["office", "support", "renewal"];
 type BannerMode = SaleType[] | "hidden" | null;
 
 function sectionsFromPath(pathname: string): BannerMode {
-  if (pathname.startsWith("/support-sales")) return ["support"];
   if (pathname.startsWith("/sales")) return ["office"];
   if (pathname.startsWith("/renewals")) return ["renewal"];
   if (pathname.startsWith("/secretary")) return ALL_TYPES;

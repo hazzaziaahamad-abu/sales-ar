@@ -58,7 +58,7 @@ function toSales(deals: Deal[], renewals: Renewal[]): SaleItem[] {
       day: dayOf(at),
       client: d.client_name,
       rep: d.assigned_rep_name || "بلا مسؤول",
-      kind: d.sales_type === "support" ? "مبيعات الدعم" : "مبيعات المكتب",
+      kind: "المبيعات",
       plan: d.plan,
       amount: d.deal_value || 0,
       at,

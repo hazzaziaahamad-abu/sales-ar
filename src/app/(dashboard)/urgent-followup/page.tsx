@@ -21,13 +21,6 @@ import {
 type Period = "اليوم" | "الأسبوع" | "الشهر" | "الكل";
 const PERIODS: Period[] = ["اليوم", "الأسبوع", "الشهر", "الكل"];
 
-type TypeFilter = "" | "office" | "support";
-const TYPES: { key: TypeFilter; label: string }[] = [
-  { key: "", label: "كل الأقسام" },
-  { key: "office", label: "المبيعات" },
-  { key: "support", label: "مبيعات الدعم" },
-];
-
 const STAGE_CFG: Record<string, { label: string; hint: string; icon: typeof CreditCard; text: string; bg: string; border: string }> = {
   "انتظار الدفع": { label: "انتظار الدفع", hint: "اجمع الفلوس اليوم — كل يوم تأخير يقلل فرصة الدفع", icon: CreditCard, text: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/40" },
   "تجريبي": { label: "تجريبي", hint: "تابع رضا العميل وحوّله لاشتراك قبل ما تنتهي التجربة", icon: FlaskConical, text: "text-violet-400", bg: "bg-violet-500/10", border: "border-violet-500/40" },
@@ -55,13 +48,6 @@ export default function UrgentFollowupPage() {
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<Period>("الكل");
   const [repFilter, setRepFilter] = useState<string>("");
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>("");
-
-  // البانر في كل قسم يفتح الصفحة على قسمه: /urgent-followup?type=office
-  useEffect(() => {
-    const t = new URLSearchParams(window.location.search).get("type");
-    if (t === "office" || t === "support") setTypeFilter(t);
-  }, []);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -87,12 +73,11 @@ export default function UrgentFollowupPage() {
   const filtered = useMemo(() => {
     const bounds = period === "الكل" ? null : tableDateBounds(period);
     return items
-      .filter((i) => !typeFilter || (i.deal.sales_type ?? "office") === typeFilter)
       .filter((i) => !repFilter || i.deal.assigned_rep_name === repFilter)
       .filter((i) => { if (!bounds) return true; const day = dealDay(i); return day >= bounds[0] && day <= bounds[1]; })
       // الأقدم بدون تحديث أولاً
       .sort((a, b) => b.staleDays - a.staleDays || b.stageDays - a.stageDays);
-  }, [items, period, typeFilter, repFilter]);
+  }, [items, period, repFilter]);
 
   const byStage = useMemo(() => {
     const m: Record<string, UrgentDeal[]> = {};
@@ -149,19 +134,6 @@ export default function UrgentFollowupPage() {
               }`}
             >
               {p}
-            </button>
-          ))}
-        </div>
-        <div className="flex rounded-[12px] border border-border bg-card p-1">
-          {TYPES.map((t) => (
-            <button
-              key={t.key || "all"}
-              onClick={() => setTypeFilter(t.key)}
-              className={`rounded-[10px] px-3 py-1.5 text-sm font-semibold transition-colors ${
-                typeFilter === t.key ? "bg-white/[0.12] text-foreground" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {t.label}
             </button>
           ))}
         </div>
@@ -269,7 +241,7 @@ export default function UrgentFollowupPage() {
                   list.map((i) => {
                     const d = i.deal;
                     const days = i.staleDays;
-                    const salesHref = `${d.sales_type === "support" ? "/support-sales" : "/sales"}?deal=${d.id}&edit=1`;
+                    const salesHref = `/sales?deal=${d.id}&edit=1`;
                     return (
                       <div
                         key={d.id}
@@ -284,7 +256,7 @@ export default function UrgentFollowupPage() {
                               )}
                               {d.deal_value > 0 && <span>{formatMoney(d.deal_value)}</span>}
                               {d.plan && <span>{d.plan}</span>}
-                              <span>{d.sales_type === "support" ? "مبيعات الدعم" : "المبيعات"}</span>
+                              <span>المبيعات</span>
                             </div>
                           </div>
                           <span

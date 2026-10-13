@@ -734,10 +734,9 @@ export default function OperationsPage() {
       ══════════════════════════════════════ */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
         {[
-          { label: "مبيعات المكتب",  href: "/sales",         color: "#10B981", icon: <TrendingUp className="w-4 h-4" /> },
+          { label: "المبيعات",       href: "/sales",         color: "#10B981", icon: <TrendingUp className="w-4 h-4" /> },
           { label: "التجديدات",       href: "/renewals",      color: "#F59E0B", icon: <RefreshCw className="w-4 h-4" /> },
           { label: "الدعم",           href: "/support",       color: "#F97316", icon: <Headphones className="w-4 h-4" /> },
-          { label: "مبيعات الدعم",   href: "/support-sales", color: "#8B5CF6", icon: <Briefcase className="w-4 h-4" /> },
         ].map(q => (
           <Link
             key={q.href}

@@ -405,11 +405,8 @@ export default function RenewalsPage() {
   const [monthFilter, setMonthFilter] = useState<number>(new Date().getMonth());
   const [yearFilter, setYearFilter] = useState<number>(new Date().getFullYear());
 
-  /* sales type tabs: all / office / support */
-  const [salesTypeTab, setSalesTypeTab] = useState<"all" | "office" | "support">("all");
-  const typedRenewals = salesTypeTab === "all"
-    ? renewals
-    : renewals.filter((r) => (r.sales_type || "support") === salesTypeTab);
+  /* تجديدات المكتب والدعم اندمجت في قائمة واحدة */
+  const typedRenewals = renewals;
 
   /* available years from data */
   const availableYears = useMemo(() => {
@@ -905,7 +902,7 @@ export default function RenewalsPage() {
   const totalPages = Math.max(1, Math.ceil(prioritySorted.length / PAGE_SIZE));
   const paginatedRenewals = prioritySorted.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  useEffect(() => { setCurrentPage(1); }, [statusFilter, clientSearch, globalSearch, salesTypeTab, summaryFilter, monthFilter, tableDateFilter, tableCustomFrom, tableCustomTo, focusFilter, silentFilter]);
+  useEffect(() => { setCurrentPage(1); }, [statusFilter, clientSearch, globalSearch, summaryFilter, monthFilter, tableDateFilter, tableCustomFrom, tableCustomTo, focusFilter, silentFilter]);
 
   /* ─── Excel template download ─── */
   const [uploadStatus, setUploadStatus] = useState<"idle" | "importing" | "done" | "error">("idle");
@@ -1195,33 +1192,6 @@ export default function RenewalsPage() {
           خطأ في رفع الملف — تأكد من صيغة الملف
         </div>
       )}
-
-      {/* ─── Sales Type Tabs ─── */}
-      <div className="flex items-center gap-1.5 bg-white/[0.04] rounded-xl p-1 border border-white/[0.06] w-fit">
-        {([
-          { key: "all" as const, label: "الكل", count: renewals.length },
-          { key: "office" as const, label: "تجديدات المكتب", count: renewals.filter((r) => r.sales_type === "office").length },
-          { key: "support" as const, label: "تجديدات الدعم", count: renewals.filter((r) => (r.sales_type || "support") === "support").length },
-        ]).map((tab) => {
-          const active = salesTypeTab === tab.key;
-          return (
-            <button
-              key={tab.key}
-              onClick={() => setSalesTypeTab(tab.key)}
-              className={`px-3.5 py-1.5 rounded-lg text-[12px] font-semibold transition-all flex items-center gap-1.5 ${
-                active
-                  ? "bg-cyan/15 text-cyan border border-cyan/30"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {tab.label}
-              <span className={`text-[12px] px-1.5 py-0.5 rounded-full ${active ? "bg-cyan/20" : "bg-white/[0.05]"}`}>
-                {tab.count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
 
       {/* ─── Daily Focus Boxes ─── */}
       {!loading && (

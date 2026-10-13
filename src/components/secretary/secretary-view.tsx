@@ -605,11 +605,10 @@ function RepAction({ repName, phoneMap, message }: { repName?: string; phoneMap:
   );
 }
 
-function SourceBadge({ deal: d }: { deal: Deal }) {
-  const support = d.sales_type === "support";
+function SourceBadge() {
   return (
-    <span className={`text-[10px] px-1.5 py-0.5 rounded-full border shrink-0 ${support ? "bg-orange-500/10 text-orange-300 border-orange-500/20" : "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"}`}>
-      {support ? "مبيعات الدعم" : "مبيعات المكتب"}
+    <span className="text-[10px] px-1.5 py-0.5 rounded-full border shrink-0 bg-emerald-500/10 text-emerald-300 border-emerald-500/20">
+      المبيعات
     </span>
   );
 }
@@ -662,7 +661,7 @@ function DailyResultsSystem({
   const [chat, setChat] = useState<ChatTarget | null>(null);
   const [win, setWin] = useState<CompassWindow>("24h");
   const winCategories = categories[win];
-  const [activeCat, setActiveCat] = useState(winCategories[0]?.key || "support");
+  const [activeCat, setActiveCat] = useState(winCategories[0]?.key || "office");
   const [detail, setDetail] = useState<{ title: string; items: DetailRow[] } | null>(null);
   const cat = winCategories.find((c) => c.key === activeCat) || winCategories[0];
   const repMsgForDeal = (d: Deal) =>
@@ -767,7 +766,7 @@ function DailyResultsSystem({
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
                   <button onClick={() => onOpenProfile(oneTarget.deal.client_phone || oneTarget.deal.client_name)} className="text-sm font-bold text-foreground truncate hover:text-cyan-400 hover:underline transition-colors" title="فتح ملخص العميل">{oneTarget.deal.client_name}</button>
-                  <SourceBadge deal={oneTarget.deal} />
+                  <SourceBadge />
                 </div>
                 <p className="text-[12px] text-muted-foreground mt-0.5">{oneTarget.deal.stage} · {oneTarget.deal.assigned_rep_name || "بلا مسؤول"}</p>
               </div>
@@ -802,7 +801,7 @@ function DailyResultsSystem({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <button onClick={() => onOpenProfile(d.client_phone || d.client_name)} className="text-[13px] font-bold text-foreground truncate hover:text-cyan-400 hover:underline transition-colors" title="فتح ملخص العميل">{d.client_name}</button>
-                    <SourceBadge deal={d} />
+                    <SourceBadge />
                     <span className="text-[11px] text-amber-300 font-bold shrink-0">{formatMoneyFull(d.deal_value)}</span>
                     <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/[0.05] text-muted-foreground shrink-0">{d.stage}</span>
                     <span className="text-[10px] text-muted-foreground shrink-0">· آخر تفاعل {last}</span>
@@ -830,7 +829,7 @@ function DailyResultsSystem({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <button onClick={() => onOpenProfile(d.client_phone || d.client_name)} className="text-[13px] font-bold text-foreground truncate hover:text-cyan-400 hover:underline transition-colors" title="فتح ملخص العميل">{d.client_name}</button>
-                    <SourceBadge deal={d} />
+                    <SourceBadge />
                     <span className="text-[11px] text-red-300 font-bold shrink-0">{formatMoneyFull(d.deal_value)}</span>
                   </div>
                   {intel.attentionReason && <p className="text-[12px] text-red-300/90 truncate">⚠ {intel.attentionReason}</p>}
@@ -1141,7 +1140,7 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
     return m;
   }, [employees]);
 
-  // بوكسات الحالات — آخر ٢٤ ساعة / آخر ٧ أيام، مقسّمة: مبيعات الدعم / التجديدات / مبيعات المكتب / تذاكر الدعم.
+  // بوكسات الحالات — آخر ٢٤ ساعة / آخر ٧ أيام، مقسّمة: المبيعات / التجديدات / تذاكر الدعم.
   const compassCategories = useMemo<Record<CompassWindow, CompassCategory[]>>(() => {
     const now = Date.now();
     const build = (windowMs: number): CompassCategory[] => {
@@ -1152,11 +1151,11 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
         return d <= 0 ? "اليوم" : d === 1 ? "أمس" : `قبل ${d}ي`;
       };
 
-      const dealGroups = (type: "support" | "office", sourceLabel: string): StateGroup[] => {
+      // مبيعات الدعم اندمجت مع المبيعات — كل الصفقات في مجموعة واحدة
+      const dealGroups = (sourceLabel: string): StateGroup[] => {
         const items = recentStageDeals
           // ٧ أيام: نفس فلتر recentStageDeals (بالأيام)؛ ٢٤ ساعة: بالوقت الفعلي لآخر تفاعل.
-          .filter(x => windowMs >= 7 * 86400000 || withinWindow(x.intel.lastActivityDate))
-          .filter(x => type === "support" ? x.deal.sales_type === "support" : (x.deal.sales_type === "office" || !x.deal.sales_type));
+          .filter(x => windowMs >= 7 * 86400000 || withinWindow(x.intel.lastActivityDate));
         const map = new Map<string, StateGroup>();
         for (const x of items) {
           const st = x.deal.stage;
@@ -1199,9 +1198,8 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
       };
 
       return [
-        { key: "support", label: "مبيعات الدعم", groups: dealGroups("support", "دعم") },
+        { key: "office", label: "المبيعات", groups: dealGroups("مبيعات") },
         { key: "renewals", label: "التجديدات", groups: renewalGroups() },
-        { key: "office", label: "مبيعات المكتب", groups: dealGroups("office", "مكتب") },
         { key: "tickets", label: "تذاكر الدعم", groups: ticketGroups() },
       ];
     };
@@ -1370,9 +1368,9 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
     // Week range: last 7 days inclusive (today ... today - 6)
     const weekStart = dateToLocal(new Date(Date.now() - 6 * 24 * 60 * 60 * 1000));
 
-    // Split deals by sales_type
-    const officeDeals = deals.filter(d => d.sales_type === "office" || !d.sales_type);
-    const supportDeals = deals.filter(d => d.sales_type === "support");
+    // مبيعات الدعم اندمجت مع المبيعات — كل الصفقات تُحسب كمبيعات
+    const officeDeals = deals;
+    const supportDeals: Deal[] = [];
 
     // Helper: check if a YYYY-MM-DD string falls within [start, end] inclusive
     const inDayRange = (dateStr: string | undefined, start: string, end: string) =>
@@ -1483,7 +1481,7 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
       if (d.stage !== "مكتملة") continue;
       if (!matchDate(d.close_date || d.created_at)) continue;
       const name = d.assigned_rep_name?.trim() || "بلا مسؤول";
-      const target = (d.sales_type === "support") ? supportRepMap : officeRepMap;
+      const target = officeRepMap;
       const cur = target.get(name) || { count: 0, rev: 0 };
       cur.count += 1; cur.rev += d.deal_value;
       target.set(name, cur);
@@ -1571,18 +1569,10 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
     const weak: { key: string; label: string; attendees: string; reason: string }[] = [];
 
     const officeCount = deals.filter(d =>
-      (d.sales_type === "office" || !d.sales_type) &&
       d.stage === "مكتملة" &&
       inToday(d.close_date || d.created_at)
     ).length;
-    if (officeCount === 0) weak.push({ key: "office", label: "مبيعات المكتب", attendees: "فريق مبيعات المكتب", reason: "لا صفقات مغلقة اليوم" });
-
-    const supportCount = deals.filter(d =>
-      d.sales_type === "support" &&
-      d.stage === "مكتملة" &&
-      inToday(d.close_date || d.created_at)
-    ).length;
-    if (supportCount === 0) weak.push({ key: "support", label: "مبيعات الدعم", attendees: "فريق مبيعات الدعم", reason: "لا صفقات مغلقة اليوم" });
+    if (officeCount === 0) weak.push({ key: "office", label: "المبيعات", attendees: "فريق المبيعات", reason: "لا صفقات مغلقة اليوم" });
 
     const resolvedCount = tickets.filter(t =>
       t.status === "محلول" && inToday(t.resolved_date || t.updated_at)
@@ -1826,18 +1816,12 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
               {(() => {
                 const s = briefingStats.periods[selectedPeriod];
                 return (
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                     <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
                       <TrendingUp className="w-4 h-4 text-emerald-400 mx-auto mb-1" />
                       <p className="text-xl font-bold text-emerald-400">{s.office}</p>
-                      <p className="text-[12px] text-muted-foreground">مبيعات المكتب</p>
+                      <p className="text-[12px] text-muted-foreground">المبيعات</p>
                       {s.officeRev > 0 && <p className="text-[12px] text-emerald-400/70 mt-0.5">{formatMoneyFull(s.officeRev)}</p>}
-                    </div>
-                    <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/20 text-center">
-                      <TrendingUp className="w-4 h-4 text-orange-400 mx-auto mb-1" />
-                      <p className="text-xl font-bold text-orange-400">{s.support}</p>
-                      <p className="text-[12px] text-muted-foreground">مبيعات الدعم</p>
-                      {s.supportRev > 0 && <p className="text-[12px] text-orange-400/70 mt-0.5">{formatMoneyFull(s.supportRev)}</p>}
                     </div>
                     <div className="p-3 rounded-xl bg-sky-500/10 border border-sky-500/20 text-center">
                       <RefreshCw className="w-4 h-4 text-sky-400 mx-auto mb-1" />
@@ -1871,18 +1855,12 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
                 <p className="text-[13px] font-bold text-muted-foreground mb-2 flex items-center gap-1.5">
                   <Users className="w-3 h-3" /> أفضل وأقل أداء ({selectedPeriod === "today" ? "اليوم" : selectedPeriod === "yesterday" ? "أمس" : selectedPeriod === "week" ? "الأسبوع" : "الشهر"})
                 </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
                   <PerformerCard
-                    title="مبيعات المكتب"
+                    title="المبيعات"
                     accent="emerald"
                     unit="صفقة"
                     data={performers.office}
-                  />
-                  <PerformerCard
-                    title="مبيعات الدعم"
-                    accent="orange"
-                    unit="صفقة"
-                    data={performers.support}
                   />
                   <PerformerCard
                     title="الدعم الفني"
@@ -1928,8 +1906,8 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
                 </div>
               </div>
 
-              {/* Office Sales */}
-              <p className="text-[12px] font-bold text-emerald-400 mb-1.5">مبيعات المكتب</p>
+              {/* Sales (المكتب + الدعم بعد الدمج) */}
+              <p className="text-[12px] font-bold text-emerald-400 mb-1.5">المبيعات</p>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
                 <div className="p-2.5 rounded-xl bg-emerald-500/[0.06] border border-emerald-500/15 text-center">
                   <p className="text-lg font-bold text-emerald-400">{briefingStats.closedOffice}</p>
@@ -1942,19 +1920,6 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
                 <div className="p-2.5 rounded-xl bg-violet-500/[0.06] border border-violet-500/15 text-center">
                   <p className="text-lg font-bold text-violet-400">{briefingStats.pipelineCount}</p>
                   <p className="text-[12px] text-muted-foreground">في خط الأنابيب</p>
-                </div>
-              </div>
-
-              {/* Support Sales */}
-              <p className="text-[12px] font-bold text-orange-400 mb-1.5">مبيعات الدعم</p>
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                <div className="p-2.5 rounded-xl bg-orange-500/[0.06] border border-orange-500/15 text-center">
-                  <p className="text-lg font-bold text-orange-400">{briefingStats.closedSupport}</p>
-                  <p className="text-[12px] text-muted-foreground">مكتملة</p>
-                </div>
-                <div className="p-2.5 rounded-xl bg-orange-500/[0.06] border border-orange-500/15 text-center">
-                  <p className="text-lg font-bold text-orange-400">{formatMoneyFull(briefingStats.revenueSupport)}</p>
-                  <p className="text-[12px] text-muted-foreground">الإيرادات</p>
                 </div>
               </div>
 

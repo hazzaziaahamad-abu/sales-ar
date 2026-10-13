@@ -29,8 +29,8 @@ export const SCOPE_LABELS: Record<VerifyScope, string> = {
 /** خيارات «القسم» حسب نوع التقرير: الصفقات أو التجديدات. */
 export function scopeOptions(entity: EntityType): { value: VerifyScope; label: string }[] {
   return entity === "renewal"
-    ? [{ value: "renewals", label: "التجديدات (الكل)" }, { value: "support", label: "تجديدات الدعم" }, { value: "office", label: "تجديدات المكتب" }]
-    : [{ value: "support", label: "مبيعات الدعم" }, { value: "office", label: "مبيعات المكتب" }, { value: "all", label: "الكل" }];
+    ? [{ value: "renewals", label: "التجديدات" }]
+    : [{ value: "all", label: "المبيعات" }];
 }
 
 /** اسم القسم في عنوان الطلب. */
@@ -96,8 +96,8 @@ export function progressOf(req: VerificationRequest) {
 }
 
 /** الصفحة اللي يحدّث منها الموظف حسب نوع التقرير والقسم. */
-export function updatePageOf(template: RequestTemplate, scope: VerifyScope): { href: string; label: string } {
+export function updatePageOf(template: RequestTemplate): { href: string; label: string } {
   if (template === GENERAL) return { href: "/daily-huddle?tab=verify", label: "طلبات التحقق" };
   if (TEMPLATES[template].entity === "renewal") return { href: "/renewals", label: "التجديدات" };
-  return scope === "support" ? { href: "/support-sales", label: "مبيعات الدعم" } : { href: "/sales", label: "المبيعات" };
+  return { href: "/sales", label: "المبيعات" };
 }

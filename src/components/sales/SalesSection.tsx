@@ -286,8 +286,8 @@ function starPeriodBounds(filter: string, from?: string, to?: string): [Date, Da
 
 export function SalesSection({ salesType }: SalesPageProps) {
   const isOffice = salesType === "office";
-  const pageTitle = isOffice ? "مبيعات المكتب" : "مبيعات الدعم";
-  const pageDesc = isOffice ? "متابعة مبيعات المكتب وخط الأنابيب" : "متابعة مبيعات الدعم وخط الأنابيب";
+  const pageTitle = isOffice ? "المبيعات" : "مبيعات الدعم";
+  const pageDesc = isOffice ? "متابعة المبيعات وخط الأنابيب" : "متابعة مبيعات الدعم وخط الأنابيب";
   const clientCodePrefix = isOffice ? "S" : "D";
   const { activeOrgId: orgId, user: authUser } = useAuth();
   const isAdmin = authUser?.isSuperAdmin || authUser?.roleName === "مدير" || authUser?.roleName === "admin";
@@ -1221,10 +1221,8 @@ export function SalesSection({ salesType }: SalesPageProps) {
         });
         setDeals((prev) => [created, ...prev]);
 
-        /* Auto-create KPI stages for support deals */
-        if (!isOffice) {
-          createDealKpiStages(created.id).catch(console.error);
-        }
+        /* Auto-create KPI stages (كانت لمبيعات الدعم — صارت لكل المبيعات بعد الدمج) */
+        createDealKpiStages(created.id).catch(console.error);
 
         /* Celebrate + auto-create renewal if created as completed */
         if (form.stage === "مكتملة") {
@@ -2859,7 +2857,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
         <TabsList className="bg-card border border-border">
           <TabsTrigger value="kpis">مؤشرات المبيعات</TabsTrigger>
           <TabsTrigger value="kpis-full">مؤشرات الأداء KPIs</TabsTrigger>
-          {!isOffice && <TabsTrigger value="sales-kpi">KPI مبيعات الدعم</TabsTrigger>}
+          <TabsTrigger value="sales-kpi">KPI المبيعات</TabsTrigger>
           <TabsTrigger value="renewals">التجديدات</TabsTrigger>
           <TabsTrigger value="satisfaction">رضا العملاء</TabsTrigger>
         </TabsList>
@@ -3072,12 +3070,10 @@ export function SalesSection({ salesType }: SalesPageProps) {
           </div>
         </TabsContent>
 
-        {/* Tab: KPI مبيعات الدعم — support only */}
-        {!isOffice && (
-          <TabsContent value="sales-kpi" className="space-y-6">
-            <SalesKPIDashboard deals={withVisibleAmounts(deals)} />
-          </TabsContent>
-        )}
+        {/* Tab: KPI المبيعات — انتقل من مبيعات الدعم بعد الدمج */}
+        <TabsContent value="sales-kpi" className="space-y-6">
+          <SalesKPIDashboard deals={withVisibleAmounts(deals)} />
+        </TabsContent>
       </Tabs>
         </div>
       )}

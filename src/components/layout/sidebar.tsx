@@ -88,7 +88,6 @@ export const NAV_ITEMS = [
   { label: "دليل العرض للموظفين — المنيو", href: "/offer/menu-staff", slug: "offer-menu-staff", icon: BookOpen, color: "violet", group: "المبيعات والدعم", external: true },
   { label: "عرض للعميل — المنيو", href: "/offer/menu", slug: "offer-menu", icon: Share2, color: "violet", group: "المبيعات والدعم", external: true },
   { label: "عرض للعميل — نحجز", href: "/offer/nahjez", slug: "offer-nahjez", icon: Share2, color: "teal", group: "المبيعات والدعم", external: true },
-  { label: "مبيعات الدعم", href: "/support-sales", slug: "support-sales", icon: TrendingUp, color: "orange", group: "المبيعات والدعم" },
   { label: "الدعم", href: "/support", slug: "support", icon: Headphones, color: "orange", group: "المبيعات والدعم" },
   // Hidden: merged into "مهامي" — { label: "دليل المبيعات", href: "/sales-guide", slug: "sales-guide", icon: BookOpen, color: "amber" },
   { label: "التجديدات", href: "/renewals", slug: "renewals", icon: RefreshCw, color: "sky", group: "المتابعة" },

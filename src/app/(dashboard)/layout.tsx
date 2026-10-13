@@ -65,7 +65,6 @@ const PAGE_SLUG_MAP: Record<string, string> = {
 // نستخدم مطابقة مسار صريحة عمداً حتى لا تُطابق /sales صفحات مثل /sales-playbook و /sales-training.
 const FOLLOWUP_BANNER_PATHS = new Set<string>([
   "/sales",
-  "/support-sales",
   "/support",
   "/renewals",
   "/renewal-boost",
@@ -598,7 +597,7 @@ function LiveNotifSubscriptions({ onLoad }: { onLoad: (n: AppNotification[]) => 
             message: closed
               ? `🎉 صفقة "${d.client_name}" أُغلقت بقيمة ${d.deal_value.toLocaleString()} ر.س`
               : `صفقة "${d.client_name}" انتقلت إلى مرحلة "${d.stage}"`,
-            section: d.sales_type === "support" ? "support-sales" : "sales",
+            section: "sales",
             timestamp: new Date().toISOString(),
             isRead: false,
             metadata: { entityId: d.id, entityName: d.client_name },
@@ -620,7 +619,7 @@ function LiveNotifSubscriptions({ onLoad }: { onLoad: (n: AppNotification[]) => 
             type: "crud_action",
             icon: "💼",
             message: `صفقة جديدة أُسندت إليك: "${d.client_name}"${d.plan ? ` — ${d.plan}` : ""}`,
-            section: d.sales_type === "support" ? "support-sales" : "sales",
+            section: "sales",
             timestamp: d.created_at,
             isRead: false,
             metadata: { entityId: d.id, entityName: d.client_name },

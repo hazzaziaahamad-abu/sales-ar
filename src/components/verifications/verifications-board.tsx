@@ -97,7 +97,7 @@ export function VerificationsBoard({ onPendingChange }: { onPendingChange?: (n: 
   const replace = (r: VerificationRequest) => setRequests((prev) => prev.map((x) => (x.id === r.id ? { ...r, updated_ids: r.updated_ids ?? x.updated_ids } : x)));
 
   function sendWhatsApp(r: VerificationRequest, reminder = false) {
-    const page = updatePageOf(r.template, r.scope);
+    const page = updatePageOf(r.template);
     const p = progressOf(r);
     const lines = [
       `السلام عليكم ${r.assignee_name ?? ""}`,
@@ -218,7 +218,7 @@ function NewRequestForm({ onCancel, onCreated, onError }: {
 }) {
   const [template, setTemplate] = useState<RequestTemplate>("trial");
   const isGeneral = template === GENERAL;
-  const [scope, setScope] = useState<VerifyScope>("support");
+  const [scope, setScope] = useState<VerifyScope>("all");
   // فاضي = بدون شرط مدة (للقوالب اللي المدة فيها اختيارية)
   const [staleDays, setStaleDays] = useState("");
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
@@ -305,7 +305,7 @@ function NewRequestForm({ onCancel, onCreated, onError }: {
                 // التجديدات: عملاء الموظف المختار؛ الصفقات: الكل
                 setRep(TEMPLATES[t].entity === "renewal" && assigneeName ? assigneeName : REP_ALL);
                 // القسم يتبع نوع التقرير (صفقات ↔ تجديدات)
-                if (isGeneral || TEMPLATES[t].entity !== TEMPLATES[template].entity) setScope(TEMPLATES[t].entity === "renewal" ? "renewals" : "support");
+                if (isGeneral || TEMPLATES[t].entity !== TEMPLATES[template].entity) setScope(TEMPLATES[t].entity === "renewal" ? "renewals" : "all");
               }}
               className={`text-right rounded-[10px] px-3 py-2 border transition-colors ${template === t ? "bg-teal-500/15 border-teal-500/30" : "bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04]"}`}
             >
@@ -409,7 +409,7 @@ function RequestCard({ r, isManager, onUpdated, onDeleted, onWhatsApp, flash }: 
 }) {
   const [busy, setBusy] = useState(false);
   const p = progressOf(r);
-  const page = updatePageOf(r.template, r.scope);
+  const page = updatePageOf(r.template);
   const late = isLate(r);
   const general = r.template === GENERAL;
 

@@ -232,7 +232,7 @@ export default function RequestsPage() {
               <InfoRow label="المرحلة" value={detailDeal.stage || "قيد التواصل"} />
               <InfoRow label="المصدر" value={detailDeal.source || "—"} />
               <InfoRow label="الباقة" value={detailDeal.plan || "—"} />
-              <InfoRow label="القسم" value={detailDeal.sales_type === "support" ? "مبيعات الدعم" : "مبيعات المكتب"} />
+              <InfoRow label="القسم" value="المبيعات" />
               <InfoRow label="المسؤول" value={detailDeal.assigned_rep_name || "—"} />
               <InfoRow label="مرسل الطلب" value={detailDeal.submitter_name || "—"} />
               {detailDeal.notes && <InfoRow label="ملاحظات" value={detailDeal.notes} />}

@@ -102,7 +102,7 @@ type SatisfactionResult = keyof typeof SATISFACTION;
 type ViewFilter = "all" | "daily" | "subscribers" | "expiring" | "transferred" | "pending" | "contacted" | "no_answer" | "postponed";
 
 const DESTINATIONS = {
-  support: { label: "مبيعات الدعم", color: "text-emerald-400", bg: "bg-emerald-500/10" },
+  support: { label: "المبيعات", color: "text-emerald-400", bg: "bg-emerald-500/10" },
   renewals: { label: "التجديدات", color: "text-sky-400", bg: "bg-sky-500/10" },
 } as const;
 
@@ -209,8 +209,7 @@ export default function TargetingPage() {
   /* Open a deal-linked client back in its sales table, flashing the row. */
   function openDeal(c: TargetClient) {
     if (!c.deal_id) return;
-    const base = c.sales_type === "support" ? "/support-sales" : "/sales";
-    router.push(`${base}?deal=${c.deal_id}`);
+    router.push(`/sales?deal=${c.deal_id}`);
   }
   const todayStr = dateToLocal(today);
 
@@ -535,7 +534,7 @@ export default function TargetingPage() {
 
   function openTransferred(c: TargetClient) {
     if (c.transferred_to === "support" && c.transferred_ref) {
-      router.push(`/support-sales?deal=${c.transferred_ref}`);
+      router.push(`/sales?deal=${c.transferred_ref}`);
     } else if (c.transferred_to === "renewals") {
       router.push(`/renewals?profile=${encodeURIComponent(c.client_phone || c.client_name)}`);
     }

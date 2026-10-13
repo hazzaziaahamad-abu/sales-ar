@@ -27,7 +27,7 @@ function timeAgo(timestamp: string): string {
 
 const SECTION_PATH: Record<string, string> = {
   support: "/support",
-  "support-sales": "/support-sales",
+  "support-sales": "/sales",
   development: "/development",
   team: "/team",
   sales: "/sales",

@@ -4,7 +4,7 @@
 // Sources:
 //   • التجديدات — customers on the basic plan (الباقة الأساسية) who renewed
 //     (status "مكتمل") and whose latest renewal row is not a cancellation.
-//   • مبيعات الدعم — support-sales deals that closed ("مكتملة").
+//   • المبيعات — deals that closed ("مكتملة") (مبيعات الدعم اندمجت مع المبيعات).
 //
 // Customers are merged across both sources by normalized phone (or name when
 // there is no phone), and each one gets a rule-based recommendation.

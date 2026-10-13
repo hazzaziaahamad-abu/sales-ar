@@ -461,7 +461,7 @@ export default function MyTasksPage() {
     try {
       const created = await createEmployeeTask({
         title: `${clientForm.stage} — ${clientForm.client_name}`,
-        description: `${clientForm.sales_type === "office" ? "مبيعات المكتب" : "مبيعات الدعم"} | المصدر: ${clientForm.source}${clientForm.plan ? ` | الباقة: ${clientForm.plan}` : ""}${clientForm.deal_value ? ` | القيمة: ${clientForm.deal_value} ر.س` : ""}`,
+        description: `المبيعات | المصدر: ${clientForm.source}${clientForm.plan ? ` | الباقة: ${clientForm.plan}` : ""}${clientForm.deal_value ? ` | القيمة: ${clientForm.deal_value} ر.س` : ""}`,
         task_type: "followup",
         priority: "medium",
         status: "in_progress",
@@ -515,7 +515,6 @@ export default function MyTasksPage() {
     try {
       const orgId = getOrgId();
       const desc = task.description || "";
-      const isSupport = desc.includes("مبيعات الدعم");
       // Parse deal value, source, plan, stage from description
       const valueMatch = desc.match(/القيمة:\s*([\d.]+)/);
       const sourceMatch = desc.match(/المصدر:\s*([^|]+)/);
@@ -523,7 +522,7 @@ export default function MyTasksPage() {
       const stageMatch = task.title?.match(/^(.+?)\s*—/);
       await submitPendingDeal(orgId, {
         org_id: orgId,
-        sales_type: isSupport ? "support" : "office",
+        sales_type: "office",
         client_name: task.client_name || task.title,
         client_phone: task.client_phone || undefined,
         deal_value: valueMatch ? parseFloat(valueMatch[1]) : 0,
@@ -1395,35 +1394,6 @@ export default function MyTasksPage() {
             </div>
 
             <div className="space-y-4">
-              {/* Sales type toggle */}
-              <div>
-                <label className="text-sm text-gray-400 mb-1.5 block">القسم</label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setClientForm(f => ({ ...f, sales_type: "office" }))}
-                    className={`flex-1 py-2.5 rounded-[14px] text-sm font-medium transition-all ${
-                      clientForm.sales_type === "office"
-                        ? "bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/30"
-                        : "bg-white/[0.04] text-gray-400 hover:bg-white/[0.07]"
-                    }`}
-                  >
-                    مبيعات المكتب
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setClientForm(f => ({ ...f, sales_type: "support" }))}
-                    className={`flex-1 py-2.5 rounded-[14px] text-sm font-medium transition-all ${
-                      clientForm.sales_type === "support"
-                        ? "bg-orange-500/15 text-orange-400 ring-1 ring-orange-500/30"
-                        : "bg-white/[0.04] text-gray-400 hover:bg-white/[0.07]"
-                    }`}
-                  >
-                    مبيعات الدعم
-                  </button>
-                </div>
-              </div>
-
               {/* Client name */}
               <div>
                 <label className="text-sm text-gray-400 mb-1 block">اسم العميل <span className="text-red-400">*</span></label>

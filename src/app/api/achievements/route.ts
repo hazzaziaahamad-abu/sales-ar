@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
   const items: AchievementItem[] = [];
   for (const d of deals.data ?? []) items.push({
     id: `deal:${d.id}`, source: "deal", title: d.client_name,
-    detail: [d.sales_type === "support" ? "مبيعات الدعم" : "مبيعات المكتب", d.plan].filter(Boolean).join(" · "),
+    detail: ["المبيعات", d.plan].filter(Boolean).join(" · "),
     who: d.assigned_rep_name, day: dayOf(d.close_date), value: d.deal_value ?? 0,
   });
   for (const r of renewals.data ?? []) items.push({
