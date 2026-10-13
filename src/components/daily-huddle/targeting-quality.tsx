@@ -7,7 +7,7 @@ import { getEditableContent, saveEditableContent, getEditableContentRange } from
 import { todayLocal } from "@/lib/utils/format";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  TEAM, KEY_PREFIX, QUALITY, qualityAvg, qualityColor, weekStart, addDays, MANAGER_LOOKBACK_DAYS, type QualityScores,
+  TEAM, KEY_PREFIX, QUALITY, qualityAvg, qualityColor, weekStart, addDays, type QualityScores,
 } from "@/components/daily-huddle/huddle-shared";
 
 // جودة الاستهداف — تقييم أسبوعي لكل موظف (بدل التقييم اليومي السابق).
@@ -77,11 +77,9 @@ export function TargetingQualityTab({ isManager }: { isManager: boolean }) {
 
   useEffect(() => { load(); }, [load]);
 
-  // المدير يشوف آخر 45 يوم فقط
-  const canGoBack = !isManager || addDays(week, -1) >= addDays(todayLocal(), -MANAGER_LOOKBACK_DAYS);
   function changeWeek(delta: number) {
     const next = addDays(week, 7 * delta);
-    if (next > thisWeek || (delta < 0 && !canGoBack)) return;
+    if (next > thisWeek) return;
     setLoading(true);
     setNotes({});
     setWeek(next);
@@ -141,7 +139,7 @@ export function TargetingQualityTab({ isManager }: { isManager: boolean }) {
             </div>
           </div>
           <div className="flex items-center gap-1.5">
-            <button onClick={() => changeWeek(-1)} disabled={!canGoBack} title="الأسبوع السابق" className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.05] text-muted-foreground hover:text-foreground disabled:opacity-30">
+            <button onClick={() => changeWeek(-1)} title="الأسبوع السابق" className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.05] text-muted-foreground hover:text-foreground">
               <ChevronRight className="w-4 h-4" />
             </button>
             <span className="text-[12px] font-bold text-foreground px-2 min-w-[120px] text-center">

@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState, useMemo } from "react";
-import { withinDays } from "@/components/daily-huddle/huddle-shared";
 import { fetchRecentUpdates, fetchActivityLogs, fetchTrainingSessionLogs, fetchEmployees, type RecentUpdateItem } from "@/lib/supabase/db";
 import type { ActivityLog, TrainingSessionLog, Employee } from "@/types";
 import { useAuth } from "@/lib/auth-context";
@@ -170,11 +169,8 @@ export function RecentUpdatesView({
   embedded = false,
   title = "التحديثات الأخيرة",
   subtitle = "جميع التغييرات والإضافات التي تمت في كل قسم خلال الأسبوع",
-  sinceDays,
 }: {
   tabs?: readonly TabMode[];
-  /** يعرض فقط آخر N يوم (المدير في «المتابعة اليومية»). */
-  sinceDays?: number;
   embedded?: boolean;
   title?: string;
   subtitle?: string;
@@ -209,9 +205,9 @@ export function RecentUpdatesView({
           fetchEmployees(),
         ]);
 
-        if (updatesData.status === "fulfilled") setItems(updatesData.value.filter((i) => withinDays(i.timestamp, sinceDays)));
-        if (logsData.status === "fulfilled") setLogs(logsData.value.filter((l) => withinDays(l.created_at, sinceDays)));
-        if (trainingData.status === "fulfilled") setTrainingSessions(trainingData.value.filter((t) => withinDays(t.started_at, sinceDays)));
+        if (updatesData.status === "fulfilled") setItems(updatesData.value);
+        if (logsData.status === "fulfilled") setLogs(logsData.value);
+        if (trainingData.status === "fulfilled") setTrainingSessions(trainingData.value);
         if (empsData.status === "fulfilled") setEmployees(empsData.value.filter(e => e.status === "نشط"));
 
         setLastUpdatedAt(new Date().toISOString());
@@ -222,7 +218,7 @@ export function RecentUpdatesView({
         setIsRefreshing(false);
       }
     },
-    [orgId, sinceDays]
+    [orgId]
   );
 
   useEffect(() => {

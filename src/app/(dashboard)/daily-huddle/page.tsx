@@ -20,7 +20,7 @@ import { VerificationsBoard } from "@/components/verifications/verifications-boa
 import { TargetingQualityTab } from "@/components/daily-huddle/targeting-quality";
 import { IdeasGarden } from "@/components/ideas/ideas-garden";
 import { canUseIdeas } from "@/lib/ideas";
-import { TEAM, KEY_PREFIX, weekStart, addDays, MANAGER_LOOKBACK_DAYS, withinDays, type QualityScores } from "@/components/daily-huddle/huddle-shared";
+import { TEAM, KEY_PREFIX, weekStart, addDays, type QualityScores } from "@/components/daily-huddle/huddle-shared";
 import { HuddleManagersButton } from "@/components/daily-huddle/huddle-managers-button";
 import { useHuddleManagers } from "@/lib/huddle-managers";
 import { Button } from "@/components/ui/button";
@@ -253,9 +253,8 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
         <input
           type="date"
           value={date}
-          min={isManager ? addDays(todayLocal(), -MANAGER_LOOKBACK_DAYS) : undefined}
           max={todayLocal()}
-          onChange={(e) => e.target.value && (!isManager || e.target.value >= addDays(todayLocal(), -MANAGER_LOOKBACK_DAYS)) && setDate(e.target.value)}
+          onChange={(e) => e.target.value && setDate(e.target.value)}
           className="px-3 py-2 rounded-[14px] bg-white/[0.04] border border-white/[0.08] text-sm text-foreground"
         />
       </div>
@@ -569,8 +568,6 @@ function DailyHuddleTabs() {
   const [verifyPending, setVerifyPending] = useState(0);
   const huddleManagers = useHuddleManagers();
   const { isManager } = huddleManagers;
-  // المدير يشوف آخر 45 يوم فقط
-  const sinceDays = isManager ? MANAGER_LOOKBACK_DAYS : undefined;
 
   // عدّاد على تبويب «طلبات التحقق»: للموظف = طلبات تنتظر رده، للمدير = ردود تنتظر المطابقة
   useEffect(() => {
@@ -578,8 +575,7 @@ function DailyHuddleTabs() {
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (!d?.me) return;
-        const list = ((d.requests ?? []) as { status: string; assignee_id: string; created_at: string }[])
-          .filter((x) => withinDays(x.created_at, sinceDays));
+        const list = (d.requests ?? []) as { status: string; assignee_id: string }[];
         // «الدخول كموظف»: نحسب على الموظف المعروض لا على جلسة الأدمن
         const me = isImpersonating && user ? { id: user.id, isManager } : d.me;
         setVerifyPending(me.isManager
@@ -587,7 +583,7 @@ function DailyHuddleTabs() {
           : list.filter((x) => x.status === "pending" && x.assignee_id === me.id).length);
       })
       .catch(() => undefined);
-  }, [isImpersonating, user, isManager, sinceDays]);
+  }, [isImpersonating, user, isManager]);
 
   return (
     <div className="space-y-5">
@@ -629,18 +625,18 @@ function DailyHuddleTabs() {
       {tab === "team" && <TeamTodayTab isManager={isManager} />}
       {tab === "quality" && <TargetingQualityTab isManager={isManager} />}
       {tab === "compass" && canUseIdeas(user) && <SecretaryView embedded sections={["compass", "yesterday", "priorities", "tasks", "quickTasks"]} />}
-      {tab === "confirmations" && canUseIdeas(user) && <SalesConfirmations canConfirm={isManager} sinceDays={sinceDays} />}
-      {tab === "verify" && <VerificationsBoard onPendingChange={setVerifyPending} sinceDays={sinceDays} />}
+      {tab === "confirmations" && canUseIdeas(user) && <SalesConfirmations canConfirm={isManager} />}
+      {tab === "verify" && <VerificationsBoard onPendingChange={setVerifyPending} />}
       {tab === "health" && canUseIdeas(user) && <SecretaryView embedded sections={["hotCold", "supportHealth", "renewalHealth"]} />}
-      {tab === "activity" && canUseIdeas(user) && <RecentUpdatesView embedded tabs={["updates", "log"]} sinceDays={sinceDays} />}
-      {tab === "challenges" && canUseIdeas(user) && <ChallengesTab sinceDays={sinceDays} />}
-      {tab === "ideas" && canUseIdeas(user) && <IdeasGarden sinceDays={sinceDays} />}
+      {tab === "activity" && canUseIdeas(user) && <RecentUpdatesView embedded tabs={["updates", "log"]} />}
+      {tab === "challenges" && canUseIdeas(user) && <ChallengesTab />}
+      {tab === "ideas" && canUseIdeas(user) && <IdeasGarden />}
     </div>
   );
 }
 
 /** تبويب «التحديات والطلبات والتطويرات»: الطلبات والتطويرات + الاجتماعات + الإنجازات + التحديات (كل واحد في قسم). */
-function ChallengesTab({ sinceDays }: { sinceDays?: number }) {
+function ChallengesTab() {
   const [view, setView] = useState<"tickets" | "meetings" | "achievements" | "challenges">("tickets");
   return (
     <div className="space-y-4">
@@ -655,10 +651,10 @@ function ChallengesTab({ sinceDays }: { sinceDays?: number }) {
           </button>
         ))}
       </div>
-      {view === "tickets" && <WorkTicketsBoard embedded sinceDays={sinceDays} />}
-      {view === "meetings" && <MeetingsBoard embedded sinceDays={sinceDays} />}
-      {view === "achievements" && <AchievementsBoard embedded sinceDays={sinceDays} />}
-      {view === "challenges" && <ChallengesHub sinceDays={sinceDays} />}
+      {view === "tickets" && <WorkTicketsBoard embedded />}
+      {view === "meetings" && <MeetingsBoard embedded />}
+      {view === "achievements" && <AchievementsBoard embedded />}
+      {view === "challenges" && <ChallengesHub />}
     </div>
   );
 }

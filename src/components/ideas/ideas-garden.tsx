@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { withinDays } from "@/components/daily-huddle/huddle-shared";
 import { Sprout, Loader2, Sparkles, Trash2, X, Plus, RotateCcw, Droplets, Check, ChevronDown } from "lucide-react";
 import {
   IDEA_STAGES, STAGE_META, ideaWarmth, warmthLabel,
@@ -20,8 +19,7 @@ function ageLabel(iso: string): string {
   return `قبل ${Math.floor(days / 30)} شهر`;
 }
 
-/** sinceDays: يعرض فقط ما أُنشئ خلال آخر N يوم (المدير في «المتابعة اليومية»). */
-export function IdeasGarden({ sinceDays }: { sinceDays?: number } = {}) {
+export function IdeasGarden() {
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -40,14 +38,14 @@ export function IdeasGarden({ sinceDays }: { sinceDays?: number } = {}) {
       const res = await fetch("/api/ideas");
       if (!res.ok) throw new Error();
       const data = await res.json();
-      setIdeas(((data.ideas ?? []) as Idea[]).filter((i) => withinDays(i.created_at, sinceDays)));
+      setIdeas(data.ideas ?? []);
       setLoadError(false);
     } catch {
       setLoadError(true);
     } finally {
       setLoading(false);
     }
-  }, [sinceDays]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 

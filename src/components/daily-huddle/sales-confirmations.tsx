@@ -81,11 +81,9 @@ function toSales(deals: Deal[], renewals: Renewal[]): SaleItem[] {
   return items;
 }
 
-/** sinceDays: لا يُعرض قبل آخر N يوم (المدير في «المتابعة اليومية»). */
-export function SalesConfirmations({ canConfirm, sinceDays }: { canConfirm: boolean; sinceDays?: number }) {
+export function SalesConfirmations({ canConfirm }: { canConfirm: boolean }) {
   const { user } = useAuth();
   const today = saudiDateStr();
-  const minDay = sinceDays ? shiftDay(today, -sinceDays) : "0000-00-00";
 
   const [day, setDay] = useState(today);
   const [sales, setSales] = useState<SaleItem[]>([]);
@@ -100,9 +98,9 @@ export function SalesConfirmations({ canConfirm, sinceDays }: { canConfirm: bool
       const [deals, renewals, rows] = await Promise.all([
         fetchDeals(),
         fetchRenewals(),
-        getEditableContentRange<DayConfirmations>(dayKey(minDay), dayKey("9999-99-99")),
+        getEditableContentRange<DayConfirmations>(dayKey("0000-00-00"), dayKey("9999-99-99")),
       ]);
-      setSales(toSales(deals, renewals).filter(s => s.day >= minDay));
+      setSales(toSales(deals, renewals));
       const map: Record<string, DayConfirmations> = {};
       for (const r of rows) map[r.key.slice(KEY_PREFIX.length + 1)] = r.value ?? {};
       setConfirmations(map);
@@ -112,7 +110,7 @@ export function SalesConfirmations({ canConfirm, sinceDays }: { canConfirm: bool
     } finally {
       setLoading(false);
     }
-  }, [minDay]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
@@ -190,15 +188,14 @@ export function SalesConfirmations({ canConfirm, sinceDays }: { canConfirm: bool
             </div>
           </div>
           <div className="flex items-center gap-1.5">
-            <button onClick={() => setDay(d => shiftDay(d, -1))} disabled={day <= minDay} title="اليوم السابق" className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.05] text-muted-foreground hover:text-foreground disabled:opacity-30">
+            <button onClick={() => setDay(d => shiftDay(d, -1))} title="اليوم السابق" className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.05] text-muted-foreground hover:text-foreground">
               <ChevronRight className="w-4 h-4" />
             </button>
             <input
               type="date"
               value={day}
-              min={sinceDays ? minDay : undefined}
               max={today}
-              onChange={e => e.target.value && e.target.value >= minDay && setDay(e.target.value)}
+              onChange={e => e.target.value && setDay(e.target.value)}
               className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-foreground"
             />
             <button onClick={() => setDay(d => shiftDay(d, 1))} disabled={day >= today} title="اليوم التالي" className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.05] text-muted-foreground hover:text-foreground disabled:opacity-30">

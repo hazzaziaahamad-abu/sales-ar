@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { withinDays } from "@/components/daily-huddle/huddle-shared";
 import Link from "next/link";
 import {
   ClipboardCheck, Plus, Send, Loader2, MessageCircle, Trash2, CheckCircle2,
@@ -38,8 +37,7 @@ const isLate = (r: VerificationRequest) => r.status === "pending" && !!r.due_at 
 const titleOf = (r: VerificationRequest) =>
   `${r.template === GENERAL ? "طلب عام" : TEMPLATES[r.template].label}${r.params?.stale_days ? ` (+${r.params.stale_days} يوم)` : ""} — ${scopeTitle(r.template, r.scope)}${r.params?.rep ? ` — ${repLabel(r.params.rep)}` : ""}`;
 
-/** sinceDays: يعرض فقط ما أُنشئ خلال آخر N يوم (المدير في «المتابعة اليومية»). */
-export function VerificationsBoard({ onPendingChange, sinceDays }: { onPendingChange?: (n: number) => void; sinceDays?: number }) {
+export function VerificationsBoard({ onPendingChange }: { onPendingChange?: (n: number) => void }) {
   const [requests, setRequests] = useState<VerificationRequest[]>([]);
   const [apiMe, setMe] = useState<{ id: string; isManager: boolean } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,7 +52,7 @@ export function VerificationsBoard({ onPendingChange, sinceDays }: { onPendingCh
       const res = await fetch("/api/verifications");
       if (!res.ok) throw new Error();
       const data = await res.json();
-      setRequests(((data.requests ?? []) as VerificationRequest[]).filter((r) => withinDays(r.created_at, sinceDays)));
+      setRequests(data.requests ?? []);
       setMe(data.me ?? null);
       setLoadError(false);
     } catch {
@@ -62,7 +60,7 @@ export function VerificationsBoard({ onPendingChange, sinceDays }: { onPendingCh
     } finally {
       setLoading(false);
     }
-  }, [sinceDays]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {

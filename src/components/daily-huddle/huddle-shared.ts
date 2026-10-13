@@ -34,13 +34,3 @@ export function addDays(date: string, delta: number): string {
   d.setUTCDate(d.getUTCDate() + delta);
   return d.toISOString().slice(0, 10);
 }
-
-/** المدير يشوف في «المتابعة اليومية» آخر 45 يوم فقط. */
-export const MANAGER_LOOKBACK_DAYS = 45;
-
-/** هل التاريخ ضمن آخر `days` يوم؟ (بدون حد = دائماً نعم) */
-export function withinDays(iso: string | null | undefined, days?: number): boolean {
-  if (!days) return true;
-  if (!iso) return false;
-  return Date.now() - new Date(iso).getTime() <= days * 86_400_000;
-}

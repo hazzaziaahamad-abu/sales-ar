@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { withinDays } from "@/components/daily-huddle/huddle-shared";
 import {
   Plus, Send, Loader2, Clock, UserRound, ChevronDown, ChevronUp, Ticket, Search, AlertTriangle,
   CheckCircle2, Play, RotateCcw, XCircle, MessageSquare, CalendarDays,
@@ -43,8 +42,7 @@ function isLate(t: WorkTicket, today: string): boolean {
 
 const inputCls = "w-full rounded-[10px] bg-white/[0.04] border border-border px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-violet-500/40";
 
-/** sinceDays: يعرض فقط ما أُنشئ خلال آخر N يوم (المدير في «المتابعة اليومية»). */
-export function WorkTicketsBoard({ embedded = false, sinceDays }: { embedded?: boolean; sinceDays?: number }) {
+export function WorkTicketsBoard({ embedded = false }: { embedded?: boolean }) {
   const today = todayLocal();
   const [tickets, setTickets] = useState<WorkTicket[]>([]);
   const [me, setMe] = useState<{ id: string; isManager: boolean } | null>(null);
@@ -65,7 +63,7 @@ export function WorkTicketsBoard({ embedded = false, sinceDays }: { embedded?: b
       const res = await fetch("/api/work-tickets");
       if (!res.ok) throw new Error();
       const data = await res.json();
-      setTickets(((data.tickets ?? []) as WorkTicket[]).filter((t) => withinDays(t.created_at, sinceDays)));
+      setTickets(data.tickets ?? []);
       setMe(data.me ?? null);
       setLoadError(false);
     } catch {
@@ -73,7 +71,7 @@ export function WorkTicketsBoard({ embedded = false, sinceDays }: { embedded?: b
     } finally {
       setLoading(false);
     }
-  }, [sinceDays]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
