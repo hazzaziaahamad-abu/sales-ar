@@ -103,6 +103,7 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
   const [kpis, setKpis] = useState<HuddleKpis | null>(null);
   const [targets, setTargets] = useState<KpiTargets>(DEFAULT_KPI_TARGETS);
   const [editingTargets, setEditingTargets] = useState(false);
+  const [showAlerts, setShowAlerts] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
@@ -196,7 +197,15 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
   const teamClosesGoal = TEAM.reduce((s, n) => s + tgt(n, "closes"), 0);
   const teamRevenue = TEAM.reduce((s, n) => s + (mk(n)?.values.closesValue ?? 0) + (mk(n)?.values.renewalsValue ?? 0), 0);
   const teamRevenueGoal = TEAM.reduce((s, n) => s + tgt(n, "closesValue") + tgt(n, "renewalsValue"), 0);
-  const teamAlerts = TEAM.reduce((s, n) => s + (mk(n)?.values.staleDeals ?? 0) + (mk(n)?.values.overdueRenewals ?? 0) + (mk(n)?.values.openTickets ?? 0), 0);
+  // «تحتاج انتباه»: نجمع فقط البنود الظاهرة في كرت كل موظف عشان الرقم يطابق الكروت
+  const ALERT_KPIS: KpiKey[] = ["staleDeals", "overdueRenewals", "openTickets"];
+  const alertsBreakdown = TEAM.map((n) => ({
+    member: n,
+    items: ALERT_KPIS.filter((key) => MEMBER_ROLES[n]?.kpis.includes(key))
+      .map((key) => ({ key, count: mk(n)?.values[key] ?? 0 }))
+      .filter((x) => x.count > 0),
+  })).filter((x) => x.items.length > 0);
+  const teamAlerts = alertsBreakdown.reduce((s, x) => s + x.items.reduce((a, i) => a + i.count, 0), 0);
   const winning = followupsHit === TEAM.length;
 
   const yesterday = prevDay(date);
@@ -338,10 +347,39 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
                 </div>
               </div>
             ))}
-            <div className="text-xs text-muted-foreground">
+            <button
+              type="button"
+              onClick={() => teamAlerts && setShowAlerts((v) => !v)}
+              className={`text-xs text-muted-foreground text-right ${teamAlerts ? "cursor-pointer hover:text-foreground" : "cursor-default"}`}
+            >
               تحتاج انتباه الآن
               <div className={`text-lg font-bold ${teamAlerts ? "text-red-400" : "text-emerald-400"}`}>{teamAlerts}</div>
-            </div>
+              {teamAlerts > 0 && <div className="text-[10px] underline">{showAlerts ? "إخفاء التفاصيل" : "اضغط للتفاصيل"}</div>}
+            </button>
+          </div>
+        )}
+
+        {kpis && showAlerts && teamAlerts > 0 && (
+          <div className="mt-3 rounded-xl bg-red-500/[0.04] border border-red-500/15 p-3 space-y-2">
+            <p className="text-[11px] text-muted-foreground">مشاكل مفتوحة الآن والهدف فيها صفر — اضغط على الاسم للانتقال لكرته.</p>
+            {alertsBreakdown.map((x) => (
+              <div key={x.member} className="text-xs">
+                <button
+                  type="button"
+                  onClick={() => document.getElementById(`huddle-member-${x.member}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                  className="font-bold text-foreground hover:underline"
+                >
+                  {x.member} · {x.items.reduce((a, i) => a + i.count, 0)}
+                </button>
+                <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5 text-muted-foreground">
+                  {x.items.map((i) => (
+                    <span key={i.key} title={KPI_DEFS[i.key].hint}>
+                      {KPI_DEFS[i.key].label}: <span className="text-red-400 font-bold">{i.count}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -368,7 +406,7 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
             while (commitments.length < 3) commitments.push({ text: "" });
             const helpedBy = Object.entries(k.helpedBy);
             return (
-              <div key={member} className={`cc-card rounded-2xl p-4 border ${metGoal ? "border-emerald-500/25" : "border-white/[0.06]"}`}>
+              <div key={member} id={`huddle-member-${member}`} className={`scroll-mt-20 cc-card rounded-2xl p-4 border ${metGoal ? "border-emerald-500/25" : "border-white/[0.06]"}`}>
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-lg bg-violet-500/15 text-violet-400 flex items-center justify-center text-sm font-bold">
                     {member[0]}
