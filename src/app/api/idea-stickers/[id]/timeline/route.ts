@@ -11,6 +11,7 @@ export const runtime = "nodejs";
  * { action: "add", label }         → خطوة جديدة في آخر التايم لاين
  * { action: "remove", key }        → حذف خطوة
  * { action: "due", due_at | null } → موعد التنفيذ المستهدف (YYYY-MM-DD)
+ * { action: "complete" }           → إنجاز التذكير أو إرجاعه غير مكتمل
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const access = await getTicketAccess();
@@ -57,6 +58,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (v === null || v === "") patch.due_at = null;
       else if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) patch.due_at = v;
       else return NextResponse.json({ error: "تاريخ غير صالح" }, { status: 400 });
+      break;
+    }
+    case "complete": {
+      if (sticker.completed_at) { patch.completed_at = null; patch.completed_by = null; }
+      else { patch.completed_at = new Date().toISOString(); patch.completed_by = access.name ?? null; }
       break;
     }
     default:

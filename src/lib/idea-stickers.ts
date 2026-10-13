@@ -12,6 +12,9 @@ export interface IdeaSticker {
   likes: string[];
   timeline?: TimelineStep[] | null;
   due_at?: string | null;
+  /** للتذكير فقط: وقت الإنجاز ومن أنجزه — المكتمل ينتقل للوحة «المنجزات». */
+  completed_at?: string | null;
+  completed_by?: string | null;
   created_by: string | null;
   created_by_name: string | null;
   created_at: string;
@@ -53,6 +56,9 @@ export function timelineOf(s: Pick<IdeaSticker, "timeline" | "created_at" | "cre
     done_by: i === 0 ? s.created_by_name : null,
   }));
 }
+
+/** التذكير ما له خطوات تنفيذ — له موعد إنجاز وحالة مكتمل / غير مكتمل فقط. */
+export const isReminder = (s: Pick<IdeaSticker, "kind">) => s.kind === "note";
 
 export const isStickerKind =(v: unknown): v is StickerKind => v === "star" || v === "note" || v === "circle";
 export const stickerKind = (k: string) => STICKER_KINDS.find((x) => x.value === k) ?? STICKER_KINDS[0];

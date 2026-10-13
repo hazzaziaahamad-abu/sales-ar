@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Marhey } from "next/font/google";
-import { Heart, Search, Trash2, X, Loader2, Dices, Sparkles, GripVertical, Check, CalendarClock, Plus, Rocket } from "lucide-react";
+import { Heart, Search, Trash2, X, Loader2, Dices, Sparkles, GripVertical, Check, CalendarClock, Plus, Rocket, Trophy, BellRing, Undo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { STICKER_KINDS, stickerKind, timelineOf, type IdeaSticker, type StickerKind, type TimelineStep } from "@/lib/idea-stickers";
+import { STICKER_KINDS, isReminder, stickerKind, timelineOf, type IdeaSticker, type StickerKind, type TimelineStep } from "@/lib/idea-stickers";
 
 // خط يدوي مرح للاستكرات — يعطي إحساس الكتابة بالقلم على ورق لاصق.
 const hand = Marhey({ subsets: ["arabic"], weight: ["400", "600", "700"], display: "swap", variable: "--font-hand" });
@@ -80,6 +80,8 @@ const CSS = `
 .ib-slot:hover .ib-pin { animation: ib-wiggle .5s ease; }
 @keyframes ib-wiggle { 25%{transform:rotate(-14deg)} 60%{transform:rotate(10deg)} 100%{transform:none} }
 
+.ib-stamp { position:absolute; top:10px; left:10px; z-index:4; padding:2px 10px; border-radius:6px; transform:rotate(-12deg);
+  font-family: var(--hand); font-weight:700; font-size:14px; color:#047857; border:2px solid #059669; background:rgba(236,253,245,.75); }
 .ib-tag { font-size:12px; font-weight:600; opacity:.7; }
 .ib-title { font-family: var(--hand); font-size:19px; font-weight:700; line-height:1.4; margin:6px 0 4px; word-break:break-word; }
 .ib-body { font-family: var(--hand); font-size:14px; line-height:1.65; white-space:pre-wrap; word-break:break-word; opacity:.86;
@@ -168,6 +170,9 @@ const dropOf = (id: string) => (seed(id) >> 5) % 22;
 
 type Draft = { kind: StickerKind; tag: string; title: string; body: string };
 type Sort = "board" | "likes" | "new";
+type View = "board" | "done";
+/** تذكير مكتمل — مكانه لوحة «المنجزات» لا اللوحة الرئيسية. */
+const isDone = (s: IdeaSticker) => isReminder(s) && !!s.completed_at;
 const emptyDraft = (kind: StickerKind = "star"): Draft => ({ kind, tag: stickerKind(kind).tag, title: "", body: "" });
 const initial = (name?: string | null) => (name ?? "").trim().charAt(0) || "؟";
 const swapKind = (d: Draft, kind: StickerKind): Draft => ({ ...d, kind, tag: d.tag === stickerKind(d.kind).tag ? stickerKind(kind).tag : d.tag });
@@ -181,6 +186,7 @@ export function IdeasBoard() {
   const [adding, setAdding] = useState(false);
   const [filter, setFilter] = useState<StickerKind | "all">("all");
   const [sort, setSort] = useState<Sort>("board");
+  const [view, setView] = useState<View>("board");
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState<IdeaSticker | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
@@ -223,6 +229,7 @@ export function IdeasBoard() {
       setDraft(emptyDraft(draft.kind));
       setFilter("all");
       setQuery("");
+      setView("board");
       setTimeout(() => slotRefs.current.get(json.sticker.id)?.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
     } catch (e) {
       alert((e as Error).message);
@@ -298,16 +305,21 @@ export function IdeasBoard() {
     if (!res.ok) load();
   };
 
+  const onBoard = useMemo(() => stickers.filter((s) => !isDone(s)), [stickers]);
+  const doneCount = stickers.length - onBoard.length;
+
   const visible = useMemo(() => {
     const q = query.trim();
-    const list = stickers.filter(
-      (s) => (filter === "all" || s.kind === filter) && (!q || `${s.tag} ${s.title} ${s.body} ${s.created_by_name ?? ""}`.includes(q))
-    );
+    const matches = (s: IdeaSticker) => !q || `${s.tag} ${s.title} ${s.body} ${s.created_by_name ?? ""}`.includes(q);
+    if (view === "done") {
+      return stickers.filter((s) => isDone(s) && matches(s)).sort((a, b) => b.completed_at!.localeCompare(a.completed_at!));
+    }
+    const list = onBoard.filter((s) => (filter === "all" || s.kind === filter) && matches(s));
     if (sort === "likes") return [...list].sort((a, b) => (b.likes?.length ?? 0) - (a.likes?.length ?? 0));
     if (sort === "new") return [...list].sort((a, b) => b.created_at.localeCompare(a.created_at));
     return list;
-  }, [stickers, filter, query, sort]);
-  const canDrag = filter === "all" && !query.trim() && sort === "board";
+  }, [stickers, onBoard, filter, query, sort, view]);
+  const canDrag = view === "board" && filter === "all" && !query.trim() && sort === "board";
 
   const surprise = () => {
     if (!visible.length) return;
@@ -432,18 +444,31 @@ export function IdeasBoard() {
           {([["all", "الكل", "conic-gradient(#fef08a 0 33%, #fbcfe8 0 66%, #a7f3d0 0)"], ...STICKER_KINDS.map((k) => [k.value, k.label, k.swatch])] as [StickerKind | "all", string, string][]).map(([v, label, color]) => (
             <button
               key={v}
-              onClick={() => setFilter(v)}
+              onClick={() => { setFilter(v); setView("board"); }}
               className={cn(
                 "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors",
-                filter === v ? "bg-white/[0.09] text-foreground border-white/20" : "bg-white/[0.02] text-muted-foreground border-border hover:text-foreground"
+                view === "board" && filter === v ? "bg-white/[0.09] text-foreground border-white/20" : "bg-white/[0.02] text-muted-foreground border-border hover:text-foreground"
               )}
             >
               <span className="w-2.5 h-2.5 rounded-full" style={{ background: color }} />
               {label}
-              <span className="opacity-60">{v === "all" ? stickers.length : stickers.filter((s) => s.kind === v).length}</span>
+              <span className="opacity-60">{v === "all" ? onBoard.length : onBoard.filter((s) => s.kind === v).length}</span>
             </button>
           ))}
+          <button
+            onClick={() => setView("done")}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors",
+              view === "done" ? "bg-emerald-500/15 text-emerald-300 border-emerald-400/30" : "bg-white/[0.02] text-muted-foreground border-border hover:text-foreground"
+            )}
+            title="التذكيرات المكتملة"
+          >
+            <Trophy className="w-3.5 h-3.5" />
+            المنجزات
+            <span className="opacity-60">{doneCount}</span>
+          </button>
           <span className="w-px h-5 bg-border mx-1 hidden sm:block" />
+          <div className={cn("flex gap-0.5", view === "done" && "hidden")}>
           <div className="flex gap-0.5 p-0.5 rounded-full bg-white/[0.03] border border-border">
             {([["board", "ترتيب اللوحة"], ["likes", "الأكثر حباً"], ["new", "الأحدث"]] as [Sort, string][]).map(([v, label]) => (
               <button key={v} onClick={() => setSort(v)}
@@ -451,6 +476,7 @@ export function IdeasBoard() {
                 {label}
               </button>
             ))}
+          </div>
           </div>
           <div className="flex items-center gap-2 mr-auto w-full sm:w-auto">
             <div className="relative flex-1 sm:w-52">
@@ -474,7 +500,11 @@ export function IdeasBoard() {
       ) : (
         <section className="ib-board">
           {visible.length === 0 ? (
-            <EmptyBoard filtering={stickers.length > 0} />
+            view === "done" ? (
+              <EmptyDone filtering={doneCount > 0} />
+            ) : (
+              <EmptyBoard filtering={onBoard.length > 0} />
+            )
           ) : (
             <div className="ib-grid">
               {visible.map((s) => {
@@ -496,6 +526,7 @@ export function IdeasBoard() {
                       onClick={() => setOpen(s)}
                     >
                       {canDrag && <GripVertical className="ib-grip w-4 h-4" />}
+                      {isDone(s) && <span className="ib-stamp">تم ✓</span>}
                       {s.tag && <span className="ib-tag">{s.tag}</span>}
                       {s.title && <h3 className="ib-title">{s.title}</h3>}
                       {s.body && <p className="ib-body">{s.body}</p>}
@@ -525,7 +556,7 @@ export function IdeasBoard() {
           )}
         </section>
       )}
-      {!canDrag && visible.length > 1 && (
+      {view === "board" && !canDrag && visible.length > 1 && (
         <p className="text-[11px] text-muted-foreground text-center">ترتيب اللوحة بالسحب متاح في «ترتيب اللوحة» بدون فلتر أو بحث</p>
       )}
 
@@ -602,6 +633,16 @@ function EmptyBoard({ filtering }: { filtering: boolean }) {
       </div>
       <p className="ib-hand text-xl font-bold text-slate-700">{filtering ? "ما لقينا شي بهالبحث" : "اللوحة تنتظر أول فكرة"}</p>
       <p className="text-sm mt-1">{filtering ? "جرّب كلمة ثانية أو اعرض الكل" : "اكتب على الورقة فوق والصقها هنا 💡"}</p>
+    </div>
+  );
+}
+
+function EmptyDone({ filtering }: { filtering: boolean }) {
+  return (
+    <div className="flex flex-col items-center justify-center text-center py-16 text-slate-500">
+      <Trophy className="w-12 h-12 text-emerald-500/70 mb-3" />
+      <p className="ib-hand text-xl font-bold text-slate-700">{filtering ? "ما لقينا شي بهالبحث" : "لا توجد منجزات بعد"}</p>
+      <p className="text-sm mt-1">{filtering ? "جرّب كلمة ثانية" : "أي تذكير تعلّمه «مكتمل» ينتقل هنا 🏆"}</p>
     </div>
   );
 }
@@ -686,7 +727,11 @@ function StickerDialog({ sticker, canEdit, liked, onLike, onClose, onSave, onDel
           )}
         </div>
 
-        <TimelinePanel sticker={sticker} canEdit={canEdit} onTimeline={onTimeline} />
+        {isReminder(sticker) ? (
+          <ReminderPanel sticker={sticker} canEdit={canEdit} onTimeline={onTimeline} />
+        ) : (
+          <TimelinePanel sticker={sticker} canEdit={canEdit} onTimeline={onTimeline} />
+        )}
       </div>
     </div>
   );
@@ -704,11 +749,15 @@ const days = (n: number) => (n === 1 ? "يوم" : n === 2 ? "يومين" : `${nu
 
 /** حالة الالتزام بالموعد: باقي / اليوم / متأخرة / تمت في الموعد / تمت متأخرة. */
 function dueStatus(due: string | null | undefined, steps: TimelineStep[]) {
+  const allDone = steps.every((s) => s.done_at);
+  return dueStatusAt(due, allDone ? Math.max(...steps.map((s) => new Date(s.done_at!).getTime())) : null);
+}
+
+/** نفس حالة الموعد لكن بوقت إنجاز مباشر (للتذكير) — null = لسا ما اكتمل. */
+function dueStatusAt(due: string | null | undefined, finished: number | null) {
   if (!due) return null;
   const end = new Date(`${due}T23:59:59`).getTime();
-  const allDone = steps.every((s) => s.done_at);
-  if (allDone) {
-    const finished = Math.max(...steps.map((s) => new Date(s.done_at!).getTime()));
+  if (finished !== null) {
     const late = Math.ceil((finished - end) / DAY);
     return late > 0
       ? { tone: "late" as const, text: `اكتملت متأخرة ${days(late)}` }
@@ -721,6 +770,7 @@ function dueStatus(due: string | null | undefined, steps: TimelineStep[]) {
 }
 
 function ProgressChip({ sticker }: { sticker: IdeaSticker }) {
+  if (isReminder(sticker)) return <ReminderChip sticker={sticker} />;
   const steps = timelineOf(sticker);
   const done = steps.filter((s) => s.done_at).length;
   if (done <= 1 && !sticker.due_at) return null; // فكرة لسا مطروحة فقط — لا نزحم الاستكر
@@ -732,6 +782,91 @@ function ProgressChip({ sticker }: { sticker: IdeaSticker }) {
       {num(done)}/{num(steps.length)}
       {!complete && <span className="ib-meter"><i style={{ width: `${(done / steps.length) * 100}%` }} /></span>}
     </span>
+  );
+}
+
+/** شارة التذكير على الاستكر: الموعد المتبقي أو «مكتمل». */
+function ReminderChip({ sticker }: { sticker: IdeaSticker }) {
+  const complete = !!sticker.completed_at;
+  if (!complete && !sticker.due_at) return null;
+  const status = dueStatusAt(sticker.due_at, complete ? new Date(sticker.completed_at!).getTime() : null);
+  return (
+    <span className={cn("ib-prog", status?.tone === "late" && !complete && "ib-late", complete && "ib-done")} title={status?.text ?? "مكتمل"}>
+      {complete ? <Check className="w-3 h-3" /> : <CalendarClock className="w-3 h-3" />}
+      {complete ? "مكتمل" : status?.text}
+    </span>
+  );
+}
+
+/** التذكير: موعد الإنجاز + الحالة (مكتمل / غير مكتمل) بدل خطوات التنفيذ. */
+function ReminderPanel({ sticker, canEdit, onTimeline }: {
+  sticker: IdeaSticker; canEdit: boolean; onTimeline: (body: Record<string, unknown>) => Promise<void>;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const complete = !!sticker.completed_at;
+  const status = dueStatusAt(sticker.due_at, complete ? new Date(sticker.completed_at!).getTime() : null);
+
+  const run = async (tag: string, body: Record<string, unknown>) => {
+    setBusy(tag);
+    try { await onTimeline(body); } catch (e) { alert((e as Error).message); } finally { setBusy(null); }
+  };
+
+  return (
+    <div className="w-[min(92vw,420px)] rounded-2xl glass-surface border border-border p-4 space-y-4 hover:translate-y-0 text-right">
+      {/* موعد الإنجاز */}
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground mb-2">موعد الإنجاز</p>
+        <div className="flex items-center gap-3 rounded-xl bg-white/[0.02] border border-white/[0.06] p-3">
+          <span className="w-9 h-9 rounded-full bg-pink-500/15 text-pink-300 flex items-center justify-center shrink-0"><CalendarClock className="w-4 h-4" /></span>
+          <div className="flex-1 min-w-0">
+            {canEdit ? (
+              <input type="date" value={sticker.due_at ?? ""} disabled={busy === "due"}
+                onChange={(e) => run("due", { action: "due", due_at: e.target.value || null })}
+                className="bg-transparent text-sm font-bold text-foreground focus:outline-none [color-scheme:dark] max-w-full" />
+            ) : (
+              <p className="text-sm font-bold text-foreground">{sticker.due_at ? fmtDate(sticker.due_at) : "غير محدد"}</p>
+            )}
+            {canEdit && sticker.due_at && <p className="text-[11px] text-muted-foreground">{fmtDate(sticker.due_at)}</p>}
+          </div>
+          {status && (
+            <span className={cn("text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap",
+              status.tone === "late" ? "bg-red-500/15 text-red-300" : status.tone === "warn" ? "bg-amber-500/15 text-amber-300" : "bg-emerald-500/15 text-emerald-300")}>
+              {status.text}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* الحالة */}
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground mb-2">الحالة</p>
+        <div className={cn("flex items-center gap-3 rounded-xl border p-3",
+          complete ? "bg-emerald-500/[0.08] border-emerald-400/25" : "bg-white/[0.02] border-white/[0.06]")}>
+          <span className={cn("w-9 h-9 rounded-full flex items-center justify-center shrink-0",
+            complete ? "bg-emerald-500/20 text-emerald-300" : "bg-amber-500/15 text-amber-300")}>
+            {complete ? <Trophy className="w-4 h-4" /> : <BellRing className="w-4 h-4" />}
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-foreground">{complete ? "مكتمل 🎉" : "غير مكتمل"}</p>
+            <p className="text-[11px] text-muted-foreground truncate">
+              {complete
+                ? `${fmtStamp(sticker.completed_at!)}${sticker.completed_by ? ` · ${sticker.completed_by}` : ""} — في «المنجزات»`
+                : "إذا خلّصته علّمه مكتمل وينتقل للمنجزات"}
+            </p>
+          </div>
+        </div>
+        {canEdit && (
+          <button onClick={() => run("complete", { action: "complete" })} disabled={!!busy}
+            className={cn("mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-full text-sm font-extrabold border transition disabled:opacity-50",
+              complete
+                ? "bg-white/[0.03] text-muted-foreground border-border hover:text-foreground"
+                : "bg-emerald-500/15 text-emerald-300 border-emerald-400/30 hover:bg-emerald-500/25")}>
+            {busy === "complete" ? <Loader2 className="w-4 h-4 animate-spin" /> : complete ? <Undo2 className="w-4 h-4" /> : <Check className="w-4 h-4" strokeWidth={3} />}
+            {complete ? "إرجاعه غير مكتمل" : "تم الإنجاز"}
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
