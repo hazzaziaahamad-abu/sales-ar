@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { withinDays } from "@/components/daily-huddle/huddle-shared";
 import Link from "next/link";
 import {
   Plus, Send, Loader2, CheckCircle2, Clock, EyeOff, Lock, ShieldQuestion, UserRound, ArrowLeft, AlertTriangle,
@@ -71,7 +72,8 @@ function fmtDate(s: string | null): string {
 }
 const daysOpen = (s: string) => Math.max(0, Math.floor((Date.now() - new Date(s).getTime()) / 86_400_000));
 
-export function ChallengesHub() {
+/** sinceDays: يعرض فقط ما أُنشئ خلال آخر N يوم (المدير في «المتابعة اليومية»). */
+export function ChallengesHub({ sinceDays }: { sinceDays?: number } = {}) {
   const [items, setItems] = useState<BoardItem[]>([]);
   const [role, setRole] = useState<Role>("employee");
   const [loading, setLoading] = useState(true);
@@ -98,7 +100,7 @@ export function ChallengesHub() {
       const res = await fetch("/api/challenges/board");
       if (!res.ok) throw new Error();
       const data = await res.json();
-      setItems(data.items ?? []);
+      setItems(((data.items ?? []) as BoardItem[]).filter((i) => withinDays(i.created_at, sinceDays)));
       setRole(data.role ?? "employee");
       setLoadError(false);
     } catch {
@@ -106,7 +108,7 @@ export function ChallengesHub() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [sinceDays]);
 
   useEffect(() => { load(); }, [load]);
 

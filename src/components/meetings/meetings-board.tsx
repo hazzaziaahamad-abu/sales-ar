@@ -50,9 +50,11 @@ const emptyForm = (date: string): FormState => ({
   duration_minutes: 30, location: "", attendees: [], agenda: "",
 });
 
-export function MeetingsBoard({ embedded = false }: { embedded?: boolean }) {
+/** sinceDays: ما يرجع لأسابيع أقدم من آخر N يوم (المدير في «المتابعة اليومية»). */
+export function MeetingsBoard({ embedded = false, sinceDays }: { embedded?: boolean; sinceDays?: number }) {
   const today = todayLocal();
   const [week, setWeek] = useState(weekStart(today));
+  const canGoBack = !sinceDays || addDays(week, -1) >= addDays(today, -sinceDays);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [me, setMe] = useState<{ id: string; isManager: boolean } | null>(null);
   const [users, setUsers] = useState<string[]>([]);
@@ -206,7 +208,7 @@ export function MeetingsBoard({ embedded = false }: { embedded?: boolean }) {
       {/* Week nav + stats */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-1.5">
-          <button onClick={() => changeWeek(-1)} title="الأسبوع السابق" className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.05] text-muted-foreground hover:text-foreground">
+          <button onClick={() => changeWeek(-1)} disabled={!canGoBack} title="الأسبوع السابق" className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.05] text-muted-foreground hover:text-foreground disabled:opacity-30">
             <ChevronRight className="w-4 h-4" />
           </button>
           <span className="text-[13px] font-bold text-foreground px-2 min-w-[150px] text-center">

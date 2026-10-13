@@ -37,7 +37,8 @@ function dayHeader(day: string): string {
   return `${DAY_NAMES[d.getUTCDay()]} · ${d.toLocaleDateString("ar-SA-u-ca-gregory", { day: "numeric", month: "long" })}`;
 }
 
-export function AchievementsBoard({ embedded = false }: { embedded?: boolean }) {
+/** sinceDays: ما يرجع لفترات أقدم من آخر N يوم (المدير في «المتابعة اليومية»). */
+export function AchievementsBoard({ embedded = false, sinceDays }: { embedded?: boolean; sinceDays?: number }) {
   const today = todayLocal();
   const [period, setPeriod] = useState<Period>("week");
   const [offset, setOffset] = useState(0);
@@ -50,6 +51,7 @@ export function AchievementsBoard({ embedded = false }: { embedded?: boolean }) 
   const [copied, setCopied] = useState(false);
 
   const range = periodRange(period, offset, today);
+  const canGoBack = !sinceDays || range.from > addDays(today, -sinceDays);
 
   const load = useCallback(async () => {
     try {
@@ -191,7 +193,7 @@ export function AchievementsBoard({ embedded = false }: { embedded?: boolean }) 
       {/* Period */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-1.5">
-          <button onClick={() => go(period, offset - 1)} title="السابق" className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.05] text-muted-foreground hover:text-foreground">
+          <button onClick={() => go(period, offset - 1)} disabled={!canGoBack} title="السابق" className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.05] text-muted-foreground hover:text-foreground disabled:opacity-30">
             <ChevronRight className="w-4 h-4" />
           </button>
           <span className="text-[13px] font-bold text-foreground px-2 min-w-[130px] text-center">{range.label}</span>
