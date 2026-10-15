@@ -126,10 +126,10 @@ const STAGE_BADGE_COLOR: Record<string, "green" | "amber" | "purple" | "cyan" | 
 const STAGE_SUMMARY: { stage: string; color: "green" | "amber" | "cyan" | "purple" | "blue" | "red"; icon: React.ReactNode; hint?: string }[] = [
   { stage: "مكتملة", color: "green" as const, icon: <CheckCircle className="w-4 h-4 text-cc-green" /> },
   { stage: "انتظار الدفع", color: "amber" as const, icon: <Clock className="w-4 h-4 text-amber" />, hint: "باقي خطوة بسيطة ويدفع العميل… تابع" },
-  { stage: "تجهيز", color: "cyan" as const, icon: <Settings className="w-4 h-4 text-cyan" /> },
+  { stage: "تجهيز", color: "cyan" as const, icon: <Settings className="w-4 h-4 text-cyan" />, hint: "جهّز حساب العميل بسرعة وسلّمه جاهز، كل يوم تأخير يبرّد حماسه" },
   { stage: "تفاوض", color: "purple" as const, icon: <MessageSquare className="w-4 h-4 text-cc-purple" />, hint: "لا تترك العميل فترة بدون تواصل، خلك متواصل وخذ منه رد واضح" },
   { stage: "تجريبي", color: "blue" as const, icon: <FlaskConical className="w-4 h-4 text-cc-blue" />, hint: "تأكد إن التجربة أفضل نسخة مبهرة للعميل تشد انتباهه، وعلّمه على كل شي" },
-  { stage: "كنسل التجربة", color: "red" as const, icon: <XCircle className="w-4 h-4 text-cc-red" /> },
+  { stage: "كنسل التجربة", color: "red" as const, icon: <XCircle className="w-4 h-4 text-cc-red" />, hint: "اسأل العميل وش اللي ما عجبه، سبب الإلغاء فرصة ترجعه أو تحسّن التجربة الجاية" },
   { stage: "مرفوض مع سبب", color: "red" as const, icon: <XCircle className="w-4 h-4 text-cc-red" /> },
 ];
 
