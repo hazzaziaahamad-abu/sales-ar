@@ -913,12 +913,12 @@ export default function SupportPage() {
           {/* Date filter */}
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-xs text-muted-foreground shrink-0">الفترة:</span>
-            {(["اليوم", "أمس", "الأسبوع", "الشهر", "الشهر الماضي", "مخصص"] as const).map((f) => (
+            {(["الجميع", "اليوم", "أمس", "الأسبوع", "الشهر", "الشهر الماضي", "مخصص"] as const).map((f) => (
               <button
                 key={f}
-                onClick={() => setTableDateFilter(tableDateFilter === f ? null : f)}
+                onClick={() => setTableDateFilter(f === "الجميع" || tableDateFilter === f ? null : f)}
                 className={`px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-colors border ${
-                  tableDateFilter === f
+                  (f === "الجميع" ? !tableDateFilter : tableDateFilter === f)
                     ? "bg-cyan/15 text-cyan border-cyan/30"
                     : "text-muted-foreground border-transparent hover:text-foreground hover:bg-white/[0.06]"
                 }`}
