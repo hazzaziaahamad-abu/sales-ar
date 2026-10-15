@@ -154,6 +154,10 @@ button.tl-dot:not(:disabled):hover { transform:scale(1.1); }
 .tl-row:hover .tl-del { opacity:.6; }
 @media (hover:none) { .tl-del { opacity:.45; } }
 
+/* تكبير الاستكر في النافذة — أصغر على الجوال عشان يبان باقي المحتوى */
+.ib-dlg-scale { transform: scale(1.45); margin: 70px 0 60px; }
+@media (max-width: 640px) { .ib-dlg-scale { transform: scale(1.15); margin: 26px 0 22px; } }
+
 .ib-cta { background: linear-gradient(135deg, #facc15, #f472b6 55%, #34d399); color:#1e1b16; }
 .ib-cta:hover { filter: brightness(1.08) saturate(1.1); }
 `;
@@ -694,13 +698,31 @@ function StickerDialog({ sticker, canEdit, liked, onLike, onClose, onSave, onDel
     try { await onSave(form); } catch (e) { alert((e as Error).message); setSaving(false); }
   };
   const close = () => { if (!dirty || confirm("فيه تعديلات غير محفوظة. إغلاق بدون حفظ؟")) onClose(); };
+  const closeRef = useRef(close);
+  useEffect(() => { closeRef.current = close; });
+
+  // نقفل تمرير الصفحة خلف النافذة (الجوال) + Esc يقفل
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") closeRef.current(); };
+    window.addEventListener("keydown", onKey);
+    return () => { document.body.style.overflow = prev; window.removeEventListener("keydown", onKey); };
+  }, []);
 
   return (
-    <div className={cn("ib-root fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 overflow-y-auto", hand.variable)} onClick={close}>
-      <div className="relative flex flex-col items-center gap-6 my-6" onClick={(e) => e.stopPropagation()}>
-        <button onClick={close} className="absolute -top-2 -left-2 sm:-left-10 p-2 rounded-full bg-white/10 text-white hover:bg-white/20 z-20"><X className="w-4 h-4" /></button>
-
-        <div style={{ transform: "scale(1.45)", margin: "70px 0 60px" }}>
+    <>
+    {/* زر الإغلاق خارج النافذة (backdrop-blur يحبس fixed) — ثابت أعلى الشاشة مهما تمررت */}
+    <button onClick={close} aria-label="إغلاق"
+      className="fixed left-3 z-[60] p-2.5 rounded-full bg-black/60 border border-white/15 text-white hover:bg-white/20 shadow-lg"
+      style={{ top: "calc(env(safe-area-inset-top) + 12px)" }}>
+      <X className="w-5 h-5" />
+    </button>
+    <div className={cn("ib-root fixed inset-0 z-50 bg-black/70 backdrop-blur-md overflow-y-auto overscroll-contain", hand.variable)} onClick={close}>
+      {/* min-h-full بدل التوسيط المباشر: المحتوى الطويل ما ينقص من فوق ويقدر يتمرر */}
+      <div className="min-h-full flex items-center justify-center px-4 py-14">
+      <div className="relative flex flex-col items-center gap-6" onClick={(e) => e.stopPropagation()}>
+        <div className="ib-dlg-scale">
           <div className="ib-slot ib-new">
           <StickerShape kind={form.kind} className="ib-lifted">
             {canEdit ? (
@@ -765,7 +787,9 @@ function StickerDialog({ sticker, canEdit, liked, onLike, onClose, onSave, onDel
           <TimelinePanel sticker={sticker} canEdit={canEdit} onTimeline={onTimeline} />
         )}
       </div>
+      </div>
     </div>
+    </>
   );
 }
 
