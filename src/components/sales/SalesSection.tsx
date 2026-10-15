@@ -382,6 +382,11 @@ export function SalesSection({ salesType }: SalesPageProps) {
     } catch { return true; }
   });
   function toggleDealsTable() {
+    // القائمة تفتح دايم على «كل المراحل» و«كل التصنيفات»
+    if (!dealsTableOpen) {
+      setStageFilter(null);
+      setCategoryFilter(null);
+    }
     setDealsTableOpen((prev) => {
       const next = !prev;
       try { localStorage.setItem(dealsTableKey, next ? "1" : "0"); } catch {}
@@ -646,6 +651,11 @@ export function SalesSection({ salesType }: SalesPageProps) {
   /* card filter */
   const [stageFilter, setStageFilter] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  // تبديل القسم (مبيعات/دعم...) يرجّع الفلاتر للكل بدل ما تبقى من القسم السابق
+  useEffect(() => {
+    setStageFilter(null);
+    setCategoryFilter(null);
+  }, [salesType]);
   const [targetOnly, setTargetOnly] = useState(false);
   const [clientSearch, setClientSearch] = useState("");
   const [searchAllTime, setSearchAllTime] = useState(false);
