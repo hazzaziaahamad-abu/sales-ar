@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Marhey } from "next/font/google";
 import { Heart, Search, Trash2, X, Loader2, Dices, Sparkles, GripVertical, Check, CalendarClock, Plus, Rocket, Trophy, BellRing, Undo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { IdeaSlicesPanel, QuickCapture, SliceChip, TodaySlices, useSlices } from "@/components/ideas/slices";
 import { STICKER_KINDS, isReminder, stickerKind, timelineOf, type IdeaSticker, type StickerKind, type TimelineStep } from "@/lib/idea-stickers";
 
 // خط يدوي مرح للاستكرات — يعطي إحساس الكتابة بالقلم على ورق لاصق.
@@ -194,6 +195,16 @@ export function IdeasBoard() {
   const [spotId, setSpotId] = useState<string | null>(null);
   const orderBeforeDrag = useRef<string[]>([]);
   const slotRefs = useRef(new Map<string, HTMLDivElement>());
+  const slices = useSlices("ideas");
+  // الورقة المفصّلة (نوع ووسم وتفاصيل) مطوية افتراضياً — الالتقاط السريع يكفي غالباً
+  const [detailed, setDetailed] = useState(false);
+  useEffect(() => {
+    try { setDetailed(localStorage.getItem("ib_detailed") === "1"); } catch { /* ignore */ }
+  }, []);
+  const toggleDetailed = () => setDetailed((v) => {
+    try { localStorage.setItem("ib_detailed", v ? "0" : "1"); } catch { /* ignore */ }
+    return !v;
+  });
 
   const load = useCallback(async () => {
     try {
@@ -215,24 +226,29 @@ export function IdeasBoard() {
   const canEdit = (s: IdeaSticker) => !!me && (me.isManager || s.created_by === me.userId);
   const replace = (s: IdeaSticker) => setStickers((p) => p.map((x) => (x.id === s.id ? s : x)));
 
-  const add = async () => {
-    if (!draft.title.trim() && !draft.body.trim()) return;
+  /** لصق استكر — من الورقة المفصّلة أو من الالتقاط السريع (سطر واحد بدون تصنيف). */
+  const add = async (quick?: string) => {
+    const payload = quick !== undefined ? emptyDraft("star") : draft;
+    if (quick !== undefined) payload.title = quick;
+    if (!payload.title.trim() && !payload.body.trim()) return false;
     setAdding(true);
     try {
       const res = await fetch("/api/idea-stickers", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(draft),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || "تعذّرت الإضافة");
       setStickers((p) => [...p, json.sticker]);
       setFreshId(json.sticker.id);
-      setDraft(emptyDraft(draft.kind));
+      if (quick === undefined) setDraft(emptyDraft(draft.kind));
       setFilter("all");
       setQuery("");
       setView("board");
       setTimeout(() => slotRefs.current.get(json.sticker.id)?.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
+      return true;
     } catch (e) {
       alert((e as Error).message);
+      return false;
     } finally {
       setAdding(false);
     }
@@ -375,7 +391,16 @@ export function IdeasBoard() {
         </div>
       </section>
 
+      {/* ─── الالتقاط السريع + شرائح اليوم ─── */}
+      <QuickCapture onAdd={(t) => add(t)} detailed={detailed} onToggleDetailed={toggleDetailed} />
+      <TodaySlices
+        api={slices}
+        ideaTitle={(id) => { const s = stickers.find((x) => x.id === id); return s ? s.title || s.body.slice(0, 60) || "فكرة" : "فكرة محذوفة"; }}
+        onOpenIdea={(id) => { const s = stickers.find((x) => x.id === id); if (s) setOpen(s); }}
+      />
+
       {/* ─── الصق فكرة: الكتابة على الاستكر نفسه ─── */}
+      {detailed && (
       <section className="glass-surface rounded-[22px] border border-border p-5 hover:translate-y-0">
         <div className="flex flex-col lg:flex-row gap-6 items-center lg:items-stretch">
           <div className="flex lg:flex-col gap-2.5 sm:gap-3 justify-center lg:justify-start flex-wrap">
@@ -427,7 +452,7 @@ export function IdeasBoard() {
               <p className="ib-hand text-lg text-foreground">اكتب على الورقة مباشرة ✍️</p>
               <p className="hidden sm:block text-xs text-muted-foreground">Enter للصق السريع · Shift+Enter لسطر جديد</p>
               <button
-                onClick={add}
+                onClick={() => add()}
                 disabled={adding || (!draft.title.trim() && !draft.body.trim())}
                 className="ib-cta mt-2 flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-extrabold shadow-lg shadow-amber-500/10 disabled:opacity-40 disabled:saturate-0 transition"
               >
@@ -437,6 +462,7 @@ export function IdeasBoard() {
           </div>
         </div>
       </section>
+      )}
 
       {/* ─── شريط الأدوات ─── */}
       {stickers.length > 0 && (
@@ -539,6 +565,7 @@ export function IdeasBoard() {
                         )}
                         {!s.created_by_name && <span className="ml-auto" />}
                         <ProgressChip sticker={s} />
+                        <SliceChip slices={slices.byIdea.get(s.id)} />
                         <button
                           onClick={(e) => { e.stopPropagation(); toggleLike(s); }}
                           className={cn("ib-like", liked && "ib-on")}
@@ -570,6 +597,7 @@ export function IdeasBoard() {
           onSave={async (d) => { await save(open.id, d); setOpen(null); }}
           onDelete={() => remove(open.id)}
           onTimeline={(body) => updateTimeline(open.id, body)}
+          slicesPanel={<IdeaSlicesPanel ideaId={open.id} api={slices} />}
         />
       )}
     </div>
@@ -649,10 +677,10 @@ function EmptyDone({ filtering }: { filtering: boolean }) {
 
 // ─── نافذة الاستكر: نفس الشكل بحجم أكبر، والكتابة عليه مباشرة ─────────────────
 
-function StickerDialog({ sticker, canEdit, liked, onLike, onClose, onSave, onDelete, onTimeline }: {
+function StickerDialog({ sticker, canEdit, liked, onLike, onClose, onSave, onDelete, onTimeline, slicesPanel }: {
   sticker: IdeaSticker; canEdit: boolean; liked: boolean; onLike: () => void;
   onClose: () => void; onSave: (d: Draft) => Promise<void>; onDelete: () => void;
-  onTimeline: (body: Record<string, unknown>) => Promise<void>;
+  onTimeline: (body: Record<string, unknown>) => Promise<void>; slicesPanel?: React.ReactNode;
 }) {
   const [form, setForm] = useState<Draft>({ kind: sticker.kind, tag: sticker.tag, title: sticker.title, body: sticker.body });
   const [saving, setSaving] = useState(false);
@@ -726,6 +754,8 @@ function StickerDialog({ sticker, canEdit, liked, onLike, onClose, onSave, onDel
             </div>
           )}
         </div>
+
+        {slicesPanel}
 
         {isReminder(sticker) ? (
           <ReminderPanel sticker={sticker} canEdit={canEdit} onTimeline={onTimeline} />
