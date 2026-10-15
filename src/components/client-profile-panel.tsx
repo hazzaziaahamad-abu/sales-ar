@@ -953,9 +953,9 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
 
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) handleClose(); }}>
-      <SheetContent side="right" className="sm:max-w-md w-[95vw] overflow-y-auto p-0" showCloseButton={false}>
+      <SheetContent side="right" className="sm:max-w-md w-[95vw] overflow-hidden gap-0 p-0" showCloseButton={false}>
         {/* Header */}
-        <SheetHeader className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/50 p-3">
+        <SheetHeader className="shrink-0 bg-background border-b border-border/50 p-3">
           <div className="flex items-center justify-between">
             <SheetTitle className="text-sm font-bold">ملخص العميل</SheetTitle>
             <button onClick={handleClose} className="p-1.5 rounded-lg hover:bg-muted/50 transition-colors">
@@ -984,7 +984,8 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
           </form>
         </SheetHeader>
 
-        <div className="p-3 space-y-3">
+        {/* التمرير داخل div عادي بدل نافذة الـ Sheet نفسها — على الآيفون ما كان يتحرك */}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 space-y-3">
           {loading && (
             <div className="flex items-center justify-center py-12">
               <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
