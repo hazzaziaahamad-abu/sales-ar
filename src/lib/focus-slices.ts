@@ -45,3 +45,38 @@ export function ideaProgress(slices: Pick<FocusSlice, "done_at">[]): number | nu
 
 /** ينظّف عنوان الشريحة (سطر واحد قصير). */
 export const cleanSliceTitle = (v: unknown) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, 140);
+
+// ─── العدّاد: العميقة المنجزة أسبوعياً + السلسلة (Streak) ─────────────────────
+
+/** إزاحة تاريخ YYYY-MM-DD بعدد أيام. */
+export function addDays(ymd: string, n: number): string {
+  const d = new Date(`${ymd}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+/** بداية الأسبوع (الأحد) لتاريخ YYYY-MM-DD. */
+export function weekStart(ymd: string): string {
+  return addDays(ymd, -new Date(`${ymd}T00:00:00Z`).getUTCDay());
+}
+
+/**
+ * السلسلة: أيام متتالية فيها شريحة عميقة منجزة واحدة على الأقل — نفس منطق سلسلة «الانضباط»:
+ * اليوم يكمّل السلسلة، ولو ما أنجزت اليوم بعد تبقى السلسلة حيّة من أمس.
+ */
+export function deepStreak(doneDays: Set<string>, today: string): number {
+  let day = doneDays.has(today) ? today : addDays(today, -1);
+  let n = 0;
+  while (doneDays.has(day)) { n++; day = addDays(day, -1); }
+  return n;
+}
+
+export interface FocusStats {
+  today: string;
+  weekDeep: number;
+  /** عدد العميقة المنجزة لكل يوم من الأحد للسبت. */
+  weekDays: { date: string; deep: number }[];
+  weekMinutes: number;
+  streak: number;
+  bestStreak: number;
+}

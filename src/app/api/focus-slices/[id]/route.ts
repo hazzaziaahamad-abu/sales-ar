@@ -13,7 +13,7 @@ const COLS = "id, space, idea_id, title, kind, planned_for, done_at, focus_minut
 /** الشريحة لازم تكون للمستخدم نفسه. */
 async function ownSlice(id: string) {
   const { data: row } = await supabaseAdmin
-    .from("focus_slices").select("id, org_id, user_id, space, kind, planned_for").eq("id", id).maybeSingle();
+    .from("focus_slices").select("id, org_id, user_id, space, kind, planned_for, focus_minutes").eq("id", id).maybeSingle();
   if (!row) return { res: NextResponse.json({ error: "غير موجودة" }, { status: 404 }) };
   const access = await getSliceAccess(row.space as SliceSpace);
   if (access instanceof NextResponse) return { res: access };
@@ -25,7 +25,7 @@ async function ownSlice(id: string) {
 
 /**
  * PATCH /api/focus-slices/[id]
- * { title?, kind?, plan?: "today" | "tomorrow" | null, done?: boolean }
+ * { title?, kind?, plan?: "today" | "tomorrow" | null, done?: boolean, add_minutes?: number }
  * الحد اليومي يُفرض هنا: عميقة واحدة + ٣ سطحية لكل يوم.
  */
 export async function PATCH(req: NextRequest, { params }: Ctx) {
@@ -45,6 +45,9 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     patch.planned_for = b.plan === "today" ? todayRiyadh() : b.plan === "tomorrow" ? tomorrowRiyadh() : null;
   }
   if (typeof b.done === "boolean") patch.done_at = b.done ? new Date().toISOString() : null;
+  // دقائق جلسة تركيز تنضاف لرصيد الشريحة
+  const addMin = typeof b.add_minutes === "number" ? Math.round(b.add_minutes) : 0;
+  if (addMin > 0) patch.focus_minutes = (row.focus_minutes ?? 0) + Math.min(addMin, 600);
 
   // فحص الحد لو تغيّر اليوم أو النوع والشريحة مخططة ليوم
   const kind = (patch.kind ?? row.kind) as SliceKind;

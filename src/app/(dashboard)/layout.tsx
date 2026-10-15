@@ -26,6 +26,9 @@ import { CCThemeProvider } from "@/lib/theme-context";
 import { saudiDateStr } from "@/lib/utils/format";
 import { PageTracker } from "@/components/layout/page-tracker";
 import { MentionAlertBanner, isMentionsManager } from "@/components/mentions/mention-alert-banner";
+import { FocusGate, FocusOverlay } from "@/components/focus/focus-overlay";
+import { EveningPlanPrompt } from "@/components/focus/evening-plan";
+import { isFocusActive, useFocusActive } from "@/lib/focus-session";
 
 const ALWAYS_ALLOWED_SLUGS = ["urgent-followup", "mentions"];
 
@@ -685,6 +688,17 @@ export default function DashboardLayout({
   const [recentMentions, setRecentMentions] = useState<MentionNotification[]>([]);
   const [dueReminders, setDueReminders] = useState<Reminder[]>([]);
   const shownBrowserNotifs = useRef<Set<string>>(new Set());
+  // إشعارات المتصفح أثناء جلسة التركيز تتأجل وتطلع بعد انتهائها
+  const deferredBrowserNotifs = useRef<{ title: string; body: string }[]>([]);
+  const focusActive = useFocusActive();
+  useEffect(() => {
+    if (focusActive || !deferredBrowserNotifs.current.length) return;
+    const queued = deferredBrowserNotifs.current.splice(0);
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    for (const n of queued) {
+      try { new Notification(n.title, { body: n.body, icon: "/favicon.ico", dir: "rtl", lang: "ar" }); } catch { /* ignore */ }
+    }
+  }, [focusActive]);
 
   // Load live notifications from DB
   useEffect(() => {
@@ -721,6 +735,7 @@ export default function DashboardLayout({
           shownBrowserNotifs.current.add(n.id);
           try {
             const title = n.type === "mention" ? "منشن جديد 💬" : "إشعار جديد 🔔";
+            if (isFocusActive()) { deferredBrowserNotifs.current.push({ title, body: n.message }); return; }
             new Notification(title, { body: n.message, icon: "/favicon.ico", dir: "rtl", lang: "ar" });
           } catch {
             // Browser may block — fail silently
@@ -743,11 +758,16 @@ export default function DashboardLayout({
       <ManagementChatNotifLoader onLoad={addNotifications} />
       <LiveNotifSubscriptions onLoad={addNotifications} />
       <PageTracker />
-      <SaleCelebration />
-      <WelcomePopup />
-      <UrgentFollowupPopup />
-      <TeamRemindersPopup />
-      <TeamCelebrationToast />
+      {/* التذكيرات والمنبثقات تتأجل أثناء جلسة التركيز */}
+      <FocusGate>
+        <SaleCelebration />
+        <WelcomePopup />
+        <UrgentFollowupPopup />
+        <TeamRemindersPopup />
+        <TeamCelebrationToast />
+        <EveningPlanPrompt />
+      </FocusGate>
+      <FocusOverlay />
       <div className="min-h-screen bg-background panel-grid">
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
@@ -804,7 +824,7 @@ export default function DashboardLayout({
           />
         )}
 
-        <BrowserNotifBanner />
+        <FocusGate><BrowserNotifBanner /></FocusGate>
 
         {/* AI Chat — hidden on agent page */}
         {!isAgentPage && (

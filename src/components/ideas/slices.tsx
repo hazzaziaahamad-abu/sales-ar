@@ -1,12 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronDown, Loader2, Plus, Scissors, Sun, SunDim, Trash2, X, Zap } from "lucide-react";
+import { Check, ChevronDown, Flame, Loader2, Moon, Play, Plus, Scissors, Sun, SunDim, Trash2, X, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   DAY_LIMIT, SLICE_KINDS, SLICE_MAX, SLICE_MIN, ideaProgress,
-  type FocusSlice, type SliceKind, type SliceSpace,
+  type FocusSlice, type FocusStats, type SliceKind, type SliceSpace,
 } from "@/lib/focus-slices";
+import { SLICES_CHANGED_EVENT } from "@/lib/focus-session";
+import { FocusStartDialog } from "@/components/focus/focus-overlay";
 
 /**
  * «الشرائح» — تقطيع الفكرة لمهام تنجز كل وحدة في جلسة واحدة، واختيار «شرائح اليوم»:
@@ -41,6 +43,11 @@ export function useSlices(space: SliceSpace) {
   }, [space]);
 
   useEffect(() => { load(); }, [load]);
+  // وضع التركيز يعدّل الشرائح من خارج الصفحة (أنجزت / دقائق التركيز)
+  useEffect(() => {
+    window.addEventListener(SLICES_CHANGED_EVENT, load);
+    return () => window.removeEventListener(SLICES_CHANGED_EVENT, load);
+  }, [load]);
 
   const create = useCallback(async (ideaId: string, rows: { title: string; kind: SliceKind }[]) => {
     const res = await fetch("/api/focus-slices", {
@@ -92,7 +99,7 @@ export function useSlices(space: SliceSpace) {
 
 export type SlicesApi = ReturnType<typeof useSlices>;
 
-/** الأماكن المتاحة اليوم لكل نوع. */
+/** الأماكن المتاحة في يوم لكل نوع. */
 function freeToday(slices: FocusSlice[], today: string) {
   const planned = slices.filter((s) => s.planned_for === today);
   return {
@@ -180,8 +187,9 @@ export function QuickCapture({ onAdd, detailed, onToggleDetailed }: {
 export function TodaySlices({ api, ideaTitle, onOpenIdea }: {
   api: SlicesApi; ideaTitle: (id: string | null) => string; onOpenIdea: (id: string) => void;
 }) {
-  const { slices, today, patch, loaded } = api;
+  const { slices, today, tomorrow, patch, loaded } = api;
   const [showRest, setShowRest] = useState(false);
+  const [focusing, setFocusing] = useState<FocusSlice | null>(null);
   const { notice, show } = useNotice();
 
   const todayList = useMemo(
@@ -190,6 +198,8 @@ export function TodaySlices({ api, ideaTitle, onOpenIdea }: {
   );
   const rest = useMemo(() => slices.filter((s) => !s.done_at && s.planned_for !== today), [slices, today]);
   const free = freeToday(slices, today);
+  const freeTomorrow = freeToday(slices, tomorrow);
+  const tomorrowCount = slices.filter((s) => s.planned_for === tomorrow).length;
   const deep = todayList.filter((s) => s.kind === "deep");
   const shallow = todayList.filter((s) => s.kind === "shallow");
   const doneToday = todayList.filter((s) => s.done_at).length;
@@ -219,6 +229,7 @@ export function TodaySlices({ api, ideaTitle, onOpenIdea }: {
           <h2 className="text-base font-extrabold text-foreground">🎯 شرائح اليوم</h2>
           <p className="text-[11px] text-muted-foreground">عميقة وحدة + {num(DAY_LIMIT.shallow)} سطحية كحد أقصى — ركّز على القليل وأنجزه</p>
         </div>
+        <FocusCounter signal={slices.filter((s) => s.done_at).length} />
         {todayList.length > 0 && (
           <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-400/25">
             أنجزت {num(doneToday)} من {num(todayList.length)}
@@ -236,6 +247,7 @@ export function TodaySlices({ api, ideaTitle, onOpenIdea }: {
             <TodayRow key={s.id} slice={s} parent={ideaTitle(s.idea_id)} big
               onOpenIdea={() => s.idea_id && onOpenIdea(s.idea_id)}
               onDone={() => run(s.id, { done: !s.done_at })}
+              onFocus={() => setFocusing(s)}
               onUnplan={() => run(s.id, { plan: null })} />
           )) : (
             <p className="text-xs text-muted-foreground py-3 text-center">اختر شريحة عميقة وحدة من «باقي الشرائح» 👇</p>
@@ -249,6 +261,7 @@ export function TodaySlices({ api, ideaTitle, onOpenIdea }: {
               <TodayRow key={s.id} slice={s} parent={ideaTitle(s.idea_id)}
                 onOpenIdea={() => s.idea_id && onOpenIdea(s.idea_id)}
                 onDone={() => run(s.id, { done: !s.done_at })}
+                onFocus={() => setFocusing(s)}
                 onUnplan={() => run(s.id, { plan: null })} />
             ))}
             {Array.from({ length: Math.max(0, free.shallow) }).map((_, i) => (
@@ -262,7 +275,7 @@ export function TodaySlices({ api, ideaTitle, onOpenIdea }: {
       <div>
         <button onClick={() => setShowRest((v) => !v)}
           className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-white/[0.03] border border-border text-xs font-bold text-muted-foreground hover:text-foreground">
-          <span>📦 باقي الشرائح ({num(rest.length)})</span>
+          <span>📦 باقي الشرائح ({num(rest.length)}){tomorrowCount > 0 && <span className="text-violet-300 font-semibold"> · 🌙 بكرة {num(tomorrowCount)}</span>}</span>
           <ChevronDown className={cn("w-4 h-4 transition-transform", showRest && "rotate-180")} />
         </button>
         {showRest && (
@@ -276,12 +289,24 @@ export function TodaySlices({ api, ideaTitle, onOpenIdea }: {
                 <div className="space-y-1">
                   {list.map((s) => {
                     const full = free[s.kind] <= 0;
+                    const isTomorrow = s.planned_for === tomorrow;
+                    const fullTomorrow = freeTomorrow[s.kind] <= 0;
                     return (
                       <div key={s.id} className="flex items-center gap-2 py-1">
                         <KindBadge kind={s.kind} small />
                         <span className="flex-1 min-w-0 text-sm text-foreground truncate">{s.title}</span>
                         {s.planned_for && s.planned_for < today && <span className="text-[10px] text-muted-foreground shrink-0">من يوم سابق</span>}
-                        {s.planned_for && s.planned_for > today && <span className="text-[10px] text-violet-300 shrink-0">بكرة</span>}
+                        <button
+                          onClick={() => isTomorrow
+                            ? run(s.id, { plan: null })
+                            : fullTomorrow
+                              ? show(s.kind === "deep" ? "🌙 اخترت شريحة عميقة لبكرة — وحدة تكفي" : `🌙 اكتملت السطحية لبكرة (${num(DAY_LIMIT.shallow)})`)
+                              : run(s.id, { plan: "tomorrow" })}
+                          className={cn("shrink-0 p-1 rounded-full", isTomorrow ? "text-violet-300" : "text-muted-foreground/60 hover:text-violet-300")}
+                          title={isTomorrow ? "مخططة لبكرة — اضغط للإلغاء" : "خططها لبكرة"}
+                        >
+                          <Moon className={cn("w-3.5 h-3.5", isTomorrow && "fill-violet-300/40")} />
+                        </button>
                         <button
                           onClick={() => full
                             ? show(s.kind === "deep" ? "🔥 عندك شريحة عميقة اليوم — وحدة تكفي. أنجزها أو رجّعها أولاً" : `⚡ اكتملت الشرائح السطحية اليوم (${num(DAY_LIMIT.shallow)}) — رجّع وحدة أولاً`)
@@ -301,12 +326,55 @@ export function TodaySlices({ api, ideaTitle, onOpenIdea }: {
           </div>
         )}
       </div>
+      {focusing && <FocusStartDialog slice={focusing} parent={ideaTitle(focusing.idea_id)} onClose={() => setFocusing(null)} />}
     </section>
   );
 }
 
-function TodayRow({ slice, parent, big, onDone, onUnplan, onOpenIdea }: {
-  slice: FocusSlice; parent: string; big?: boolean; onDone: () => void; onUnplan: () => void; onOpenIdea: () => void;
+/** العدّاد: العميقة المنجزة هالأسبوع + السلسلة (أيام متتالية فيها عميقة منجزة). */
+export function FocusCounter({ signal }: { signal: number }) {
+  const [stats, setStats] = useState<FocusStats | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/focus-slices/stats", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (alive && j) setStats(j); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [signal]);
+  if (!stats) return null;
+  const DAYS = ["ح", "ن", "ث", "ر", "خ", "ج", "س"];
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-orange-500/10 border border-orange-400/25" title="الشرائح العميقة المنجزة هالأسبوع (من الأحد)">
+        <span className="text-lg font-extrabold text-orange-300 leading-none">{num(stats.weekDeep)}</span>
+        <div className="leading-tight">
+          <p className="text-[10px] font-bold text-orange-200">🔥 عميقة هالأسبوع</p>
+          <div className="flex gap-0.5 mt-0.5">
+            {stats.weekDays.map((d, i) => (
+              <span key={d.date} title={d.date}
+                className={cn("w-3.5 h-3.5 rounded-[4px] text-[8px] font-bold flex items-center justify-center",
+                  d.deep ? "bg-orange-400 text-black" : d.date === stats.today ? "border border-orange-300/60 text-orange-200" : "bg-white/[0.06] text-muted-foreground/70")}>
+                {DAYS[i]}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-amber-500/10 border border-amber-400/25"
+        title={`أطول سلسلة: ${stats.bestStreak} يوم`}>
+        <Flame className={cn("w-5 h-5", stats.streak ? "text-amber-300 fill-amber-400/40" : "text-muted-foreground")} />
+        <div className="leading-tight">
+          <p className="text-sm font-extrabold text-amber-200">{num(stats.streak)} <span className="text-[10px] font-bold">يوم</span></p>
+          <p className="text-[10px] text-muted-foreground">سلسلة متتالية</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TodayRow({ slice, parent, big, onDone, onFocus, onUnplan, onOpenIdea }: {
+  slice: FocusSlice; parent: string; big?: boolean; onDone: () => void; onFocus: () => void; onUnplan: () => void; onOpenIdea: () => void;
 }) {
   const done = !!slice.done_at;
   return (
@@ -321,9 +389,17 @@ function TodayRow({ slice, parent, big, onDone, onUnplan, onOpenIdea }: {
         <button onClick={onOpenIdea} className="text-[10px] text-muted-foreground hover:text-foreground truncate max-w-full block text-right">💡 {parent}</button>
       </div>
       {!done && (
-        <button onClick={onUnplan} title="رجّعها لباقي الشرائح" className="shrink-0 p-1 text-muted-foreground hover:text-foreground">
-          <SunDim className="w-4 h-4" />
-        </button>
+        <>
+          <button onClick={onFocus} title="ابدأ جلسة تركيز"
+            className={cn("shrink-0 flex items-center gap-1 rounded-full font-bold border transition",
+              big ? "px-3 py-1.5 text-xs bg-orange-500/20 text-orange-200 border-orange-400/40 hover:bg-orange-500/30"
+                : "px-2 py-1 text-[11px] bg-white/[0.04] text-foreground/80 border-border hover:bg-white/[0.08]")}>
+            <Play className="w-3 h-3" /> ركّز
+          </button>
+          <button onClick={onUnplan} title="رجّعها لباقي الشرائح" className="shrink-0 p-1 text-muted-foreground hover:text-foreground">
+            <SunDim className="w-4 h-4" />
+          </button>
+        </>
       )}
     </div>
   );
