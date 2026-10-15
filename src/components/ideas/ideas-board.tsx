@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Marhey } from "next/font/google";
 import { Heart, Search, Trash2, X, Loader2, Dices, Sparkles, GripVertical, Check, CalendarClock, Plus, Rocket, Trophy, BellRing, Undo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PushCard } from "@/components/push/push-card";
 import { IdeaSlicesPanel, QuickCapture, SliceChip, TodaySlices, useSlices } from "@/components/ideas/slices";
 import { STICKER_KINDS, isReminder, stickerKind, timelineOf, type IdeaSticker, type StickerKind, type TimelineStep } from "@/lib/idea-stickers";
 
@@ -393,6 +394,7 @@ export function IdeasBoard() {
 
       {/* ─── الالتقاط السريع + شرائح اليوم ─── */}
       <QuickCapture onAdd={(t) => add(t)} detailed={detailed} onToggleDetailed={toggleDetailed} />
+      <PushCard />
       <TodaySlices
         api={slices}
         parentTitle={(id) => { const s = stickers.find((x) => x.id === id); return s ? s.title || s.body.slice(0, 60) || "فكرة" : "فكرة محذوفة"; }}

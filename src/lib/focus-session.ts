@@ -5,6 +5,7 @@
 
 import { useSyncExternalStore } from "react";
 import type { SliceKind, SliceSpace } from "@/lib/focus-slices";
+import { schedulePush } from "@/lib/push-client";
 
 export interface FocusSession {
   sliceId: string;
@@ -41,6 +42,16 @@ function read(): FocusSession | null {
   return cached;
 }
 
+/** إشعار جوال «انتهى وقت التركيز» في وقت نهاية الجلسة — يوصل والجوال مقفل. الإيقاف المؤقت يلغيه. */
+function syncFocusPush(s: FocusSession | null) {
+  if (!s || s.pausedAt) return schedulePush("focus", null);
+  schedulePush("focus", s.startedAt + s.pausedMs + s.minutes * 60_000, {
+    title: "⏰ انتهى وقت التركيز",
+    body: `${s.title} — أنجزتها؟ افتح وعلّمها`,
+    url: s.space === "work" ? "/work" : "/ideas",
+  });
+}
+
 function write(s: FocusSession | null) {
   try {
     if (s) localStorage.setItem(KEY, JSON.stringify(s));
@@ -53,14 +64,20 @@ export const getFocusSession = () => (typeof window === "undefined" ? null : rea
 export const isFocusActive = () => !!getFocusSession();
 
 export function startFocus(s: Omit<FocusSession, "startedAt" | "pausedAt" | "pausedMs">) {
-  write({ ...s, startedAt: Date.now(), pausedAt: null, pausedMs: 0 });
+  const next = { ...s, startedAt: Date.now(), pausedAt: null, pausedMs: 0 };
+  write(next);
+  syncFocusPush(next);
 }
 export function updateFocus(patch: Partial<FocusSession>) {
   const cur = read();
-  if (cur) write({ ...cur, ...patch });
+  if (!cur) return;
+  const next = { ...cur, ...patch };
+  write(next);
+  if ("minutes" in patch || "pausedAt" in patch) syncFocusPush(next);
 }
 export function endFocus() {
   write(null);
+  syncFocusPush(null);
 }
 
 /** الوقت المنقضي فعلياً (بدون فترات الإيقاف) بالملّي ثانية. */

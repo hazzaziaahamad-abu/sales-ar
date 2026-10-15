@@ -29,6 +29,7 @@ import { MentionAlertBanner, isMentionsManager } from "@/components/mentions/men
 import { FocusGate, FocusOverlay } from "@/components/focus/focus-overlay";
 import { EveningPlanPrompt } from "@/components/focus/evening-plan";
 import { WorkDayWatcher, WorkHoursBanner } from "@/components/work/work-day";
+import { PushRefresher } from "@/components/push/push-card";
 import { isFocusActive, useFocusActive } from "@/lib/focus-session";
 
 const ALWAYS_ALLOWED_SLUGS = ["urgent-followup", "mentions"];
@@ -770,6 +771,7 @@ export default function DashboardLayout({
         <WorkDayWatcher />
       </FocusGate>
       <FocusOverlay />
+      <PushRefresher />
       <div className="min-h-screen bg-background panel-grid">
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 

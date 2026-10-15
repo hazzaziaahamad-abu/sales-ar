@@ -48,6 +48,12 @@ export const tomorrowRiyadh = () => saudiDateStr(new Date(Date.now() + 86_400_00
 /** «بكرة» حسب المساحة: العمل الوظيفي = يوم الدوام التالي (الخميس ← الأحد). */
 export const nextDayFor = (space: SliceSpace) => (space === "work" ? nextWorkday(todayRiyadh()) : tomorrowRiyadh());
 
+/** أهم شريحة اليوم: العميقة المخططة لليوم، وإلا أول شريحة غير منجزة لليوم. */
+export function topSliceOf(slices: FocusSlice[], today: string): FocusSlice | null {
+  const todays = slices.filter((s) => s.planned_for === today && !s.done_at);
+  return todays.find((s) => s.kind === "deep") ?? todays[0] ?? null;
+}
+
 /** نسبة إنجاز الفكرة من شرائحها (٠–١٠٠) — null لو ما لها شرائح. */
 export function ideaProgress(slices: Pick<FocusSlice, "done_at">[]): number | null {
   if (!slices.length) return null;

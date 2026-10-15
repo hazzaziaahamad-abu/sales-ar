@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { workClock, type WorkClock } from "@/lib/work-hours";
-import type { FocusSlice } from "@/lib/focus-slices";
 
 /** ساعة الدوام الحية — تتحدث كل ٣٠ ثانية. */
 export function useWorkClock(): WorkClock {
@@ -14,11 +13,7 @@ export function useWorkClock(): WorkClock {
   return clock;
 }
 
-/** أهم شريحة اليوم: العميقة المخططة لليوم، وإلا أول شريحة غير منجزة لليوم. */
-export function topSliceOf(slices: FocusSlice[], today: string): FocusSlice | null {
-  const todays = slices.filter((s) => s.planned_for === today && !s.done_at);
-  return todays.find((s) => s.kind === "deep") ?? todays[0] ?? null;
-}
+export { topSliceOf } from "@/lib/focus-slices";
 
 /** «بكرة» أو اسم يوم الدوام التالي (الخميس ← «الأحد»). */
 export function nextDayLabel(clock: WorkClock): string {

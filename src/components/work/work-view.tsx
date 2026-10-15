@@ -8,6 +8,7 @@ import { WORK_END_MIN, WORK_START_MIN, fmtDuration, fmtTime } from "@/lib/work-h
 import { IdeaSlicesPanel, QuickCapture, TodaySlices, useSlices } from "@/components/ideas/slices";
 import { FocusStartDialog } from "@/components/focus/focus-overlay";
 import { ShutdownPanel, StartCard } from "@/components/work/work-cards";
+import { PushCard } from "@/components/push/push-card";
 import { nextDayLabel, topSliceOf, useWorkClock } from "@/components/work/work-clock";
 
 /**
@@ -111,6 +112,7 @@ export function WorkView() {
         </div>
       </section>
 
+      <PushCard />
       {error && <p className="text-center text-sm text-muted-foreground">{error}</p>}
 
       {/* ─── بداية الدوام / إغلاقه ─── */}
