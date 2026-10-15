@@ -13,7 +13,7 @@ import { FollowUpLogButton } from "@/components/follow-up-log";
 import { DealCloserCoach } from "@/components/DealCloserCoach";
 import { ManagementChat } from "@/components/ManagementChat";
 import { useAuth } from "@/lib/auth-context";
-import { Search, Phone, User, ShoppingBag, RefreshCw, Headphones, FileText, ChevronDown, ChevronUp, Clock, X, Pencil, Check, StickyNote, BarChart2, Trophy, MessageSquarePlus, Send, AtSign, Bell, BellOff, CalendarClock, ShieldCheck, ShieldOff, Plus, PhoneCall } from "lucide-react";
+import { Search, Phone, User, ShoppingBag, RefreshCw, Headphones, FileText, ChevronDown, ChevronUp, Clock, X, Pencil, Check, StickyNote, BarChart2, Trophy, MessageSquarePlus, Send, AtSign, Bell, BellOff, CalendarClock, ShieldCheck, ShieldOff, Plus, PhoneCall, Sparkles, Lock, LockOpen, Loader2, AlertTriangle } from "lucide-react";
 import type { Deal, Renewal, Ticket, FollowUpNote, DealKpiStage, Employee } from "@/types";
 
 const STAGE_COLORS: Record<string, string> = {
@@ -55,6 +55,133 @@ function StatusBadge({ label, colorMap }: { label: string; colorMap: Record<stri
     <span className={`text-[12px] px-2 py-0.5 rounded-full border font-medium ${cls}`}>
       {label}
     </span>
+  );
+}
+
+type ClientInsights = {
+  summary: string;
+  temperature: string;
+  recommendations: string[];
+  next_action: string;
+  warning: string;
+};
+
+const TEMPERATURE_COLORS: Record<string, string> = {
+  "حار": "bg-red-500/15 text-red-400 border-red-500/20",
+  "دافئ": "bg-amber-500/15 text-amber-400 border-amber-500/20",
+  "بارد": "bg-sky-500/15 text-sky-400 border-sky-500/20",
+};
+
+// توصيات ذكية مقفلة افتراضياً — ما تتولّد إلا لما الموظف يفتحها بنفسه
+function ClientInsightsBox({ data }: { data: ClientProfileData }) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [insights, setInsights] = useState<ClientInsights | null>(null);
+
+  async function generate() {
+    setLoading(true);
+    setError("");
+    try {
+      const entityLabel = (type: string, id: string) => {
+        if (type === "deal") {
+          const d = data.deals.find(x => x.id === id);
+          return d ? `صفقة (${d.stage})` : "صفقة";
+        }
+        if (type === "renewal") {
+          const r = data.renewals.find(x => x.id === id);
+          return r ? `تجديد (${r.status})` : "تجديد";
+        }
+        const t = data.tickets.find(x => x.id === id);
+        return t ? `تذكرة (${t.status})` : "تذكرة";
+      };
+      const client = {
+        deals: data.deals.map(d => ({ stage: d.stage, plan: d.plan, value: d.deal_value, rep: d.assigned_rep_name, source: d.source, date: d.deal_date || d.created_at?.slice(0, 10) })),
+        renewals: data.renewals.map(r => ({ plan: r.plan_name, price: r.plan_price, status: r.status, renewal_date: r.renewal_date, rep: r.assigned_rep })),
+        tickets: data.tickets.map(t => ({ issue: t.issue, status: t.status, priority: t.priority, agent: t.assigned_agent_name, date: t.created_at?.slice(0, 10) })),
+        notes: data.notes.slice(0, 30).map(n => ({ date: n.created_at, author: n.author_name, on: entityLabel(n.entity_type, n.entity_id), note: n.note.slice(0, 600) })),
+      };
+      const r = await fetch("/api/ai/client-insights", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ client }),
+      });
+      const j = await r.json();
+      if (!r.ok) setError(j.error || "فشل توليد التوصيات");
+      else setInsights(j as ClientInsights);
+    } catch {
+      setError("تعذّر الاتصال — حاول مرة ثانية");
+    }
+    setLoading(false);
+  }
+
+  function toggle() {
+    const next = !open;
+    setOpen(next);
+    if (next && !insights && !loading) generate();
+  }
+
+  return (
+    <div className="border border-violet-500/30 rounded-xl overflow-hidden">
+      <button
+        onClick={toggle}
+        className="w-full flex items-center justify-between px-3 py-2.5 bg-violet-500/10 hover:bg-violet-500/15 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-3.5 h-3.5 text-violet-400" />
+          <span className="text-xs font-bold text-foreground">توصيات ذكية</span>
+          {!open && <span className="text-[11px] text-muted-foreground">اضغط للفتح</span>}
+        </div>
+        {open ? <LockOpen className="w-3.5 h-3.5 text-violet-400" /> : <Lock className="w-3.5 h-3.5 text-muted-foreground" />}
+      </button>
+      {open && (
+        <div className="p-3 space-y-2.5 text-[12px]">
+          {loading && (
+            <div className="flex items-center gap-2 text-muted-foreground py-2">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" /> يقرأ المتابعات ويجهّز التوصيات...
+            </div>
+          )}
+          {error && !loading && (
+            <div className="flex items-center justify-between gap-2 text-red-400">
+              <span>{error}</span>
+              <button onClick={generate} className="text-[11px] underline">إعادة المحاولة</button>
+            </div>
+          )}
+          {insights && !loading && (
+            <>
+              <div className="flex items-start gap-2">
+                {insights.temperature && (
+                  <StatusBadge label={insights.temperature} colorMap={TEMPERATURE_COLORS} />
+                )}
+                <p className="text-foreground/80 leading-relaxed">{insights.summary}</p>
+              </div>
+              {insights.warning && (
+                <div className="flex gap-1.5 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span>{insights.warning}</span>
+                </div>
+              )}
+              {insights.recommendations.length > 0 && (
+                <ol className="space-y-1.5 list-decimal pr-4 text-foreground/70">
+                  {insights.recommendations.map((rec, i) => <li key={i}>{rec}</li>)}
+                </ol>
+              )}
+              {insights.next_action && (
+                <div className="p-2 rounded-lg bg-violet-500/10 border border-violet-500/20">
+                  <span className="font-bold text-violet-400">الخطوة التالية: </span>
+                  <span className="text-foreground/80">{insights.next_action}</span>
+                </div>
+              )}
+              <div className="flex justify-end">
+                <button onClick={generate} className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors">
+                  <RefreshCw className="w-3 h-3" /> تحديث التوصيات
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1348,6 +1475,11 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
                     </div>
                   )}
                 </div>
+              )}
+
+              {/* Smart recommendations (locked until opened) */}
+              {data.notes.length > 0 && (
+                <ClientInsightsBox key={`${data.notes[0].id}-${data.notes.length}`} data={data} />
               )}
 
               {/* Timeline */}
