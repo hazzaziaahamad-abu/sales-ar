@@ -281,7 +281,10 @@ export function FollowUpLogButton({ entityType, entityId, entityName }: FollowUp
                 />
                 {/* Mention suggestions dropdown */}
                 {showMentions && filteredEmployees.length > 0 && (
-                  <div className="absolute top-full mt-1 right-0 w-full min-w-[280px] bg-card border border-border rounded-lg shadow-lg z-50 max-h-[200px] overflow-y-auto">
+                  <div
+                    className="mt-1 w-full bg-card border border-border rounded-lg shadow-lg max-h-[40vh] overflow-y-auto overscroll-contain touch-pan-y"
+                    style={{ WebkitOverflowScrolling: "touch" }}
+                  >
                     {filteredEmployees.map((name, idx) => (
                       <button
                         key={name}
@@ -411,7 +414,7 @@ export function FollowUpLogButton({ entityType, entityId, entityName }: FollowUp
           </div>
 
           {/* Notes list */}
-          <div className="flex-1 overflow-y-auto space-y-3 mt-2">
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-3 mt-2">
             {loading ? (
               <div className="text-center text-muted-foreground text-sm py-8">جاري التحميل...</div>
             ) : notes.length === 0 ? (
