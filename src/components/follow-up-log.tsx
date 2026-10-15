@@ -281,19 +281,17 @@ export function FollowUpLogButton({ entityType, entityId, entityName }: FollowUp
                 />
                 {/* Mention suggestions dropdown */}
                 {showMentions && filteredEmployees.length > 0 && (
-                  <div
-                    className="mt-1 w-full bg-card border border-border rounded-lg shadow-lg max-h-[40vh] overflow-y-auto overscroll-contain touch-pan-y"
-                    style={{ WebkitOverflowScrolling: "touch" }}
-                  >
+                  <div className="mt-1 w-full bg-card border border-border rounded-lg shadow-lg p-2 flex flex-wrap gap-1.5 max-h-[40vh] overflow-y-auto overscroll-contain">
                     {filteredEmployees.map((name, idx) => (
                       <button
                         key={name}
+                        type="button"
                         onClick={() => insertMention(name)}
-                        className={`w-full flex items-center gap-2 px-3 py-2.5 text-right text-sm transition-colors ${
-                          idx === mentionIndex ? "bg-cyan/10 text-cyan" : "text-foreground hover:bg-white/5"
+                        className={`flex items-center gap-1.5 rounded-full border ps-1 pe-3 py-1 text-sm transition-colors ${
+                          idx === mentionIndex ? "border-cyan/50 bg-cyan/10 text-cyan" : "border-border text-foreground hover:bg-white/5"
                         }`}
                       >
-                        <div className="w-7 h-7 rounded-full bg-amber/15 text-amber flex items-center justify-center text-xs font-bold flex-shrink-0">
+                        <div className="w-6 h-6 rounded-full bg-amber/15 text-amber flex items-center justify-center text-xs font-bold flex-shrink-0">
                           {name.charAt(0)}
                         </div>
                         <span className="font-medium whitespace-nowrap">{name}</span>
