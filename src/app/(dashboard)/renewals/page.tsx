@@ -437,7 +437,7 @@ export default function RenewalsPage() {
   const [globalSearch, setGlobalSearch] = useState("");
   const [repFilter, setRepFilter] = useState<string | null>(null);
   const [showClosed, setShowClosed] = useState(false);
-  const [tableDateFilter, setTableDateFilter] = useState<string | null>(null);
+  const [tableDateFilter, setTableDateFilter] = useState<string | null>("اليوم");
   const [tableCustomFrom, setTableCustomFrom] = useState("");
   const [tableCustomTo, setTableCustomTo] = useState("");
   const [silentFilter, setSilentFilter] = useState(false);
