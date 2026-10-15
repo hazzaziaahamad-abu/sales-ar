@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { timingSafeEqual } from "crypto";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { claimDaily, getPushConfig, sendPushToUser } from "@/lib/push";
+import { claimDaily, sendPushToUser } from "@/lib/push";
+import { verifyCronSecret } from "@/lib/cron-auth";
 import { topSliceOf, tomorrowRiyadh, type FocusSlice } from "@/lib/focus-slices";
 import { WORK_END_MIN, WORK_START_MIN, riyadhMinutes, workClock } from "@/lib/work-hours";
 
@@ -12,7 +12,6 @@ export const dynamic = "force-dynamic";
 const EVENING_FROM = 20 * 60;
 const EVENING_TO = 23 * 60;
 
-const safeEq = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 const toMin = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
 
 /**
@@ -23,9 +22,7 @@ const toMin = (t: string) => { const [h, m] = t.split(":").map(Number); return h
  * أثناء جلسة تركيز شغّالة تتأجل التذكيرات (ما عدا انتهاء الجلسة نفسها).
  */
 async function handle(req: NextRequest) {
-  const cfg = await getPushConfig();
-  const provided = req.headers.get("x-push-secret") ?? "";
-  if (!cfg || !provided || !safeEq(provided, cfg.cron_secret)) {
+  if (!(await verifyCronSecret(req.headers.get("x-push-secret")))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
