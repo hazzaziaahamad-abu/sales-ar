@@ -28,6 +28,7 @@ import { PageTracker } from "@/components/layout/page-tracker";
 import { MentionAlertBanner, isMentionsManager } from "@/components/mentions/mention-alert-banner";
 import { FocusGate, FocusOverlay } from "@/components/focus/focus-overlay";
 import { EveningPlanPrompt } from "@/components/focus/evening-plan";
+import { WorkDayWatcher, WorkHoursBanner } from "@/components/work/work-day";
 import { isFocusActive, useFocusActive } from "@/lib/focus-session";
 
 const ALWAYS_ALLOWED_SLUGS = ["urgent-followup", "mentions"];
@@ -766,6 +767,7 @@ export default function DashboardLayout({
         <TeamRemindersPopup />
         <TeamCelebrationToast />
         <EveningPlanPrompt />
+        <WorkDayWatcher />
       </FocusGate>
       <FocusOverlay />
       <div className="min-h-screen bg-background panel-grid">
@@ -792,6 +794,7 @@ export default function DashboardLayout({
                   }} />
                 </>
               )}
+              <WorkHoursBanner />
               <LastSaleBanner />
               <AIAlertsBanner />
               {children}

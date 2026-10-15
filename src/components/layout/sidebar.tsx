@@ -61,6 +61,8 @@ import { useAuth } from "@/lib/auth-context";
 import { isSupportSalesMerged } from "@/lib/sales-merge";
 import { countPendingDeals, countUrgentFollowupDeals, fetchMentionNotifications, URGENT_ADMIN_DAYS } from "@/lib/supabase/db";
 import { isMentionsManager, MENTIONS_UPDATED_EVENT } from "@/components/mentions/mention-alert-banner";
+import { useWorkClock } from "@/components/work/work-clock";
+import { fmtDuration } from "@/lib/work-hours";
 
 export const NAV_ITEMS = [
   // هام جداً — ظاهرة لكل الموظفين دائماً (بدون صلاحية) عشان ما تضيع متابعة انتظار الدفع / التجريبي / التجهيز
@@ -101,6 +103,8 @@ export const NAV_ITEMS = [
   { label: "الطلبات والتطويرات", href: "/work-tickets", slug: "work-tickets", icon: Ticket, color: "amber", group: "المهام" },
   { label: "الاجتماعات", href: "/meetings", slug: "meetings", icon: CalendarDays, color: "indigo", group: "المهام" },
   { label: "أفكار", href: "/ideas", slug: "ideas-board", icon: Lightbulb, color: "amber", group: "المهام" },
+  // مساحة شخصية للسوبر أدمن — مستقلة عن مهام MENU (خلال الدوام تطلع مثبّتة أعلى القائمة)
+  { label: "العمل الوظيفي", href: "/work", slug: "work", icon: Briefcase, color: "emerald", group: "المهام", superOnly: true },
   { label: "الإنجازات", href: "/achievements", slug: "achievements", icon: Trophy, color: "amber", group: "المهام" },
   { label: "إدارة المهام", href: "/tasks", slug: "tasks", icon: ListTodo, color: "indigo", group: "المهام" },
   { label: "مهامي", href: "/my-tasks", slug: "my-tasks", icon: UserCheck, color: "cyan", group: "المهام" },
@@ -153,7 +157,8 @@ interface SidebarProps {
 
 export function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const { user, loading, signOut, activeOrgId, switchOrg, orgs } = useAuth();
+  const { user, loading, signOut, activeOrgId, switchOrg, orgs, isImpersonating } = useAuth();
+  const workClock = useWorkClock();
   const [orgMenuOpen, setOrgMenuOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [urgentCount, setUrgentCount] = useState(0);
@@ -199,6 +204,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
     // نحجز: «مبيعات الدعم» مدموجة مع «المبيعات»
     if (item.slug === "support-sales" && isSupportSalesMerged(activeOrgId)) return false;
     if ((item as { managerOnly?: boolean }).managerOnly) return isManager;
+    if ((item as { superOnly?: boolean }).superOnly) return isSuperAdmin && !isImpersonating;
     if (isSuperAdmin) return true;
     if ((item as { alwaysVisible?: boolean }).alwaysVisible) return !!user;
     return user?.allowedPages.includes(item.slug);
@@ -312,6 +318,20 @@ export function Sidebar({ open, onClose }: SidebarProps) {
 
         {/* Navigation */}
         <nav className="flex-1 py-3 px-3 overflow-y-auto">
+          {/* خلال الدوام: «العمل الوظيفي» أولوية أعلى القائمة */}
+          {isSuperAdmin && !isImpersonating && workClock.phase === "on" && (
+            <Link href="/work" onClick={onClose}
+              className={cn("mb-2 flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-colors",
+                pathname.startsWith("/work") ? "border-emerald-400/50 bg-emerald-500/20" : "border-emerald-400/30 bg-emerald-500/10 hover:bg-emerald-500/15")}>
+              <span className="relative flex w-2.5 h-2.5 shrink-0">
+                <span className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-60" />
+                <span className="relative w-2.5 h-2.5 rounded-full bg-emerald-400" />
+              </span>
+              <Briefcase className="w-4 h-4 text-emerald-300" />
+              <span className="flex-1 text-sm font-bold text-emerald-100">العمل الوظيفي</span>
+              <span className="text-[10px] text-emerald-300/80">باقي {fmtDuration(workClock.minutesLeft)}</span>
+            </Link>
+          )}
           {NAV_GROUPS.map((group) => {
             const groupItems = visibleItems.filter((item) => item.group === group);
             if (groupItems.length === 0) return null;

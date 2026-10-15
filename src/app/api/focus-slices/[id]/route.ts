@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getSliceAccess } from "@/lib/api/focus-slices-access";
 import {
-  DAY_LIMIT, SLICE_KINDS, cleanSliceTitle, isSliceKind, todayRiyadh, tomorrowRiyadh, type SliceKind, type SliceSpace,
+  DAY_LIMIT, SLICE_COLS, SLICE_KINDS, cleanSliceTitle, isSliceKind, nextDayFor, todayRiyadh, type SliceKind, type SliceSpace,
 } from "@/lib/focus-slices";
 
 export const runtime = "nodejs";
 type Ctx = { params: Promise<{ id: string }> };
 
-const COLS = "id, space, idea_id, title, kind, planned_for, done_at, focus_minutes, sort_order, created_at";
+const COLS = SLICE_COLS;
 
 /** الشريحة لازم تكون للمستخدم نفسه. */
 async function ownSlice(id: string) {
@@ -25,7 +25,8 @@ async function ownSlice(id: string) {
 
 /**
  * PATCH /api/focus-slices/[id]
- * { title?, kind?, plan?: "today" | "tomorrow" | null, done?: boolean, add_minutes?: number }
+ * { title?, kind?, plan?: "today" | "tomorrow" | null, done?: boolean, add_minutes?: number, session_at?: "HH:MM" | null }
+ * «tomorrow» في العمل الوظيفي = يوم الدوام التالي.
  * الحد اليومي يُفرض هنا: عميقة واحدة + ٣ سطحية لكل يوم.
  */
 export async function PATCH(req: NextRequest, { params }: Ctx) {
@@ -42,8 +43,11 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   }
   if (isSliceKind(b.kind)) patch.kind = b.kind;
   if ("plan" in b) {
-    patch.planned_for = b.plan === "today" ? todayRiyadh() : b.plan === "tomorrow" ? tomorrowRiyadh() : null;
+    patch.planned_for = b.plan === "today" ? todayRiyadh() : b.plan === "tomorrow" ? nextDayFor(row.space as SliceSpace) : null;
   }
+  // موعد الجلسة العميقة HH:MM (أو null للإلغاء)
+  if (b.session_at === null) patch.session_at = null;
+  else if (typeof b.session_at === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(b.session_at)) patch.session_at = b.session_at;
   if (typeof b.done === "boolean") patch.done_at = b.done ? new Date().toISOString() : null;
   // دقائق جلسة تركيز تنضاف لرصيد الشريحة
   const addMin = typeof b.add_minutes === "number" ? Math.round(b.add_minutes) : 0;

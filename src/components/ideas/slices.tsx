@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, Flame, Loader2, Moon, Play, Plus, Scissors, Sun, SunDim, Trash2, X, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  DAY_LIMIT, SLICE_KINDS, SLICE_MAX, SLICE_MIN, ideaProgress,
+  DAY_LIMIT, SLICE_KINDS, SLICE_MAX, SLICE_MIN, ideaProgress, parentOf,
   type FocusSlice, type FocusStats, type SliceKind, type SliceSpace,
 } from "@/lib/focus-slices";
 import { SLICES_CHANGED_EVENT } from "@/lib/focus-session";
@@ -16,7 +16,9 @@ import { FocusStartDialog } from "@/components/focus/focus-overlay";
  */
 
 const num = (n: number) => n.toLocaleString("ar-SA");
-type Patch = { title?: string; kind?: SliceKind; plan?: "today" | "tomorrow" | null; done?: boolean };
+/** «لبكرة» أو «ليوم الأحد». */
+export const forDay = (label: string) => (label === "بكرة" ? "لبكرة" : `ليوم ${label}`);
+type Patch = { title?: string; kind?: SliceKind; plan?: "today" | "tomorrow" | null; done?: boolean; session_at?: string | null };
 
 // ─── البيانات ────────────────────────────────────────────────────────────────
 
@@ -49,10 +51,10 @@ export function useSlices(space: SliceSpace) {
     return () => window.removeEventListener(SLICES_CHANGED_EVENT, load);
   }, [load]);
 
-  const create = useCallback(async (ideaId: string, rows: { title: string; kind: SliceKind }[]) => {
+  const create = useCallback(async (parentId: string, rows: { title: string; kind: SliceKind }[]) => {
     const res = await fetch("/api/focus-slices", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ space, idea_id: ideaId, slices: rows }),
+      body: JSON.stringify({ space, parent_id: parentId, slices: rows }),
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(json.error || "تعذّر حفظ الشرائح");
@@ -69,6 +71,7 @@ export function useSlices(space: SliceSpace) {
       if (body.kind) next.kind = body.kind;
       if ("plan" in body) next.planned_for = body.plan === "today" ? today : body.plan === "tomorrow" ? tomorrow : null;
       if (body.done !== undefined) next.done_at = body.done ? new Date().toISOString() : null;
+      if (body.session_at !== undefined) next.session_at = body.session_at;
       return next;
     }));
     const res = await fetch(`/api/focus-slices/${id}`, {
@@ -88,13 +91,17 @@ export function useSlices(space: SliceSpace) {
     setSlices((p) => p.filter((s) => s.id !== id));
   }, []);
 
-  const byIdea = useMemo(() => {
+  /** الشرائح حسب الأم (الفكرة أو بند العمل). */
+  const byParent = useMemo(() => {
     const m = new Map<string, FocusSlice[]>();
-    for (const s of slices) if (s.idea_id) m.set(s.idea_id, [...(m.get(s.idea_id) ?? []), s]);
+    for (const s of slices) {
+      const p = parentOf(s);
+      if (p) m.set(p, [...(m.get(p) ?? []), s]);
+    }
     return m;
   }, [slices]);
 
-  return { slices, byIdea, today, tomorrow, loaded, create, patch, remove, reload: load };
+  return { space, slices, byParent, today, tomorrow, loaded, create, patch, remove, reload: load };
 }
 
 export type SlicesApi = ReturnType<typeof useSlices>;
@@ -142,8 +149,8 @@ function KindBadge({ kind, onClick, small }: { kind: SliceKind; onClick?: () => 
 
 // ─── صندوق الالتقاط السريع ────────────────────────────────────────────────────
 
-export function QuickCapture({ onAdd, detailed, onToggleDetailed }: {
-  onAdd: (title: string) => Promise<boolean>; detailed: boolean; onToggleDetailed: () => void;
+export function QuickCapture({ onAdd, detailed, onToggleDetailed, placeholder }: {
+  onAdd: (title: string) => Promise<boolean>; detailed?: boolean; onToggleDetailed?: () => void; placeholder?: string;
 }) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -161,7 +168,7 @@ export function QuickCapture({ onAdd, detailed, onToggleDetailed }: {
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); submit(); } }}
-          placeholder="فكرة طارت في بالك؟ اكتبها بسطر واحد واضغط Enter"
+          placeholder={placeholder ?? "فكرة طارت في بالك؟ اكتبها بسطر واحد واضغط Enter"}
           maxLength={200}
           enterKeyHint="send"
           className="flex-1 min-w-0 rounded-full bg-white/[0.04] border border-border px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-amber-400/40"
@@ -172,20 +179,22 @@ export function QuickCapture({ onAdd, detailed, onToggleDetailed }: {
           <span className="hidden sm:inline">التقط</span>
         </button>
       </div>
-      <div className="flex justify-end mt-2">
+      {onToggleDetailed && <div className="flex justify-end mt-2">
         <button onClick={onToggleDetailed} className="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground hover:text-foreground">
           {detailed ? "إخفاء الورقة المفصّلة" : "ورقة مفصّلة (نوع ووسم وتفاصيل) ✍️"}
           <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", detailed && "rotate-180")} />
         </button>
-      </div>
+      </div>}
     </section>
   );
 }
 
 // ─── شرائح اليوم + باقي الشرائح ───────────────────────────────────────────────
 
-export function TodaySlices({ api, ideaTitle, onOpenIdea }: {
-  api: SlicesApi; ideaTitle: (id: string | null) => string; onOpenIdea: (id: string) => void;
+export function TodaySlices({ api, parentTitle, onOpenParent, readOnly, icon = "💡", emptyHint, nextLabel = "بكرة" }: {
+  api: SlicesApi; parentTitle: (id: string | null) => string; onOpenParent: (id: string) => void;
+  /** عرض فقط (مثل العمل الوظيفي خارج الدوام). */
+  readOnly?: boolean; icon?: string; emptyHint?: string; nextLabel?: string;
 }) {
   const { slices, today, tomorrow, patch, loaded } = api;
   const [showRest, setShowRest] = useState(false);
@@ -206,7 +215,7 @@ export function TodaySlices({ api, ideaTitle, onOpenIdea }: {
 
   const groups = useMemo(() => {
     const m = new Map<string, FocusSlice[]>();
-    for (const s of rest) { const k = s.idea_id ?? ""; m.set(k, [...(m.get(k) ?? []), s]); }
+    for (const s of rest) { const k = parentOf(s) ?? ""; m.set(k, [...(m.get(k) ?? []), s]); }
     return [...m.entries()];
   }, [rest]);
 
@@ -217,7 +226,7 @@ export function TodaySlices({ api, ideaTitle, onOpenIdea }: {
     return (
       <section className="rounded-[22px] border border-dashed border-border p-4 text-center">
         <p className="text-sm font-bold text-foreground">🎯 شرائح اليوم</p>
-        <p className="text-xs text-muted-foreground mt-1">افتح أي فكرة واضغط «قطّع ✂️» — تتحول لشرائح صغيرة تختار منها شغل يومك</p>
+        <p className="text-xs text-muted-foreground mt-1">{emptyHint ?? "افتح أي فكرة واضغط «قطّع ✂️» — تتحول لشرائح صغيرة تختار منها شغل يومك"}</p>
       </section>
     );
   }
@@ -244,8 +253,8 @@ export function TodaySlices({ api, ideaTitle, onOpenIdea }: {
         <div className="rounded-2xl border border-orange-400/25 bg-gradient-to-bl from-orange-500/[0.09] to-transparent p-3">
           <p className="text-[11px] font-bold text-orange-300 mb-2">🔥 الشريحة العميقة (٦٠–٩٠ د)</p>
           {deep.length ? deep.map((s) => (
-            <TodayRow key={s.id} slice={s} parent={ideaTitle(s.idea_id)} big
-              onOpenIdea={() => s.idea_id && onOpenIdea(s.idea_id)}
+            <TodayRow key={s.id} slice={s} parent={parentTitle(parentOf(s))} icon={icon} readOnly={readOnly} big
+              onOpenIdea={() => { const p = parentOf(s); if (p) onOpenParent(p); }}
               onDone={() => run(s.id, { done: !s.done_at })}
               onFocus={() => setFocusing(s)}
               onUnplan={() => run(s.id, { plan: null })} />
@@ -258,8 +267,8 @@ export function TodaySlices({ api, ideaTitle, onOpenIdea }: {
           <p className="text-[11px] font-bold text-sky-300 mb-2">⚡ سطحية (أقل من ١٥ د) · {num(shallow.length)}/{num(DAY_LIMIT.shallow)}</p>
           <div className="space-y-1.5">
             {shallow.map((s) => (
-              <TodayRow key={s.id} slice={s} parent={ideaTitle(s.idea_id)}
-                onOpenIdea={() => s.idea_id && onOpenIdea(s.idea_id)}
+              <TodayRow key={s.id} slice={s} parent={parentTitle(parentOf(s))} icon={icon} readOnly={readOnly}
+                onOpenIdea={() => { const p = parentOf(s); if (p) onOpenParent(p); }}
                 onDone={() => run(s.id, { done: !s.done_at })}
                 onFocus={() => setFocusing(s)}
                 onUnplan={() => run(s.id, { plan: null })} />
@@ -275,16 +284,16 @@ export function TodaySlices({ api, ideaTitle, onOpenIdea }: {
       <div>
         <button onClick={() => setShowRest((v) => !v)}
           className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-white/[0.03] border border-border text-xs font-bold text-muted-foreground hover:text-foreground">
-          <span>📦 باقي الشرائح ({num(rest.length)}){tomorrowCount > 0 && <span className="text-violet-300 font-semibold"> · 🌙 بكرة {num(tomorrowCount)}</span>}</span>
+          <span>📦 باقي الشرائح ({num(rest.length)}){tomorrowCount > 0 && <span className="text-violet-300 font-semibold"> · 🌙 {nextLabel} {num(tomorrowCount)}</span>}</span>
           <ChevronDown className={cn("w-4 h-4 transition-transform", showRest && "rotate-180")} />
         </button>
         {showRest && (
           <div className="mt-3 space-y-3">
-            {groups.length === 0 && <p className="text-xs text-muted-foreground text-center py-2">ما فيه شرائح باقية — قطّع فكرة جديدة ✂️</p>}
-            {groups.map(([ideaId, list]) => (
-              <div key={ideaId} className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-2.5">
-                <button onClick={() => ideaId && onOpenIdea(ideaId)} className="text-[11px] font-bold text-amber-300/90 hover:underline mb-1.5 truncate max-w-full block text-right">
-                  💡 {ideaTitle(ideaId || null)}
+            {groups.length === 0 && <p className="text-xs text-muted-foreground text-center py-2">ما فيه شرائح باقية — قطّع {icon === "💡" ? "فكرة جديدة" : "بند جديد"} ✂️</p>}
+            {groups.map(([pid, list]) => (
+              <div key={pid} className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-2.5">
+                <button onClick={() => pid && onOpenParent(pid)} className="text-[11px] font-bold text-amber-300/90 hover:underline mb-1.5 truncate max-w-full block text-right">
+                  {icon} {parentTitle(pid || null)}
                 </button>
                 <div className="space-y-1">
                   {list.map((s) => {
@@ -296,14 +305,15 @@ export function TodaySlices({ api, ideaTitle, onOpenIdea }: {
                         <KindBadge kind={s.kind} small />
                         <span className="flex-1 min-w-0 text-sm text-foreground truncate">{s.title}</span>
                         {s.planned_for && s.planned_for < today && <span className="text-[10px] text-muted-foreground shrink-0">من يوم سابق</span>}
+                        {readOnly ? (isTomorrow && <Moon className="w-3.5 h-3.5 text-violet-300 shrink-0" />) : (<>
                         <button
                           onClick={() => isTomorrow
                             ? run(s.id, { plan: null })
                             : fullTomorrow
-                              ? show(s.kind === "deep" ? "🌙 اخترت شريحة عميقة لبكرة — وحدة تكفي" : `🌙 اكتملت السطحية لبكرة (${num(DAY_LIMIT.shallow)})`)
+                              ? show(s.kind === "deep" ? `🌙 اخترت شريحة عميقة ${forDay(nextLabel)} — وحدة تكفي` : `🌙 اكتملت السطحية ${forDay(nextLabel)} (${num(DAY_LIMIT.shallow)})`)
                               : run(s.id, { plan: "tomorrow" })}
                           className={cn("shrink-0 p-1 rounded-full", isTomorrow ? "text-violet-300" : "text-muted-foreground/60 hover:text-violet-300")}
-                          title={isTomorrow ? "مخططة لبكرة — اضغط للإلغاء" : "خططها لبكرة"}
+                          title={isTomorrow ? `مخططة ${forDay(nextLabel)} — اضغط للإلغاء` : `خططها ${forDay(nextLabel)}`}
                         >
                           <Moon className={cn("w-3.5 h-3.5", isTomorrow && "fill-violet-300/40")} />
                         </button>
@@ -317,6 +327,7 @@ export function TodaySlices({ api, ideaTitle, onOpenIdea }: {
                         >
                           <Sun className="w-3 h-3" /> لليوم
                         </button>
+                        </>)}
                       </div>
                     );
                   })}
@@ -326,7 +337,7 @@ export function TodaySlices({ api, ideaTitle, onOpenIdea }: {
           </div>
         )}
       </div>
-      {focusing && <FocusStartDialog slice={focusing} parent={ideaTitle(focusing.idea_id)} onClose={() => setFocusing(null)} />}
+      {focusing && <FocusStartDialog slice={focusing} parent={parentTitle(parentOf(focusing))} onClose={() => setFocusing(null)} />}
     </section>
   );
 }
@@ -373,22 +384,23 @@ export function FocusCounter({ signal }: { signal: number }) {
   );
 }
 
-function TodayRow({ slice, parent, big, onDone, onFocus, onUnplan, onOpenIdea }: {
-  slice: FocusSlice; parent: string; big?: boolean; onDone: () => void; onFocus: () => void; onUnplan: () => void; onOpenIdea: () => void;
+function TodayRow({ slice, parent, icon, big, readOnly, onDone, onFocus, onUnplan, onOpenIdea }: {
+  slice: FocusSlice; parent: string; icon: string; big?: boolean; readOnly?: boolean;
+  onDone: () => void; onFocus: () => void; onUnplan: () => void; onOpenIdea: () => void;
 }) {
   const done = !!slice.done_at;
   return (
     <div className={cn("flex items-center gap-2.5 rounded-xl px-2 py-1.5 bg-white/[0.02]", done && "opacity-60")}>
-      <button onClick={onDone} title={done ? "تراجع" : "أنجزت"}
-        className={cn("shrink-0 rounded-full border-2 flex items-center justify-center transition", big ? "w-7 h-7" : "w-6 h-6",
+      <button onClick={onDone} title={done ? "تراجع" : "أنجزت"} disabled={readOnly}
+        className={cn("shrink-0 rounded-full border-2 flex items-center justify-center transition disabled:cursor-default", big ? "w-7 h-7" : "w-6 h-6",
           done ? "bg-emerald-500 border-emerald-500 text-white" : "border-white/25 hover:border-emerald-400")}>
         {done && <Check className="w-3.5 h-3.5" strokeWidth={3} />}
       </button>
       <div className="flex-1 min-w-0">
         <p className={cn("font-bold text-foreground leading-snug", big ? "text-sm sm:text-base" : "text-sm", done && "line-through")}>{slice.title}</p>
-        <button onClick={onOpenIdea} className="text-[10px] text-muted-foreground hover:text-foreground truncate max-w-full block text-right">💡 {parent}</button>
+        <button onClick={onOpenIdea} className="text-[10px] text-muted-foreground hover:text-foreground truncate max-w-full block text-right">{icon} {parent}</button>
       </div>
-      {!done && (
+      {!done && !readOnly && (
         <>
           <button onClick={onFocus} title="ابدأ جلسة تركيز"
             className={cn("shrink-0 flex items-center gap-1 rounded-full font-bold border transition",
@@ -423,8 +435,12 @@ export function SliceChip({ slices }: { slices: FocusSlice[] | undefined }) {
 
 type DraftRow = { title: string; kind: SliceKind };
 
-export function IdeaSlicesPanel({ ideaId, api }: { ideaId: string; api: SlicesApi }) {
-  const list = api.byIdea.get(ideaId) ?? [];
+export function IdeaSlicesPanel({ ideaId, api, suggestUrl, readOnly, className }: {
+  ideaId: string; api: SlicesApi;
+  /** رابط اقتراح التقطيع (افتراضياً لاستكرات الأفكار). */
+  suggestUrl?: string; readOnly?: boolean; className?: string;
+}) {
+  const list = api.byParent.get(ideaId) ?? [];
   const [draft, setDraft] = useState<DraftRow[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const { notice, show } = useNotice();
@@ -434,7 +450,7 @@ export function IdeaSlicesPanel({ ideaId, api }: { ideaId: string; api: SlicesAp
   const suggest = async () => {
     setBusy("ai");
     try {
-      const res = await fetch(`/api/idea-stickers/${ideaId}/slice`, { method: "POST" });
+      const res = await fetch(suggestUrl ?? `/api/idea-stickers/${ideaId}/slice`, { method: "POST" });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || "تعذّر التقطيع");
       setDraft(json.slices);
@@ -456,7 +472,7 @@ export function IdeaSlicesPanel({ ideaId, api }: { ideaId: string; api: SlicesAp
   const setRow = (i: number, r: Partial<DraftRow>) => setDraft((d) => d!.map((x, j) => (j === i ? { ...x, ...r } : x)));
 
   return (
-    <div className="w-[min(92vw,420px)] rounded-2xl glass-surface border border-border p-4 space-y-3 hover:translate-y-0 text-right">
+    <div className={cn("rounded-2xl glass-surface border border-border p-4 space-y-3 hover:translate-y-0 text-right", className ?? "w-[min(92vw,420px)]")}>
       <div className="flex items-center justify-between gap-2">
         <div>
           <p className="text-sm font-extrabold text-foreground">✂️ شرائحي</p>
@@ -478,15 +494,15 @@ export function IdeaSlicesPanel({ ideaId, api }: { ideaId: string; api: SlicesAp
             const isToday = s.planned_for === api.today;
             return (
               <div key={s.id} className={cn("flex items-center gap-2 rounded-xl px-2 py-1.5 bg-white/[0.02] border border-white/[0.05]", s.done_at && "opacity-60")}>
-                <button onClick={() => run(s.id, () => api.patch(s.id, { done: !s.done_at }))} disabled={!!busy}
+                <button onClick={() => run(s.id, () => api.patch(s.id, { done: !s.done_at }))} disabled={!!busy || readOnly}
                   className={cn("shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center",
                     s.done_at ? "bg-emerald-500 border-emerald-500 text-white" : "border-white/25 hover:border-emerald-400")}
                   title={s.done_at ? "تراجع" : "أنجزت"}>
                   {busy === s.id ? <Loader2 className="w-3 h-3 animate-spin" /> : s.done_at && <Check className="w-3.5 h-3.5" strokeWidth={3} />}
                 </button>
                 <span className={cn("flex-1 min-w-0 text-sm text-foreground break-words", s.done_at && "line-through")}>{s.title}</span>
-                <KindBadge kind={s.kind} small onClick={s.done_at ? undefined : () => run(`k-${s.id}`, () => api.patch(s.id, { kind: s.kind === "deep" ? "shallow" : "deep" }))} />
-                {!s.done_at && (
+                <KindBadge kind={s.kind} small onClick={s.done_at || readOnly ? undefined : () => run(`k-${s.id}`, () => api.patch(s.id, { kind: s.kind === "deep" ? "shallow" : "deep" }))} />
+                {!s.done_at && !readOnly && (
                   <button
                     onClick={() => isToday
                       ? run(`p-${s.id}`, () => api.patch(s.id, { plan: null }))
@@ -498,17 +514,19 @@ export function IdeaSlicesPanel({ ideaId, api }: { ideaId: string; api: SlicesAp
                     <Sun className={cn("w-4 h-4", isToday && "fill-amber-300/40")} />
                   </button>
                 )}
-                <button onClick={() => { if (confirm(`حذف شريحة «${s.title}»؟`)) run(`d-${s.id}`, () => api.remove(s.id)); }}
+                {!readOnly && <button onClick={() => { if (confirm(`حذف شريحة «${s.title}»؟`)) run(`d-${s.id}`, () => api.remove(s.id)); }}
                   className="shrink-0 p-1 text-muted-foreground/60 hover:text-red-400" title="حذف">
                   <X className="w-3.5 h-3.5" />
-                </button>
+                </button>}
               </div>
             );
           })}
         </div>
       )}
 
-      {draft ? (
+      {readOnly ? (
+        list.length === 0 && <p className="text-xs text-muted-foreground text-center">ما فيه شرائح</p>
+      ) : draft ? (
         <div className="space-y-2 rounded-xl border border-amber-400/25 bg-amber-500/[0.05] p-2.5">
           <p className="text-[11px] font-bold text-amber-300">راجع الشرائح وعدّلها قبل الحفظ</p>
           {draft.map((r, i) => (

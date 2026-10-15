@@ -395,8 +395,8 @@ export function IdeasBoard() {
       <QuickCapture onAdd={(t) => add(t)} detailed={detailed} onToggleDetailed={toggleDetailed} />
       <TodaySlices
         api={slices}
-        ideaTitle={(id) => { const s = stickers.find((x) => x.id === id); return s ? s.title || s.body.slice(0, 60) || "فكرة" : "فكرة محذوفة"; }}
-        onOpenIdea={(id) => { const s = stickers.find((x) => x.id === id); if (s) setOpen(s); }}
+        parentTitle={(id) => { const s = stickers.find((x) => x.id === id); return s ? s.title || s.body.slice(0, 60) || "فكرة" : "فكرة محذوفة"; }}
+        onOpenParent={(id) => { const s = stickers.find((x) => x.id === id); if (s) setOpen(s); }}
       />
 
       {/* ─── الصق فكرة: الكتابة على الاستكر نفسه ─── */}
@@ -565,7 +565,7 @@ export function IdeasBoard() {
                         )}
                         {!s.created_by_name && <span className="ml-auto" />}
                         <ProgressChip sticker={s} />
-                        <SliceChip slices={slices.byIdea.get(s.id)} />
+                        <SliceChip slices={slices.byParent.get(s.id)} />
                         <button
                           onClick={(e) => { e.stopPropagation(); toggleLike(s); }}
                           className={cn("ib-like", liked && "ib-on")}

@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getSliceAccess } from "@/lib/api/focus-slices-access";
 import {
-  SLICE_MAX, SLICES_PER_IDEA_MAX, cleanSliceTitle, isSliceKind, isSliceSpace, todayRiyadh, tomorrowRiyadh,
+  SLICE_COLS, SLICE_MAX, SLICES_PER_IDEA_MAX, cleanSliceTitle, isSliceKind, isSliceSpace, nextDayFor, todayRiyadh,
 } from "@/lib/focus-slices";
 
 export const runtime = "nodejs";
 
-const COLS = "id, space, idea_id, title, kind, planned_for, done_at, focus_minutes, sort_order, created_at";
+const COLS = SLICE_COLS;
 
 /** GET /api/focus-slices?space=ideas → شرائح المستخدم نفسه في المساحة. */
 export async function GET(req: NextRequest) {
@@ -23,24 +23,27 @@ export async function GET(req: NextRequest) {
     .limit(2000);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(
-    { slices: data ?? [], today: todayRiyadh(), tomorrow: tomorrowRiyadh() },
+    { slices: data ?? [], today: todayRiyadh(), tomorrow: nextDayFor(space) },
     { headers: { "Cache-Control": "no-store" } }
   );
 }
 
-/** POST /api/focus-slices { space, idea_id, slices: [{ title, kind }] } → حفظ شرائح فكرة (تروح «باقي الشرائح»). */
+/**
+ * POST /api/focus-slices { space, parent_id, slices: [{ title, kind }] } → حفظ شرائح (تروح «باقي الشرائح»).
+ * الأم: فكرة من اللوحة (ideas) أو بند عمل (work). idea_id مقبول للتوافق.
+ */
 export async function POST(req: NextRequest) {
   const b = ((await req.json().catch(() => ({}))) ?? {}) as Record<string, unknown>;
   const space = isSliceSpace(b.space) ? b.space : "ideas";
   const access = await getSliceAccess(space);
   if (access instanceof NextResponse) return access;
 
-  const ideaId = typeof b.idea_id === "string" ? b.idea_id : "";
-  if (space === "ideas") {
-    const { data: idea } = await supabaseAdmin
-      .from("idea_stickers").select("id").eq("id", ideaId).eq("org_id", access.orgId).maybeSingle();
-    if (!idea) return NextResponse.json({ error: "الفكرة غير موجودة" }, { status: 404 });
-  }
+  const parentId = typeof b.parent_id === "string" ? b.parent_id : typeof b.idea_id === "string" ? b.idea_id : "";
+  const parentCol = space === "work" ? "work_item_id" : "idea_id";
+  const { data: parent } = space === "work"
+    ? await supabaseAdmin.from("work_items").select("id").eq("id", parentId).eq("org_id", access.orgId).eq("user_id", access.userId).maybeSingle()
+    : await supabaseAdmin.from("idea_stickers").select("id").eq("id", parentId).eq("org_id", access.orgId).maybeSingle();
+  if (!parent) return NextResponse.json({ error: space === "work" ? "البند غير موجود" : "الفكرة غير موجودة" }, { status: 404 });
 
   const rows = (Array.isArray(b.slices) ? b.slices : [])
     .map((s) => (s && typeof s === "object" ? (s as Record<string, unknown>) : {}))
@@ -51,7 +54,7 @@ export async function POST(req: NextRequest) {
 
   const { data: existing } = await supabaseAdmin
     .from("focus_slices").select("sort_order")
-    .eq("org_id", access.orgId).eq("user_id", access.userId).eq("idea_id", ideaId)
+    .eq("org_id", access.orgId).eq("user_id", access.userId).eq(parentCol, parentId)
     .order("sort_order", { ascending: false });
   if ((existing?.length ?? 0) + rows.length > SLICES_PER_IDEA_MAX) {
     return NextResponse.json({ error: `الحد ${SLICES_PER_IDEA_MAX} شريحة للفكرة — أنجز أو احذف شرائح قديمة أولاً` }, { status: 400 });
@@ -61,7 +64,7 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabaseAdmin
     .from("focus_slices")
     .insert(rows.map((r, i) => ({
-      org_id: access.orgId, user_id: access.userId, space, idea_id: ideaId || null,
+      org_id: access.orgId, user_id: access.userId, space, [parentCol]: parentId,
       title: r.title, kind: r.kind, sort_order: base + i,
     })))
     .select(COLS);

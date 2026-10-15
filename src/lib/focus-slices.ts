@@ -1,5 +1,6 @@
 // «الشرائح» — تقطيع الفكرة لمهام تنجز كل وحدة في جلسة واحدة. أنواع وثوابت مشتركة بين الواجهة والـAPI.
 import { saudiDateStr } from "@/lib/utils/format";
+import { nextWorkday } from "@/lib/work-hours";
 
 export type SliceKind = "deep" | "shallow";
 export type SliceSpace = "ideas" | "work";
@@ -8,14 +9,22 @@ export interface FocusSlice {
   id: string;
   space: SliceSpace;
   idea_id: string | null;
+  work_item_id: string | null;
   title: string;
   kind: SliceKind;
   planned_for: string | null;
   done_at: string | null;
   focus_minutes: number;
+  /** موعد الجلسة العميقة (HH:MM:SS) — للعمل الوظيفي. */
+  session_at: string | null;
   sort_order: number;
   created_at: string;
 }
+
+/** الأم: الفكرة (الأفكار) أو بند العمل (العمل الوظيفي). */
+export const parentOf = (s: Pick<FocusSlice, "idea_id" | "work_item_id">) => s.idea_id ?? s.work_item_id ?? null;
+
+export const SLICE_COLS = "id, space, idea_id, work_item_id, title, kind, planned_for, done_at, focus_minutes, session_at, sort_order, created_at";
 
 export const SLICE_KINDS: Record<SliceKind, { icon: string; label: string; hint: string }> = {
   deep: { icon: "🔥", label: "عميقة", hint: "٦٠–٩٠ دقيقة تركيز" },
@@ -36,6 +45,8 @@ export const isSliceSpace = (v: unknown): v is SliceSpace => v === "ideas" || v 
 /** اليوم وبكرة بتوقيت الرياض (YYYY-MM-DD). */
 export const todayRiyadh = () => saudiDateStr();
 export const tomorrowRiyadh = () => saudiDateStr(new Date(Date.now() + 86_400_000));
+/** «بكرة» حسب المساحة: العمل الوظيفي = يوم الدوام التالي (الخميس ← الأحد). */
+export const nextDayFor = (space: SliceSpace) => (space === "work" ? nextWorkday(todayRiyadh()) : tomorrowRiyadh());
 
 /** نسبة إنجاز الفكرة من شرائحها (٠–١٠٠) — null لو ما لها شرائح. */
 export function ideaProgress(slices: Pick<FocusSlice, "done_at">[]): number | null {
