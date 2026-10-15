@@ -8,6 +8,7 @@ interface StatCardProps {
   progress?: number;
   icon?: React.ReactNode;
   subtext?: string;
+  hint?: string; // جملة توجيهية قصيرة تحت الشريط
   muted?: boolean;
   tooltip?: string;
   onClick?: () => void;
@@ -80,7 +81,7 @@ const COLOR_MAP: Record<string, {
   },
 };
 
-export function StatCard({ value, label, color, progress, icon, subtext, muted, tooltip, onClick, active }: StatCardProps) {
+export function StatCard({ value, label, color, progress, icon, subtext, hint, muted, tooltip, onClick, active }: StatCardProps) {
   const c = COLOR_MAP[color];
   const content = (
     <div
@@ -122,6 +123,9 @@ export function StatCard({ value, label, color, progress, icon, subtext, muted, 
             style={{ width: `${Math.min(100, progress)}%` }}
           />
         </div>
+      )}
+      {hint && (
+        <p className="mt-3 text-[12px] leading-relaxed text-foreground/70 relative z-10">{hint}</p>
       )}
     </div>
   );
