@@ -1043,9 +1043,8 @@ function MonthBarChart({ days, metric, onMetricChange, selectedDay, onSelect, mo
   const ticketsTotal = days.reduce((s, d) => s + d.ticketsResolved, 0);
   const ticketsNewTotal = days.reduce((s, d) => s + d.ticketsNew, 0);
   const focus = days.find((d) => d.date === (hover ?? selectedDay));
-  // رقم مختصر يدخل داخل العمود (الإيرادات: 1.2K)
-  const short = (v: number) =>
-    !isRev ? String(v) : v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 1_000 ? `${+(v / 1_000).toFixed(v < 10_000 ? 1 : 0)}K` : String(v);
+  // الإيرادات تنعرض بالمبلغ الكامل (1,497) — الرسم يتوسّع لها
+  const short = (v: number) => (isRev ? v.toLocaleString("en-US") : String(v));
   const SALES_H = 160, TICKETS_H = 90, HEADROOM = 0.82; // نترك مساحة فوق أطول عمود لرقم الإجمالي
 
   // على الجوال الرسم يتمرّر — نبدأ عند اليوم (أو اليوم المختار) بدل أول الشهر
@@ -1056,7 +1055,7 @@ function MonthBarChart({ days, metric, onMetricChange, selectedDay, onSelect, mo
     if (!box || !el || box.scrollWidth <= box.clientWidth) return;
     const b = box.getBoundingClientRect(), r = el.getBoundingClientRect();
     box.scrollBy({ left: r.left + r.width / 2 - (b.left + b.width / 2) });
-  }, [days, selectedDay, todayStr]);
+  }, [days, selectedDay, todayStr, isRev]);
 
   // صف أعمدة مشترك للرسمين — نفس الأيام بنفس المواضع
   function renderBars(height: number, render: (d: MonthDayStat) => React.ReactNode) {
@@ -1178,7 +1177,7 @@ function MonthBarChart({ days, metric, onMetricChange, selectedDay, onSelect, mo
       </div>
 
       <div ref={scrollRef} className="overflow-x-auto -mx-1 px-1 pb-1">
-      <div className="min-w-[900px]" onMouseLeave={() => setHover(null)}>
+      <div className={isRev ? "min-w-[1750px]" : "min-w-[900px]"} onMouseLeave={() => setHover(null)}>
         <p className="text-[11px] text-muted-foreground mb-1">المبيعات والتجديدات ({isRev ? "ر.س" : "عدد"})</p>
         {renderBars(SALES_H, (d) => {
             const total = salesTotal(d);
