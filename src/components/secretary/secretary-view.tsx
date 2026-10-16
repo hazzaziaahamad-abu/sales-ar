@@ -944,6 +944,179 @@ export const SECRETARY_MOVED_SECTIONS: readonly SecretarySection[] = [
  * السكرتير التنفيذي. يعرض كل الأقسام افتراضياً؛ `sections` تحدد أقسام معيّنة فقط،
  * و`exclude` تخفي أقساماً. `embedded` يخفي الترويسة والتحليل الذكي عند التضمين في صفحة أخرى.
  */
+const AR_WEEKDAYS = ["أحد", "اثنين", "ثلاثاء", "أربعاء", "خميس", "جمعة", "سبت"];
+
+function weekdayOf(date: string) {
+  const [y, m, d] = date.split("-").map(Number);
+  return AR_WEEKDAYS[new Date(y, m - 1, d).getDay()];
+}
+
+function formatDayLabel(date: string) {
+  if (date === todayLocal()) return "اليوم";
+  const [, m, d] = date.split("-").map(Number);
+  return `${weekdayOf(date)} ${d}/${m}`;
+}
+
+type MonthDayStat = {
+  date: string; day: number; future: boolean;
+  office: number; support: number; renewals: number;
+  ticketsNew: number; ticketsResolved: number; totalRev: number;
+};
+
+function DayStrip({ days, selectedDay, onSelect }: {
+  days: MonthDayStat[];
+  selectedDay: string | null;
+  onSelect: (date: string) => void;
+}) {
+  const todayStr = todayLocal();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // نخلي اليوم (أو اليوم المختار) ظاهر عند الفتح
+  useEffect(() => {
+    const box = scrollRef.current;
+    const el = box?.querySelector<HTMLElement>(`[data-day="${selectedDay ?? todayStr}"]`);
+    if (!box || !el) return;
+    // نحرّك الشريط أفقياً فقط (scrollIntoView كان ينزّل الصفحة كلها)
+    const b = box.getBoundingClientRect(), r = el.getBoundingClientRect();
+    box.scrollBy({ left: r.left + r.width / 2 - (b.left + b.width / 2) });
+  }, [days, selectedDay, todayStr]);
+
+  return (
+    <div ref={scrollRef} className="flex gap-2 overflow-x-auto pb-2 mb-3 -mx-1 px-1 snap-x">
+      {days.map((d) => {
+        const isToday = d.date === todayStr;
+        const isSel = d.date === selectedDay;
+        return (
+          <button
+            key={d.date}
+            data-day={d.date}
+            type="button"
+            disabled={d.future}
+            onClick={() => onSelect(d.date)}
+            className={`snap-center shrink-0 w-14 py-1.5 rounded-xl border text-center transition-colors ${
+              isSel
+                ? "bg-amber-500/20 border-amber-500/50 text-amber-300"
+                : isToday
+                  ? "border-amber-500/40 text-foreground hover:bg-white/[0.04]"
+                  : d.future
+                    ? "border-white/[0.04] text-muted-foreground/40 cursor-not-allowed"
+                    : "border-white/[0.08] text-foreground hover:bg-white/[0.04]"
+            }`}
+          >
+            <span className={`block text-[11px] ${isSel ? "text-amber-300/80" : "text-muted-foreground"}`}>
+              {isToday ? "اليوم" : weekdayOf(d.date)}
+            </span>
+            <span className="block text-base font-bold leading-tight">{d.day}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function MonthBarChart({ days, metric, onMetricChange, selectedDay, onSelect, monthLabel }: {
+  days: MonthDayStat[];
+  metric: "revenue" | "sales" | "tickets";
+  onMetricChange: (m: "revenue" | "sales" | "tickets") => void;
+  selectedDay: string | null;
+  onSelect: (date: string) => void;
+  monthLabel: string;
+}) {
+  const [hover, setHover] = useState<string | null>(null);
+  const valueOf = (d: MonthDayStat) =>
+    metric === "revenue" ? d.totalRev : metric === "sales" ? d.office + d.support + d.renewals : d.ticketsResolved;
+  const fmt = (v: number) => (metric === "revenue" ? formatMoneyFull(v) : String(v));
+  const max = Math.max(1, ...days.map(valueOf));
+  const total = days.reduce((s, d) => s + valueOf(d), 0);
+  const best = days.reduce<MonthDayStat | null>((b, d) => (valueOf(d) > (b ? valueOf(b) : 0) ? d : b), null);
+  const focus = days.find((d) => d.date === (hover ?? selectedDay));
+  const todayStr = todayLocal();
+
+  return (
+    <div className="mt-4 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
+        <p className="text-[13px] font-bold text-muted-foreground flex items-center gap-1.5">
+          <BarChart3 className="w-3 h-3" /> أداء الشهر يوم بيوم ({monthLabel})
+        </p>
+        <div className="flex items-center gap-1 p-1 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+          {([
+            { key: "revenue", label: "الإيرادات" },
+            { key: "sales", label: "المبيعات والتجديدات" },
+            { key: "tickets", label: "التذاكر المحلولة" },
+          ] as const).map((m) => (
+            <button
+              key={m.key}
+              type="button"
+              onClick={() => onMetricChange(m.key)}
+              className={`text-[12px] px-2.5 py-0.5 rounded-lg transition-colors ${
+                metric === m.key ? "bg-cyan-500/20 text-cyan-300 font-bold" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="text-[12px] text-muted-foreground mb-3 min-h-[18px]">
+        {focus ? (
+          <>
+            <span className="text-foreground font-medium">{formatDayLabel(focus.date)}</span>
+            {" · "}{formatMoneyFull(focus.totalRev)}
+            {" · "}{focus.office + focus.support} صفقة
+            {" · "}{focus.renewals} تجديد
+            {" · "}{focus.ticketsResolved} تذكرة محلولة
+          </>
+        ) : (
+          <>
+            إجمالي الشهر: <span className="text-foreground font-medium">{fmt(total)}</span>
+            {best && valueOf(best) > 0 && <> · أفضل يوم: <span className="text-foreground font-medium">{formatDayLabel(best.date)} ({fmt(valueOf(best))})</span></>}
+          </>
+        )}
+      </p>
+      <div className="relative h-36" onMouseLeave={() => setHover(null)}>
+        {/* خط الأساس */}
+        <div className="absolute inset-x-0 bottom-5 border-t border-white/[0.08]" />
+        <div className="absolute inset-0 flex items-end gap-[2px]">
+          {days.map((d) => {
+            const v = valueOf(d);
+            const h = v > 0 ? Math.max(3, (v / max) * 100) : 0;
+            const isSel = d.date === selectedDay;
+            const isHover = d.date === hover;
+            const dim = (selectedDay || hover) && !isSel && !isHover;
+            return (
+              <button
+                key={d.date}
+                type="button"
+                disabled={d.future}
+                onClick={() => onSelect(d.date)}
+                onMouseEnter={() => setHover(d.date)}
+                onFocus={() => setHover(d.date)}
+                onBlur={() => setHover(null)}
+                aria-label={`${formatDayLabel(d.date)}: ${fmt(v)}`}
+                title={`${formatDayLabel(d.date)}: ${fmt(v)}`}
+                className="group relative flex-1 min-w-0 h-full flex flex-col justify-end items-stretch disabled:cursor-default"
+              >
+                <div className="flex-1 flex items-end">
+                  <div
+                    className={`w-full rounded-t-[4px] transition-opacity ${
+                      isSel ? "bg-amber-400" : "bg-cyan-400"
+                    } ${dim ? "opacity-35" : "opacity-90"}`}
+                    style={{ height: `${h}%` }}
+                  />
+                </div>
+                <span className={`h-5 leading-5 text-[10px] tabular-nums ${
+                  isSel ? "text-amber-300 font-bold" : d.date === todayStr ? "text-foreground font-bold" : "text-muted-foreground/70"
+                } ${d.day % 5 === 0 || d.day === 1 || isSel || d.date === todayStr ? "" : "invisible sm:visible"}`}>
+                  {d.day}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function SecretaryView({ sections, exclude, embedded = false }: {
   sections?: readonly SecretarySection[];
   exclude?: readonly SecretarySection[];
@@ -966,6 +1139,9 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedPeriod, setSelectedPeriod] = useState<"today" | "yesterday" | "week" | "month">("today");
+  // يوم محدد من شريط أيام الشهر (YYYY-MM-DD) — إذا انختار يتقدّم على فلتر الفترة
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [chartMetric, setChartMetric] = useState<"revenue" | "sales" | "tickets">("revenue");
   const [attendancePeriod, setAttendancePeriod] = useState<"today" | "yesterday" | "week" | "month">("today");
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     briefing: true, meetings: false, hotCold: true, supportHealth: true, renewalHealth: true, priorities: true,
@@ -1396,7 +1572,7 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
       return d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear;
     };
 
-    function statsForRange(label: "today" | "yesterday" | "week" | "month", start: string, end: string) {
+    function statsForRange(label: "today" | "yesterday" | "week" | "month" | "day", start: string, end: string) {
       const useMonth = label === "month";
       const dealMatches = (d: Deal) => {
         if (d.stage !== "مكتملة") return false;
@@ -1437,6 +1613,15 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
     const yesterday = statsForRange("yesterday", yesterdayStr, yesterdayStr);
     const week = statsForRange("week", weekStart, todayStr);
     const month = statsForRange("month", "", ""); // args ignored when useMonth
+    const day = selectedDay ? statsForRange("day", selectedDay, selectedDay) : null;
+
+    // أيام الشهر المختار — للشريط والرسم البياني
+    const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const monthDays = Array.from({ length: daysInMonth }, (_, i) => {
+      const date = `${selectedYear}-${pad(selectedMonth)}-${pad(i + 1)}`;
+      return { date, day: i + 1, future: date > todayStr, ...statsForRange("day", date, date) };
+    });
 
     // Monthly richer metrics (for the existing detailed section)
     const monthOffice = officeDeals.filter(d => d.month === selectedMonth && d.year === selectedYear);
@@ -1450,6 +1635,7 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
 
     return {
       periods: { today, yesterday, week, month },
+      day, monthDays,
       // Monthly (legacy fields — consumed by existing monthly section + AI)
       closedOffice: month.office, revenueOffice: month.officeRev,
       closedSupport: month.support, revenueSupport: month.supportRev,
@@ -1463,7 +1649,10 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
       todayNew: 0,
       todayTotalRev: today.totalRev,
     };
-  }, [deals, renewals, tickets, selectedMonth, selectedYear, salesMerged]);
+  }, [deals, renewals, tickets, selectedMonth, selectedYear, salesMerged, selectedDay]);
+
+  // اليوم المختار يخص الشهر المعروض — لو تغيّر الشهر نرجع لفلتر الفترة
+  useEffect(() => { setSelectedDay(null); }, [selectedMonth, selectedYear]);
 
   // Performers — top/bottom per department for the selected period
   const performers = useMemo(() => {
@@ -1480,8 +1669,9 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
     };
 
     let start: string, end: string;
-    const useMonth = selectedPeriod === "month";
-    if (selectedPeriod === "today") { start = todayStr; end = todayStr; }
+    const useMonth = !selectedDay && selectedPeriod === "month";
+    if (selectedDay) { start = selectedDay; end = selectedDay; }
+    else if (selectedPeriod === "today") { start = todayStr; end = todayStr; }
     else if (selectedPeriod === "yesterday") { start = yesterdayStr; end = yesterdayStr; }
     else if (selectedPeriod === "week") { start = weekStart; end = todayStr; }
     else { start = ""; end = ""; }
@@ -1570,7 +1760,7 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
       tickets: ticketRank,
       renewals: renewalRank as { top?: RankEntry; bottom?: RankEntry; total: number },
     };
-  }, [deals, renewals, tickets, selectedPeriod, selectedMonth, selectedYear, salesMerged]);
+  }, [deals, renewals, tickets, selectedPeriod, selectedDay, selectedMonth, selectedYear, salesMerged]);
 
   // Weak departments today — used to auto-schedule a 9 PM review meeting
   const weakDepartments = useMemo(() => {
@@ -1825,9 +2015,9 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
                   ] as const).map(tab => (
                     <button
                       key={tab.key}
-                      onClick={() => setSelectedPeriod(tab.key)}
+                      onClick={() => { setSelectedPeriod(tab.key); setSelectedDay(null); }}
                       className={`text-[13px] px-3 py-1 rounded-lg transition-colors ${
-                        selectedPeriod === tab.key
+                        !selectedDay && selectedPeriod === tab.key
                           ? "bg-amber-500/20 text-amber-300 font-bold"
                           : "text-muted-foreground hover:text-foreground hover:bg-white/[0.04]"
                       }`}
@@ -1837,8 +2027,14 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
                   ))}
                 </div>
               </div>
+              {/* ── شريط أيام الشهر — اضغط يوم تطلع نتائجه ── */}
+              <DayStrip
+                days={briefingStats.monthDays}
+                selectedDay={selectedDay}
+                onSelect={(d) => setSelectedDay(selectedDay === d ? null : d)}
+              />
               {(() => {
-                const s = briefingStats.periods[selectedPeriod];
+                const s = briefingStats.day ?? briefingStats.periods[selectedPeriod];
                 return (
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                     <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
@@ -1865,13 +2061,13 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
                       <Headphones className="w-4 h-4 text-rose-400 mx-auto mb-1" />
                       <p className="text-xl font-bold text-rose-400">{s.ticketsNew}</p>
                       <p className="text-[12px] text-muted-foreground">تذاكر جديدة</p>
-                      {selectedPeriod === "today" && supportHealth.urgentCount > 0 && <p className="text-[12px] text-red-400/80 mt-0.5">🚨 {supportHealth.urgentCount} عاجلة</p>}
+                      {!selectedDay && selectedPeriod === "today" && supportHealth.urgentCount > 0 && <p className="text-[12px] text-red-400/80 mt-0.5">🚨 {supportHealth.urgentCount} عاجلة</p>}
                     </div>
                     <div className="p-3 rounded-xl bg-teal-500/10 border border-teal-500/20 text-center">
                       <CheckSquare className="w-4 h-4 text-teal-400 mx-auto mb-1" />
                       <p className="text-xl font-bold text-teal-400">{s.ticketsResolved}</p>
                       <p className="text-[12px] text-muted-foreground">تذاكر محلولة</p>
-                      {selectedPeriod === "today" && supportHealth.avgResponse > 0 && <p className="text-[12px] text-teal-400/70 mt-0.5">⏱ {supportHealth.avgResponse}د</p>}
+                      {!selectedDay && selectedPeriod === "today" && supportHealth.avgResponse > 0 && <p className="text-[12px] text-teal-400/70 mt-0.5">⏱ {supportHealth.avgResponse}د</p>}
                     </div>
                     <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-center">
                       <Banknote className="w-4 h-4 text-cyan-400 mx-auto mb-1" />
@@ -1885,7 +2081,7 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
               {/* ── Top/Bottom Performers per department ── */}
               <div className="mt-4">
                 <p className="text-[13px] font-bold text-muted-foreground mb-2 flex items-center gap-1.5">
-                  <Users className="w-3 h-3" /> أفضل وأقل أداء ({selectedPeriod === "today" ? "اليوم" : selectedPeriod === "yesterday" ? "أمس" : selectedPeriod === "week" ? "الأسبوع" : "الشهر"})
+                  <Users className="w-3 h-3" /> أفضل وأقل أداء ({selectedDay ? formatDayLabel(selectedDay) : selectedPeriod === "today" ? "اليوم" : selectedPeriod === "yesterday" ? "أمس" : selectedPeriod === "week" ? "الأسبوع" : "الشهر"})
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5">
                   <PerformerCard
@@ -1916,6 +2112,16 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
                   />
                 </div>
               </div>
+
+              {/* ── رسم بياني للشهر كامل ── */}
+              <MonthBarChart
+                days={briefingStats.monthDays}
+                metric={chartMetric}
+                onMetricChange={setChartMetric}
+                selectedDay={selectedDay}
+                onSelect={(d) => setSelectedDay(selectedDay === d ? null : d)}
+                monthLabel={new Date(selectedYear, selectedMonth - 1).toLocaleDateString("ar-SA-u-ca-gregory", { month: "long", year: "numeric" })}
+              />
             </div>
 
             <div className="border-t border-border" />
