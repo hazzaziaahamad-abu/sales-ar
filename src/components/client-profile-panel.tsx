@@ -1490,7 +1490,7 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
                   icon={<Clock className="w-3.5 h-3.5 text-primary" />}
                   count={data.notes.length}
                 >
-                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                  <div className="space-y-1.5">
                     {data.notes.slice(0, 15).map(n => {
                       const isHighlighted = highlightNoteId === n.id;
                       return (
