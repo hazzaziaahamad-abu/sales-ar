@@ -365,14 +365,14 @@ function FinanceContent() {
 
   /* ─── Collection rows: صفقات الشهر المكتملة + تجديداته المكتملة ─── */
   type CollectionStatus = "محصّل" | "معلق" | "متأخر";
-  const collectionRows: { key: string; id: string; kind: "deal" | "renewal"; name: string; value: number; product: string; date: string; status: CollectionStatus }[] = [
+  const collectionRows: { key: string; id: string; kind: "office" | "support" | "renewal"; rep: string; name: string; value: number; product: string; date: string; status: CollectionStatus }[] = [
     ...closedDeals.map(d => ({
-      key: `d-${d.id}`, id: d.id, kind: "deal" as const, name: d.client_name, value: d.deal_value,
+      key: `d-${d.id}`, id: d.id, kind: (d.sales_type === "support" ? "support" : "office") as "office" | "support", rep: d.assigned_rep_name || "—", name: d.client_name, value: d.deal_value,
       product: d.plan || "—", date: (d.deal_date || d.close_date || "").slice(0, 10),
       status: (d.collection_status || "معلق") as CollectionStatus,
     })),
     ...monthRenewals.map(r => ({
-      key: `r-${r.id}`, id: r.id, kind: "renewal" as const, name: r.customer_name, value: r.plan_price,
+      key: `r-${r.id}`, id: r.id, kind: "renewal" as const, rep: r.assigned_rep || "—", name: r.customer_name, value: r.plan_price,
       product: r.plan_name || "—", date: (r.payment_date || r.renewal_date || "").slice(0, 10),
       status: (r.collection_status || "معلق") as CollectionStatus,
     })),
@@ -1159,6 +1159,7 @@ function FinanceContent() {
                       <tr className="border-b border-border">
                         <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">العميل</th>
                         <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">النوع</th>
+                        <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">الموظف</th>
                         <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">تاريخ الصفقة</th>
                         <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">القيمة</th>
                         <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">المنتج</th>
@@ -1173,11 +1174,14 @@ function FinanceContent() {
                             <td className="py-2.5 px-3 text-foreground font-medium">{row.name}</td>
                             <td className="py-2.5 px-3">
                               <span className={`px-2 py-0.5 rounded-md text-[12px] font-medium border ${
-                                row.kind === "deal" ? "bg-cyan/10 text-cyan border-cyan/20" : "bg-cc-green/10 text-cc-green border-cc-green/20"
+                                row.kind === "office" ? "bg-cyan/10 text-cyan border-cyan/20"
+                                : row.kind === "support" ? "bg-amber/10 text-amber border-amber/20"
+                                : "bg-cc-green/10 text-cc-green border-cc-green/20"
                               }`}>
-                                {row.kind === "deal" ? "صفقة" : "تجديد"}
+                                {row.kind === "office" ? "مبيعات المكتب" : row.kind === "support" ? "مبيعات الدعم" : "تجديد"}
                               </span>
                             </td>
+                            <td className="py-2.5 px-3 text-muted-foreground whitespace-nowrap">{row.rep}</td>
                             <td className="py-2.5 px-3 text-muted-foreground whitespace-nowrap">{row.date || "—"}</td>
                             <td className="py-2.5 px-3 text-cyan font-semibold">{formatMoney(row.value)}</td>
                             <td className="py-2.5 px-3 text-muted-foreground">{row.product}</td>
@@ -1186,7 +1190,7 @@ function FinanceContent() {
                                 {(["محصّل", "معلق", "متأخر"] as const).map(s => (
                                   <button
                                     key={s}
-                                    onClick={() => row.kind === "deal" ? handleCollectionStatus(row.id, s) : handleRenewalCollectionStatus(row.id, s)}
+                                    onClick={() => row.kind === "renewal" ? handleRenewalCollectionStatus(row.id, s) : handleCollectionStatus(row.id, s)}
                                     className={`px-2.5 py-1 rounded-md text-[13px] font-medium transition-all border ${
                                       status === s
                                         ? s === "محصّل" ? "bg-cc-green/15 text-cc-green border-cc-green/30"
