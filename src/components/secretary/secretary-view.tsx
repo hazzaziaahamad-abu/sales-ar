@@ -1043,12 +1043,25 @@ function MonthBarChart({ days, metric, onMetricChange, selectedDay, onSelect, mo
   const ticketsTotal = days.reduce((s, d) => s + d.ticketsResolved, 0);
   const ticketsNewTotal = days.reduce((s, d) => s + d.ticketsNew, 0);
   const focus = days.find((d) => d.date === (hover ?? selectedDay));
-  const showLabel = (d: MonthDayStat) => d.day === 1 || d.day % 5 === 0 || d.date === selectedDay || d.date === todayStr;
+  // رقم مختصر يدخل داخل العمود (الإيرادات: 1.2K)
+  const short = (v: number) =>
+    !isRev ? String(v) : v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 1_000 ? `${Math.round(v / 1_000)}K` : String(v);
+  const SALES_H = 160, TICKETS_H = 72, HEADROOM = 0.82; // نترك مساحة فوق أطول عمود لرقم الإجمالي
+
+  // على الجوال الرسم يتمرّر — نبدأ عند اليوم (أو اليوم المختار) بدل أول الشهر
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const box = scrollRef.current;
+    const el = box?.querySelector<HTMLElement>(`[data-chart-day="${selectedDay ?? todayStr}"]`);
+    if (!box || !el || box.scrollWidth <= box.clientWidth) return;
+    const b = box.getBoundingClientRect(), r = el.getBoundingClientRect();
+    box.scrollBy({ left: r.left + r.width / 2 - (b.left + b.width / 2) });
+  }, [days, selectedDay, todayStr]);
 
   // صف أعمدة مشترك للرسمين — نفس الأيام بنفس المواضع
-  function renderBars(height: string, render: (d: MonthDayStat) => React.ReactNode) {
+  function renderBars(height: number, render: (d: MonthDayStat) => React.ReactNode) {
     return (
-      <div className={`relative ${height}`}>
+      <div className="relative" style={{ height }}>
         <div className="absolute inset-x-0 bottom-0 border-t border-white/[0.08]" />
         <div className="absolute inset-0 flex items-end gap-[2px]">
           {days.map((d) => {
@@ -1139,36 +1152,49 @@ function MonthBarChart({ days, metric, onMetricChange, selectedDay, onSelect, mo
         )}
       </div>
 
-      <div onMouseLeave={() => setHover(null)}>
+      <div ref={scrollRef} className="overflow-x-auto -mx-1 px-1 pb-1">
+      <div className="min-w-[900px]" onMouseLeave={() => setHover(null)}>
         <p className="text-[11px] text-muted-foreground mb-1">المبيعات والتجديدات ({isRev ? "ر.س" : "عدد"})</p>
-        {renderBars("h-32", (d) => {
+        {renderBars(SALES_H, (d) => {
             const total = salesTotal(d);
             if (total === 0) return null;
+            const barPx = Math.max(4, (total / maxSales) * SALES_H * HEADROOM);
             return (
-              <div className="w-full flex flex-col-reverse gap-[2px]" style={{ height: `${Math.max(4, (total / maxSales) * 100)}%` }}>
-                {series.map((x, i) => {
-                  const v = x.get(d);
-                  if (v === 0) return null;
-                  const isTop = series.slice(i + 1).every((y) => y.get(d) === 0);
-                  return (
-                    <div
-                      key={x.key}
-                      className={`w-full min-h-[2px] ${isTop ? "rounded-t-[4px]" : ""}`}
-                      style={{ flexGrow: v, flexBasis: 0, background: SERIES_COLORS[x.key] }}
-                    />
-                  );
-                })}
-              </div>
+              <>
+                <span className="block text-center text-[11px] font-bold text-foreground tabular-nums leading-4 mb-0.5">{short(total)}</span>
+                <div className="w-full flex flex-col-reverse gap-[2px]" style={{ height: barPx }}>
+                  {series.map((x, i) => {
+                    const v = x.get(d);
+                    if (v === 0) return null;
+                    const isTop = series.slice(i + 1).every((y) => y.get(d) === 0);
+                    const segPx = (v / total) * barPx;
+                    return (
+                      <div
+                        key={x.key}
+                        className={`w-full min-h-[2px] flex items-center justify-center overflow-hidden ${isTop ? "rounded-t-[4px]" : ""}`}
+                        style={{ flexGrow: v, flexBasis: 0, background: SERIES_COLORS[x.key] }}
+                      >
+                        {segPx >= 11 && total !== v && (
+                          <span className="text-[10px] font-bold text-white tabular-nums leading-none">{short(v)}</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
             );
         })}
 
         <p className="text-[11px] text-muted-foreground mt-3 mb-1">تذاكر الدعم المحلولة</p>
-        {renderBars("h-14", (d) =>
+        {renderBars(TICKETS_H, (d) =>
             d.ticketsResolved > 0 ? (
-              <div
-                className="w-full rounded-t-[4px]"
-                style={{ height: `${Math.max(6, (d.ticketsResolved / maxTickets) * 100)}%`, background: SERIES_COLORS.tickets }}
-              />
+              <>
+                <span className="block text-center text-[11px] font-bold text-foreground tabular-nums leading-4 mb-0.5">{d.ticketsResolved}</span>
+                <div
+                  className="w-full rounded-t-[4px]"
+                  style={{ height: Math.max(4, (d.ticketsResolved / maxTickets) * TICKETS_H * 0.7), background: SERIES_COLORS.tickets }}
+                />
+              </>
             ) : null
         )}
 
@@ -1177,14 +1203,16 @@ function MonthBarChart({ days, metric, onMetricChange, selectedDay, onSelect, mo
           {days.map((d) => (
             <span
               key={d.date}
+              data-chart-day={d.date}
               className={`flex-1 min-w-0 text-center text-[10px] tabular-nums ${
                 d.date === selectedDay ? "text-amber-300 font-bold" : d.date === todayStr ? "text-foreground font-bold" : "text-muted-foreground/70"
-              } ${showLabel(d) ? "" : "invisible sm:visible"}`}
+              }`}
             >
               {d.day}
             </span>
           ))}
         </div>
+      </div>
       </div>
     </div>
   );
