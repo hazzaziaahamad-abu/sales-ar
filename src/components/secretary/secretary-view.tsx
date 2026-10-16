@@ -960,6 +960,7 @@ function formatDayLabel(date: string) {
 type MonthDayStat = {
   date: string; day: number; future: boolean;
   office: number; support: number; renewals: number;
+  officeRev: number; supportRev: number; renewalRev: number;
   ticketsNew: number; ticketsResolved: number; totalRev: number;
 };
 
@@ -1013,35 +1014,78 @@ function DayStrip({ days, selectedDay, onSelect }: {
   );
 }
 
-function MonthBarChart({ days, metric, onMetricChange, selectedDay, onSelect, monthLabel }: {
+// ألوان ثابتة لكل قسم (نفس ألوان كروت الملخص) — متحقق منها للتباين وعمى الألوان على الخلفيتين
+const SERIES_COLORS = { office: "#059669", support: "#ea580c", renewals: "#0284c7", tickets: "#f43f5e" };
+
+function MonthBarChart({ days, metric, onMetricChange, selectedDay, onSelect, monthLabel, salesMerged }: {
   days: MonthDayStat[];
-  metric: "revenue" | "sales" | "tickets";
-  onMetricChange: (m: "revenue" | "sales" | "tickets") => void;
+  metric: "count" | "revenue";
+  onMetricChange: (m: "count" | "revenue") => void;
   selectedDay: string | null;
   onSelect: (date: string) => void;
   monthLabel: string;
+  salesMerged: boolean;
 }) {
   const [hover, setHover] = useState<string | null>(null);
-  const valueOf = (d: MonthDayStat) =>
-    metric === "revenue" ? d.totalRev : metric === "sales" ? d.office + d.support + d.renewals : d.ticketsResolved;
-  const fmt = (v: number) => (metric === "revenue" ? formatMoneyFull(v) : String(v));
-  const max = Math.max(1, ...days.map(valueOf));
-  const total = days.reduce((s, d) => s + valueOf(d), 0);
-  const best = days.reduce<MonthDayStat | null>((b, d) => (valueOf(d) > (b ? valueOf(b) : 0) ? d : b), null);
-  const focus = days.find((d) => d.date === (hover ?? selectedDay));
   const todayStr = todayLocal();
+  const isRev = metric === "revenue";
+
+  const series = [
+    { key: "office" as const, label: salesMerged ? "المبيعات" : "مبيعات المكتب", get: (d: MonthDayStat) => (isRev ? d.officeRev : d.office) },
+    ...(salesMerged ? [] : [{ key: "support" as const, label: "مبيعات الدعم", get: (d: MonthDayStat) => (isRev ? d.supportRev : d.support) }]),
+    { key: "renewals" as const, label: "التجديدات", get: (d: MonthDayStat) => (isRev ? d.renewalRev : d.renewals) },
+  ];
+  const fmt = (v: number) => (isRev ? formatMoneyFull(v) : String(v));
+  const salesTotal = (d: MonthDayStat) => series.reduce((s, x) => s + x.get(d), 0);
+  const maxSales = Math.max(1, ...days.map(salesTotal));
+  const maxTickets = Math.max(1, ...days.map((d) => d.ticketsResolved));
+  const monthTotals = series.map((x) => ({ ...x, total: days.reduce((s, d) => s + x.get(d), 0) }));
+  const ticketsTotal = days.reduce((s, d) => s + d.ticketsResolved, 0);
+  const ticketsNewTotal = days.reduce((s, d) => s + d.ticketsNew, 0);
+  const focus = days.find((d) => d.date === (hover ?? selectedDay));
+  const showLabel = (d: MonthDayStat) => d.day === 1 || d.day % 5 === 0 || d.date === selectedDay || d.date === todayStr;
+
+  // صف أعمدة مشترك للرسمين — نفس الأيام بنفس المواضع
+  function renderBars(height: string, render: (d: MonthDayStat) => React.ReactNode) {
+    return (
+      <div className={`relative ${height}`}>
+        <div className="absolute inset-x-0 bottom-0 border-t border-white/[0.08]" />
+        <div className="absolute inset-0 flex items-end gap-[2px]">
+          {days.map((d) => {
+            const dim = (selectedDay || hover) && d.date !== selectedDay && d.date !== hover;
+            return (
+              <button
+                key={d.date}
+                type="button"
+                disabled={d.future}
+                onClick={() => onSelect(d.date)}
+                onMouseEnter={() => setHover(d.date)}
+                onFocus={() => setHover(d.date)}
+                onBlur={() => setHover(null)}
+                aria-label={formatDayLabel(d.date)}
+                className={`relative flex-1 min-w-0 h-full flex flex-col justify-end transition-opacity disabled:cursor-default ${
+                  dim ? "opacity-35" : ""
+                } ${d.date === selectedDay ? "outline outline-1 outline-amber-400/70 outline-offset-1 rounded-t-[4px]" : ""}`}
+              >
+                {render(d)}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mt-4 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-      <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
         <p className="text-[13px] font-bold text-muted-foreground flex items-center gap-1.5">
           <BarChart3 className="w-3 h-3" /> أداء الشهر يوم بيوم ({monthLabel})
         </p>
         <div className="flex items-center gap-1 p-1 rounded-xl bg-white/[0.03] border border-white/[0.06]">
           {([
+            { key: "count", label: "العدد" },
             { key: "revenue", label: "الإيرادات" },
-            { key: "sales", label: "المبيعات والتجديدات" },
-            { key: "tickets", label: "التذاكر المحلولة" },
           ] as const).map((m) => (
             <button
               key={m.key}
@@ -1056,61 +1100,90 @@ function MonthBarChart({ days, metric, onMetricChange, selectedDay, onSelect, mo
           ))}
         </div>
       </div>
-      <p className="text-[12px] text-muted-foreground mb-3 min-h-[18px]">
+
+      {/* المفتاح + إجمالي الشهر لكل قسم */}
+      <div className="flex flex-wrap gap-x-4 gap-y-1 mb-2 text-[12px]">
+        {monthTotals.map((x) => (
+          <span key={x.key} className="flex items-center gap-1.5 text-muted-foreground">
+            <span className="w-2.5 h-2.5 rounded-sm" style={{ background: SERIES_COLORS[x.key] }} />
+            {x.label}: <span className="text-foreground font-bold tabular-nums">{fmt(x.total)}</span>
+          </span>
+        ))}
+        <span className="flex items-center gap-1.5 text-muted-foreground">
+          <span className="w-2.5 h-2.5 rounded-sm" style={{ background: SERIES_COLORS.tickets }} />
+          تذاكر محلولة: <span className="text-foreground font-bold tabular-nums">{ticketsTotal}</span>
+          <span className="text-muted-foreground/70">(جديدة {ticketsNewTotal})</span>
+        </span>
+      </div>
+
+      {/* تفاصيل اليوم عند التأشير/الاختيار */}
+      <div className="min-h-[40px] mb-2 text-[12px]">
         {focus ? (
-          <>
-            <span className="text-foreground font-medium">{formatDayLabel(focus.date)}</span>
-            {" · "}{formatMoneyFull(focus.totalRev)}
-            {" · "}{focus.office + focus.support} صفقة
-            {" · "}{focus.renewals} تجديد
-            {" · "}{focus.ticketsResolved} تذكرة محلولة
-          </>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-2 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06]">
+            <span className="text-foreground font-bold">{formatDayLabel(focus.date)}</span>
+            {series.map((x) => (
+              <span key={x.key} className="flex items-center gap-1 text-muted-foreground">
+                <span className="w-2 h-2 rounded-sm" style={{ background: SERIES_COLORS[x.key] }} />
+                {x.label} <span className="text-foreground font-bold tabular-nums">{x.key === "office" ? focus.office : x.key === "support" ? focus.support : focus.renewals}</span>
+              </span>
+            ))}
+            <span className="flex items-center gap-1 text-muted-foreground">
+              <span className="w-2 h-2 rounded-sm" style={{ background: SERIES_COLORS.tickets }} />
+              تذاكر محلولة <span className="text-foreground font-bold tabular-nums">{focus.ticketsResolved}</span>
+              <span className="text-muted-foreground/70">/ جديدة {focus.ticketsNew}</span>
+            </span>
+            <span className="text-muted-foreground">الإيرادات <span className="text-foreground font-bold">{formatMoneyFull(focus.totalRev)}</span></span>
+          </div>
         ) : (
-          <>
-            إجمالي الشهر: <span className="text-foreground font-medium">{fmt(total)}</span>
-            {best && valueOf(best) > 0 && <> · أفضل يوم: <span className="text-foreground font-medium">{formatDayLabel(best.date)} ({fmt(valueOf(best))})</span></>}
-          </>
+          <p className="text-muted-foreground/70 pt-2">أشّر على يوم أو اضغطه عشان تشوف أرقامه بالتفصيل</p>
         )}
-      </p>
-      <div className="relative h-36" onMouseLeave={() => setHover(null)}>
-        {/* خط الأساس */}
-        <div className="absolute inset-x-0 bottom-5 border-t border-white/[0.08]" />
-        <div className="absolute inset-0 flex items-end gap-[2px]">
-          {days.map((d) => {
-            const v = valueOf(d);
-            const h = v > 0 ? Math.max(3, (v / max) * 100) : 0;
-            const isSel = d.date === selectedDay;
-            const isHover = d.date === hover;
-            const dim = (selectedDay || hover) && !isSel && !isHover;
+      </div>
+
+      <div onMouseLeave={() => setHover(null)}>
+        <p className="text-[11px] text-muted-foreground mb-1">المبيعات والتجديدات ({isRev ? "ر.س" : "عدد"})</p>
+        {renderBars("h-32", (d) => {
+            const total = salesTotal(d);
+            if (total === 0) return null;
             return (
-              <button
-                key={d.date}
-                type="button"
-                disabled={d.future}
-                onClick={() => onSelect(d.date)}
-                onMouseEnter={() => setHover(d.date)}
-                onFocus={() => setHover(d.date)}
-                onBlur={() => setHover(null)}
-                aria-label={`${formatDayLabel(d.date)}: ${fmt(v)}`}
-                title={`${formatDayLabel(d.date)}: ${fmt(v)}`}
-                className="group relative flex-1 min-w-0 h-full flex flex-col justify-end items-stretch disabled:cursor-default"
-              >
-                <div className="flex-1 flex items-end">
-                  <div
-                    className={`w-full rounded-t-[4px] transition-opacity ${
-                      isSel ? "bg-amber-400" : "bg-cyan-400"
-                    } ${dim ? "opacity-35" : "opacity-90"}`}
-                    style={{ height: `${h}%` }}
-                  />
-                </div>
-                <span className={`h-5 leading-5 text-[10px] tabular-nums ${
-                  isSel ? "text-amber-300 font-bold" : d.date === todayStr ? "text-foreground font-bold" : "text-muted-foreground/70"
-                } ${d.day % 5 === 0 || d.day === 1 || isSel || d.date === todayStr ? "" : "invisible sm:visible"}`}>
-                  {d.day}
-                </span>
-              </button>
+              <div className="w-full flex flex-col-reverse gap-[2px]" style={{ height: `${Math.max(4, (total / maxSales) * 100)}%` }}>
+                {series.map((x, i) => {
+                  const v = x.get(d);
+                  if (v === 0) return null;
+                  const isTop = series.slice(i + 1).every((y) => y.get(d) === 0);
+                  return (
+                    <div
+                      key={x.key}
+                      className={`w-full min-h-[2px] ${isTop ? "rounded-t-[4px]" : ""}`}
+                      style={{ flexGrow: v, flexBasis: 0, background: SERIES_COLORS[x.key] }}
+                    />
+                  );
+                })}
+              </div>
             );
-          })}
+        })}
+
+        <p className="text-[11px] text-muted-foreground mt-3 mb-1">تذاكر الدعم المحلولة</p>
+        {renderBars("h-14", (d) =>
+            d.ticketsResolved > 0 ? (
+              <div
+                className="w-full rounded-t-[4px]"
+                style={{ height: `${Math.max(6, (d.ticketsResolved / maxTickets) * 100)}%`, background: SERIES_COLORS.tickets }}
+              />
+            ) : null
+        )}
+
+        {/* أرقام الأيام */}
+        <div className="flex gap-[2px] mt-1">
+          {days.map((d) => (
+            <span
+              key={d.date}
+              className={`flex-1 min-w-0 text-center text-[10px] tabular-nums ${
+                d.date === selectedDay ? "text-amber-300 font-bold" : d.date === todayStr ? "text-foreground font-bold" : "text-muted-foreground/70"
+              } ${showLabel(d) ? "" : "invisible sm:visible"}`}
+            >
+              {d.day}
+            </span>
+          ))}
         </div>
       </div>
     </div>
@@ -1141,7 +1214,7 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
   const [selectedPeriod, setSelectedPeriod] = useState<"today" | "yesterday" | "week" | "month">("today");
   // يوم محدد من شريط أيام الشهر (YYYY-MM-DD) — إذا انختار يتقدّم على فلتر الفترة
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
-  const [chartMetric, setChartMetric] = useState<"revenue" | "sales" | "tickets">("revenue");
+  const [chartMetric, setChartMetric] = useState<"count" | "revenue">("count");
   const [attendancePeriod, setAttendancePeriod] = useState<"today" | "yesterday" | "week" | "month">("today");
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     briefing: true, meetings: false, hotCold: true, supportHealth: true, renewalHealth: true, priorities: true,
@@ -2121,6 +2194,7 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
                 selectedDay={selectedDay}
                 onSelect={(d) => setSelectedDay(selectedDay === d ? null : d)}
                 monthLabel={new Date(selectedYear, selectedMonth - 1).toLocaleDateString("ar-SA-u-ca-gregory", { month: "long", year: "numeric" })}
+                salesMerged={salesMerged}
               />
             </div>
 
