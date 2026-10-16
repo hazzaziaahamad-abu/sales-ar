@@ -1034,15 +1034,18 @@ function MonthBarChart({ days, metric, onMetricChange, selectedDay, onSelect, mo
   const isRev = metric === "revenue";
 
   const series = [
-    { key: "office" as const, label: salesMerged ? "المبيعات" : "مبيعات المكتب", get: (d: MonthDayStat) => (isRev ? d.officeRev : d.office) },
-    ...(salesMerged ? [] : [{ key: "support" as const, label: "مبيعات الدعم", get: (d: MonthDayStat) => (isRev ? d.supportRev : d.support) }]),
-    { key: "renewals" as const, label: "التجديدات", get: (d: MonthDayStat) => (isRev ? d.renewalRev : d.renewals) },
-  ];
-  const fmt = (v: number) => (isRev ? formatMoneyFull(v) : String(v));
+    { key: "office" as const, label: salesMerged ? "المبيعات" : "مبيعات المكتب", count: (d: MonthDayStat) => d.office, rev: (d: MonthDayStat) => d.officeRev },
+    ...(salesMerged ? [] : [{ key: "support" as const, label: "مبيعات الدعم", count: (d: MonthDayStat) => d.support, rev: (d: MonthDayStat) => d.supportRev }]),
+    { key: "renewals" as const, label: "التجديدات", count: (d: MonthDayStat) => d.renewals, rev: (d: MonthDayStat) => d.renewalRev },
+  ].map((x) => ({ ...x, get: (d: MonthDayStat) => (isRev ? x.rev(d) : x.count(d)) }));
   const salesTotal = (d: MonthDayStat) => series.reduce((s, x) => s + x.get(d), 0);
   const maxSales = Math.max(1, ...days.map(salesTotal));
   const maxTickets = Math.max(1, ...days.map((d) => Math.max(d.ticketsResolved, d.ticketsNew)));
-  const monthTotals = series.map((x) => ({ ...x, total: days.reduce((s, d) => s + x.get(d), 0) }));
+  const monthTotals = series.map((x) => ({
+    ...x,
+    totalCount: days.reduce((s, d) => s + x.count(d), 0),
+    totalRev: days.reduce((s, d) => s + x.rev(d), 0),
+  }));
   const ticketsTotal = days.reduce((s, d) => s + d.ticketsResolved, 0);
   const ticketsNewTotal = days.reduce((s, d) => s + d.ticketsNew, 0);
   const focus = days.find((d) => d.date === (hover ?? selectedDay));
@@ -1169,7 +1172,8 @@ function MonthBarChart({ days, metric, onMetricChange, selectedDay, onSelect, mo
         {monthTotals.map((x) => (
           <span key={x.key} className="flex items-center gap-1.5 text-muted-foreground">
             <span className="w-2.5 h-2.5 rounded-sm" style={{ background: SERIES_COLORS[x.key] }} />
-            {x.label}: <span className="text-foreground font-bold tabular-nums">{fmt(x.total)}</span>
+            {x.label}: <span className="text-foreground font-bold tabular-nums">{x.totalCount}</span>
+            <span className="text-muted-foreground/80 tabular-nums">({formatMoneyFull(x.totalRev)})</span>
           </span>
         ))}
         <span className="flex items-center gap-1.5 text-muted-foreground">
@@ -1190,7 +1194,8 @@ function MonthBarChart({ days, metric, onMetricChange, selectedDay, onSelect, mo
             {series.map((x) => (
               <span key={x.key} className="flex items-center gap-1 text-muted-foreground">
                 <span className="w-2 h-2 rounded-sm" style={{ background: SERIES_COLORS[x.key] }} />
-                {x.label} <span className="text-foreground font-bold tabular-nums">{x.key === "office" ? focus.office : x.key === "support" ? focus.support : focus.renewals}</span>
+                {x.label} <span className="text-foreground font-bold tabular-nums">{x.count(focus)}</span>
+                {x.rev(focus) > 0 && <span className="text-muted-foreground/80 tabular-nums">({formatMoneyFull(x.rev(focus))})</span>}
               </span>
             ))}
             <span className="flex items-center gap-1 text-muted-foreground">
