@@ -72,6 +72,18 @@ const TEMPERATURE_COLORS: Record<string, string> = {
   "بارد": "bg-sky-500/15 text-sky-400 border-sky-500/20",
 };
 
+// وين تنحفظ «إضافة متابعة» من ملخص العميل: الصفقة النشطة، وإلا التجديد، وإلا التذكرة (المفتوحة أولاً)
+// — عملاء الدعم اللي عندهم تذاكر بس كان يختفي عندهم مربع المتابعة
+function pickQuickNoteTarget(data: ClientProfileData): { entityType: "deal" | "renewal" | "ticket"; entityId: string; entityName: string } | null {
+  const deal = data.deals.find(d => d.stage !== "مرفوض مع سبب") || data.deals[0];
+  if (deal) return { entityType: "deal", entityId: deal.id, entityName: deal.client_name };
+  const renewal = data.renewals[0];
+  if (renewal) return { entityType: "renewal", entityId: renewal.id, entityName: renewal.customer_name };
+  const ticket = data.tickets.find(t => t.status !== "محلول") || data.tickets[0];
+  if (ticket) return { entityType: "ticket", entityId: ticket.id, entityName: ticket.client_name };
+  return null;
+}
+
 // توصيات ذكية مقفلة افتراضياً — ما تتولّد إلا لما الموظف يفتحها بنفسه
 function ClientInsightsBox({ data }: { data: ClientProfileData }) {
   const [open, setOpen] = useState(false);
@@ -859,17 +871,14 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
 
   const addQuickNote = useCallback(async () => {
     if (!quickNote.trim() || !data) return;
-    const activeDeal = data.deals.find(d => d.stage !== "مرفوض مع سبب") || data.deals[0];
-    const activeRenewal = !activeDeal ? data.renewals[0] : null;
-    const entityType = activeDeal ? "deal" : activeRenewal ? "renewal" : null;
-    const entityId = activeDeal?.id || activeRenewal?.id;
-    if (!entityType || !entityId) return;
+    const target = pickQuickNoteTarget(data);
+    if (!target) return;
+    const { entityType, entityId, entityName } = target;
     setQuickNoteSaving(true);
     try {
       const authorName = user?.name || user?.email || "مستخدم";
       const created = await createFollowUpNote(entityType, entityId, quickNote.trim(), authorName);
       setData(prev => prev ? { ...prev, notes: [created, ...prev.notes] } : prev);
-      const entityName = activeDeal?.client_name || activeRenewal?.customer_name || "";
       const notified = new Set<string>();
       for (const name of mentionNames) {
         if (!quickNote.includes(`@${name}`)) continue;
@@ -887,15 +896,12 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
 
   async function saveQuickReminder() {
     if (!reminderDate || !reminderTime || !data) return;
-    const activeDeal = data.deals.find(d => d.stage !== "مرفوض مع سبب") || data.deals[0];
-    const activeRenewal = !activeDeal ? data.renewals[0] : null;
-    const entityType = activeDeal ? "deal" : activeRenewal ? "renewal" : null;
-    const entityId = activeDeal?.id || activeRenewal?.id;
-    if (!entityType || !entityId) return;
+    const target = pickQuickNoteTarget(data);
+    if (!target) return;
+    const { entityType, entityId, entityName } = target;
     setSavingReminder(true);
     try {
       const authorName = user?.name || user?.email || "مستخدم";
-      const entityName = activeDeal?.client_name || activeRenewal?.customer_name || "";
       await createReminder({
         entity_type: entityType,
         entity_id: entityId,
@@ -1380,7 +1386,7 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
               </div>
 
               {/* Quick follow-up note */}
-              {(data.deals.length > 0 || data.renewals.length > 0) && (
+              {pickQuickNoteTarget(data) && (
                 <div className="rounded-xl border border-border/50 bg-muted/20 p-3 space-y-2">
                   <div className="flex items-center gap-1.5">
                     <MessageSquarePlus className="w-3.5 h-3.5 text-cyan-400" />
