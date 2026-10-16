@@ -1045,7 +1045,7 @@ function MonthBarChart({ days, metric, onMetricChange, selectedDay, onSelect, mo
   const focus = days.find((d) => d.date === (hover ?? selectedDay));
   // رقم مختصر يدخل داخل العمود (الإيرادات: 1.2K)
   const short = (v: number) =>
-    !isRev ? String(v) : v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 1_000 ? `${Math.round(v / 1_000)}K` : String(v);
+    !isRev ? String(v) : v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 1_000 ? `${+(v / 1_000).toFixed(v < 10_000 ? 1 : 0)}K` : String(v);
   const SALES_H = 160, TICKETS_H = 90, HEADROOM = 0.82; // نترك مساحة فوق أطول عمود لرقم الإجمالي
 
   // على الجوال الرسم يتمرّر — نبدأ عند اليوم (أو اليوم المختار) بدل أول الشهر
@@ -1085,6 +1085,25 @@ function MonthBarChart({ days, metric, onMetricChange, selectedDay, onSelect, mo
             );
           })}
         </div>
+      </div>
+    );
+  }
+
+  // أرقام أيام الشهر تحت كل رسم
+  function renderDayLabels(anchor = false) {
+    return (
+      <div className="flex gap-1.5 mt-1">
+        {days.map((d) => (
+          <span
+            key={d.date}
+            data-chart-day={anchor ? d.date : undefined}
+            className={`flex-1 min-w-0 text-center text-[11px] tabular-nums ${
+              d.date === selectedDay ? "text-amber-300 font-bold" : d.date === todayStr ? "text-foreground font-bold" : "text-muted-foreground"
+            }`}
+          >
+            {d.day}
+          </span>
+        ))}
       </div>
     );
   }
@@ -1191,6 +1210,8 @@ function MonthBarChart({ days, metric, onMetricChange, selectedDay, onSelect, mo
             );
         })}
 
+        {renderDayLabels(true)}
+
         <p className="text-[11px] text-muted-foreground mt-3 mb-1 flex items-center gap-3">
           تذاكر الدعم
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: SERIES_COLORS.ticketsNew }} />جديدة</span>
@@ -1220,20 +1241,7 @@ function MonthBarChart({ days, metric, onMetricChange, selectedDay, onSelect, mo
             ) : null
         )}
 
-        {/* أرقام الأيام */}
-        <div className="flex gap-1.5 mt-1">
-          {days.map((d) => (
-            <span
-              key={d.date}
-              data-chart-day={d.date}
-              className={`flex-1 min-w-0 text-center text-[10px] tabular-nums ${
-                d.date === selectedDay ? "text-amber-300 font-bold" : d.date === todayStr ? "text-foreground font-bold" : "text-muted-foreground/70"
-              }`}
-            >
-              {d.day}
-            </span>
-          ))}
-        </div>
+        {renderDayLabels()}
       </div>
       </div>
     </div>
