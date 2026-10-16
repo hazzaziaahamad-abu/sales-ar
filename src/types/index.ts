@@ -45,11 +45,16 @@ export interface Ticket {
   assigned_agent_name?: string;
   open_date?: string;
   due_date?: string;
-  resolved_date?: string;
+  resolved_date?: string | null;
   response_time?: string;
   response_time_minutes?: number;
   month?: number;
   year?: number;
+  /** سبب آخر إعادة فتح للتذكرة بعد ما انحلّت */
+  reopen_reason?: string | null;
+  reopen_count?: number;
+  reopened_at?: string | null;
+  reopened_by?: string | null;
   created_at: string;
   updated_at: string;
 }

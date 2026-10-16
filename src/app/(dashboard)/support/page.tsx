@@ -5,6 +5,7 @@ import {
   fetchTickets, createTicket, updateTicket, deleteTicket,
   fetchEmployees, fetchActivityLogs,
   fetchQuoteCommitments, addQuoteCommitment, removeQuoteCommitment,
+  createFollowUpNote,
 } from "@/lib/supabase/db";
 import { useAuth } from "@/lib/auth-context";
 import { useTopbarControls } from "@/components/layout/topbar-context";
@@ -71,6 +72,7 @@ import {
   Share2,
   Loader2,
   Download,
+  RotateCcw,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -169,6 +171,11 @@ export default function SupportPage() {
   // Delete confirmation
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // إعادة فتح تذكرة محلولة — السبب إلزامي عشان الفريق يعالجها صح
+  const [reopenTicket, setReopenTicket] = useState<Ticket | null>(null);
+  const [reopenReason, setReopenReason] = useState("");
+  const [reopening, setReopening] = useState(false);
 
   // Month filter
   const { activeMonthIndex, filterCutoff } = useTopbarControls();
@@ -581,6 +588,37 @@ export default function SupportPage() {
       console.error(err);
     } finally {
       setSaving(false);
+    }
+  }
+
+  function openReopenDialog(ticket: Ticket) {
+    setReopenTicket(ticket);
+    setReopenReason("");
+  }
+
+  async function handleReopen() {
+    const reason = reopenReason.trim();
+    if (!reopenTicket || !reason) return;
+    setReopening(true);
+    try {
+      const by = authUser?.name || "";
+      const updated = await updateTicket(reopenTicket.id, {
+        status: "مفتوح",
+        resolved_date: null,
+        reopen_reason: reason,
+        reopen_count: (reopenTicket.reopen_count ?? 0) + 1,
+        reopened_at: new Date().toISOString(),
+        reopened_by: by || null,
+      });
+      setTickets((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      createFollowUpNote("ticket", updated.id, `🔁 إعادة فتح التذكرة\nالسبب: ${reason}`, by || "—").catch(console.error);
+      setReopenTicket(null);
+      setReopenReason("");
+      if (logsOpen) void loadActivityLogs();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setReopening(false);
     }
   }
 
@@ -1047,8 +1085,20 @@ export default function SupportPage() {
                       <p className="text-[12px] text-muted-foreground mt-0.5">{ticket.issue_subcategory}</p>
                     )}
                   </TableCell>
-                  <TableCell className="text-right text-xs max-w-[200px] truncate">
-                    {ticket.issue}
+                  <TableCell className="text-right text-xs max-w-[220px]">
+                    <div className="truncate">{ticket.issue}</div>
+                    {(ticket.reopen_count ?? 0) > 0 && (
+                      <div
+                        className="mt-1 flex items-start gap-1 text-[12px] text-amber"
+                        title={ticket.reopen_reason ? `سبب إعادة الفتح: ${ticket.reopen_reason}` : undefined}
+                      >
+                        <RotateCcw className="w-3 h-3 mt-0.5 shrink-0" />
+                        <span className="line-clamp-2 whitespace-normal">
+                          أُعيد فتحها{(ticket.reopen_count ?? 0) > 1 ? ` (${ticket.reopen_count})` : ""}
+                          {ticket.reopen_reason && ticket.status !== "محلول" ? `: ${ticket.reopen_reason}` : ""}
+                        </span>
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell className="text-right text-xs">
                     {ticket.due_date ? (
@@ -1081,6 +1131,17 @@ export default function SupportPage() {
                         entityId={ticket.id}
                         entityName={ticket.client_name}
                       />
+                      {ticket.status === "محلول" && (
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          onClick={() => openReopenDialog(ticket)}
+                          title="إعادة فتح"
+                          className="text-amber hover:text-amber"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon-xs"
@@ -1569,6 +1630,24 @@ export default function SupportPage() {
               </div>
             </div>
 
+            {(() => {
+              const t = editingId ? tickets.find((x) => x.id === editingId) : null;
+              if (!t?.reopen_reason) return null;
+              return (
+                <div className="md:col-span-2 flex items-start gap-2 rounded-lg border border-amber/30 bg-amber/10 px-3 py-2 text-xs text-amber">
+                  <RotateCcw className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <div>
+                    <div className="font-medium">
+                      أُعيد فتحها{(t.reopen_count ?? 0) > 1 ? ` ${t.reopen_count} مرات` : ""}
+                      {t.reopened_by ? ` — ${t.reopened_by}` : ""}
+                      {t.reopened_at ? ` · ${formatDate(t.reopened_at)}` : ""}
+                    </div>
+                    <div className="mt-0.5 whitespace-pre-wrap">السبب: {t.reopen_reason}</div>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* اسم العميل */}
             <div className="space-y-1.5">
               <Label htmlFor="client_name">اسم العميل</Label>
@@ -1758,6 +1837,43 @@ export default function SupportPage() {
             </Button>
             <Button onClick={handleSave} disabled={saving}>
               {saving ? "جاري الحفظ..." : editingId ? "حفظ التعديلات" : "إنشاء التذكرة"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* -------- Reopen Dialog -------- */}
+      <Dialog open={!!reopenTicket} onOpenChange={(o) => { if (!o) setReopenTicket(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>إعادة فتح التذكرة</DialogTitle>
+            <DialogDescription>
+              {reopenTicket ? `#${reopenTicket.ticket_number ?? ""} — ${reopenTicket.client_name}` : ""}
+              {" · "}اكتب سبب إعادة الفتح عشان الفريق يعرف وش اللي ما انحل ويعالجه صح.
+            </DialogDescription>
+          </DialogHeader>
+          {reopenTicket?.reopen_reason && (
+            <p className="text-[12px] text-muted-foreground">
+              سبب إعادة الفتح السابقة: {reopenTicket.reopen_reason}
+            </p>
+          )}
+          <div className="space-y-1.5">
+            <Label htmlFor="reopen_reason">سبب إعادة الفتح</Label>
+            <Textarea
+              id="reopen_reason"
+              value={reopenReason}
+              onChange={(e) => setReopenReason(e.target.value)}
+              placeholder="مثال: العميل تواصل والمشكلة رجعت بعد التحديث..."
+              rows={3}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReopenTicket(null)}>
+              إلغاء
+            </Button>
+            <Button onClick={handleReopen} disabled={reopening || !reopenReason.trim()}>
+              {reopening ? "جاري الحفظ..." : "إعادة فتح"}
             </Button>
           </DialogFooter>
         </DialogContent>
