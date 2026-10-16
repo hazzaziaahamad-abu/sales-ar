@@ -132,6 +132,12 @@ function FinanceContent() {
   const [savingStartup, setSavingStartup] = useState(false);
   const [startupCustomCat, setStartupCustomCat] = useState("");
 
+  /* فلتر شهر حالة التحصيل — التلقائي الشهر الحالي (بتوقيت الرياض)، أو "all" لكل الأشهر */
+  const [collMonth, setCollMonth] = useState(() => {
+    const today = saudiDateStr(new Date());
+    return `${Number(today.slice(0, 4))}-${Number(today.slice(5, 7))}`;
+  });
+
   const now = new Date();
   const selectedMonth = activeMonthIndex?.month ?? (now.getMonth() + 1);
   const selectedYear = activeMonthIndex?.year ?? now.getFullYear();
@@ -363,20 +369,50 @@ function FinanceContent() {
   /* Total revenue = sales + renewals */
   const totalRevenue = salesRevenue + renewalsRevenue;
 
-  /* ─── Collection rows: صفقات الشهر المكتملة + تجديداته المكتملة ─── */
+  /* ─── Collection rows: الصفقات المكتملة + التجديدات المكتملة في شهر الفلتر ─── */
   type CollectionStatus = "محصّل" | "معلق" | "متأخر";
+  const completedDealsAll = deals.filter(d => d.stage === "مكتملة");
+  const completedRenewalsAll = renewals.filter(r => r.status === "مكتمل");
+  const collMonthOptions = (() => {
+    const set = new Set<string>(collMonth === "all" ? [] : [collMonth]);
+    const add = (ym: YearMonth | null) => { if (ym) set.add(`${ym.y}-${ym.m}`); };
+    completedDealsAll.forEach(d => add(dealRevenueMonth(d)));
+    completedRenewalsAll.forEach(r => add(renewalRevenueMonth(r)));
+    return [...set]
+      .map(k => { const [y, m] = k.split("-").map(Number); return { key: k, y, m }; })
+      .sort((a, b) => b.y - a.y || b.m - a.m);
+  })();
+  const inCollMonth = (ym: YearMonth | null) => {
+    if (collMonth === "all") return true;
+    const [y, m] = collMonth.split("-").map(Number);
+    return inMonth(ym, m, y);
+  };
+  const collDeals = completedDealsAll.filter(d => inCollMonth(dealRevenueMonth(d)));
+  const collRenewals = completedRenewalsAll.filter(r => inCollMonth(renewalRevenueMonth(r)));
   const collectionRows: { key: string; id: string; kind: "office" | "support" | "renewal"; rep: string; source: string; name: string; value: number; product: string; date: string; status: CollectionStatus }[] = [
-    ...closedDeals.map(d => ({
+    ...collDeals.map(d => ({
       key: `d-${d.id}`, id: d.id, kind: (d.sales_type === "support" ? "support" : "office") as "office" | "support", rep: d.assigned_rep_name || "—", source: d.source || "—", name: d.client_name, value: d.deal_value,
       product: d.plan || "—", date: (d.deal_date || d.close_date || "").slice(0, 10),
       status: (d.collection_status || "معلق") as CollectionStatus,
     })),
-    ...monthRenewals.map(r => ({
+    ...collRenewals.map(r => ({
       key: `r-${r.id}`, id: r.id, kind: "renewal" as const, rep: r.assigned_rep || "—", source: "—", name: r.customer_name, value: r.plan_price,
       product: r.plan_name || "—", date: (r.payment_date || r.renewal_date || "").slice(0, 10),
       status: (r.collection_status || "معلق") as CollectionStatus,
     })),
   ].sort((a, b) => b.date.localeCompare(a.date));
+
+  /* إجمالي التحصيل لكل موظف */
+  const collectionByRep = Object.values(collectionRows.reduce((acc, r) => {
+    const e = acc[r.rep] ||= { rep: r.rep, count: 0, total: 0, collected: 0, pending: 0, overdue: 0 };
+    e.count++;
+    e.total += r.value;
+    if (r.status === "محصّل") e.collected += r.value;
+    else if (r.status === "متأخر") e.overdue += r.value;
+    else e.pending += r.value;
+    return acc;
+  }, {} as Record<string, { rep: string; count: number; total: number; collected: number; pending: number; overdue: number }>))
+    .sort((a, b) => b.total - a.total);
 
   /* ─── Expenses: خصم من الإيرادات + توزيع حسب البند ─── */
   const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
@@ -1099,15 +1135,29 @@ function FinanceContent() {
       </div>
 
       {/* ─── Collection Status Section ─── */}
-      {!loading && collectionRows.length > 0 && (
+      {!loading && (
         <div className="cc-card rounded-[14px] p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Banknote className="w-5 h-5 text-cc-green" />
-            <h3 className="text-sm font-bold text-foreground">حالة التحصيل — {MONTHS_AR[selectedMonth - 1]} {selectedYear}</h3>
+          <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Banknote className="w-5 h-5 text-cc-green" />
+              <h3 className="text-sm font-bold text-foreground">حالة التحصيل</h3>
+            </div>
+            <select
+              value={collMonth}
+              onChange={(e) => setCollMonth(e.target.value)}
+              className="bg-white/[0.03] border border-white/[0.08] rounded-lg px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-cyan/40"
+            >
+              <option value="all">كل الأشهر</option>
+              {collMonthOptions.map(o => (
+                <option key={o.key} value={o.key}>{MONTHS_AR[o.m - 1]} {o.y}</option>
+              ))}
+            </select>
           </div>
 
           {/* Status summary pills */}
-          {(() => {
+          {collectionRows.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">لا توجد صفقات أو تجديدات مكتملة في هذا الشهر</p>
+          ) : (() => {
             const collected = collectionRows.filter(r => r.status === "محصّل");
             const pending = collectionRows.filter(r => r.status === "معلق");
             const overdue = collectionRows.filter(r => r.status === "متأخر");
@@ -1151,6 +1201,39 @@ function FinanceContent() {
                     </div>
                   );
                 })()}
+
+                {/* إجمالي التحصيل لكل موظف */}
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground mb-2">إجمالي التحصيل لكل موظف</p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">الموظف</th>
+                          <th className="text-center py-2 px-3 text-xs font-semibold text-muted-foreground">العدد</th>
+                          <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">الإجمالي</th>
+                          <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">محصّل</th>
+                          <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">معلق</th>
+                          <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">متأخر</th>
+                          <th className="text-center py-2 px-3 text-xs font-semibold text-muted-foreground">نسبة التحصيل</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {collectionByRep.map(e => (
+                          <tr key={e.rep} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
+                            <td className="py-2.5 px-3 text-foreground font-medium whitespace-nowrap">{e.rep === "—" ? "بدون موظف" : e.rep}</td>
+                            <td className="py-2.5 px-3 text-center text-muted-foreground">{e.count}</td>
+                            <td className="py-2.5 px-3 text-cyan font-semibold whitespace-nowrap">{formatMoney(e.total)}</td>
+                            <td className="py-2.5 px-3 text-cc-green whitespace-nowrap">{formatMoney(e.collected)}</td>
+                            <td className="py-2.5 px-3 text-amber whitespace-nowrap">{formatMoney(e.pending)}</td>
+                            <td className="py-2.5 px-3 text-cc-red whitespace-nowrap">{formatMoney(e.overdue)}</td>
+                            <td className="py-2.5 px-3 text-center font-bold text-cc-green">{e.total > 0 ? Math.round((e.collected / e.total) * 100) : 0}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
 
                 {/* Deals table with status toggle */}
                 <div className="overflow-x-auto">
