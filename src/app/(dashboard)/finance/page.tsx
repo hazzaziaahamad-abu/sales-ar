@@ -772,7 +772,7 @@ function FinanceContent() {
                       const expPct = totalExp > 0 ? Math.round((exp.amount / totalExp) * 100) : 0;
 
                       return (
-                        <div key={exp.id} className="group relative bg-white/[0.02] rounded-[14px] p-3 border border-white/[0.06] hover:border-white/[0.1] transition-colors">
+                        <div key={exp.id} onClick={() => openEditDialog(exp)} className="group relative cursor-pointer bg-white/[0.02] rounded-[14px] p-3 border border-white/[0.06] hover:border-white/[0.1] transition-colors">
                           <div className="flex items-center justify-between mb-1.5">
                             <div className="flex items-center gap-2 flex-1 min-w-0">
                               <span className={`text-xs font-bold ${textColor} w-8 shrink-0`}>#{idx + 1}</span>
@@ -786,16 +786,18 @@ function FinanceContent() {
                               <span className={`text-sm font-bold ${textColor}`}>{formatMoney(exp.amount)}</span>
                               <span className="text-[12px] text-muted-foreground">{expPct}%</span>
                               <button
-                                onClick={() => openEditDialog(exp)}
-                                className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-cyan/10 text-muted-foreground hover:text-cyan transition-all"
+                                onClick={(e) => { e.stopPropagation(); openEditDialog(exp); }}
+                                aria-label="تعديل المصروف"
+                                className="sm:opacity-0 sm:group-hover:opacity-100 p-1.5 rounded-lg hover:bg-cyan/10 text-muted-foreground hover:text-cyan transition-all"
                               >
-                                <Pencil className="w-3.5 h-3.5" />
+                                <Pencil className="w-4 h-4" />
                               </button>
                               <button
-                                onClick={() => handleDeleteExpense(exp.id)}
-                                className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-cc-red/10 text-muted-foreground hover:text-cc-red transition-all"
+                                onClick={(e) => { e.stopPropagation(); if (confirm(`حذف مصروف "${exp.category}" بقيمة ${formatMoney(exp.amount)}؟`)) handleDeleteExpense(exp.id); }}
+                                aria-label="حذف المصروف"
+                                className="sm:opacity-0 sm:group-hover:opacity-100 p-1.5 rounded-lg hover:bg-cc-red/10 text-muted-foreground hover:text-cc-red transition-all"
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                <Trash2 className="w-4 h-4" />
                               </button>
                             </div>
                           </div>
