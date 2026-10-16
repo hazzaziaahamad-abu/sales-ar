@@ -5,6 +5,8 @@ import type { Deal, Renewal, MonthlyExpense, MonthlyBudget, StartupCost } from "
 import { fetchDeals, fetchRenewals, fetchMonthlyExpenses, createExpense, deleteExpense, updateExpense, updateDeal, fetchMonthlyBudget, upsertBudgetItem, deleteBudgetItem, copyBudgetFromPreviousMonth, fetchStartupCosts, createStartupCost, deleteStartupCost, fetchEmployees } from "@/lib/supabase/db";
 import { useAuth } from "@/lib/auth-context";
 import { useTopbarControls } from "@/components/layout/topbar-context";
+import { SalesConfirmations } from "@/components/daily-huddle/sales-confirmations";
+import { useHuddleManagers } from "@/lib/huddle-managers";
 import { MONTHS_AR, SOURCE_COLORS } from "@/lib/utils/constants";
 import { formatMoney, formatMoneyFull, saudiDateStr } from "@/lib/utils/format";
 import { StatCard } from "@/components/ui/stat-card";
@@ -42,6 +44,7 @@ import {
   TrendingDown,
   CalendarClock,
   Users,
+  BadgeCheck,
 } from "lucide-react";
 
 /* CSS variable color → hex for donut chart */
@@ -59,9 +62,18 @@ const DEFAULT_CATEGORIES = ["رواتب", "اتصالات", "استضافة", "�
 
 const MONTHLY_TARGET = 17500;
 
+const TABS = [
+  { key: "overview", label: "النظرة المالية", icon: BarChart3 },
+  { key: "confirmations", label: "تأكيدات المبيعات", icon: BadgeCheck },
+] as const;
+type TabKey = (typeof TABS)[number]["key"];
+
 export default function FinancePage() {
   const { activeOrgId: orgId } = useAuth();
   const { activeMonthIndex } = useTopbarControls();
+  // تأكيد/رفض المبيعات لمدراء المتابعة اليومية (والسوبر أدمن) فقط
+  const { isManager } = useHuddleManagers();
+  const [tab, setTab] = useState<TabKey>("overview");
   const [deals, setDeals] = useState<Deal[]>([]);
   const [renewals, setRenewals] = useState<Renewal[]>([]);
   const [expenses, setExpenses] = useState<MonthlyExpense[]>([]);
@@ -466,11 +478,31 @@ export default function FinancePage() {
         <div>
           <h1 className="text-lg font-bold text-foreground">المالية</h1>
           <p className="text-xs text-muted-foreground">
-            مراقبة المؤشرات المالية الرئيسية
+            مراقبة المؤشرات المالية الرئيسية · تأكيدات المبيعات
           </p>
         </div>
       </div>
 
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+        {TABS.map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={`flex items-center gap-2 shrink-0 rounded-[14px] px-4 py-2.5 text-sm font-bold transition-all border ${
+              tab === key
+                ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+                : "bg-white/[0.03] text-muted-foreground hover:text-foreground border-white/[0.06]"
+            }`}
+          >
+            <Icon className="w-4 h-4" />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "confirmations" && <SalesConfirmations canConfirm={isManager} />}
+
+      {tab === "overview" && (<>
       {/* KPI cards — 6 metrics */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {loading ? (
@@ -1535,6 +1567,7 @@ export default function FinancePage() {
           </>
         )}
       </div>
+      </>)}
 
       {/* ─── Add Expense Dialog ─── */}
       <Dialog open={expenseDialog} onOpenChange={(open) => { setExpenseDialog(open); if (!open) setCustomCategory(""); }}>

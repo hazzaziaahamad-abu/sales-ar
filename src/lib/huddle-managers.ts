@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { getEditableContent, saveEditableContent } from "@/lib/supabase/db";
 
-// مستخدمون يملكون صلاحيات المدير داخل «المتابعة اليومية» فقط
-// (تقييم الجودة، تعديل أرقام الفريق، تأكيد/رفض المبيعات).
+// مستخدمون يملكون صلاحيات المدير داخل «المتابعة اليومية» (وتأكيد المبيعات في «المالية»)
+// (تقييم الجودة، تعديل أرقام الفريق، تأكيد/رفض المبيعات في قسم المالية).
 // السوبر أدمن مدير دائماً، وهو الوحيد اللي يعدّل القائمة.
 const KEY = "huddle_managers";
 

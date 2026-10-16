@@ -11,7 +11,6 @@ import {
 import { todayLocal, formatMoneyFull } from "@/lib/utils/format";
 import { SecretaryView } from "@/components/secretary/secretary-view";
 import { RecentUpdatesView } from "@/components/recent-updates/recent-updates-view";
-import { SalesConfirmations } from "@/components/daily-huddle/sales-confirmations";
 import { ChallengesHub } from "@/components/daily-huddle/challenges-hub";
 import { WorkTicketsBoard } from "@/components/work-tickets/work-tickets-board";
 import { MeetingsBoard } from "@/components/meetings/meetings-board";
@@ -25,7 +24,7 @@ import { HuddleManagersButton } from "@/components/daily-huddle/huddle-managers-
 import { useHuddleManagers } from "@/lib/huddle-managers";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CalendarClock, Users, Trophy, Save, Check, Settings2, Compass, HeartPulse, Activity, BadgeCheck, ShieldQuestion, Star, ClipboardCheck, Sprout } from "lucide-react";
+import { CalendarClock, Users, Trophy, Save, Check, Settings2, Compass, HeartPulse, Activity, ShieldQuestion, Star, ClipboardCheck, Sprout } from "lucide-react";
 
 // النموذج: اجتماع يومي قصير (Daily Huddle) + لوحة نتائج بمقاييس الأفعال (4DX).
 // مؤشرات كل موظف تُقرأ تلقائياً من اللوحة (سجل المتابعة، الصفقات، التذاكر، التجديدات) — راجع lib/huddle-kpis.
@@ -576,7 +575,6 @@ const TABS = [
   { key: "team", label: "الفريق اليوم", icon: Users },
   { key: "quality", label: "جودة الاستهداف", icon: Star },
   { key: "compass", label: "بوصلة اليوم", icon: Compass },
-  { key: "confirmations", label: "تأكيدات المبيعات", icon: BadgeCheck },
   { key: "verify", label: "طلبات التحقق", icon: ClipboardCheck },
   { key: "health", label: "صحة الأقسام", icon: HeartPulse },
   { key: "activity", label: "نشاط الفريق", icon: Activity },
@@ -585,7 +583,7 @@ const TABS = [
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
-const MANAL_ONLY_TABS: TabKey[] = ["compass", "confirmations", "health", "activity", "challenges", "ideas"];
+const MANAL_ONLY_TABS: TabKey[] = ["compass", "health", "activity", "challenges", "ideas"];
 
 export default function DailyHuddlePage() {
   return (
@@ -599,7 +597,7 @@ function DailyHuddleTabs() {
   // ?tab=verify — رابط مباشر لتبويب (مثلاً من رسالة واتساب لطلب تحقق)
   const searchParams = useSearchParams();
   const { user, isImpersonating } = useAuth();
-  // «البذور» و«بوصلة اليوم» و«تأكيدات المبيعات» و«صحة الأقسام» و«نشاط الفريق» و«التحديات والطلبات والتطويرات» للمدير ومنال فقط
+  // «البذور» و«بوصلة اليوم» و«صحة الأقسام» و«نشاط الفريق» و«التحديات والطلبات والتطويرات» للمدير ومنال فقط
   const tabs = TABS.filter((t) => !MANAL_ONLY_TABS.includes(t.key) || canUseIdeas(user));
   const initialTab = tabs.find((t) => t.key === searchParams.get("tab"))?.key ?? "team";
   const [tab, setTab] = useState<TabKey>(initialTab);
@@ -631,7 +629,7 @@ function DailyHuddleTabs() {
         </div>
         <div>
           <h1 className="text-lg font-bold text-foreground">المتابعة اليومية</h1>
-          <p className="text-xs text-muted-foreground">الفريق · جودة الاستهداف · طلبات التحقق{canUseIdeas(user) ? " · تأكيدات المبيعات · بوصلة اليوم · صحة الأقسام · نشاط الفريق · التحديات والطلبات" : ""}</p>
+          <p className="text-xs text-muted-foreground">الفريق · جودة الاستهداف · طلبات التحقق{canUseIdeas(user) ? " · بوصلة اليوم · صحة الأقسام · نشاط الفريق · التحديات والطلبات" : ""}</p>
         </div>
         {huddleManagers.isOwner && (
           <div className="mr-auto">
@@ -663,7 +661,6 @@ function DailyHuddleTabs() {
       {tab === "team" && <TeamTodayTab isManager={isManager} />}
       {tab === "quality" && <TargetingQualityTab isManager={isManager} />}
       {tab === "compass" && canUseIdeas(user) && <SecretaryView embedded sections={["compass", "yesterday", "priorities", "tasks", "quickTasks"]} />}
-      {tab === "confirmations" && canUseIdeas(user) && <SalesConfirmations canConfirm={isManager} />}
       {tab === "verify" && <VerificationsBoard onPendingChange={setVerifyPending} />}
       {tab === "health" && canUseIdeas(user) && <SecretaryView embedded sections={["hotCold", "supportHealth", "renewalHealth"]} />}
       {tab === "activity" && canUseIdeas(user) && <RecentUpdatesView embedded tabs={["updates", "log"]} />}
