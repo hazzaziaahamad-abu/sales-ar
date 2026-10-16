@@ -1015,7 +1015,7 @@ function DayStrip({ days, selectedDay, onSelect }: {
 }
 
 // ألوان ثابتة لكل قسم (نفس ألوان كروت الملخص) — متحقق منها للتباين وعمى الألوان على الخلفيتين
-const SERIES_COLORS = { office: "#059669", support: "#ea580c", renewals: "#0284c7", tickets: "#f43f5e" };
+const SERIES_COLORS = { office: "#059669", support: "#ea580c", renewals: "#0284c7", tickets: "#f43f5e", ticketsNew: "#8b5cf6" };
 
 function MonthBarChart({ days, metric, onMetricChange, selectedDay, onSelect, monthLabel, salesMerged }: {
   days: MonthDayStat[];
@@ -1038,7 +1038,7 @@ function MonthBarChart({ days, metric, onMetricChange, selectedDay, onSelect, mo
   const fmt = (v: number) => (isRev ? formatMoneyFull(v) : String(v));
   const salesTotal = (d: MonthDayStat) => series.reduce((s, x) => s + x.get(d), 0);
   const maxSales = Math.max(1, ...days.map(salesTotal));
-  const maxTickets = Math.max(1, ...days.map((d) => d.ticketsResolved));
+  const maxTickets = Math.max(1, ...days.map((d) => Math.max(d.ticketsResolved, d.ticketsNew)));
   const monthTotals = series.map((x) => ({ ...x, total: days.reduce((s, d) => s + x.get(d), 0) }));
   const ticketsTotal = days.reduce((s, d) => s + d.ticketsResolved, 0);
   const ticketsNewTotal = days.reduce((s, d) => s + d.ticketsNew, 0);
@@ -1046,7 +1046,7 @@ function MonthBarChart({ days, metric, onMetricChange, selectedDay, onSelect, mo
   // رقم مختصر يدخل داخل العمود (الإيرادات: 1.2K)
   const short = (v: number) =>
     !isRev ? String(v) : v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 1_000 ? `${Math.round(v / 1_000)}K` : String(v);
-  const SALES_H = 160, TICKETS_H = 72, HEADROOM = 0.82; // نترك مساحة فوق أطول عمود لرقم الإجمالي
+  const SALES_H = 160, TICKETS_H = 90, HEADROOM = 0.82; // نترك مساحة فوق أطول عمود لرقم الإجمالي
 
   // على الجوال الرسم يتمرّر — نبدأ عند اليوم (أو اليوم المختار) بدل أول الشهر
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -1063,7 +1063,7 @@ function MonthBarChart({ days, metric, onMetricChange, selectedDay, onSelect, mo
     return (
       <div className="relative" style={{ height }}>
         <div className="absolute inset-x-0 bottom-0 border-t border-white/[0.08]" />
-        <div className="absolute inset-0 flex items-end gap-[2px]">
+        <div className="absolute inset-0 flex items-end gap-1.5">
           {days.map((d) => {
             const dim = (selectedDay || hover) && d.date !== selectedDay && d.date !== hover;
             return (
@@ -1123,9 +1123,12 @@ function MonthBarChart({ days, metric, onMetricChange, selectedDay, onSelect, mo
           </span>
         ))}
         <span className="flex items-center gap-1.5 text-muted-foreground">
+          <span className="w-2.5 h-2.5 rounded-sm" style={{ background: SERIES_COLORS.ticketsNew }} />
+          تذاكر جديدة: <span className="text-foreground font-bold tabular-nums">{ticketsNewTotal}</span>
+        </span>
+        <span className="flex items-center gap-1.5 text-muted-foreground">
           <span className="w-2.5 h-2.5 rounded-sm" style={{ background: SERIES_COLORS.tickets }} />
           تذاكر محلولة: <span className="text-foreground font-bold tabular-nums">{ticketsTotal}</span>
-          <span className="text-muted-foreground/70">(جديدة {ticketsNewTotal})</span>
         </span>
       </div>
 
@@ -1141,9 +1144,12 @@ function MonthBarChart({ days, metric, onMetricChange, selectedDay, onSelect, mo
               </span>
             ))}
             <span className="flex items-center gap-1 text-muted-foreground">
+              <span className="w-2 h-2 rounded-sm" style={{ background: SERIES_COLORS.ticketsNew }} />
+              تذاكر جديدة <span className="text-foreground font-bold tabular-nums">{focus.ticketsNew}</span>
+            </span>
+            <span className="flex items-center gap-1 text-muted-foreground">
               <span className="w-2 h-2 rounded-sm" style={{ background: SERIES_COLORS.tickets }} />
               تذاكر محلولة <span className="text-foreground font-bold tabular-nums">{focus.ticketsResolved}</span>
-              <span className="text-muted-foreground/70">/ جديدة {focus.ticketsNew}</span>
             </span>
             <span className="text-muted-foreground">الإيرادات <span className="text-foreground font-bold">{formatMoneyFull(focus.totalRev)}</span></span>
           </div>
@@ -1185,21 +1191,37 @@ function MonthBarChart({ days, metric, onMetricChange, selectedDay, onSelect, mo
             );
         })}
 
-        <p className="text-[11px] text-muted-foreground mt-3 mb-1">تذاكر الدعم المحلولة</p>
+        <p className="text-[11px] text-muted-foreground mt-3 mb-1 flex items-center gap-3">
+          تذاكر الدعم
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: SERIES_COLORS.ticketsNew }} />جديدة</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: SERIES_COLORS.tickets }} />محلولة</span>
+        </p>
         {renderBars(TICKETS_H, (d) =>
-            d.ticketsResolved > 0 ? (
-              <>
-                <span className="block text-center text-[11px] font-bold text-foreground tabular-nums leading-4 mb-0.5">{d.ticketsResolved}</span>
-                <div
-                  className="w-full rounded-t-[4px]"
-                  style={{ height: Math.max(4, (d.ticketsResolved / maxTickets) * TICKETS_H * 0.7), background: SERIES_COLORS.tickets }}
-                />
-              </>
+            d.ticketsNew > 0 || d.ticketsResolved > 0 ? (
+              // عمودين جنب بعض: جديدة (يمين) ومحلولة (يسار)
+              <div className="w-full flex items-end gap-px">
+                {([
+                  { v: d.ticketsNew, color: SERIES_COLORS.ticketsNew },
+                  { v: d.ticketsResolved, color: SERIES_COLORS.tickets },
+                ]).map((b, i) => (
+                  <div key={i} className="flex-1 min-w-0 flex flex-col items-center justify-end">
+                    {b.v > 0 && (
+                      <>
+                        <span className="text-[10px] font-bold text-foreground tabular-nums leading-4">{b.v}</span>
+                        <div
+                          className="w-full rounded-t-[3px]"
+                          style={{ height: Math.max(3, (b.v / maxTickets) * TICKETS_H * 0.7), background: b.color }}
+                        />
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
             ) : null
         )}
 
         {/* أرقام الأيام */}
-        <div className="flex gap-[2px] mt-1">
+        <div className="flex gap-1.5 mt-1">
           {days.map((d) => (
             <span
               key={d.date}
