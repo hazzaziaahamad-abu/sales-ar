@@ -1017,13 +1017,16 @@ function DayStrip({ days, selectedDay, onSelect }: {
 // ألوان ثابتة لكل قسم (نفس ألوان كروت الملخص) — متحقق منها للتباين وعمى الألوان على الخلفيتين
 const SERIES_COLORS = { office: "#059669", support: "#ea580c", renewals: "#0284c7", tickets: "#f43f5e", ticketsNew: "#8b5cf6" };
 
-function MonthBarChart({ days, metric, onMetricChange, selectedDay, onSelect, monthLabel, salesMerged }: {
+function MonthBarChart({ days, metric, onMetricChange, selectedDay, onSelect, monthLabel, salesMerged, month, year, onMonthChange }: {
   days: MonthDayStat[];
   metric: "count" | "revenue";
   onMetricChange: (m: "count" | "revenue") => void;
   selectedDay: string | null;
   onSelect: (date: string) => void;
   monthLabel: string;
+  month: number;
+  year: number;
+  onMonthChange: (month: number, year: number) => void;
   salesMerged: boolean;
 }) {
   const [hover, setHover] = useState<string | null>(null);
@@ -1107,8 +1110,37 @@ function MonthBarChart({ days, metric, onMetricChange, selectedDay, onSelect, mo
     );
   }
 
+  // آخر 12 شهر (الأحدث يمين) لاختيار الشهر المعروض
+  const now = new Date();
+  const monthOptions = Array.from({ length: 12 }, (_, i) => {
+    const dt = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    return {
+      m: dt.getMonth() + 1,
+      y: dt.getFullYear(),
+      label: i === 0 ? "الشهر الحالي" : i === 1 ? "الشهر الماضي"
+        : dt.toLocaleDateString("ar-SA-u-ca-gregory", { month: "long", ...(dt.getFullYear() !== now.getFullYear() ? { year: "numeric" } : {}) }),
+    };
+  });
+
   return (
     <div className="mt-4 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+      <div className="flex gap-1.5 overflow-x-auto pb-2 mb-2 -mx-1 px-1">
+        {monthOptions.map((o) => {
+          const on = o.m === month && o.y === year;
+          return (
+            <button
+              key={`${o.y}-${o.m}`}
+              type="button"
+              onClick={() => onMonthChange(o.m, o.y)}
+              className={`shrink-0 text-[12px] px-3 py-1 rounded-full border transition-colors ${
+                on ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-300 font-bold" : "border-white/[0.08] text-muted-foreground hover:text-foreground hover:bg-white/[0.04]"
+              }`}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
       <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
         <p className="text-[13px] font-bold text-muted-foreground flex items-center gap-1.5">
           <BarChart3 className="w-3 h-3" /> أداء الشهر يوم بيوم ({monthLabel})
@@ -2252,6 +2284,9 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
                 onSelect={(d) => setSelectedDay(selectedDay === d ? null : d)}
                 monthLabel={new Date(selectedYear, selectedMonth - 1).toLocaleDateString("ar-SA-u-ca-gregory", { month: "long", year: "numeric" })}
                 salesMerged={salesMerged}
+                month={selectedMonth}
+                year={selectedYear}
+                onMonthChange={(m, y) => { setSelectedMonth(m); setSelectedYear(y); }}
               />
             </div>
 
