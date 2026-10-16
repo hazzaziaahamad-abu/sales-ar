@@ -78,6 +78,10 @@ function yearMonthOf(s?: string | null): YearMonth | null {
   const day = s.length === 10 ? s : saudiDateStr(new Date(s));
   return { y: Number(day.slice(0, 4)), m: Number(day.slice(5, 7)) };
 }
+function dayOf(s?: string | null): string {
+  if (!s) return "";
+  return s.length === 10 ? s : saudiDateStr(new Date(s));
+}
 function dealRevenueMonth(d: Deal): YearMonth | null {
   return yearMonthOf(d.close_date) ?? (d.month && d.year ? { m: d.month, y: d.year } : null);
 }
@@ -392,12 +396,12 @@ function FinanceContent() {
   const collectionRows: { key: string; id: string; kind: "office" | "support" | "renewal"; rep: string; source: string; name: string; value: number; product: string; date: string; status: CollectionStatus }[] = [
     ...collDeals.map(d => ({
       key: `d-${d.id}`, id: d.id, kind: (d.sales_type === "support" ? "support" : "office") as "office" | "support", rep: d.assigned_rep_name || "—", source: d.source || "—", name: d.client_name, value: d.deal_value,
-      product: d.plan || "—", date: (d.deal_date || d.close_date || "").slice(0, 10),
+      product: d.plan || "—", date: dayOf(d.close_date || d.deal_date),
       status: (d.collection_status || "معلق") as CollectionStatus,
     })),
     ...collRenewals.map(r => ({
       key: `r-${r.id}`, id: r.id, kind: "renewal" as const, rep: r.assigned_rep || "—", source: "—", name: r.customer_name, value: r.plan_price,
-      product: r.plan_name || "—", date: (r.payment_date || r.renewal_date || "").slice(0, 10),
+      product: r.plan_name || "—", date: dayOf(r.payment_date || r.updated_at || r.renewal_date),
       status: (r.collection_status || "معلق") as CollectionStatus,
     })),
   ].sort((a, b) => b.date.localeCompare(a.date));
@@ -1244,7 +1248,7 @@ function FinanceContent() {
                         <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">النوع</th>
                         <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">الموظف</th>
                         <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">المصدر</th>
-                        <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">تاريخ الصفقة</th>
+                        <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">تاريخ الاكتمال</th>
                         <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">القيمة</th>
                         <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">المنتج</th>
                         <th className="text-center py-2 px-3 text-xs font-semibold text-muted-foreground">حالة التحصيل</th>
