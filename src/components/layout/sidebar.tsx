@@ -118,7 +118,8 @@ export const NAV_ITEMS = [
   { label: "تقرير الأداء", href: "/registration-gaps", slug: "registration-gaps", icon: BarChart2, color: "rose", group: "تقرير الأداء" },
   { label: "الباقات", href: "/packages", slug: "packages", icon: Package, color: "violet", group: "النظام" },
   { label: "الأكاديمية", href: "/academy", slug: "academy", icon: GraduationCap, color: "amber", group: "النظام" },
-  { label: "المالية", href: "/finance", slug: "finance", icon: Banknote, color: "lime", group: "النظام" },
+  // للسوبر أدمن فقط (مصروفات + تأكيدات المبيعات)
+  { label: "المالية", href: "/finance", slug: "finance", icon: Banknote, color: "lime", group: "النظام", superOnly: true },
   { label: "رفع الملفات", href: "/upload", slug: "upload", icon: Upload, color: "slate", group: "النظام" },
   { label: "الحوكمة", href: "/governance", slug: "governance", icon: ShieldCheck, color: "indigo", group: "النظام" },
   { label: "إدارة المستخدمين", href: "/users", slug: "users", icon: Shield, color: "red", group: "النظام" },

@@ -33,6 +33,8 @@ import { PushRefresher } from "@/components/push/push-card";
 import { isFocusActive, useFocusActive } from "@/lib/focus-session";
 
 const ALWAYS_ALLOWED_SLUGS = ["urgent-followup", "mentions"];
+// صفحات للسوبر أدمن فقط حتى لو الصلاحية مفعّلة للموظف
+const SUPER_ONLY_SLUGS = ["finance"];
 
 const PAGE_SLUG_MAP: Record<string, string> = {
   "/dashboard": "dashboard",
@@ -294,6 +296,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!loading && user && !user.isSuperAdmin) {
       const slug = PAGE_SLUG_MAP[pathname] || pathname.split("/")[1];
+      if (slug && SUPER_ONLY_SLUGS.includes(slug)) {
+        router.replace(`/${user.allowedPages[0] || "dashboard"}`);
+        return;
+      }
       // صفحات مفتوحة لكل الموظفين بدون صلاحية
       if (slug && ALWAYS_ALLOWED_SLUGS.includes(slug)) return;
       if (slug && !user.allowedPages.includes(slug)) {

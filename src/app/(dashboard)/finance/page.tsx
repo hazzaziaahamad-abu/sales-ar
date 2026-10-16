@@ -64,11 +64,19 @@ const MONTHLY_TARGET = 17500;
 
 const TABS = [
   { key: "overview", label: "النظرة المالية", icon: BarChart3 },
+  { key: "expenses", label: "المصروفات", icon: Receipt },
   { key: "confirmations", label: "تأكيدات المبيعات", icon: BadgeCheck },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
+// المالية للسوبر أدمن فقط (ومو أثناء «الدخول كموظف»)
 export default function FinancePage() {
+  const { user, isImpersonating } = useAuth();
+  if (!user?.isSuperAdmin || isImpersonating) return null;
+  return <FinanceContent />;
+}
+
+function FinanceContent() {
   const { activeOrgId: orgId } = useAuth();
   const { activeMonthIndex } = useTopbarControls();
   // تأكيد/رفض المبيعات لمدراء المتابعة اليومية (والسوبر أدمن) فقط
@@ -331,6 +339,22 @@ export default function FinancePage() {
 
   /* Total revenue = sales + renewals */
   const totalRevenue = salesRevenue + renewalsRevenue;
+
+  /* ─── Expenses: خصم من الإيرادات + توزيع حسب البند ─── */
+  const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
+  const remainingRevenue = totalRevenue - totalExpenses;
+  const EXPENSE_COLORS = ["#EF4444", "#F59E0B", "#8B5CF6", "#00D4FF", "#10B981", "#EC4899", "#3B82F6", "#14B8A6", "#F97316", "#64748B"];
+  const expenseByCategory = (() => {
+    const map: Record<string, { value: number; count: number }> = {};
+    expenses.forEach((e) => {
+      map[e.category] = map[e.category] || { value: 0, count: 0 };
+      map[e.category].value += e.amount;
+      map[e.category].count += 1;
+    });
+    return Object.entries(map)
+      .sort((a, b) => b[1].value - a[1].value)
+      .map(([category, v], i) => ({ category, ...v, color: EXPENSE_COLORS[i % EXPENSE_COLORS.length] }));
+  })();
   const avgDealValue = closedDeals.length > 0 ? Math.round(salesRevenue / closedDeals.length) : 0;
 
   /* MRR: selected month total revenue */
@@ -478,7 +502,7 @@ export default function FinancePage() {
         <div>
           <h1 className="text-lg font-bold text-foreground">المالية</h1>
           <p className="text-xs text-muted-foreground">
-            مراقبة المؤشرات المالية الرئيسية · تأكيدات المبيعات
+            مراقبة المؤشرات المالية الرئيسية · المصروفات · تأكيدات المبيعات
           </p>
         </div>
       </div>
@@ -501,6 +525,217 @@ export default function FinancePage() {
       </div>
 
       {tab === "confirmations" && <SalesConfirmations canConfirm={isManager} />}
+
+      {/* ─── Expenses tab: بنود المصروفات + الخصم من الإيرادات ─── */}
+      {tab === "expenses" && (
+        <div className="space-y-6">
+          {/* الإيرادات − المصروفات = الإيراد المتبقي */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {loading ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="cc-card rounded-[14px] p-4">
+                  <Skeleton className="h-7 w-24 mb-2" />
+                  <Skeleton className="h-3 w-20" />
+                </div>
+              ))
+            ) : (
+              <>
+                <StatCard
+                  value={formatMoneyFull(totalRevenue)}
+                  label={`إجمالي الإيرادات — ${MONTHS_AR[selectedMonth - 1]}`}
+                  color="green"
+                  icon={<TrendingUp className="w-4 h-4 text-cc-green" />}
+                />
+                <StatCard
+                  value={formatMoneyFull(totalExpenses)}
+                  label={`إجمالي المصروفات (${expenses.length})`}
+                  color="red"
+                  icon={<Receipt className="w-4 h-4 text-cc-red" />}
+                />
+                <StatCard
+                  value={formatMoneyFull(remainingRevenue)}
+                  label={remainingRevenue >= 0 ? "الإيراد المتبقي بعد المصروفات" : "عجز: المصروفات أكبر من الإيرادات"}
+                  color={remainingRevenue >= 0 ? "cyan" : "red"}
+                  icon={<Banknote className={`w-4 h-4 ${remainingRevenue >= 0 ? "text-cyan" : "text-cc-red"}`} />}
+                />
+              </>
+            )}
+          </div>
+
+          {/* وين نصرف: رسم بياني حسب البند */}
+          {!loading && expenses.length > 0 && (
+            <div className="cc-card rounded-[14px] p-5">
+              <div className="flex items-center gap-2 mb-5">
+                <BarChart3 className="w-5 h-5 text-cc-purple" />
+                <h3 className="text-sm font-bold text-foreground">وين نصرف؟ المصروفات حسب البند</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-6 items-center">
+                <DonutChart
+                  segments={expenseByCategory.map((c) => ({ label: c.category, value: c.value, color: c.color }))}
+                  centerValue={formatMoney(totalExpenses)}
+                  centerLabel="المصروفات"
+                />
+                <div className="space-y-3">
+                  {expenseByCategory.map((c) => {
+                    const pctOfExpenses = totalExpenses > 0 ? Math.round((c.value / totalExpenses) * 100) : 0;
+                    const pctOfRevenue = totalRevenue > 0 ? Math.round((c.value / totalRevenue) * 100) : null;
+                    return (
+                      <button
+                        key={c.category}
+                        onClick={() => setCategoryFilter(categoryFilter === c.category ? null : c.category)}
+                        className={`w-full text-right rounded-lg p-2 -m-2 transition-colors ${categoryFilter === c.category ? "bg-white/[0.05]" : "hover:bg-white/[0.03]"}`}
+                      >
+                        <div className="flex items-center justify-between mb-1.5 gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: c.color }} />
+                            <span className="text-sm font-semibold text-foreground truncate">{c.category}</span>
+                            <span className="text-[12px] text-muted-foreground">({c.count})</span>
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0">
+                            <span className="text-sm font-bold" style={{ color: c.color }}>{formatMoneyFull(c.value)}</span>
+                            <span className="text-[12px] text-muted-foreground w-9 text-left">{pctOfExpenses}%</span>
+                          </div>
+                        </div>
+                        <div className="h-2 bg-white/[0.04] rounded-full overflow-hidden">
+                          <div className="h-full rounded-full transition-all" style={{ width: `${pctOfExpenses}%`, backgroundColor: c.color }} />
+                        </div>
+                        {pctOfRevenue !== null && (
+                          <p className="text-[11px] text-muted-foreground mt-1">يستهلك {pctOfRevenue}% من الإيرادات</p>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="cc-card rounded-[14px] p-5">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2">
+                <Receipt className="w-5 h-5 text-cc-red" />
+                <h3 className="text-sm font-bold text-foreground">سجل المصروفات — {MONTHS_AR[selectedMonth - 1]} {selectedYear}</h3>
+              </div>
+              <Button size="sm" onClick={() => setExpenseDialog(true)} className="gap-1.5">
+                <Plus className="w-4 h-4" /> إضافة مصروف
+              </Button>
+            </div>
+
+            {loading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-lg" />)}
+              </div>
+            ) : expenses.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground">
+                <Receipt className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p>لا توجد مصروفات مسجلة لهذا الشهر</p>
+                <p className="text-sm mt-1">أضف أول مصروف لتتبع النفقات</p>
+              </div>
+            ) : (
+              <>
+                {/* Category filter */}
+                {(() => {
+                  const categories = [...new Set(expenses.map((e) => e.category))];
+                  if (categories.length < 2) return null;
+                  return (
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      <button
+                        onClick={() => setCategoryFilter(null)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                          categoryFilter === null
+                            ? "bg-cyan/15 text-cyan border-cyan/30"
+                            : "bg-white/[0.05] text-muted-foreground border-white/[0.06] hover:border-white/[0.15]"
+                        }`}
+                      >
+                        الكل ({expenses.length})
+                      </button>
+                      {categories.map((cat) => {
+                        const count = expenses.filter((e) => e.category === cat).length;
+                        const catTotal = expenses.filter((e) => e.category === cat).reduce((s, e) => s + e.amount, 0);
+                        return (
+                          <button
+                            key={cat}
+                            onClick={() => setCategoryFilter(categoryFilter === cat ? null : cat)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                              categoryFilter === cat
+                                ? "bg-cyan/15 text-cyan border-cyan/30"
+                                : "bg-white/[0.05] text-muted-foreground border-white/[0.06] hover:border-white/[0.15]"
+                            }`}
+                          >
+                            {cat} ({count}) — {formatMoney(catTotal)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+
+                {/* Expense items sorted by amount (highest first) */}
+                <div className="space-y-2">
+                  {(() => {
+                    const filtered = categoryFilter ? expenses.filter((e) => e.category === categoryFilter) : expenses;
+                    const maxAmount = Math.max(...filtered.map((e) => e.amount), 1);
+                    const sorted = [...filtered].sort((a, b) => b.amount - a.amount);
+                    return sorted.map((exp, idx) => {
+                      const pct = Math.round((exp.amount / maxAmount) * 100);
+                      // Color gradient: top items red → middle amber → bottom green
+                      const ratio = sorted.length > 1 ? idx / (sorted.length - 1) : 0;
+                      let barColor = "bg-cc-red";
+                      let textColor = "text-cc-red";
+                      if (ratio > 0.6) {
+                        barColor = "bg-cc-green";
+                        textColor = "text-cc-green";
+                      } else if (ratio > 0.3) {
+                        barColor = "bg-amber";
+                        textColor = "text-amber";
+                      }
+
+                      const totalExp = filtered.reduce((s, e) => s + e.amount, 0);
+                      const expPct = totalExp > 0 ? Math.round((exp.amount / totalExp) * 100) : 0;
+
+                      return (
+                        <div key={exp.id} className="group relative bg-white/[0.02] rounded-[14px] p-3 border border-white/[0.06] hover:border-white/[0.1] transition-colors">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <span className={`text-xs font-bold ${textColor} w-8 shrink-0`}>#{idx + 1}</span>
+                              <span className="text-sm font-semibold text-foreground truncate">{exp.category}</span>
+                              {exp.description && (
+                                <span className="text-[12px] text-muted-foreground truncate hidden sm:inline">— {exp.description}</span>
+                              )}
+                              <span className="text-[12px] text-muted-foreground/60 hidden md:inline">{exp.expense_date}</span>
+                            </div>
+                            <div className="flex items-center gap-3 shrink-0">
+                              <span className={`text-sm font-bold ${textColor}`}>{formatMoney(exp.amount)}</span>
+                              <span className="text-[12px] text-muted-foreground">{expPct}%</span>
+                              <button
+                                onClick={() => openEditDialog(exp)}
+                                className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-cyan/10 text-muted-foreground hover:text-cyan transition-all"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteExpense(exp.id)}
+                                className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-cc-red/10 text-muted-foreground hover:text-cc-red transition-all"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="h-2 bg-white/[0.04] rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${barColor} transition-all`} style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+
+              </>
+            )}
+          </div>
+
+        </div>
+      )}
 
       {tab === "overview" && (<>
       {/* KPI cards — 6 metrics */}
@@ -1145,176 +1380,6 @@ export default function FinancePage() {
                 </div>
               );
             })()}
-          </>
-        )}
-      </div>
-
-      {/* ─── Monthly Expenses Section ─── */}
-      <div className="cc-card rounded-[14px] p-5">
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-2">
-            <Receipt className="w-5 h-5 text-cc-red" />
-            <h3 className="text-sm font-bold text-foreground">المصاريف الشهرية — {MONTHS_AR[selectedMonth - 1]} {selectedYear}</h3>
-          </div>
-          <Button size="sm" onClick={() => setExpenseDialog(true)} className="gap-1.5">
-            <Plus className="w-4 h-4" /> إضافة مصروف
-          </Button>
-        </div>
-
-        {loading ? (
-          <div className="space-y-3">
-            {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-lg" />)}
-          </div>
-        ) : expenses.length === 0 ? (
-          <div className="text-center py-10 text-muted-foreground">
-            <Receipt className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p>لا توجد مصاريف مسجلة لهذا الشهر</p>
-            <p className="text-sm mt-1">أضف أول مصروف لتتبع النفقات</p>
-          </div>
-        ) : (
-          <>
-            {/* Summary cards */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-5">
-              <div className="p-3 rounded-lg bg-cc-red/10 border border-cc-red/20 text-center">
-                <p className="text-xl font-bold text-cc-red">{formatMoney(expenses.reduce((s, e) => s + e.amount, 0))}</p>
-                <p className="text-[12px] text-muted-foreground mt-0.5">إجمالي المصاريف</p>
-              </div>
-              <div className="p-3 rounded-lg bg-amber/10 border border-amber/20 text-center">
-                <p className="text-xl font-bold text-amber">{expenses.length}</p>
-                <p className="text-[12px] text-muted-foreground mt-0.5">عدد الأصناف</p>
-              </div>
-              <div className="p-3 rounded-lg bg-cyan/10 border border-cyan/20 text-center">
-                <p className="text-xl font-bold text-cyan">
-                  {formatMoney(totalRevenue > 0 ? totalRevenue - expenses.reduce((s, e) => s + e.amount, 0) : 0)}
-                </p>
-                <p className="text-[12px] text-muted-foreground mt-0.5">صافي الربح</p>
-              </div>
-            </div>
-
-            {/* Category filter */}
-            {(() => {
-              const categories = [...new Set(expenses.map((e) => e.category))];
-              if (categories.length < 2) return null;
-              return (
-                <div className="flex flex-wrap gap-2 mb-4">
-                  <button
-                    onClick={() => setCategoryFilter(null)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
-                      categoryFilter === null
-                        ? "bg-cyan/15 text-cyan border-cyan/30"
-                        : "bg-white/[0.05] text-muted-foreground border-white/[0.06] hover:border-white/[0.15]"
-                    }`}
-                  >
-                    الكل ({expenses.length})
-                  </button>
-                  {categories.map((cat) => {
-                    const count = expenses.filter((e) => e.category === cat).length;
-                    const catTotal = expenses.filter((e) => e.category === cat).reduce((s, e) => s + e.amount, 0);
-                    return (
-                      <button
-                        key={cat}
-                        onClick={() => setCategoryFilter(categoryFilter === cat ? null : cat)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
-                          categoryFilter === cat
-                            ? "bg-cyan/15 text-cyan border-cyan/30"
-                            : "bg-white/[0.05] text-muted-foreground border-white/[0.06] hover:border-white/[0.15]"
-                        }`}
-                      >
-                        {cat} ({count}) — {formatMoney(catTotal)}
-                      </button>
-                    );
-                  })}
-                </div>
-              );
-            })()}
-
-            {/* Expense items sorted by amount (highest first) */}
-            <div className="space-y-2">
-              {(() => {
-                const filtered = categoryFilter ? expenses.filter((e) => e.category === categoryFilter) : expenses;
-                const maxAmount = Math.max(...filtered.map((e) => e.amount), 1);
-                const sorted = [...filtered].sort((a, b) => b.amount - a.amount);
-                return sorted.map((exp, idx) => {
-                  const pct = Math.round((exp.amount / maxAmount) * 100);
-                  // Color gradient: top items red → middle amber → bottom green
-                  const ratio = sorted.length > 1 ? idx / (sorted.length - 1) : 0;
-                  let barColor = "bg-cc-red";
-                  let textColor = "text-cc-red";
-                  if (ratio > 0.6) {
-                    barColor = "bg-cc-green";
-                    textColor = "text-cc-green";
-                  } else if (ratio > 0.3) {
-                    barColor = "bg-amber";
-                    textColor = "text-amber";
-                  }
-
-                  const totalExp = filtered.reduce((s, e) => s + e.amount, 0);
-                  const expPct = totalExp > 0 ? Math.round((exp.amount / totalExp) * 100) : 0;
-
-                  return (
-                    <div key={exp.id} className="group relative bg-white/[0.02] rounded-[14px] p-3 border border-white/[0.06] hover:border-white/[0.1] transition-colors">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <span className={`text-xs font-bold ${textColor} w-8 shrink-0`}>#{idx + 1}</span>
-                          <span className="text-sm font-semibold text-foreground truncate">{exp.category}</span>
-                          {exp.description && (
-                            <span className="text-[12px] text-muted-foreground truncate hidden sm:inline">— {exp.description}</span>
-                          )}
-                          <span className="text-[12px] text-muted-foreground/60 hidden md:inline">{exp.expense_date}</span>
-                        </div>
-                        <div className="flex items-center gap-3 shrink-0">
-                          <span className={`text-sm font-bold ${textColor}`}>{formatMoney(exp.amount)}</span>
-                          <span className="text-[12px] text-muted-foreground">{expPct}%</span>
-                          <button
-                            onClick={() => openEditDialog(exp)}
-                            className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-cyan/10 text-muted-foreground hover:text-cyan transition-all"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteExpense(exp.id)}
-                            className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-cc-red/10 text-muted-foreground hover:text-cc-red transition-all"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                      <div className="h-2 bg-white/[0.04] rounded-full overflow-hidden">
-                        <div className={`h-full rounded-full ${barColor} transition-all`} style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
-                  );
-                });
-              })()}
-            </div>
-
-            {/* Category breakdown donut */}
-            {expenses.length >= 2 && (
-              <div className="mt-5 pt-5 border-t border-border">
-                <h4 className="text-xs font-bold text-muted-foreground mb-3">توزيع المصاريف حسب الصنف</h4>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                  {(() => {
-                    const catMap: Record<string, number> = {};
-                    expenses.forEach((e) => { catMap[e.category] = (catMap[e.category] || 0) + e.amount; });
-                    const totalExp = expenses.reduce((s, e) => s + e.amount, 0);
-                    const cats = Object.entries(catMap).sort((a, b) => b[1] - a[1]);
-                    const catColors = ["#EF4444", "#F59E0B", "#8B5CF6", "#00D4FF", "#10B981", "#EC4899", "#3B82F6"];
-                    return cats.map(([cat, val], i) => {
-                      const pct = totalExp > 0 ? Math.round((val / totalExp) * 100) : 0;
-                      const color = catColors[i % catColors.length];
-                      return (
-                        <div key={cat} className="p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.06] text-center">
-                          <div className="w-3 h-3 rounded-full mx-auto mb-1.5" style={{ backgroundColor: color }} />
-                          <p className="text-[13px] font-semibold text-foreground truncate">{cat}</p>
-                          <p className="text-xs font-bold mt-0.5" style={{ color }}>{formatMoney(val)}</p>
-                          <p className="text-[12px] text-muted-foreground">{pct}%</p>
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-              </div>
-            )}
           </>
         )}
       </div>
