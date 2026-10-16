@@ -5,7 +5,7 @@ import {
   fetchTickets, createTicket, updateTicket, deleteTicket,
   fetchEmployees, fetchActivityLogs,
   fetchQuoteCommitments, addQuoteCommitment, removeQuoteCommitment,
-  createFollowUpNote,
+  createFollowUpNote, createMentionNotification, fetchUserProfiles,
 } from "@/lib/supabase/db";
 import { useAuth } from "@/lib/auth-context";
 import { useTopbarControls } from "@/components/layout/topbar-context";
@@ -176,6 +176,8 @@ export default function SupportPage() {
   const [reopenTicket, setReopenTicket] = useState<Ticket | null>(null);
   const [reopenReason, setReopenReason] = useState("");
   const [reopening, setReopening] = useState(false);
+  const [reopenMentions, setReopenMentions] = useState<string[]>([]);
+  const [mentionPeople, setMentionPeople] = useState<string[]>([]);
 
   // Month filter
   const { activeMonthIndex, filterCutoff } = useTopbarControls();
@@ -289,7 +291,9 @@ export default function SupportPage() {
     : cardFilter
       ? cardFilter === "عاجل"
         ? categoryFilteredTickets.filter((t) => t.priority === "عاجل")
-        : categoryFilteredTickets.filter((t) => t.status === cardFilter)
+        : cardFilter === "معاد فتحها"
+          ? categoryFilteredTickets.filter((t) => (t.reopen_count ?? 0) > 0)
+          : categoryFilteredTickets.filter((t) => t.status === cardFilter)
       : categoryFilteredTickets;
   const _ticketDateBounds = tableDateBounds(tableDateFilter || "", tableCustomFrom, tableCustomTo);
   const dateFilteredTickets = _ticketDateBounds
@@ -399,6 +403,9 @@ export default function SupportPage() {
     setIsCardsExporting(false);
   }
   const countUrgent = agentFilteredTickets.filter((t) => t.priority === "عاجل").length;
+  const reopenedTickets = agentFilteredTickets.filter((t) => (t.reopen_count ?? 0) > 0);
+  const countReopened = reopenedTickets.length;
+  const countReopenedActive = reopenedTickets.filter((t) => t.status !== "محلول").length;
   const countProblems = agentFilteredTickets.filter((t) => (t.request_type || "problem") === "problem").length;
   const countServices = agentFilteredTickets.filter((t) => t.request_type === "service").length;
 
@@ -594,6 +601,21 @@ export default function SupportPage() {
   function openReopenDialog(ticket: Ticket) {
     setReopenTicket(ticket);
     setReopenReason("");
+    // الموظف المسؤول عن التذكرة يتمنشن تلقائياً (يقدر يشيله أو يضيف غيره)
+    const assigned = ticket.assigned_agent_name?.trim();
+    setReopenMentions(assigned && assigned !== authUser?.name ? [assigned] : []);
+    if (mentionPeople.length === 0) {
+      fetchUserProfiles()
+        .then((profiles) => {
+          const names = [...profiles.map((p) => p.name), ...employees.map((e) => e.name)].filter(Boolean);
+          setMentionPeople([...new Set(names)]);
+        })
+        .catch(() => setMentionPeople([...new Set(employees.map((e) => e.name).filter(Boolean))]));
+    }
+  }
+
+  function toggleReopenMention(name: string) {
+    setReopenMentions((prev) => (prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]));
   }
 
   async function handleReopen() {
@@ -611,7 +633,15 @@ export default function SupportPage() {
         reopened_by: by || null,
       });
       setTickets((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-      createFollowUpNote("ticket", updated.id, `🔁 إعادة فتح التذكرة\nالسبب: ${reason}`, by || "—").catch(console.error);
+      const author = by || "—";
+      const mentioned = reopenMentions.filter((n) => n && n !== by);
+      const noteText = `🔁 إعادة فتح التذكرة\nالسبب: ${reason}${mentioned.length ? `\n${mentioned.map((n) => `@${n}`).join(" ")}` : ""}`;
+      createFollowUpNote("ticket", updated.id, noteText, author)
+        .then((note) => Promise.all(mentioned.map((name) =>
+          createMentionNotification(note.id, "ticket", updated.id, updated.client_name, name, author, noteText)
+            .catch((err) => console.error("[mention] reopen notify failed:", name, err))
+        )))
+        .catch(console.error);
       setReopenTicket(null);
       setReopenReason("");
       if (logsOpen) void loadActivityLogs();
@@ -827,9 +857,9 @@ export default function SupportPage() {
           </button>
         </div>
       )}
-      <div ref={statusCardsRef} className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div ref={statusCardsRef} className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {loading ? (
-          Array.from({ length: 4 }).map((_, index) => <SupportStatSkeleton key={index} />)
+          Array.from({ length: 5 }).map((_, index) => <SupportStatSkeleton key={index} />)
         ) : (
           <>
             <StatCard
@@ -863,6 +893,15 @@ export default function SupportPage() {
               icon={<AlertTriangle className="w-4 h-4 text-cc-blue" />}
               onClick={() => setCardFilter(cardFilter === "عاجل" ? null : "عاجل")}
               active={cardFilter === "عاجل"}
+            />
+            <StatCard
+              value={String(countReopened)}
+              label="معاد فتحها"
+              color="purple"
+              icon={<RotateCcw className="w-4 h-4 text-cc-purple" />}
+              subtext={countReopened > 0 ? `${countReopenedActive} لم تُحل بعد` : undefined}
+              onClick={() => setCardFilter(cardFilter === "معاد فتحها" ? null : "معاد فتحها")}
+              active={cardFilter === "معاد فتحها"}
             />
           </>
         )}
@@ -1867,6 +1906,32 @@ export default function SupportPage() {
               rows={3}
               autoFocus
             />
+          </div>
+          <div className="space-y-1.5">
+            <Label>منشن للموظف المعني</Label>
+            <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
+              {[...new Set([...reopenMentions, ...mentionPeople])].filter((n) => n !== authUser?.name).map((name) => {
+                const on = reopenMentions.includes(name);
+                return (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => toggleReopenMention(name)}
+                    className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${
+                      on ? "border-cyan/50 bg-cyan/10 text-cyan" : "border-border text-muted-foreground hover:bg-white/5"
+                    }`}
+                  >
+                    @{name}
+                  </button>
+                );
+              })}
+              {mentionPeople.length === 0 && reopenMentions.length === 0 && (
+                <span className="text-[12px] text-muted-foreground">جاري تحميل الأسماء...</span>
+              )}
+            </div>
+            {reopenMentions.length > 0 && (
+              <p className="text-[12px] text-muted-foreground">بيوصلهم تنبيه بالسبب في المنشن.</p>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setReopenTicket(null)}>
