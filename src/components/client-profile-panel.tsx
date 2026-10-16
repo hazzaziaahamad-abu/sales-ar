@@ -427,7 +427,10 @@ const TICKET_TYPE_LABEL: Record<string, string> = {
   service: "خدمة",
 };
 
-function TicketCard({ ticket }: { ticket: Ticket }) {
+function TicketCard({ ticket, notes }: { ticket: Ticket; notes: FollowUpNote[] }) {
+  // سجل متابعة التذكرة ظاهر مباشرة في الملخص — بدون ما يحتاج زر سجل المتابعة
+  const [showNotes, setShowNotes] = useState(true);
+  const ticketNotes = notes.filter(n => n.entity_type === "ticket" && n.entity_id === ticket.id);
   return (
     <div className="rounded-lg border border-border/40 bg-card/50 p-2.5 space-y-1.5">
       <div className="flex items-center justify-between gap-2">
@@ -477,6 +480,24 @@ function TicketCard({ ticket }: { ticket: Ticket }) {
 
       {ticket.resolved_date && (
         <p className="text-[12px] text-emerald-400/70">✓ تم الحل: {formatDate(ticket.resolved_date)}</p>
+      )}
+      {ticketNotes.length > 0 && (
+        <>
+          <button onClick={() => setShowNotes(!showNotes)} className="text-[12px] text-primary hover:underline flex items-center gap-1">
+            <FileText className="w-3 h-3" /> {ticketNotes.length} متابعة
+          </button>
+          {showNotes && (
+            <div className="space-y-1 mr-2 border-r-2 border-primary/20 pr-2">
+              {ticketNotes.map(n => (
+                <div key={n.id} className="text-[12px] whitespace-pre-line break-words">
+                  <span className="text-muted-foreground">{formatDate(n.created_at)}</span>
+                  <span className="text-foreground/70 mr-1">— {n.author_name}:</span>
+                  <span className="text-foreground/60">{n.note}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -1581,7 +1602,7 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
                       )}
                     </div>
                     {data.tickets.map(t => (
-                      <TicketCard key={t.id} ticket={t} />
+                      <TicketCard key={t.id} ticket={t} notes={data.notes} />
                     ))}
                   </SectionToggle>
                 );
