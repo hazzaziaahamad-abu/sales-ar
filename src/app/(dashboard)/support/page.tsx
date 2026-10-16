@@ -188,7 +188,7 @@ export default function SupportPage() {
   // Employee filter
   const [agentFilter, setAgentFilter] = useState<string | null>(null);
   // Table date filter
-  const [tableDateFilter, setTableDateFilter] = useState<string | null>("اليوم");
+  const [tableDateFilter, setTableDateFilter] = useState<string | null>("الشهر");
   const [tableCustomFrom, setTableCustomFrom] = useState("");
   const [tableCustomTo, setTableCustomTo] = useState("");
 

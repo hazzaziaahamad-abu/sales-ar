@@ -668,7 +668,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const [achieveFilterIds, setAchieveFilterIds] = useState<Set<string>>(new Set());
 
   /* table date filter — defaults to current month */
-  const [tableDateFilter, setTableDateFilter] = useState<string | null>("اليوم");
+  const [tableDateFilter, setTableDateFilter] = useState<string | null>("الشهر");
   const [tableCustomFrom, setTableCustomFrom] = useState("");
   const [tableCustomTo, setTableCustomTo] = useState("");
   /* فلتر فترة «نجم الفترة + لوحة المتصدرين» */
