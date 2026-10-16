@@ -69,6 +69,25 @@ const TABS = [
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
+/* ─── شهر احتساب الإيراد (بتوقيت الرياض) ───
+   الصفقة: بشهر إغلاقها (close_date)، ولو ما فيه تاريخ إغلاق نرجع لحقل الشهر.
+   التجديد: بشهر الدفع (payment_date) ثم آخر تحديث ثم تاريخ التجديد — مثل صفحة التجديدات. */
+type YearMonth = { m: number; y: number };
+function yearMonthOf(s?: string | null): YearMonth | null {
+  if (!s) return null;
+  const day = s.length === 10 ? s : saudiDateStr(new Date(s));
+  return { y: Number(day.slice(0, 4)), m: Number(day.slice(5, 7)) };
+}
+function dealRevenueMonth(d: Deal): YearMonth | null {
+  return yearMonthOf(d.close_date) ?? (d.month && d.year ? { m: d.month, y: d.year } : null);
+}
+function renewalRevenueMonth(r: Renewal): YearMonth | null {
+  return yearMonthOf(r.payment_date || r.updated_at || r.renewal_date);
+}
+function inMonth(ym: YearMonth | null, m: number, y: number): boolean {
+  return !!ym && ym.m === m && ym.y === y;
+}
+
 // المالية للسوبر أدمن فقط (ومو أثناء «الدخول كموظف»)
 export default function FinancePage() {
   const { user, isImpersonating } = useAuth();
@@ -318,22 +337,17 @@ function FinanceContent() {
   // Merge default categories with existing ones from expenses
   const allCategories = [...new Set([...DEFAULT_CATEGORIES, ...expenses.map((e) => e.category)])];
 
-  /* ─── Helper: match renewal to a month (by month only, ignoring year) ─── */
-  function renewalMatchesMonth(r: Renewal, m: number) {
-    const rd = new Date(r.renewal_date);
-    return rd.getMonth() + 1 === m;
-  }
-
   /* ─── Computed Metrics (filtered by selected month) ─── */
   const monthDeals = deals.filter((d) => d.month === selectedMonth && d.year === selectedYear);
-  const closedDeals = monthDeals.filter((d) => d.stage === "مكتملة");
+  // الإيراد يُحسب بشهر الإغلاق (close_date) لا بشهر إنشاء الصفقة (month/year)
+  const closedDeals = deals.filter((d) => d.stage === "مكتملة" && inMonth(dealRevenueMonth(d), selectedMonth, selectedYear));
   const salesRevenue = closedDeals.reduce((s, d) => s + d.deal_value, 0);
   const pipelineValue = monthDeals.filter((d) => d.stage !== "مكتملة").reduce((s, d) => s + d.deal_value, 0);
 
   /* Renewals revenue for the selected month */
   const monthRenewals = renewals.filter((r) => {
     if (r.status !== "مكتمل") return false;
-    return renewalMatchesMonth(r, selectedMonth);
+    return inMonth(renewalRevenueMonth(r), selectedMonth, selectedYear);
   });
   const renewalsRevenue = monthRenewals.reduce((s, r) => s + r.plan_price, 0);
 
@@ -371,10 +385,10 @@ function FinanceContent() {
       const m = d.getMonth() + 1;
       const y = d.getFullYear();
       const sRev = allClosedDeals
-        .filter((deal) => deal.month === m && deal.year === y)
+        .filter((deal) => inMonth(dealRevenueMonth(deal), m, y))
         .reduce((s, deal) => s + deal.deal_value, 0);
       const rRev = completedRenewals
-        .filter((r) => renewalMatchesMonth(r, m))
+        .filter((r) => inMonth(renewalRevenueMonth(r), m, y))
         .reduce((s, r) => s + r.plan_price, 0);
       months.push({ month: MONTHS_AR[d.getMonth()], salesRev: sRev, renewalsRev: rRev, revenue: sRev + rRev });
     }

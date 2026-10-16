@@ -888,13 +888,22 @@ export async function deleteReview(id: string): Promise<void> {
 
 export async function fetchRenewals(): Promise<Renewal[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("renewals")
-    .select("*")
-    .eq("org_id", getOrgId())
-    .order("renewal_date", { ascending: true });
-  if (error) throw error;
-  return (data ?? []) as Renewal[];
+  // Supabase يرجّع 1000 صف كحد أقصى لكل طلب — نجلب على صفحات حتى لا تسقط تجديدات
+  const PAGE = 1000;
+  const rows: Renewal[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("renewals")
+      .select("*")
+      .eq("org_id", getOrgId())
+      .order("renewal_date", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    rows.push(...((data ?? []) as Renewal[]));
+    if (!data || data.length < PAGE) break;
+  }
+  return rows;
 }
 
 export async function createRenewal(
