@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { Deal, Renewal, MonthlyExpense, MonthlyBudget, StartupCost } from "@/types";
-import { fetchDeals, fetchRenewals, fetchMonthlyExpenses, createExpense, deleteExpense, updateExpense, updateDeal, fetchMonthlyBudget, upsertBudgetItem, deleteBudgetItem, copyBudgetFromPreviousMonth, fetchStartupCosts, createStartupCost, deleteStartupCost, fetchEmployees } from "@/lib/supabase/db";
+import { fetchDeals, fetchRenewals, updateRenewal, fetchMonthlyExpenses, createExpense, deleteExpense, updateExpense, updateDeal, fetchMonthlyBudget, upsertBudgetItem, deleteBudgetItem, copyBudgetFromPreviousMonth, fetchStartupCosts, createStartupCost, deleteStartupCost, fetchEmployees } from "@/lib/supabase/db";
 import { useAuth } from "@/lib/auth-context";
 import { useTopbarControls } from "@/components/layout/topbar-context";
 import { SalesConfirmations } from "@/components/daily-huddle/sales-confirmations";
@@ -334,6 +334,15 @@ function FinanceContent() {
     }
   }
 
+  async function handleRenewalCollectionStatus(renewalId: string, status: "محصّل" | "معلق" | "متأخر") {
+    try {
+      const updated = await updateRenewal(renewalId, { collection_status: status });
+      setRenewals(prev => prev.map(r => r.id === renewalId ? updated : r));
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
   // Merge default categories with existing ones from expenses
   const allCategories = [...new Set([...DEFAULT_CATEGORIES, ...expenses.map((e) => e.category)])];
 
@@ -353,6 +362,21 @@ function FinanceContent() {
 
   /* Total revenue = sales + renewals */
   const totalRevenue = salesRevenue + renewalsRevenue;
+
+  /* ─── Collection rows: صفقات الشهر المكتملة + تجديداته المكتملة ─── */
+  type CollectionStatus = "محصّل" | "معلق" | "متأخر";
+  const collectionRows: { key: string; id: string; kind: "deal" | "renewal"; name: string; value: number; product: string; date: string; status: CollectionStatus }[] = [
+    ...closedDeals.map(d => ({
+      key: `d-${d.id}`, id: d.id, kind: "deal" as const, name: d.client_name, value: d.deal_value,
+      product: d.plan || "—", date: (d.deal_date || d.close_date || "").slice(0, 10),
+      status: (d.collection_status || "معلق") as CollectionStatus,
+    })),
+    ...monthRenewals.map(r => ({
+      key: `r-${r.id}`, id: r.id, kind: "renewal" as const, name: r.customer_name, value: r.plan_price,
+      product: r.plan_name || "—", date: (r.payment_date || r.renewal_date || "").slice(0, 10),
+      status: (r.collection_status || "معلق") as CollectionStatus,
+    })),
+  ].sort((a, b) => b.date.localeCompare(a.date));
 
   /* ─── Expenses: خصم من الإيرادات + توزيع حسب البند ─── */
   const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
@@ -1075,7 +1099,7 @@ function FinanceContent() {
       </div>
 
       {/* ─── Collection Status Section ─── */}
-      {!loading && closedDeals.length > 0 && (
+      {!loading && collectionRows.length > 0 && (
         <div className="cc-card rounded-[14px] p-5">
           <div className="flex items-center gap-2 mb-4">
             <Banknote className="w-5 h-5 text-cc-green" />
@@ -1084,12 +1108,12 @@ function FinanceContent() {
 
           {/* Status summary pills */}
           {(() => {
-            const collected = closedDeals.filter(d => d.collection_status === "محصّل");
-            const pending = closedDeals.filter(d => !d.collection_status || d.collection_status === "معلق");
-            const overdue = closedDeals.filter(d => d.collection_status === "متأخر");
-            const collectedVal = collected.reduce((s, d) => s + d.deal_value, 0);
-            const pendingVal = pending.reduce((s, d) => s + d.deal_value, 0);
-            const overdueVal = overdue.reduce((s, d) => s + d.deal_value, 0);
+            const collected = collectionRows.filter(r => r.status === "محصّل");
+            const pending = collectionRows.filter(r => r.status === "معلق");
+            const overdue = collectionRows.filter(r => r.status === "متأخر");
+            const collectedVal = collected.reduce((s, r) => s + r.value, 0);
+            const pendingVal = pending.reduce((s, r) => s + r.value, 0);
+            const overdueVal = overdue.reduce((s, r) => s + r.value, 0);
 
             return (
               <div className="space-y-4">
@@ -1134,25 +1158,35 @@ function FinanceContent() {
                     <thead>
                       <tr className="border-b border-border">
                         <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">العميل</th>
+                        <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">النوع</th>
+                        <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">تاريخ الصفقة</th>
                         <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">القيمة</th>
                         <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">المنتج</th>
                         <th className="text-center py-2 px-3 text-xs font-semibold text-muted-foreground">حالة التحصيل</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {closedDeals.map(deal => {
-                        const status = deal.collection_status || "معلق";
+                      {collectionRows.map(row => {
+                        const status = row.status;
                         return (
-                          <tr key={deal.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
-                            <td className="py-2.5 px-3 text-foreground font-medium">{deal.client_name}</td>
-                            <td className="py-2.5 px-3 text-cyan font-semibold">{formatMoney(deal.deal_value)}</td>
-                            <td className="py-2.5 px-3 text-muted-foreground">{deal.plan || "—"}</td>
+                          <tr key={row.key} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
+                            <td className="py-2.5 px-3 text-foreground font-medium">{row.name}</td>
+                            <td className="py-2.5 px-3">
+                              <span className={`px-2 py-0.5 rounded-md text-[12px] font-medium border ${
+                                row.kind === "deal" ? "bg-cyan/10 text-cyan border-cyan/20" : "bg-cc-green/10 text-cc-green border-cc-green/20"
+                              }`}>
+                                {row.kind === "deal" ? "صفقة" : "تجديد"}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-muted-foreground whitespace-nowrap">{row.date || "—"}</td>
+                            <td className="py-2.5 px-3 text-cyan font-semibold">{formatMoney(row.value)}</td>
+                            <td className="py-2.5 px-3 text-muted-foreground">{row.product}</td>
                             <td className="py-2.5 px-3">
                               <div className="flex items-center justify-center gap-1">
                                 {(["محصّل", "معلق", "متأخر"] as const).map(s => (
                                   <button
                                     key={s}
-                                    onClick={() => handleCollectionStatus(deal.id, s)}
+                                    onClick={() => row.kind === "deal" ? handleCollectionStatus(row.id, s) : handleRenewalCollectionStatus(row.id, s)}
                                     className={`px-2.5 py-1 rounded-md text-[13px] font-medium transition-all border ${
                                       status === s
                                         ? s === "محصّل" ? "bg-cc-green/15 text-cc-green border-cc-green/30"

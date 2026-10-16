@@ -196,6 +196,7 @@ export interface Renewal {
   assigned_rep?: string;
   notes?: string;
   sales_type?: "office" | "support";
+  collection_status?: "محصّل" | "معلق" | "متأخر";
   created_at: string;
   updated_at: string;
 }
