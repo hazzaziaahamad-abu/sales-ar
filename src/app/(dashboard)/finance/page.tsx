@@ -365,14 +365,14 @@ function FinanceContent() {
 
   /* ─── Collection rows: صفقات الشهر المكتملة + تجديداته المكتملة ─── */
   type CollectionStatus = "محصّل" | "معلق" | "متأخر";
-  const collectionRows: { key: string; id: string; kind: "office" | "support" | "renewal"; rep: string; name: string; value: number; product: string; date: string; status: CollectionStatus }[] = [
+  const collectionRows: { key: string; id: string; kind: "office" | "support" | "renewal"; rep: string; source: string; name: string; value: number; product: string; date: string; status: CollectionStatus }[] = [
     ...closedDeals.map(d => ({
-      key: `d-${d.id}`, id: d.id, kind: (d.sales_type === "support" ? "support" : "office") as "office" | "support", rep: d.assigned_rep_name || "—", name: d.client_name, value: d.deal_value,
+      key: `d-${d.id}`, id: d.id, kind: (d.sales_type === "support" ? "support" : "office") as "office" | "support", rep: d.assigned_rep_name || "—", source: d.source || "—", name: d.client_name, value: d.deal_value,
       product: d.plan || "—", date: (d.deal_date || d.close_date || "").slice(0, 10),
       status: (d.collection_status || "معلق") as CollectionStatus,
     })),
     ...monthRenewals.map(r => ({
-      key: `r-${r.id}`, id: r.id, kind: "renewal" as const, rep: r.assigned_rep || "—", name: r.customer_name, value: r.plan_price,
+      key: `r-${r.id}`, id: r.id, kind: "renewal" as const, rep: r.assigned_rep || "—", source: "—", name: r.customer_name, value: r.plan_price,
       product: r.plan_name || "—", date: (r.payment_date || r.renewal_date || "").slice(0, 10),
       status: (r.collection_status || "معلق") as CollectionStatus,
     })),
@@ -1160,6 +1160,7 @@ function FinanceContent() {
                         <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">العميل</th>
                         <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">النوع</th>
                         <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">الموظف</th>
+                        <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">المصدر</th>
                         <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">تاريخ الصفقة</th>
                         <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">القيمة</th>
                         <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">المنتج</th>
@@ -1181,7 +1182,8 @@ function FinanceContent() {
                                 {row.kind === "office" ? "مبيعات المكتب" : row.kind === "support" ? "مبيعات الدعم" : "تجديد"}
                               </span>
                             </td>
-                            <td className="py-2.5 px-3 text-muted-foreground whitespace-nowrap">{row.rep}</td>
+                            <td className="py-2.5 px-3 text-foreground whitespace-nowrap">{row.rep}</td>
+                            <td className="py-2.5 px-3 text-muted-foreground whitespace-nowrap">{row.source}</td>
                             <td className="py-2.5 px-3 text-muted-foreground whitespace-nowrap">{row.date || "—"}</td>
                             <td className="py-2.5 px-3 text-cyan font-semibold">{formatMoney(row.value)}</td>
                             <td className="py-2.5 px-3 text-muted-foreground">{row.product}</td>
