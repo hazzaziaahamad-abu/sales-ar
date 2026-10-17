@@ -458,15 +458,20 @@ export default function RenewalsPage() {
         return s >= _renewalDateBounds[0] && s <= _renewalDateBounds[1];
       })
     : statusFilteredRenewals;
-  const silentFilteredRenewals = silentFilter
-    ? dateFilteredRenewals.filter(r => {
-        if (r.status === "مكتمل" || r.status === "ملغي بسبب") return false;
-        return Math.floor((Date.now() - new Date(r.updated_at).getTime()) / 86400000) >= 7;
-      })
-    : dateFilteredRenewals;
-  const filteredRenewals_base = clientSearch
-    ? silentFilteredRenewals.filter((r) => r.customer_name.toLowerCase().includes(clientSearch.toLowerCase()) || (r.client_code && r.client_code.toLowerCase().includes(clientSearch.toLowerCase())))
-    : silentFilteredRenewals;
+  const applySilentAndSearch = (list: Renewal[]) => {
+    const silent = silentFilter
+      ? list.filter(r => {
+          if (r.status === "مكتمل" || r.status === "ملغي بسبب") return false;
+          return Math.floor((Date.now() - new Date(r.updated_at).getTime()) / 86400000) >= 7;
+        })
+      : list;
+    return clientSearch
+      ? silent.filter((r) => r.customer_name.toLowerCase().includes(clientSearch.toLowerCase()) || (r.client_code && r.client_code.toLowerCase().includes(clientSearch.toLowerCase())))
+      : silent;
+  };
+  const filteredRenewals_base = applySilentAndSearch(dateFilteredRenewals);
+  // Focus boxes (overdue/today/week/month) ignore the table period filter
+  const focusBase_unsummarized = applySilentAndSearch(statusFilteredRenewals);
 
   useEffect(() => {
     setLoading(true);
@@ -734,7 +739,7 @@ export default function RenewalsPage() {
   /* ─── Focus filter (daily task boxes) ─── */
   const [focusFilter, setFocusFilter] = useState<"overdue" | "today" | "week" | "month" | null>(null);
 
-  const _activeRenewals = filteredRenewals_summary.filter(r => r.status !== "مكتمل" && r.status !== "ملغي بسبب");
+  const _activeRenewals = (summaryFilter ? filteredRenewals_summary : focusBase_unsummarized).filter(r => r.status !== "مكتمل" && r.status !== "ملغي بسبب");
   const focusOverdue = _activeRenewals.filter(r => (r.renewal_date || "") < todayStr);
   const focusToday   = _activeRenewals.filter(r => (r.renewal_date || "").slice(0, 10) === todayStr);
   const in7Days = (() => { const d = new Date(); d.setDate(d.getDate() + 7); return d.toISOString().slice(0, 10); })();
