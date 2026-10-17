@@ -258,25 +258,27 @@ function normalizeClientName(
   return name;
 }
 
-// يرجّع أفضل نص لفتح ملخص العميل لكيان معيّن: الجوال أولاً (أدق من الاسم)، وإلا الاسم
-export async function resolveClientProfileQuery(
+// يرجّع أفضل نص لفتح ملخص العميل لكيان معيّن: الجوال أولاً (أدق من الاسم)، وإلا الاسم.
+// للصفقات يرجّع نوعها كمان (مكتب/دعم) عشان المنشن يفتح الصفحة اللي فيها الصفقة فعلاً.
+export async function resolveClientProfileTarget(
   entityType: "deal" | "renewal" | "ticket",
   entityId: string,
   fallbackName = "",
-): Promise<string> {
+): Promise<{ query: string; salesType?: "office" | "support" }> {
   const supabase = createClient();
   const table = entityType === "deal" ? "deals" : entityType === "renewal" ? "renewals" : "tickets";
   const phoneCol = entityType === "renewal" ? "customer_phone" : "client_phone";
   const nameCol = entityType === "renewal" ? "customer_name" : "client_name";
+  const cols = entityType === "deal" ? `${phoneCol}, ${nameCol}, sales_type` : `${phoneCol}, ${nameCol}`;
   try {
-    const { data } = await supabase.from(table).select(`${phoneCol}, ${nameCol}`)
+    const { data } = await supabase.from(table).select(cols)
       .eq("org_id", getOrgId()).eq("id", entityId).maybeSingle();
     const row = data as Record<string, string | null> | null;
+    const salesType = row?.sales_type === "support" ? "support" : row?.sales_type === "office" ? "office" : undefined;
     const phone = sanitizeClientSearch(row?.[phoneCol] || "");
-    if (phone) return phone;
-    return row?.[nameCol] || fallbackName;
+    return { query: phone || row?.[nameCol] || fallbackName, salesType };
   } catch {
-    return fallbackName;
+    return { query: fallbackName };
   }
 }
 

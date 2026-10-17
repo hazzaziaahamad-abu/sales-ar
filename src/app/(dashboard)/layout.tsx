@@ -25,7 +25,21 @@ import type { AppNotification, MentionNotification, Deal, Ticket, Renewal, Emplo
 import { CCThemeProvider } from "@/lib/theme-context";
 import { saudiDateStr } from "@/lib/utils/format";
 import { PageTracker } from "@/components/layout/page-tracker";
-import { MentionAlertBanner, isMentionsManager } from "@/components/mentions/mention-alert-banner";
+import { MentionAlertBanner, isMentionsManager, buildMentionUrl } from "@/components/mentions/mention-alert-banner";
+
+const OPEN_MENTION_EVENT = "open-mention";
+
+type BrowserNotif = { title: string; body: string; mention?: AppNotification["metadata"] };
+
+// إشعار المتصفح: الضغط عليه يرجّع للتبويب، ولو كان منشن يفتح ملخص العميل على الملاحظة
+function showBrowserNotif({ title, body, mention }: BrowserNotif) {
+  const notif = new Notification(title, { body, icon: "/favicon.ico", dir: "rtl", lang: "ar" });
+  notif.onclick = () => {
+    window.focus();
+    notif.close();
+    if (mention) window.dispatchEvent(new CustomEvent(OPEN_MENTION_EVENT, { detail: mention }));
+  };
+}
 import { FocusGate, FocusOverlay } from "@/components/focus/focus-overlay";
 import { EveningPlanPrompt } from "@/components/focus/evening-plan";
 import { WorkDayWatcher, WorkHoursBanner } from "@/components/work/work-day";
@@ -131,6 +145,20 @@ function MentionNotifLoader({ onLoad, onMentions }: { onLoad: (n: AppNotificatio
     const interval = setInterval(() => { if (!document.hidden) loadMentions(); }, 60000);
     return () => { window.removeEventListener("focus", onFocus); clearInterval(interval); };
   }, [loadMentions]);
+
+  // الضغط على إشعار المتصفح للمنشن يفتح الملخص (الإشعار ينطلق من خارج AuthProvider فيوصلنا كحدث)
+  const router = useRouter();
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const meta = (e as CustomEvent<AppNotification["metadata"]>).detail;
+      if (!meta) return;
+      if (meta.mentionNotifId) markSingleMentionRead(meta.mentionNotifId).catch(console.error);
+      buildMentionUrl({ entityType: meta.entityType || "", entityId: meta.entityId, entityName: meta.entityName, noteId: meta.noteId }, user)
+        .then((url) => router.push(url));
+    };
+    window.addEventListener(OPEN_MENTION_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_MENTION_EVENT, onOpen);
+  }, [user, router]);
 
   // Supabase Realtime — instant mention notifications
   useEffect(() => {
@@ -697,14 +725,14 @@ export default function DashboardLayout({
   const [dueReminders, setDueReminders] = useState<Reminder[]>([]);
   const shownBrowserNotifs = useRef<Set<string>>(new Set());
   // إشعارات المتصفح أثناء جلسة التركيز تتأجل وتطلع بعد انتهائها
-  const deferredBrowserNotifs = useRef<{ title: string; body: string }[]>([]);
+  const deferredBrowserNotifs = useRef<BrowserNotif[]>([]);
   const focusActive = useFocusActive();
   useEffect(() => {
     if (focusActive || !deferredBrowserNotifs.current.length) return;
     const queued = deferredBrowserNotifs.current.splice(0);
     if (!("Notification" in window) || Notification.permission !== "granted") return;
     for (const n of queued) {
-      try { new Notification(n.title, { body: n.body, icon: "/favicon.ico", dir: "rtl", lang: "ar" }); } catch { /* ignore */ }
+      try { showBrowserNotif(n); } catch { /* ignore */ }
     }
   }, [focusActive]);
 
@@ -743,8 +771,9 @@ export default function DashboardLayout({
           shownBrowserNotifs.current.add(n.id);
           try {
             const title = n.type === "mention" ? "منشن جديد 💬" : "إشعار جديد 🔔";
-            if (isFocusActive()) { deferredBrowserNotifs.current.push({ title, body: n.message }); return; }
-            new Notification(title, { body: n.message, icon: "/favicon.ico", dir: "rtl", lang: "ar" });
+            const browserNotif: BrowserNotif = { title, body: n.message, mention: n.type === "mention" ? n.metadata : undefined };
+            if (isFocusActive()) { deferredBrowserNotifs.current.push(browserNotif); return; }
+            showBrowserNotif(browserNotif);
           } catch {
             // Browser may block — fail silently
           }

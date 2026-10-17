@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   fetchTickets, createTicket, updateTicket, deleteTicket,
   fetchEmployees, fetchActivityLogs,
@@ -234,6 +235,18 @@ export default function SupportPage() {
   const [isTableExporting, setIsTableExporting] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileQuery, setProfileQuery] = useState("");
+  const [profileNoteId, setProfileNoteId] = useState<string | undefined>(undefined);
+  const searchParams = useSearchParams();
+
+  // فتح ملخص العميل من رابط المنشن: ?profile=<جوال/اسم>&noteId=<الملاحظة>
+  useEffect(() => {
+    const p = searchParams.get("profile");
+    if (p) {
+      setProfileQuery(p);
+      setProfileNoteId(searchParams.get("noteId") || undefined);
+      setProfileOpen(true);
+    }
+  }, [searchParams]);
 
   const handleShareTable = useCallback(async () => {
     if (!tableRef.current || isTableExporting) return;
@@ -1971,6 +1984,7 @@ export default function SupportPage() {
         open={profileOpen}
         onClose={() => setProfileOpen(false)}
         initialQuery={profileQuery}
+        highlightNoteId={profileNoteId}
       />
     </div>
   );

@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { markMentionNotificationsRead, resolveClientProfileQuery } from "@/lib/supabase/db";
+import { getOrgId, markMentionNotificationsRead, resolveClientProfileTarget } from "@/lib/supabase/db";
+import { useAuth } from "@/lib/auth-context";
+import { isSupportSalesMerged } from "@/lib/sales-merge";
 import type { MentionNotification } from "@/types";
 
 /** مدراء يبقى لهم البانر أعلى الصفحة مثل باقي الفريق */
@@ -24,18 +26,37 @@ const MENTION_SECTION_PATH: Record<string, string> = {
   renewal: "/renewals",
 };
 
-// يفتح ملخص العميل بجواله (من السجل نفسه) بدل الاسم — الاسم ممكن يكون عام أو رمز مثل «*»
-export async function buildMentionUrl(m: MentionNotification): Promise<string> {
-  const base = MENTION_SECTION_PATH[m.entity_type] || "/sales";
+export type MentionTarget = { entityType: string; entityId?: string; entityName?: string; noteId?: string | null };
+
+/** صلاحيات المستخدم لاختيار الصفحة — null/undefined = سوبر أدمن (كل الصفحات) */
+type PageAccess = { isSuperAdmin?: boolean; allowedPages?: string[] } | null | undefined;
+
+// يفتح ملخص العميل بجواله (من السجل نفسه) بدل الاسم — الاسم ممكن يكون عام أو رمز مثل «*».
+// صفقة «مبيعات الدعم» تفتح صفحة مبيعات الدعم وتبرز الصفقة نفسها، بدل صفحة المكتب اللي ما فيها الصفقة.
+export async function buildMentionUrl(t: MentionTarget, access?: PageAccess): Promise<string> {
+  const type = t.entityType;
+  let base = MENTION_SECTION_PATH[type] || "/sales";
   const params = new URLSearchParams();
-  const profile = await resolveClientProfileQuery(m.entity_type, m.entity_id, m.entity_name);
-  if (profile) params.set("profile", profile);
-  if (m.note_id) params.set("noteId", m.note_id);
+  if (t.entityId && (type === "deal" || type === "renewal" || type === "ticket")) {
+    const { query, salesType } = await resolveClientProfileTarget(type, t.entityId, t.entityName);
+    if (query) params.set("profile", query);
+    if (type === "deal") {
+      const canOpenSupportSales = !access || access.isSuperAdmin || !!access.allowedPages?.includes("support-sales");
+      if (salesType === "support" && !isSupportSalesMerged(getOrgId()) && canOpenSupportSales) base = "/support-sales";
+      params.set("deal", t.entityId);
+    }
+  } else if (t.entityName) {
+    params.set("profile", t.entityName);
+  }
+  if (t.noteId) params.set("noteId", t.noteId);
+  // ختم وقت عشان الضغط على نفس المنشن مرة ثانية يعيد فتح الملخص (الرابط يتغيّر)
+  params.set("t", String(Date.now()));
   return `${base}?${params.toString()}`;
 }
 
 export function MentionAlertBanner({ mentions, onRefresh, fullList = false }: { mentions: MentionNotification[]; onRefresh: () => void; fullList?: boolean }) {
   const router = useRouter();
+  const { user } = useAuth();
   const [markedIds, setMarkedIds] = useState<Set<string>>(new Set());
 
   if (mentions.length === 0) return null;
@@ -88,7 +109,10 @@ export function MentionAlertBanner({ mentions, onRefresh, fullList = false }: { 
               key={m.id}
               onClick={() => {
                 if (isNew) markRead([m.id]);
-                buildMentionUrl(m).then((url) => router.push(url));
+                buildMentionUrl(
+                  { entityType: m.entity_type, entityId: m.entity_id, entityName: m.entity_name, noteId: m.note_id },
+                  user,
+                ).then((url) => router.push(url));
               }}
               className={`w-full text-right px-4 py-2.5 flex items-center gap-3 hover:bg-white/[0.04] transition-colors ${isNew ? "" : "opacity-50"}`}
             >

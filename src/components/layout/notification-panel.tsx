@@ -4,7 +4,9 @@ import { useRouter } from "next/navigation";
 import type { AppNotification } from "@/types";
 import { Button } from "@/components/ui/button";
 import { X, CheckCheck } from "lucide-react";
-import { markSingleMentionRead, resolveClientProfileQuery } from "@/lib/supabase/db";
+import { markSingleMentionRead } from "@/lib/supabase/db";
+import { useAuth } from "@/lib/auth-context";
+import { buildMentionUrl } from "@/components/mentions/mention-alert-banner";
 
 interface NotificationPanelProps {
   notifications: AppNotification[];
@@ -46,6 +48,7 @@ export function NotificationPanel({
   onMarkOneRead,
 }: NotificationPanelProps) {
   const router = useRouter();
+  const { user } = useAuth();
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   function handleNotifClick(n: AppNotification) {
@@ -55,20 +58,8 @@ export function NotificationPanel({
     // If it's a mention, mark in DB + navigate with noteId
     if (n.type === "mention" && n.metadata?.mentionNotifId) {
       markSingleMentionRead(n.metadata.mentionNotifId).catch(console.error);
-      const base = SECTION_PATH[n.section] || "/sales";
       const { entityType, entityId, entityName, noteId } = n.metadata;
-      const go = (profile?: string) => {
-        const params = new URLSearchParams();
-        if (profile) params.set("profile", profile);
-        if (noteId) params.set("noteId", noteId);
-        router.push(`${base}?${params.toString()}`);
-      };
-      // نفتح الملخص بجوال العميل بدل الاسم (الاسم ممكن يكون رمز مثل «*» فيطابق كل العملاء)
-      if (entityId && (entityType === "deal" || entityType === "renewal" || entityType === "ticket")) {
-        resolveClientProfileQuery(entityType, entityId, entityName).then(go);
-      } else {
-        go(entityName);
-      }
+      buildMentionUrl({ entityType: entityType || "", entityId, entityName, noteId }, user).then((url) => router.push(url));
     } else {
       const path = SECTION_PATH[n.section];
       if (path) router.push(path);

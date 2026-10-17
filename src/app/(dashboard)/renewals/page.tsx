@@ -254,12 +254,14 @@ export default function RenewalsPage() {
   const [assignRenewal, setAssignRenewal] = useState<Renewal | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileQuery, setProfileQuery] = useState("");
+  const [profileNoteId, setProfileNoteId] = useState<string | undefined>(undefined);
   const searchParams = useSearchParams();
 
   useEffect(() => {
     const p = searchParams.get("profile");
     if (p) {
       setProfileQuery(p);
+      setProfileNoteId(searchParams.get("noteId") || undefined);
       setProfileOpen(true);
     }
   }, [searchParams]);
@@ -2744,6 +2746,7 @@ export default function RenewalsPage() {
         open={profileOpen}
         onClose={() => setProfileOpen(false)}
         initialQuery={profileQuery}
+        highlightNoteId={profileNoteId}
       />
     </div>
   );
