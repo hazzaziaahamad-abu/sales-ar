@@ -1746,8 +1746,9 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
         const key = d.close_date || d.created_at;
         return useMonth ? inMonth(key) : inDayRange(key, start, end);
       };
+      // التجديد يُحسب بيوم الدفع الفعلي، لا بآخر تعديل على السجل (تعديل الملاحظات/التحصيل كان ينقله لليوم الحالي)
       const renewalMatches = (r: Renewal) =>
-        r.status === "مكتمل" && (useMonth ? inMonth(r.updated_at) : inDayRange(r.updated_at, start, end));
+        r.status === "مكتمل" && (useMonth ? inMonth(r.payment_date || r.updated_at) : inDayRange(r.payment_date || r.updated_at, start, end));
       const ticketCreatedInRange = (t: Ticket) =>
         useMonth ? inMonth(t.created_at) : inDayRange(t.created_at, start, end);
       const ticketResolvedInRange = (t: Ticket) => {
@@ -1877,7 +1878,7 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
     const renewalRepMap = new Map<string, { count: number; rev: number }>();
     for (const r of renewals) {
       if (r.status !== "مكتمل") continue;
-      if (!matchDate(r.updated_at)) continue;
+      if (!matchDate(r.payment_date || r.updated_at)) continue;
       const name = r.assigned_rep?.trim() || "بلا مسؤول";
       const cur = renewalRepMap.get(name) || { count: 0, rev: 0 };
       cur.count += 1; cur.rev += r.plan_price;
@@ -1965,7 +1966,7 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
     }
 
     const renewCount = renewals.filter(r =>
-      r.status === "مكتمل" && inToday(r.updated_at)
+      r.status === "مكتمل" && inToday(r.payment_date || r.updated_at)
     ).length;
     if (renewCount === 0) weak.push({ key: "renewals", label: "التجديدات", attendees: "فريق التجديدات", reason: "لا تجديدات مكتملة اليوم" });
 

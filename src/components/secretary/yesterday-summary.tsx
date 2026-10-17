@@ -92,7 +92,7 @@ export function YesterdaySummary({ deals, renewals, tickets, employees }: {
     const newDeals = deals.filter(d => dayOf(d.created_at) === day);
     const closedDeals = deals.filter(d => d.stage === "مكتملة" && dayOf(d.close_date || d.created_at) === day);
     const closedRevenue = closedDeals.reduce((s, d) => s + d.deal_value, 0);
-    const doneRenewals = renewals.filter(r => r.status === "مكتمل" && dayOf(r.updated_at) === day);
+    const doneRenewals = renewals.filter(r => r.status === "مكتمل" && dayOf(r.payment_date || r.updated_at) === day);
     const renewalRevenue = doneRenewals.reduce((s, r) => s + r.plan_price, 0);
     const newTickets = tickets.filter(t => dayOf(t.created_at) === day);
     const resolvedTickets = tickets.filter(t => t.status === "محلول" && dayOf(t.resolved_date || t.updated_at) === day);
