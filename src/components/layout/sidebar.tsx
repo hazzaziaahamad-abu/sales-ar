@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
+  MonitorPlay,
   TrendingUp,
   RefreshCw,
   Zap,
@@ -90,6 +91,7 @@ export const NAV_ITEMS = [
   { label: "خريطة منصة نحجز", href: "/nahjez-map", slug: "nahjez-map", icon: CalendarCheck, color: "teal", group: "المبيعات والدعم" },
   { label: "دليل العرض للموظفين — المنيو", href: "/offer/menu-staff", slug: "offer-menu-staff", icon: BookOpen, color: "violet", group: "المبيعات والدعم", external: true },
   { label: "عرض للعميل — المنيو", href: "/offer/menu", slug: "offer-menu", icon: Share2, color: "violet", group: "المبيعات والدعم", external: true },
+  { label: "معرض شاشات MENU", href: "/showcase", slug: "showcase", icon: MonitorPlay, color: "violet", group: "المبيعات والدعم", external: true, alwaysVisible: true },
   { label: "عرض للعميل — نحجز", href: "/offer/nahjez", slug: "offer-nahjez", icon: Share2, color: "teal", group: "المبيعات والدعم", external: true },
   { label: "مبيعات الدعم", href: "/support-sales", slug: "support-sales", icon: TrendingUp, color: "orange", group: "المبيعات والدعم" },
   { label: "الدعم", href: "/support", slug: "support", icon: Headphones, color: "orange", group: "المبيعات والدعم" },
