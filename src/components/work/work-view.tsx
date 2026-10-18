@@ -45,7 +45,7 @@ export function WorkView() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  const titleOf = useCallback((id: string | null) => items.find((i) => i.id === id)?.title ?? "بند محذوف", [items]);
+  const titleOf = useCallback((id: string | null) => (id ? items.find((i) => i.id === id)?.title ?? "بند محذوف" : ""), [items]);
   const open = (id: string) => {
     setOpenId(id);
     setTimeout(() => document.getElementById(`wi-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 60);

@@ -61,6 +61,19 @@ export function useSlices(space: SliceSpace) {
     setSlices((p) => [...p, ...(json.slices ?? [])]);
   }, [space]);
 
+  /** مهمة سريعة بدون أم تنضاف مباشرة لشرائح اليوم. */
+  const quickAdd = useCallback(async (title: string, kind: SliceKind) => {
+    const res = await fetch("/api/focus-slices", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ space, plan: "today", slices: [{ title, kind }] }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.error || "تعذّرت الإضافة");
+    const row = json.slices?.[0] as FocusSlice | undefined;
+    if (row) setSlices((p) => [...p, row]);
+    return row ?? null;
+  }, [space]);
+
   /** تحديث متفائل — يرجع للحالة السابقة ويرمي الخطأ لو رفض السيرفر (مثل تجاوز حد اليوم). */
   const patch = useCallback(async (id: string, body: Patch) => {
     const before = ref.current.find((s) => s.id === id);
@@ -101,7 +114,7 @@ export function useSlices(space: SliceSpace) {
     return m;
   }, [slices]);
 
-  return { space, slices, byParent, today, tomorrow, loaded, create, patch, remove, reload: load };
+  return { space, slices, byParent, today, tomorrow, loaded, create, quickAdd, patch, remove, reload: load };
 }
 
 export type SlicesApi = ReturnType<typeof useSlices>;
@@ -197,6 +210,8 @@ export function TodaySlices({ api, parentTitle, onOpenParent, readOnly, icon = "
   readOnly?: boolean; icon?: string; emptyHint?: string; nextLabel?: string;
 }) {
   const { slices, today, tomorrow, patch, loaded } = api;
+  // المهام السريعة ما لها أم
+  const titleOf = (id: string | null) => (id ? parentTitle(id) : "");
   const [showRest, setShowRest] = useState(false);
   const [focusing, setFocusing] = useState<FocusSlice | null>(null);
   const { notice, show } = useNotice();
@@ -220,9 +235,18 @@ export function TodaySlices({ api, parentTitle, onOpenParent, readOnly, icon = "
   }, [rest]);
 
   const run = async (id: string, body: Patch) => { try { await patch(id, body); } catch (e) { show((e as Error).message); } };
+  /** كتابة مهمة في خانة فاضية — ومع «ابدأ» تنفتح جلسة التركيز ويبدأ العدّاد. */
+  const quick = async (title: string, kind: SliceKind, start: boolean) => {
+    try {
+      const row = await api.quickAdd(title, kind);
+      if (row && start) setFocusing(row);
+      return true;
+    } catch (e) { show((e as Error).message); return false; }
+  };
 
-  if (!loaded || slices.length === 0) {
-    if (!loaded) return null;
+  if (!loaded) return null;
+  // بدون شرائح: الخانات الفاضية تنكتب مباشرة، إلا في وضع العرض
+  if (slices.length === 0 && readOnly) {
     return (
       <section className="rounded-[22px] border border-dashed border-border p-4 text-center">
         <p className="text-sm font-bold text-foreground">🎯 شرائح اليوم</p>
@@ -253,13 +277,18 @@ export function TodaySlices({ api, parentTitle, onOpenParent, readOnly, icon = "
         <div className="rounded-2xl border border-orange-400/25 bg-gradient-to-bl from-orange-500/[0.09] to-transparent p-3">
           <p className="text-[11px] font-bold text-orange-300 mb-2">🔥 الشريحة العميقة (٦٠–٩٠ د)</p>
           {deep.length ? deep.map((s) => (
-            <TodayRow key={s.id} slice={s} parent={parentTitle(parentOf(s))} icon={icon} readOnly={readOnly} big
+            <TodayRow key={s.id} slice={s} parent={titleOf(parentOf(s))} icon={icon} readOnly={readOnly} big
               onOpenIdea={() => { const p = parentOf(s); if (p) onOpenParent(p); }}
               onDone={() => run(s.id, { done: !s.done_at })}
               onFocus={() => setFocusing(s)}
               onUnplan={() => run(s.id, { plan: null })} />
-          )) : (
-            <p className="text-xs text-muted-foreground py-3 text-center">اختر شريحة عميقة وحدة من «باقي الشرائح» 👇</p>
+          )) : readOnly ? (
+            <p className="text-xs text-muted-foreground py-3 text-center">ما فيه شريحة عميقة اليوم</p>
+          ) : (
+            <div className="space-y-1.5">
+              <QuickSlot kind="deep" onAdd={quick} placeholder="اكتب الشريحة العميقة هنا…" />
+              <p className="text-[10px] text-muted-foreground text-center">أو اختر وحدة من «باقي الشرائح» 👇</p>
+            </div>
           )}
         </div>
         {/* السطحية */}
@@ -267,14 +296,16 @@ export function TodaySlices({ api, parentTitle, onOpenParent, readOnly, icon = "
           <p className="text-[11px] font-bold text-sky-300 mb-2">⚡ سطحية (أقل من ١٥ د) · {num(shallow.length)}/{num(DAY_LIMIT.shallow)}</p>
           <div className="space-y-1.5">
             {shallow.map((s) => (
-              <TodayRow key={s.id} slice={s} parent={parentTitle(parentOf(s))} icon={icon} readOnly={readOnly}
+              <TodayRow key={s.id} slice={s} parent={titleOf(parentOf(s))} icon={icon} readOnly={readOnly}
                 onOpenIdea={() => { const p = parentOf(s); if (p) onOpenParent(p); }}
                 onDone={() => run(s.id, { done: !s.done_at })}
                 onFocus={() => setFocusing(s)}
                 onUnplan={() => run(s.id, { plan: null })} />
             ))}
             {Array.from({ length: Math.max(0, free.shallow) }).map((_, i) => (
-              <div key={i} className="h-9 rounded-xl border border-dashed border-white/[0.08]" />
+              readOnly || i > 0
+                ? <div key={i} className="h-9 rounded-xl border border-dashed border-white/[0.08]" />
+                : <QuickSlot key={i} kind="shallow" onAdd={quick} placeholder="اكتب مهمة سطحية هنا…" />
             ))}
           </div>
         </div>
@@ -292,9 +323,11 @@ export function TodaySlices({ api, parentTitle, onOpenParent, readOnly, icon = "
             {groups.length === 0 && <p className="text-xs text-muted-foreground text-center py-2">ما فيه شرائح باقية — قطّع {icon === "💡" ? "فكرة جديدة" : "بند جديد"} ✂️</p>}
             {groups.map(([pid, list]) => (
               <div key={pid} className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-2.5">
-                <button onClick={() => pid && onOpenParent(pid)} className="text-[11px] font-bold text-amber-300/90 hover:underline mb-1.5 truncate max-w-full block text-right">
-                  {icon} {parentTitle(pid || null)}
-                </button>
+                {pid ? (
+                  <button onClick={() => onOpenParent(pid)} className="text-[11px] font-bold text-amber-300/90 hover:underline mb-1.5 truncate max-w-full block text-right">
+                    {icon} {parentTitle(pid)}
+                  </button>
+                ) : <p className="text-[11px] font-bold text-amber-300/90 mb-1.5">⚡ مهام سريعة</p>}
                 <div className="space-y-1">
                   {list.map((s) => {
                     const full = free[s.kind] <= 0;
@@ -337,7 +370,7 @@ export function TodaySlices({ api, parentTitle, onOpenParent, readOnly, icon = "
           </div>
         )}
       </div>
-      {focusing && <FocusStartDialog slice={focusing} parent={parentTitle(parentOf(focusing))} onClose={() => setFocusing(null)} />}
+      {focusing && <FocusStartDialog slice={focusing} parent={titleOf(parentOf(focusing))} onClose={() => setFocusing(null)} />}
     </section>
   );
 }
@@ -384,6 +417,45 @@ export function FocusCounter({ signal }: { signal: number }) {
   );
 }
 
+/** خانة فاضية تنكتب فيها مهمة: Enter يضيفها، و«ابدأ» يضيفها ويشغّل العدّاد. */
+function QuickSlot({ kind, placeholder, onAdd }: {
+  kind: SliceKind; placeholder: string; onAdd: (title: string, kind: SliceKind, start: boolean) => Promise<boolean>;
+}) {
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const submit = async (start: boolean) => {
+    const t = text.trim();
+    if (!t || busy) return;
+    setBusy(true);
+    try { if (await onAdd(t, kind, start)) setText(""); } finally { setBusy(false); }
+  };
+  return (
+    <div className="flex items-center gap-1.5 rounded-xl border border-dashed border-white/[0.12] focus-within:border-solid focus-within:border-sky-400/40 px-1.5 py-1">
+      <input
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); submit(false); } }}
+        placeholder={placeholder}
+        maxLength={140}
+        enterKeyHint="done"
+        className="flex-1 min-w-0 bg-transparent px-1.5 py-1 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+      />
+      {text.trim() && (
+        <>
+          <button onClick={() => submit(false)} disabled={busy} title="أضفها لليوم"
+            className="shrink-0 p-1.5 rounded-full text-muted-foreground hover:text-foreground disabled:opacity-40">
+            {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+          </button>
+          <button onClick={() => submit(true)} disabled={busy} title="أضفها وابدأ العدّاد"
+            className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-400/30 hover:bg-emerald-500/25 disabled:opacity-40">
+            <Play className="w-3 h-3" /> ابدأ
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 function TodayRow({ slice, parent, icon, big, readOnly, onDone, onFocus, onUnplan, onOpenIdea }: {
   slice: FocusSlice; parent: string; icon: string; big?: boolean; readOnly?: boolean;
   onDone: () => void; onFocus: () => void; onUnplan: () => void; onOpenIdea: () => void;
@@ -398,7 +470,7 @@ function TodayRow({ slice, parent, icon, big, readOnly, onDone, onFocus, onUnpla
       </button>
       <div className="flex-1 min-w-0">
         <p className={cn("font-bold text-foreground leading-snug", big ? "text-sm sm:text-base" : "text-sm", done && "line-through")}>{slice.title}</p>
-        <button onClick={onOpenIdea} className="text-[10px] text-muted-foreground hover:text-foreground truncate max-w-full block text-right">{icon} {parent}</button>
+        {parent && <button onClick={onOpenIdea} className="text-[10px] text-muted-foreground hover:text-foreground truncate max-w-full block text-right">{icon} {parent}</button>}
       </div>
       {!done && !readOnly && (
         <>

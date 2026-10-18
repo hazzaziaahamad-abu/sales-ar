@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getSliceAccess } from "@/lib/api/focus-slices-access";
 import {
-  SLICE_COLS, SLICE_MAX, SLICES_PER_IDEA_MAX, cleanSliceTitle, isSliceKind, isSliceSpace, nextDayFor, todayRiyadh,
+  DAY_LIMIT, SLICE_COLS, SLICE_KINDS, SLICE_MAX, SLICES_PER_IDEA_MAX, cleanSliceTitle, isSliceKind, isSliceSpace, nextDayFor, todayRiyadh,
 } from "@/lib/focus-slices";
 
 export const runtime = "nodejs";
@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
   if (access instanceof NextResponse) return access;
 
   const parentId = typeof b.parent_id === "string" ? b.parent_id : typeof b.idea_id === "string" ? b.idea_id : "";
+  if (!parentId && b.plan === "today") return quickToday(space, access, b);
   const parentCol = space === "work" ? "work_item_id" : "idea_id";
   const { data: parent } = space === "work"
     ? await supabaseAdmin.from("work_items").select("id").eq("id", parentId).eq("org_id", access.orgId).eq("user_id", access.userId).maybeSingle()
@@ -67,6 +68,37 @@ export async function POST(req: NextRequest) {
       org_id: access.orgId, user_id: access.userId, space, [parentCol]: parentId,
       title: r.title, kind: r.kind, sort_order: base + i,
     })))
+    .select(COLS);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ slices: data ?? [] });
+}
+
+/**
+ * مهمة سريعة بدون أم تنكتب مباشرة في خانة فاضية من «شرائح اليوم»:
+ * POST { space, plan: "today", slices: [{ title, kind }] } — مع فحص الحد اليومي.
+ */
+async function quickToday(space: "ideas" | "work", access: { userId: string; orgId: string }, b: Record<string, unknown>) {
+  const first = Array.isArray(b.slices) && b.slices[0] && typeof b.slices[0] === "object" ? (b.slices[0] as Record<string, unknown>) : {};
+  const title = cleanSliceTitle(first.title);
+  const kind = isSliceKind(first.kind) ? first.kind : "shallow";
+  if (!title) return NextResponse.json({ error: "اكتب المهمة" }, { status: 400 });
+
+  const today = todayRiyadh();
+  const { count } = await supabaseAdmin
+    .from("focus_slices").select("id", { count: "exact", head: true })
+    .eq("org_id", access.orgId).eq("user_id", access.userId).eq("space", space)
+    .eq("planned_for", today).eq("kind", kind);
+  if ((count ?? 0) >= DAY_LIMIT[kind]) {
+    const k = SLICE_KINDS[kind];
+    return NextResponse.json(
+      { error: kind === "deep" ? `${k.icon} عندك شريحة عميقة اليوم — وحدة تكفي` : `${k.icon} اكتملت الشرائح السطحية اليوم (${DAY_LIMIT.shallow})` },
+      { status: 409 }
+    );
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("focus_slices")
+    .insert({ org_id: access.orgId, user_id: access.userId, space, title, kind, planned_for: today })
     .select(COLS);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ slices: data ?? [] });
