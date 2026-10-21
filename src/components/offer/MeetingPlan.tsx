@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import {
   QrCode, CreditCard, Store, MonitorSmartphone, Bike, Gift, Globe, Clock, MessageCircle,
-  Wallet, LayoutDashboard, Rocket, Check, ChevronLeft, ChevronRight, Maximize2, Minimize2,
+  Wallet, LayoutDashboard, Rocket, Check, ChevronLeft, ChevronRight, Maximize2, Minimize2, Sun, Moon,
   Printer, Link2, Sparkles, Stamp, BellRing, GraduationCap, Headphones, CalendarCheck,
   TrendingUp, Users, Palette, ImageIcon, ClipboardList, Timer, Handshake, PartyPopper,
   Coffee, Scissors, Presentation, ShieldCheck, Star,
@@ -175,6 +175,32 @@ const PRODUCTS: Record<ProductKey, Product> = {
 
 const GOLD = "#F5B301";
 
+/* ──────────────────────────── المظاهر ──────────────────────────── */
+
+type ThemeKey = "brand" | "night";
+
+// «هوية المنصة»: نفس ألوان لوحة نحجز (كحلي + بنفسجي على خلفية فاتحة)
+const BRAND_ACCENT = "#5B3FE0";
+const BRAND_DEEP = "#1E2B7A";
+
+const THEMES: Record<ThemeKey, Record<string, string>> = {
+  brand: {
+    "--bg": "#F4F5FA", "--surface": "#FFFFFF", "--surface-2": "#EEF0F7", "--hover": "#EEF0F7",
+    "--line": "#E3E6EF", "--line-strong": "#CDD2E1", "--ink": "#171A3A", "--body": "#3D4262",
+    "--muted": "#666C8E", "--faint": "#9499B4", "--glass": "rgba(255,255,255,.88)", "--grid": "rgba(30,43,122,.06)",
+    "--shadow": "0 1px 2px rgba(23,26,58,.04), 0 12px 32px -18px rgba(23,26,58,.18)", "--glow": "22%",
+  },
+  night: {
+    "--bg": "#070A12", "--surface": "rgba(255,255,255,.03)", "--surface-2": "rgba(255,255,255,.06)", "--hover": "rgba(255,255,255,.06)",
+    "--line": "rgba(255,255,255,.09)", "--line-strong": "rgba(255,255,255,.2)", "--ink": "#FFFFFF", "--body": "#CBD5E1",
+    "--muted": "#94A3B8", "--faint": "#64748B", "--glass": "rgba(7,10,18,.8)", "--grid": "rgba(255,255,255,.035)",
+    "--shadow": "none", "--glow": "35%",
+  },
+};
+
+const accentOf = (p: Product, t: ThemeKey) =>
+  t === "brand" ? { acc: BRAND_ACCENT, deep: BRAND_DEEP } : { acc: p.accent, deep: p.accentDeep };
+
 /* ──────────────────────────── فصول الاجتماع ──────────────────────────── */
 
 const CHAPTERS = [
@@ -258,8 +284,8 @@ function Chapter({ id, n, kicker, title, lead, children }: {
             </span>
             {kicker}
           </div>
-          <h2 className="text-3xl font-black leading-tight text-white sm:text-5xl">{title}</h2>
-          {lead && <p className="mt-4 max-w-2xl text-base leading-relaxed text-slate-400 sm:text-lg">{lead}</p>}
+          <h2 className="text-3xl font-black leading-tight text-[var(--ink)] sm:text-5xl">{title}</h2>
+          {lead && <p className="mt-4 max-w-2xl text-base leading-relaxed text-[var(--muted)] sm:text-lg">{lead}</p>}
         </Reveal>
         <div className="mt-10 sm:mt-14">{children}</div>
       </div>
@@ -267,7 +293,7 @@ function Chapter({ id, n, kicker, title, lead, children }: {
   );
 }
 
-const card = "rounded-3xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-sm";
+const card = "rounded-3xl border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow)]";
 
 /* ──────────────────────────── الصفحة ──────────────────────────── */
 
@@ -276,7 +302,7 @@ const noop = () => () => {};
 // الصفحة تعتمد على تاريخ/ساعة جهاز العارض — نرسمها على المتصفح فقط
 export default function MeetingPlan() {
   const isClient = useSyncExternalStore(noop, () => true, () => false);
-  if (!isClient) return <div className="min-h-screen bg-[#070A12]" />;
+  if (!isClient) return <div className="min-h-screen bg-[var(--bg)]" />;
   return <MeetingPlanInner />;
 }
 
@@ -284,6 +310,17 @@ function MeetingPlanInner() {
   const params = useSearchParams();
   const [productKey, setProductKey] = useState<ProductKey>(params.get("p") === "nahjez" ? "nahjez" : "menu");
   const P = PRODUCTS[productKey];
+  const [theme, setTheme] = useState<ThemeKey>(() => {
+    const q = params.get("theme");
+    if (q === "night" || q === "brand") return q;
+    try { return localStorage.getItem("mp-theme") === "night" ? "night" : "brand"; } catch { return "brand"; }
+  });
+  const toggleTheme = () => {
+    const next = theme === "brand" ? "night" : "brand";
+    setTheme(next);
+    try { localStorage.setItem("mp-theme", next); } catch { /* ignore */ }
+  };
+  const A = accentOf(P, theme);
   const [client, setClient] = useState(params.get("c") ?? "");
   const [tierIdx, setTierIdx] = useState<number>(() => {
     const t = Number(params.get("t") ?? NaN);
@@ -404,15 +441,15 @@ function MeetingPlanInner() {
   return (
     <div
       dir="rtl"
-      className="mp-root min-h-screen w-full overflow-x-hidden bg-[#070A12] text-slate-200"
-      style={{ ["--acc" as string]: P.accent, ["--acc-deep" as string]: P.accentDeep, fontFamily: "var(--font-tajawal), system-ui, sans-serif" } as React.CSSProperties}
+      className="mp-root min-h-screen w-full overflow-x-hidden bg-[var(--bg)] text-[var(--body)]"
+      style={{ ...THEMES[theme], ["--acc" as string]: A.acc, ["--acc-deep" as string]: A.deep, colorScheme: theme === "night" ? "dark" : "light", fontFamily: "var(--font-tajawal), system-ui, sans-serif" } as React.CSSProperties}
     >
       <style>{`
         html { scroll-behavior: smooth; }
         .mp-root ::selection { background: var(--acc); color: white; }
-        .mp-glow { background: radial-gradient(60% 60% at 50% 0%, color-mix(in srgb, var(--acc) 35%, transparent), transparent 70%); }
-        .mp-grid { background-image: linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px); background-size: 48px 48px; mask-image: radial-gradient(70% 60% at 50% 30%, black, transparent); }
-        .mp-range { -webkit-appearance: none; appearance: none; height: 6px; border-radius: 999px; background: rgba(255,255,255,.08); outline: none; }
+        .mp-glow { background: radial-gradient(60% 60% at 50% 0%, color-mix(in srgb, var(--acc) var(--glow), transparent), transparent 70%); }
+        .mp-grid { background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 48px 48px; mask-image: radial-gradient(70% 60% at 50% 30%, black, transparent); }
+        .mp-range { -webkit-appearance: none; appearance: none; height: 6px; border-radius: 999px; background: var(--line); outline: none; }
         .mp-range::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 999px; background: white; border: 4px solid var(--acc); cursor: pointer; box-shadow: 0 0 0 6px color-mix(in srgb, var(--acc) 20%, transparent); }
         .mp-range::-moz-range-thumb { width: 14px; height: 14px; border-radius: 999px; background: white; border: 4px solid var(--acc); cursor: pointer; }
         @keyframes mp-float { 0%,100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-10px) rotate(-1deg); } }
@@ -430,25 +467,25 @@ function MeetingPlanInner() {
       `}</style>
 
       {/* ─── شريط علوي ─── */}
-      <header className="mp-noprint fixed inset-x-0 top-0 z-50 border-b border-white/[0.06] bg-[#070A12]/80 backdrop-blur-xl">
+      <header className="mp-noprint fixed inset-x-0 top-0 z-50 border-b border-[var(--line)] bg-[var(--glass)] backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-2">
             <span className="grid h-9 w-9 place-items-center rounded-xl text-white" style={{ background: "linear-gradient(135deg, var(--acc), var(--acc-deep))" }}>
               <P.icon size={18} />
             </span>
             <div className="hidden leading-tight sm:block">
-              <div className="text-sm font-black text-white">{P.brand}</div>
-              <div className="text-[11px] text-slate-500">خطة الانطلاق</div>
+              <div className="text-sm font-black text-[var(--ink)]">{P.brand}</div>
+              <div className="text-[11px] text-[var(--faint)]">خطة الانطلاق</div>
             </div>
           </div>
 
-          <div className="mx-auto flex rounded-full border border-white/10 bg-white/[0.03] p-1 text-xs font-bold">
+          <div className="mx-auto flex rounded-full border border-[var(--line)] bg-[var(--surface)] p-1 text-xs font-bold">
             {(Object.keys(PRODUCTS) as ProductKey[]).map((k) => (
               <button
                 key={k}
                 onClick={() => switchProduct(k)}
                 className="rounded-full px-3 py-1.5 transition-colors sm:px-4"
-                style={productKey === k ? { background: PRODUCTS[k].accent, color: "white" } : { color: "#94a3b8" }}
+                style={productKey === k ? { background: accentOf(PRODUCTS[k], theme).acc, color: "white" } : { color: "var(--muted)" }}
               >
                 {PRODUCTS[k].brand}
               </button>
@@ -456,11 +493,12 @@ function MeetingPlanInner() {
           </div>
 
           <div className="flex items-center gap-1.5">
-            <span className="hidden items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 font-mono text-xs text-slate-400 md:flex" title="مدة الاجتماع">
+            <span className="hidden items-center gap-1.5 rounded-full border border-[var(--line)] px-3 py-1.5 font-mono text-xs text-[var(--muted)] md:flex" title="مدة الاجتماع">
               <Timer size={13} /> {clock}
             </span>
             <IconBtn onClick={copyLink} title="نسخ رابط الاجتماع">{copied ? <Check size={16} /> : <Link2 size={16} />}</IconBtn>
             <IconBtn onClick={() => window.print()} title="طباعة / PDF"><Printer size={16} /></IconBtn>
+            <IconBtn onClick={toggleTheme} title={theme === "brand" ? "المظهر الليلي" : "هوية المنصة"}>{theme === "brand" ? <Moon size={16} /> : <Sun size={16} />}</IconBtn>
             <IconBtn onClick={toggleFs} title="وضع العرض (F)">{fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</IconBtn>
           </div>
         </div>
@@ -474,7 +512,7 @@ function MeetingPlanInner() {
                 key={c.id}
                 onClick={() => goTo(i)}
                 className="flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition-all"
-                style={on ? { background: "color-mix(in srgb, var(--acc) 22%, transparent)", color: "white", boxShadow: "inset 0 0 0 1px var(--acc)" } : { color: done ? "#cbd5e1" : "#64748b" }}
+                style={on ? { background: "var(--acc)", color: "white" } : { color: done ? "var(--body)" : "var(--faint)" }}
               >
                 {done ? <Check size={12} style={{ color: "var(--acc)" }} /> : <c.icon size={12} />}
                 {c.label}
@@ -482,7 +520,7 @@ function MeetingPlanInner() {
             );
           })}
         </nav>
-        <div className="h-[2px] bg-white/[0.04]">
+        <div className="h-[2px] bg-[var(--surface)]">
           <div className="h-full transition-all duration-500" style={{ width: `${((activeIdx + 1) / CHAPTERS.length) * 100}%`, background: "linear-gradient(90deg, var(--acc), " + GOLD + ")" }} />
         </div>
       </header>
@@ -493,34 +531,34 @@ function MeetingPlanInner() {
         <div className="mp-grid pointer-events-none absolute inset-0" />
         <div className="relative mx-auto grid w-full max-w-6xl items-center gap-12 lg:grid-cols-[1.2fr_1fr]">
           <Reveal>
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-1.5 text-xs font-bold text-slate-300">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--surface)] px-4 py-1.5 text-xs font-bold text-[var(--body)]">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full" style={{ background: "var(--acc)" }} />
               خطة انطلاق مُعدّة خصيصاً · {today.toLocaleDateString(LOCALE, { day: "numeric", month: "long", year: "numeric" })}
             </div>
-            <h1 className="text-4xl font-black leading-[1.15] text-white sm:text-6xl">
+            <h1 className="text-4xl font-black leading-[1.15] text-[var(--ink)] sm:text-6xl">
               أهلاً
               <input
                 value={client}
                 onChange={(e) => setClient(e.target.value)}
                 placeholder="اسم العميل / المنشأة"
-                className="mp-noprint mx-2 inline-block w-[8.5em] max-w-full rounded-xl border border-dashed border-white/20 bg-transparent px-2 align-baseline text-[0.85em] font-black outline-none placeholder:text-slate-600 focus:border-[var(--acc)]"
+                className="mp-noprint mx-2 inline-block w-[8.5em] max-w-full rounded-xl border border-dashed border-[var(--line)] bg-transparent px-2 align-baseline text-[0.85em] font-black outline-none placeholder:text-[var(--faint)] focus:border-[var(--acc)]"
                 style={{ color: "var(--acc)" }}
               />
               <span className="hidden print:inline" style={{ color: "var(--acc)" }}>{who}</span>
               <br />
-              <span className="bg-clip-text text-transparent" style={{ backgroundImage: `linear-gradient(90deg, #fff, ${GOLD})` }}>
+              <span className="bg-clip-text text-transparent" style={{ backgroundImage: "linear-gradient(90deg, var(--ink), var(--acc))" }}>
                 خلّنا نرسم طريق نجاحك
               </span>
             </h1>
-            <p className="mt-6 max-w-xl text-lg leading-relaxed text-slate-400">
+            <p className="mt-6 max-w-xl text-lg leading-relaxed text-[var(--muted)]">
               {P.pitch} في هذا الاجتماع نمشي معك خطوة بخطوة: من الاشتراك إلى الإطلاق، ومن تدريب فريقك إلى أول تقرير نتائج.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <button onClick={() => goTo(1)} className="inline-flex items-center gap-2 rounded-full px-7 py-3.5 font-extrabold text-white shadow-2xl transition-transform hover:-translate-y-0.5" style={{ background: "linear-gradient(135deg, var(--acc), var(--acc-deep))", boxShadow: "0 20px 50px -15px var(--acc)" }}>
                 ابدأ العرض <ChevronLeft size={18} />
               </button>
-              <div className="flex items-center gap-2 rounded-full border border-white/10 px-5 py-3.5 text-sm text-slate-400">
-                <Rocket size={16} style={{ color: GOLD }} /> الإطلاق خلال <b className="text-white">٧ أيام</b>
+              <div className="flex items-center gap-2 rounded-full border border-[var(--line)] px-5 py-3.5 text-sm text-[var(--muted)]">
+                <Rocket size={16} style={{ color: GOLD }} /> الإطلاق خلال <b className="text-[var(--ink)]">٧ أيام</b>
               </div>
             </div>
           </Reveal>
@@ -529,18 +567,18 @@ function MeetingPlanInner() {
           <Reveal delay={150}>
             <div className={`${card} p-6`}>
               <div className="mb-4 flex items-center justify-between">
-                <div className="text-sm font-black text-white">أجندة الاجتماع</div>
-                <div className="text-xs text-slate-500">~ ٣٠ دقيقة</div>
+                <div className="text-sm font-black text-[var(--ink)]">أجندة الاجتماع</div>
+                <div className="text-xs text-[var(--faint)]">~ ٣٠ دقيقة</div>
               </div>
               <ol className="space-y-1">
                 {CHAPTERS.slice(1).map((c, i) => (
                   <li key={c.id}>
-                    <button onClick={() => goTo(i + 1)} className="group flex w-full items-center gap-3 rounded-xl px-2 py-2 text-right transition-colors hover:bg-white/[0.04]">
-                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/[0.05] text-slate-400 transition-colors group-hover:text-white" style={{}}>
+                    <button onClick={() => goTo(i + 1)} className="group flex w-full items-center gap-3 rounded-xl px-2 py-2 text-right transition-colors hover:bg-[var(--hover)]">
+                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--surface-2)] text-[var(--muted)] transition-colors group-hover:text-[var(--ink)]" style={{}}>
                         <c.icon size={15} />
                       </span>
-                      <span className="flex-1 text-sm font-bold text-slate-300 group-hover:text-white">{c.label}</span>
-                      <span className="font-mono text-[11px] text-slate-600">{String(i + 1).padStart(2, "0")}</span>
+                      <span className="flex-1 text-sm font-bold text-[var(--body)] group-hover:text-[var(--ink)]">{c.label}</span>
+                      <span className="font-mono text-[11px] text-[var(--faint)]">{String(i + 1).padStart(2, "0")}</span>
                     </button>
                   </li>
                 ))}
@@ -557,11 +595,11 @@ function MeetingPlanInner() {
             {P.features.map((f, i) => (
               <Reveal key={f.title} delay={i * 60}>
                 <div className={`${card} group h-full p-6 transition-all hover:-translate-y-1 hover:border-[var(--acc)]/40`}>
-                  <span className="mb-4 grid h-12 w-12 place-items-center rounded-2xl text-white transition-transform group-hover:scale-110" style={{ background: "color-mix(in srgb, var(--acc) 18%, transparent)", color: "var(--acc)" }}>
+                  <span className="mb-4 grid h-12 w-12 place-items-center rounded-2xl text-[var(--ink)] transition-transform group-hover:scale-110" style={{ background: "color-mix(in srgb, var(--acc) 18%, transparent)", color: "var(--acc)" }}>
                     <f.icon size={22} />
                   </span>
-                  <div className="text-lg font-black text-white">{f.title}</div>
-                  <p className="mt-1.5 text-sm leading-relaxed text-slate-400">{f.text}</p>
+                  <div className="text-lg font-black text-[var(--ink)]">{f.title}</div>
+                  <p className="mt-1.5 text-sm leading-relaxed text-[var(--muted)]">{f.text}</p>
                 </div>
               </Reveal>
             ))}
@@ -583,26 +621,26 @@ function MeetingPlanInner() {
                   onClick={() => setTierIdx(i)}
                   className={`relative flex h-full w-full flex-col rounded-3xl border p-6 text-right transition-all ${sel ? "-translate-y-1" : "hover:-translate-y-0.5"}`}
                   style={sel
-                    ? { borderColor: "var(--acc)", background: "linear-gradient(180deg, color-mix(in srgb, var(--acc) 16%, transparent), rgba(255,255,255,.02))", boxShadow: "0 30px 60px -30px var(--acc)" }
-                    : { borderColor: "rgba(255,255,255,.08)", background: "rgba(255,255,255,.02)" }}
+                    ? { borderColor: "var(--acc)", background: "linear-gradient(180deg, color-mix(in srgb, var(--acc) 16%, transparent), var(--surface))", boxShadow: "0 30px 60px -30px var(--acc)" }
+                    : { borderColor: "var(--line)", background: "var(--surface)" }}
                 >
                   {t.badge && (
                     <span className="absolute -top-3 left-5 rounded-full px-3 py-1 text-[11px] font-black text-[#1a1306]" style={{ background: GOLD }}>{t.badge}</span>
                   )}
                   <div className="flex items-center justify-between">
-                    <span className="text-lg font-black text-white">{t.name}</span>
-                    <span className="grid h-6 w-6 place-items-center rounded-full border-2 transition-colors" style={{ borderColor: sel ? "var(--acc)" : "rgba(255,255,255,.2)", background: sel ? "var(--acc)" : "transparent" }}>
+                    <span className="text-lg font-black text-[var(--ink)]">{t.name}</span>
+                    <span className="grid h-6 w-6 place-items-center rounded-full border-2 transition-colors" style={{ borderColor: sel ? "var(--acc)" : "var(--line-strong)", background: sel ? "var(--acc)" : "transparent" }}>
                       {sel && <Check size={13} className="text-white" />}
                     </span>
                   </div>
                   <div className="mt-4 flex items-baseline gap-1.5">
-                    <span className="text-4xl font-black text-white">{fmt(t.price)}</span>
-                    <span className="text-sm text-slate-400">{t.period}</span>
+                    <span className="text-4xl font-black text-[var(--ink)]">{fmt(t.price)}</span>
+                    <span className="text-sm text-[var(--muted)]">{t.period}</span>
                   </div>
-                  <p className="mt-1 text-xs text-slate-500">{t.note}</p>
-                  <ul className="mt-5 space-y-2.5 border-t border-white/[0.06] pt-5">
+                  <p className="mt-1 text-xs text-[var(--faint)]">{t.note}</p>
+                  <ul className="mt-5 space-y-2.5 border-t border-[var(--line)] pt-5">
                     {t.features.map((f) => (
-                      <li key={f} className="flex items-start gap-2 text-sm text-slate-300">
+                      <li key={f} className="flex items-start gap-2 text-sm text-[var(--body)]">
                         <Check size={15} className="mt-0.5 shrink-0" style={{ color: "var(--acc)" }} /> {f}
                       </li>
                     ))}
@@ -614,8 +652,8 @@ function MeetingPlanInner() {
         </div>
         {!tier.loyalty && (
           <Reveal>
-            <p className="mt-6 text-center text-sm text-slate-500">
-              💡 بطاقات الولاء والهدايا متاحة في باقة <b className="text-slate-300">{P.tiers.find((t) => t.loyalty)?.name}</b> — وهي اللي تصنع العميل المتكرّر.
+            <p className="mt-6 text-center text-sm text-[var(--faint)]">
+              💡 بطاقات الولاء والهدايا متاحة في باقة <b className="text-[var(--body)]">{P.tiers.find((t) => t.loyalty)?.name}</b> — وهي اللي تصنع العميل المتكرّر.
             </p>
           </Reveal>
         )}
@@ -634,14 +672,14 @@ function MeetingPlanInner() {
                   <li className="relative flex gap-4 md:flex-col md:gap-3">
                     <span
                       className="relative z-10 grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-black"
-                      style={last ? { background: GOLD, color: "#1a1306", boxShadow: `0 0 0 6px ${GOLD}22` } : { background: "#0d1220", color: "var(--acc)", boxShadow: "inset 0 0 0 2px var(--acc)" }}
+                      style={last ? { background: GOLD, color: "#1a1306", boxShadow: `0 0 0 6px ${GOLD}22` } : { background: "var(--surface)", color: "var(--acc)", boxShadow: "inset 0 0 0 2px var(--acc)" }}
                     >
                       {last ? <Rocket size={17} /> : fmt(i + 1)}
                     </span>
                     <div>
-                      <div className="text-[11px] font-bold text-slate-500">{s.day === 0 ? "اليوم" : `يوم ${fmt(s.day)}`} · {dayLabel(addDays(today, s.day))}</div>
-                      <div className="mt-0.5 font-black text-white">{s.title}</div>
-                      <p className="mt-1 text-xs leading-relaxed text-slate-400">{s.text}</p>
+                      <div className="text-[11px] font-bold text-[var(--faint)]">{s.day === 0 ? "اليوم" : `يوم ${fmt(s.day)}`} · {dayLabel(addDays(today, s.day))}</div>
+                      <div className="mt-0.5 font-black text-[var(--ink)]">{s.title}</div>
+                      <p className="mt-1 text-xs leading-relaxed text-[var(--muted)]">{s.text}</p>
                     </div>
                   </li>
                 </Reveal>
@@ -656,20 +694,20 @@ function MeetingPlanInner() {
         <div className="grid gap-5 lg:grid-cols-[1fr_1fr_260px]">
           <Reveal>
             <div className={`${card} h-full p-6`}>
-              <div className="mb-4 flex items-center gap-2 text-sm font-black text-white"><ClipboardList size={16} style={{ color: GOLD }} /> منك</div>
+              <div className="mb-4 flex items-center gap-2 text-sm font-black text-[var(--ink)]"><ClipboardList size={16} style={{ color: GOLD }} /> منك</div>
               <ul className="space-y-2">
                 {P.fromClient.map((it, i) => (
                   <li key={it.text}>
                     <button
                       onClick={() => setReady((r) => r.map((v, j) => (j === i ? !v : v)))}
-                      className="flex w-full items-center gap-3 rounded-2xl border border-white/[0.06] px-3 py-3 text-right transition-all hover:bg-white/[0.03]"
+                      className="flex w-full items-center gap-3 rounded-2xl border border-[var(--line)] px-3 py-3 text-right transition-all hover:bg-[var(--hover)]"
                       style={ready[i] ? { borderColor: "color-mix(in srgb, var(--acc) 50%, transparent)", background: "color-mix(in srgb, var(--acc) 8%, transparent)" } : {}}
                     >
-                      <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg border-2 transition-colors" style={{ borderColor: ready[i] ? "var(--acc)" : "rgba(255,255,255,.18)", background: ready[i] ? "var(--acc)" : "transparent" }}>
+                      <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg border-2 transition-colors" style={{ borderColor: ready[i] ? "var(--acc)" : "var(--line-strong)", background: ready[i] ? "var(--acc)" : "transparent" }}>
                         {ready[i] && <Check size={13} className="mp-pop text-white" />}
                       </span>
-                      <it.icon size={16} className="shrink-0 text-slate-500" />
-                      <span className={`text-sm font-bold ${ready[i] ? "text-white" : "text-slate-300"}`}>{it.text}</span>
+                      <it.icon size={16} className="shrink-0 text-[var(--faint)]" />
+                      <span className={`text-sm font-bold ${ready[i] ? "text-[var(--ink)]" : "text-[var(--body)]"}`}>{it.text}</span>
                     </button>
                   </li>
                 ))}
@@ -678,10 +716,10 @@ function MeetingPlanInner() {
           </Reveal>
           <Reveal delay={100}>
             <div className={`${card} h-full p-6`}>
-              <div className="mb-4 flex items-center gap-2 text-sm font-black text-white"><ShieldCheck size={16} style={{ color: "var(--acc)" }} /> علينا</div>
+              <div className="mb-4 flex items-center gap-2 text-sm font-black text-[var(--ink)]"><ShieldCheck size={16} style={{ color: "var(--acc)" }} /> علينا</div>
               <ul className="space-y-3">
                 {P.fromUs.map((t) => (
-                  <li key={t} className="flex items-start gap-3 text-sm text-slate-300">
+                  <li key={t} className="flex items-start gap-3 text-sm text-[var(--body)]">
                     <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full" style={{ background: "color-mix(in srgb, var(--acc) 20%, transparent)" }}>
                       <Check size={12} style={{ color: "var(--acc)" }} />
                     </span>
@@ -694,8 +732,8 @@ function MeetingPlanInner() {
           <Reveal delay={200}>
             <div className={`${card} flex h-full flex-col items-center justify-center p-6 text-center`}>
               <Ring value={readyCount / P.fromClient.length} />
-              <div className="mt-4 text-sm font-black text-white">جاهزية البيانات</div>
-              <p className="mt-1 text-xs leading-relaxed text-slate-500">
+              <div className="mt-4 text-sm font-black text-[var(--ink)]">جاهزية البيانات</div>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--faint)]">
                 {readyCount === P.fromClient.length ? "كل شي جاهز — نقدر نبدأ البناء اليوم 🎉" : `باقي ${fmt(P.fromClient.length - readyCount)} — نرسل لك القائمة على الواتساب`}
               </p>
             </div>
@@ -747,11 +785,11 @@ function MeetingPlanInner() {
               </button>
 
               {/* إشعار قرب المحل */}
-              <div className="mx-auto mt-5 flex max-w-sm items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-3.5 backdrop-blur">
+              <div className="mx-auto mt-5 flex max-w-sm items-start gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-3.5 backdrop-blur">
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-white" style={{ background: "var(--acc)" }}><BellRing size={16} /></span>
                 <div className="text-xs leading-relaxed">
-                  <div className="font-black text-white">{who} · الآن</div>
-                  <div className="text-slate-400">أنت قريب منّا 👋 باقي لك {fmt(Math.max(stampsTotal - stamps, 0))} {P.stampWord} على {reward}!</div>
+                  <div className="font-black text-[var(--ink)]">{who} · الآن</div>
+                  <div className="text-[var(--muted)]">أنت قريب منّا 👋 باقي لك {fmt(Math.max(stampsTotal - stamps, 0))} {P.stampWord} على {reward}!</div>
                 </div>
               </div>
             </div>
@@ -760,19 +798,19 @@ function MeetingPlanInner() {
           <Reveal delay={120}>
             <div className="space-y-5">
               <div className={`${card} p-5`}>
-                <div className="mb-3 text-sm font-black text-white">صمّم برنامجك الآن</div>
-                <label className="mb-1.5 block text-xs text-slate-500">عدد الأختام للمكافأة</label>
+                <div className="mb-3 text-sm font-black text-[var(--ink)]">صمّم برنامجك الآن</div>
+                <label className="mb-1.5 block text-xs text-[var(--faint)]">عدد الأختام للمكافأة</label>
                 <div className="flex flex-wrap gap-2">
                   {[4, 5, 6, 8, 10].map((n) => (
                     <button key={n} onClick={() => { setStampsTotal(n); setStamps((s) => Math.min(s, n)); }}
                       className="h-10 w-12 rounded-xl border text-sm font-black transition-colors"
-                      style={stampsTotal === n ? { borderColor: "var(--acc)", background: "var(--acc)", color: "white" } : { borderColor: "rgba(255,255,255,.1)", color: "#94a3b8" }}>
+                      style={stampsTotal === n ? { borderColor: "var(--acc)", background: "var(--acc)", color: "white" } : { borderColor: "var(--line)", color: "var(--muted)" }}>
                       {fmt(n)}
                     </button>
                   ))}
                 </div>
-                <label className="mb-1.5 mt-4 block text-xs text-slate-500">المكافأة</label>
-                <input value={reward} onChange={(e) => setReward(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-sm font-bold text-white outline-none focus:border-[var(--acc)]" />
+                <label className="mb-1.5 mt-4 block text-xs text-[var(--faint)]">المكافأة</label>
+                <input value={reward} onChange={(e) => setReward(e.target.value)} className="w-full rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 text-sm font-bold text-[var(--ink)] outline-none focus:border-[var(--acc)]" />
               </div>
               <div className="grid gap-3 sm:grid-cols-3">
                 {[
@@ -782,8 +820,8 @@ function MeetingPlanInner() {
                 ].map((s) => (
                   <div key={s.t} className={`${card} p-4`}>
                     <s.icon size={18} style={{ color: "var(--acc)" }} />
-                    <div className="mt-2 text-sm font-black text-white">{s.t}</div>
-                    <div className="mt-1 text-xs leading-relaxed text-slate-500">{s.d}</div>
+                    <div className="mt-2 text-sm font-black text-[var(--ink)]">{s.t}</div>
+                    <div className="mt-1 text-xs leading-relaxed text-[var(--faint)]">{s.d}</div>
                   </div>
                 ))}
               </div>
@@ -821,18 +859,18 @@ function MeetingPlanInner() {
           <Reveal delay={120} className="lg:order-1">
             <div className="space-y-5">
               <div className={`${card} p-5`}>
-                <div className="mb-3 text-sm font-black text-white">جرّب تصميم بطاقة</div>
+                <div className="mb-3 text-sm font-black text-[var(--ink)]">جرّب تصميم بطاقة</div>
                 <div className="flex flex-wrap gap-2">
                   {[100, 200, 300, 500, 1000].map((a) => (
                     <button key={a} onClick={() => setGiftAmount(a)}
                       className="rounded-xl border px-4 py-2 text-sm font-black transition-colors"
-                      style={giftAmount === a ? { borderColor: GOLD, background: GOLD, color: "#1a1306" } : { borderColor: "rgba(255,255,255,.1)", color: "#94a3b8" }}>
+                      style={giftAmount === a ? { borderColor: GOLD, background: GOLD, color: "#1a1306" } : { borderColor: "var(--line)", color: "var(--muted)" }}>
                       {fmt(a)}
                     </button>
                   ))}
                 </div>
-                <label className="mb-1.5 mt-4 block text-xs text-slate-500">اسم المُهدى إليه</label>
-                <input value={giftTo} onChange={(e) => setGiftTo(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-sm font-bold text-white outline-none focus:border-[#F5B301]" />
+                <label className="mb-1.5 mt-4 block text-xs text-[var(--faint)]">اسم المُهدى إليه</label>
+                <input value={giftTo} onChange={(e) => setGiftTo(e.target.value)} className="w-full rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 text-sm font-bold text-[var(--ink)] outline-none focus:border-[#F5B301]" />
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 {[
@@ -844,8 +882,8 @@ function MeetingPlanInner() {
                   <div key={s.t} className={`${card} flex gap-3 p-4`}>
                     <span className="text-2xl">{s.e}</span>
                     <div>
-                      <div className="text-sm font-black text-white">{s.t}</div>
-                      <div className="mt-0.5 text-xs leading-relaxed text-slate-500">{s.d}</div>
+                      <div className="text-sm font-black text-[var(--ink)]">{s.t}</div>
+                      <div className="mt-0.5 text-xs leading-relaxed text-[var(--faint)]">{s.d}</div>
                     </div>
                   </div>
                 ))}
@@ -865,14 +903,14 @@ function MeetingPlanInner() {
                   <span className="grid h-12 w-12 place-items-center rounded-2xl" style={{ background: "color-mix(in srgb, var(--acc) 18%, transparent)", color: "var(--acc)" }}>
                     <s.icon size={22} />
                   </span>
-                  <span className="flex items-center gap-1 rounded-full border border-white/10 px-3 py-1 text-xs font-bold text-slate-400">
+                  <span className="flex items-center gap-1 rounded-full border border-[var(--line)] px-3 py-1 text-xs font-bold text-[var(--muted)]">
                     <Clock size={12} /> {fmt(s.mins)} دقيقة
                   </span>
                 </div>
-                <div className="mt-4 text-lg font-black text-white">{s.who}</div>
+                <div className="mt-4 text-lg font-black text-[var(--ink)]">{s.who}</div>
                 <ul className="mt-3 space-y-2">
                   {s.items.map((it) => (
-                    <li key={it} className="flex items-center gap-2 text-sm text-slate-400">
+                    <li key={it} className="flex items-center gap-2 text-sm text-[var(--muted)]">
                       <span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--acc)" }} /> {it}
                     </li>
                   ))}
@@ -891,9 +929,9 @@ function MeetingPlanInner() {
               <div className={`${card} relative h-full overflow-hidden p-5`}>
                 <div className="absolute inset-x-0 top-0 h-1" style={{ background: `linear-gradient(90deg, var(--acc), ${GOLD})`, opacity: 0.35 + i * 0.15 }} />
                 <div className="text-[11px] font-bold" style={{ color: "var(--acc)" }}>{f.when}</div>
-                <f.icon size={20} className="mt-3 text-white" />
-                <div className="mt-2 font-black text-white">{f.title}</div>
-                <p className="mt-1 text-xs leading-relaxed text-slate-400">{f.text}</p>
+                <f.icon size={20} className="mt-3 text-[var(--ink)]" />
+                <div className="mt-2 font-black text-[var(--ink)]">{f.title}</div>
+                <p className="mt-1 text-xs leading-relaxed text-[var(--muted)]">{f.text}</p>
               </div>
             </Reveal>
           ))}
@@ -908,14 +946,14 @@ function MeetingPlanInner() {
               {P.calc.map((f) => (
                 <div key={f.key}>
                   <div className="mb-2 flex items-center justify-between text-sm">
-                    <span className="font-bold text-slate-300">{f.label}</span>
-                    <span className="font-black text-white">{fmt(calc[f.key])} <span className="text-xs font-bold text-slate-500">{f.unit}</span></span>
+                    <span className="font-bold text-[var(--body)]">{f.label}</span>
+                    <span className="font-black text-[var(--ink)]">{fmt(calc[f.key])} <span className="text-xs font-bold text-[var(--faint)]">{f.unit}</span></span>
                   </div>
                   <input
                     type="range" min={f.min} max={f.max} step={f.step} value={calc[f.key]}
                     onChange={(e) => setCalc((c) => ({ ...c, [f.key]: Number(e.target.value) }))}
                     className="mp-range w-full"
-                    style={{ background: `linear-gradient(to left, var(--acc) ${((calc[f.key] - f.min) / (f.max - f.min)) * 100}%, rgba(255,255,255,.08) 0)` }}
+                    style={{ background: `linear-gradient(to left, var(--acc) ${((calc[f.key] - f.min) / (f.max - f.min)) * 100}%, var(--line) 0)` }}
                     dir="rtl"
                   />
                 </div>
@@ -925,13 +963,13 @@ function MeetingPlanInner() {
 
           <Reveal delay={120}>
             <div className="space-y-4">
-              <div className="relative overflow-hidden rounded-3xl p-7" style={{ background: "linear-gradient(135deg, color-mix(in srgb, var(--acc) 30%, #0b0f1a), #0b0f1a)", boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--acc) 40%, transparent)" }}>
-                <div className="text-sm font-bold text-slate-300">عائد إضافي متوقع شهرياً</div>
+              <div className="relative overflow-hidden rounded-3xl p-7" style={{ background: "linear-gradient(120deg, #15172e, var(--acc-deep) 55%, var(--acc))", boxShadow: "0 30px 60px -30px var(--acc)" }}>
+                <div className="text-sm font-bold text-white/85">عائد إضافي متوقع شهرياً</div>
                 <div className="mt-2 flex items-baseline gap-2">
                   <span className="text-5xl font-black text-white sm:text-6xl">{fmt(monthly)}</span>
-                  <span className="text-lg font-bold text-slate-400">ريال</span>
+                  <span className="text-lg font-bold text-white/60">ريال</span>
                 </div>
-                <div className="mt-5 flex h-3 overflow-hidden rounded-full bg-white/[0.06]">
+                <div className="mt-5 flex h-3 overflow-hidden rounded-full bg-white/15">
                   {parts.map((p) => (
                     <div key={p.label} className="h-full transition-all duration-500" style={{ width: `${monthly ? (p.value / monthly) * 100 : 0}%`, background: p.color }} />
                   ))}
@@ -939,7 +977,7 @@ function MeetingPlanInner() {
                 <ul className="mt-4 space-y-2">
                   {parts.map((p) => (
                     <li key={p.label} className="flex items-center justify-between text-sm">
-                      <span className="flex items-center gap-2 text-slate-300"><span className="h-2.5 w-2.5 rounded-full" style={{ background: p.color }} />{p.label}</span>
+                      <span className="flex items-center gap-2 text-white/85"><span className="h-2.5 w-2.5 rounded-full ring-2 ring-white/70" style={{ background: p.color }} />{p.label}</span>
                       <span className="font-black text-white">{fmt(p.value)}</span>
                     </li>
                   ))}
@@ -952,13 +990,13 @@ function MeetingPlanInner() {
               </div>
               <div className="flex items-center gap-3 rounded-2xl border p-4 text-sm" style={{ borderColor: `${GOLD}55`, background: `${GOLD}10` }}>
                 <Sparkles size={20} style={{ color: GOLD }} className="shrink-0" />
-                <span className="text-slate-300">
+                <span className="text-[var(--body)]">
                   {paybackDays > 0
-                    ? <>الاشتراك يسدّد قيمته خلال <b className="text-white">{fmt(paybackDays)} يوم</b> تقريباً — والباقي ربح صافي لك.</>
+                    ? <>الاشتراك يسدّد قيمته خلال <b className="text-[var(--ink)]">{fmt(paybackDays)} يوم</b> تقريباً — والباقي ربح صافي لك.</>
                     : "حرّك المؤشرات لرؤية العائد."}
                 </span>
               </div>
-              <p className="text-[11px] leading-relaxed text-slate-600">
+              <p className="text-[11px] leading-relaxed text-[var(--faint)]">
                 * تقديرات استرشادية مبنية على الأرقام المُدخلة{productKey === "menu" ? " (عمولة توصيل افتراضية ٢٠٪)" : " (انخفاض الغياب ٥٠٪ بالتذكير)"}، والنتائج الفعلية تختلف حسب النشاط والتطبيق.
               </p>
             </div>
@@ -972,11 +1010,11 @@ function MeetingPlanInner() {
         <div className="relative mx-auto max-w-3xl text-center">
           <Reveal>
             <div className="mb-3 text-sm font-bold" style={{ color: "var(--acc)" }}>الخطوة التالية</div>
-            <h2 className="text-3xl font-black leading-tight text-white sm:text-5xl">جاهزين نبدأ يا {who}؟</h2>
+            <h2 className="text-3xl font-black leading-tight text-[var(--ink)] sm:text-5xl">جاهزين نبدأ يا {who}؟</h2>
           </Reveal>
           <Reveal delay={100}>
             <div className={`${card} mx-auto mt-10 max-w-xl p-6 text-right`}>
-              <div className="mb-4 text-xs font-bold text-slate-500">ملخص الاتفاق</div>
+              <div className="mb-4 text-xs font-bold text-[var(--faint)]">ملخص الاتفاق</div>
               {[
                 ["النظام", P.brand],
                 ["الباقة", `${tier.name} — ${fmt(tier.price)} ${tier.period}`],
@@ -984,9 +1022,9 @@ function MeetingPlanInner() {
                 ["الإطلاق المتوقع", launchDate.toLocaleDateString(LOCALE, { weekday: "long", day: "numeric", month: "long" })],
                 ["العائد الشهري المتوقع", `~ ${fmt(monthly)} ريال`],
               ].map(([k, v]) => (
-                <div key={k} className="flex items-center justify-between border-b border-white/[0.05] py-3 text-sm last:border-0">
-                  <span className="text-slate-400">{k}</span>
-                  <span className="font-black text-white">{v}</span>
+                <div key={k} className="flex items-center justify-between border-b border-[var(--line)] py-3 text-sm last:border-0">
+                  <span className="text-[var(--muted)]">{k}</span>
+                  <span className="font-black text-[var(--ink)]">{v}</span>
                 </div>
               ))}
             </div>
@@ -998,10 +1036,10 @@ function MeetingPlanInner() {
                 style={{ background: "#16a34a", boxShadow: "0 20px 50px -15px #16a34a" }}>
                 <MessageCircle size={18} /> أرسل الملخص واتساب
               </a>
-              <button onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-full border border-white/15 px-6 py-3.5 font-bold text-slate-200 hover:bg-white/[0.05]">
+              <button onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] px-6 py-3.5 font-bold text-[var(--body)] hover:bg-[var(--hover)]">
                 <Printer size={17} /> حفظ PDF
               </button>
-              <button onClick={copyLink} className="inline-flex items-center gap-2 rounded-full border border-white/15 px-6 py-3.5 font-bold text-slate-200 hover:bg-white/[0.05]">
+              <button onClick={copyLink} className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] px-6 py-3.5 font-bold text-[var(--body)] hover:bg-[var(--hover)]">
                 {copied ? <Check size={17} /> : <Link2 size={17} />} {copied ? "تم النسخ" : "نسخ الرابط"}
               </button>
             </div>
@@ -1010,12 +1048,12 @@ function MeetingPlanInner() {
       </section>
 
       {/* ─── تنقّل سفلي ─── */}
-      <div className="mp-noprint fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-1 rounded-full border border-white/10 bg-[#0d1220]/90 p-1.5 shadow-2xl backdrop-blur-xl">
-        <button onClick={() => goTo(activeIdx - 1)} disabled={activeIdx <= 0} className="grid h-9 w-9 place-items-center rounded-full text-slate-300 hover:bg-white/10 disabled:opacity-30" aria-label="السابق">
+      <div className="mp-noprint fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-1 rounded-full border border-[var(--line)] bg-[var(--glass)] p-1.5 shadow-2xl backdrop-blur-xl">
+        <button onClick={() => goTo(activeIdx - 1)} disabled={activeIdx <= 0} className="grid h-9 w-9 place-items-center rounded-full text-[var(--body)] hover:bg-[var(--hover)] disabled:opacity-30" aria-label="السابق">
           <ChevronRight size={18} />
         </button>
-        <span className="min-w-[110px] px-2 text-center text-xs font-bold text-slate-300">
-          {CHAPTERS[Math.max(0, activeIdx)].label} <span className="text-slate-600">· {fmt(Math.max(0, activeIdx) + 1)}/{fmt(CHAPTERS.length)}</span>
+        <span className="min-w-[110px] px-2 text-center text-xs font-bold text-[var(--body)]">
+          {CHAPTERS[Math.max(0, activeIdx)].label} <span className="text-[var(--faint)]">· {fmt(Math.max(0, activeIdx) + 1)}/{fmt(CHAPTERS.length)}</span>
         </span>
         <button onClick={() => goTo(activeIdx + 1)} disabled={activeIdx >= CHAPTERS.length - 1} className="grid h-9 w-9 place-items-center rounded-full text-white disabled:opacity-30" style={{ background: "var(--acc)" }} aria-label="التالي">
           <ChevronLeft size={18} />
@@ -1029,7 +1067,7 @@ function MeetingPlanInner() {
 
 function IconBtn({ children, onClick, title }: { children: React.ReactNode; onClick: () => void; title: string }) {
   return (
-    <button onClick={onClick} title={title} aria-label={title} className="grid h-9 w-9 place-items-center rounded-full border border-white/10 text-slate-400 transition-colors hover:bg-white/[0.06] hover:text-white">
+    <button onClick={onClick} title={title} aria-label={title} className="grid h-9 w-9 place-items-center rounded-full border border-[var(--line)] text-[var(--muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--ink)]">
       {children}
     </button>
   );
@@ -1038,9 +1076,9 @@ function IconBtn({ children, onClick, title }: { children: React.ReactNode; onCl
 function Stat({ label, value, unit, accent }: { label: string; value: string; unit: string; accent?: boolean }) {
   return (
     <div className={`${card} p-4`} style={accent ? { borderColor: `${GOLD}55` } : {}}>
-      <div className="text-[11px] text-slate-500">{label}</div>
-      <div className="mt-1 text-xl font-black sm:text-2xl" style={{ color: accent ? GOLD : "white" }}>{value}</div>
-      <div className="text-[10px] text-slate-600">{unit}</div>
+      <div className="text-[11px] text-[var(--faint)]">{label}</div>
+      <div className="mt-1 text-xl font-black sm:text-2xl" style={{ color: accent ? GOLD : "var(--ink)" }}>{value}</div>
+      <div className="text-[10px] text-[var(--faint)]">{unit}</div>
     </div>
   );
 }
@@ -1051,11 +1089,11 @@ function Ring({ value }: { value: number }) {
   return (
     <div className="relative h-32 w-32">
       <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
-        <circle cx="60" cy="60" r={r} fill="none" stroke="rgba(255,255,255,.07)" strokeWidth="10" />
+        <circle cx="60" cy="60" r={r} fill="none" stroke="var(--line)" strokeWidth="10" />
         <circle cx="60" cy="60" r={r} fill="none" stroke="var(--acc)" strokeWidth="10" strokeLinecap="round"
           strokeDasharray={c} strokeDashoffset={c * (1 - value)} style={{ transition: "stroke-dashoffset .6s ease" }} />
       </svg>
-      <div className="absolute inset-0 grid place-items-center text-2xl font-black text-white">{fmt(value * 100)}٪</div>
+      <div className="absolute inset-0 grid place-items-center text-2xl font-black text-[var(--ink)]">{fmt(value * 100)}٪</div>
     </div>
   );
 }
@@ -1066,7 +1104,7 @@ function PhoneMock({ product, who }: { product: Product; who: string }) {
     ? [["لاتيه مثلّج", "18"], ["كرواسون زعتر", "14"], ["سبانش لاتيه", "21"], ["كوكيز", "9"]]
     : [["قص وتصفيف", "120"], ["صبغة كاملة", "350"], ["مناكير وباديكير", "140"], ["بروتين", "600"]];
   return (
-    <div className="mp-float relative mx-auto w-[280px] rounded-[44px] border border-white/10 bg-[#0b0f1a] p-3 shadow-2xl" style={{ boxShadow: "0 50px 100px -40px var(--acc)" }}>
+    <div className="mp-float relative mx-auto w-[280px] rounded-[44px] border border-[var(--line)] bg-[#0b0f1a] p-3 shadow-2xl" style={{ boxShadow: "0 50px 100px -40px var(--acc)" }}>
       <div className="mx-auto mb-2 h-5 w-24 rounded-full bg-black" />
       <div className="overflow-hidden rounded-[32px] bg-[#f8f7f3] text-[#1f1b16]">
         <div className="p-5 text-white" style={{ background: "linear-gradient(135deg, var(--acc-deep), var(--acc))" }}>
