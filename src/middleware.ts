@@ -8,6 +8,7 @@ import { createMiddlewareClient } from "@/lib/supabase/middleware";
 //   /api/render/task-card  — public image, payload HMAC-signed in the token
 // /content/<token> + /api/public/content-plan — رابط مشاركة خطة المحتوى (محروس بالتوكن)
 // /flow + /api/public/contact-flow — مسار الاتصال للموظفين، عرض فقط (مفاتيح محدّدة)
+// /api/public/meeting-plan — محتوى خطة اجتماع العميل (قراءة عامة، التعديل يتحقق من السوبر أدمن داخل المسار)
 const PUBLIC_PATHS = [
   "/login",
   "/auth/callback",
@@ -16,6 +17,7 @@ const PUBLIC_PATHS = [
   "/offer",
   "/flow",
   "/api/public/contact-flow",
+  "/api/public/meeting-plan",
   "/content/",
   "/api/public/content-plan/",
   "/api/offer/track",

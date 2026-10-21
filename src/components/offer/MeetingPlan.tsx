@@ -8,7 +8,7 @@ import {
   Wallet, LayoutDashboard, Rocket, Check, ChevronLeft, ChevronRight, Maximize2, Minimize2, Sun, Moon,
   Printer, Link2, Sparkles, Stamp, BellRing, GraduationCap, Headphones, CalendarCheck,
   TrendingUp, Users, Palette, ImageIcon, ClipboardList, Timer, Handshake, PartyPopper,
-  Coffee, Scissors, Presentation, ShieldCheck, Star,
+  Coffee, Scissors, Presentation, ShieldCheck, Star, Pencil, Plus, X, Save, RotateCcw,
 } from "lucide-react";
 import { waLink } from "@/components/offer/OfferCta";
 
@@ -241,6 +241,169 @@ const FOLLOWUP = [
   { when: "طوال الاشتراك", icon: Headphones, title: "دعم فني مستمر", text: "واتساب مباشر مع فريق يعرف مشروعك بالاسم." },
 ];
 
+/* ──────────────────────────── المحتوى القابل للتعديل ──────────────────────────── */
+
+// كل نصوص الصفحة لكل منتج. المحفوظ في القاعدة يغطّي الافتراضي مفتاحاً بمفتاح.
+// داخل العناوين: *كلمة* = تلوين، و{العميل} {الباقة} {الأيام} {تاريخ_التدريب} = قيم تلقائية.
+type ChapterText = { kicker: string; title: string; lead: string };
+
+type Content = {
+  heroTitle: string;
+  heroPitch: string;
+  agendaMins: string;
+  chapters: Record<string, ChapterText>;
+  features: { title: string; text: string }[];
+  tiers: Tier[];
+  fromClient: string[];
+  fromUs: string[];
+  activation: { day: number; title: string; text: string }[];
+  reward: string;
+  loyaltySteps: { t: string; d: string }[];
+  giftPerks: { e: string; t: string; d: string }[];
+  training: { who: string; mins: number; items: string[] }[];
+  followup: { when: string; title: string; text: string }[];
+};
+
+function defaultContent(p: Product): Content {
+  return {
+    heroTitle: "خلّنا نرسم طريق نجاحك",
+    heroPitch: `${p.pitch} في هذا الاجتماع نمشي معك خطوة بخطوة: من الاشتراك إلى الإطلاق، ومن تدريب فريقك إلى أول تقرير نتائج.`,
+    agendaMins: "~ ٣٠ دقيقة",
+    chapters: {
+      system: { kicker: "تعرّف على النظام", title: `${p.brand} — *${p.tagline}*`, lead: "كل اللي يحتاجه مشروعك في مكان واحد، بدون تعقيد ولا أجهزة إضافية." },
+      pricing: { kicker: "الباقات والأسعار", title: "اختر الباقة اللي تناسب مرحلتك", lead: "اضغط على الباقة لاختيارها — كل الحسابات في العرض تتحدّث عليها مباشرة. دعم فني لجميع الباقات." },
+      activation: { kicker: "خطوات التفعيل", title: "من اليوم إلى الإطلاق في *{الأيام} أيام*", lead: "أنت تركّز على مشروعك، وفريقنا يتكفّل بالباقي. هذا جدولك الفعلي بالتواريخ:" },
+      site: { kicker: "خدمة ما بعد البيع · تجهيز الموقع", title: `نجهّز ${p.site} *معك*، مو بس لك`, lead: "قائمة واضحة: اللي نحتاجه منك، واللي علينا. علّم على اللي جاهز عندك الحين." },
+      loyalty: { kicker: "تجهيز نظام بطاقات الولاء", title: "عميلك يرجع لك *من نفسه*", lead: "بطاقة ختم رقمية في محفظة آبل وقوقل — بدون تطبيق. جرّب: اضغط على البطاقة وأضف ختم." },
+      gift: { kicker: "تجهيز بطاقات الهدايا", title: "سيولة *قبل الخدمة* + عملاء جدد", lead: "عميلك يهدي صديقه بطاقة باسم مشروعك — أنت تستلم المبلغ اليوم، وتكسب عميل جديد بكرة." },
+      training: { kicker: "تدريب الموظفين", title: "فريقك يتقن النظام من أول يوم", lead: "جلسات عملية قصيرة قبل الإطلاق ({تاريخ_التدريب}) — حضورياً أو عن بُعد، مع دليل مختصر ومقاطع مسجّلة للرجوع لها." },
+      followup: { kicker: "المتابعة المستمرة", title: "ما نختفي بعد البيع — *نكبر معك*", lead: "مدير حساب يعرف مشروعك بالاسم، وخطة متابعة واضحة طوال فترة اشتراكك." },
+      results: { kicker: "النتائج المتوقعة", title: "خلّنا نحسبها بأرقامك أنت", lead: "حرّك المؤشرات حسب واقع مشروعك — والنتائج تتحدّث مباشرة على باقة «{الباقة}»." },
+      next: { kicker: "الخطوة التالية", title: "جاهزين نبدأ يا {العميل}؟", lead: "" },
+    },
+    features: p.features.map(({ title, text }) => ({ title, text })),
+    tiers: p.tiers.map((t) => ({ ...t, features: [...t.features] })),
+    fromClient: p.fromClient.map((x) => x.text),
+    fromUs: [...p.fromUs],
+    activation: ACTIVATION.map((a) => ({ ...a })),
+    reward: p.reward,
+    loyaltySteps: [
+      { t: "يمسح ويضيف", d: "العميل يضيف البطاقة لمحفظته بثانية" },
+      { t: "يجمع الأختام", d: "الكاشير يختم مع كل زيارة" },
+      { t: "يتذكّرك", d: "إشعارات عند القرب وفي المواسم" },
+    ],
+    giftPerks: [
+      { e: "💰", t: "دخل مقدّم", d: "تستلم قيمة البطاقة فوراً قبل تقديم الخدمة" },
+      { e: "🧲", t: "عميل جديد مجاناً", d: "المُهدى إليه يجرّبك لأول مرة بلا تكلفة إعلان" },
+      { e: "🌙", t: "مواسم ذهبية", d: "رمضان، العيد، اليوم الوطني، المناسبات" },
+      { e: "🔗", t: "رابط شراء مباشر", d: "تُشترى أونلاين وتُرسل بالواتساب خلال ثوانٍ" },
+    ],
+    training: TRAINING.map(({ who, mins, items }) => ({ who, mins, items: [...items] })),
+    followup: FOLLOWUP.map(({ when, title, text }) => ({ when, title, text })),
+  };
+}
+
+/** يدمج المحفوظ فوق الافتراضي — يتجاهل أي مفتاح نوعه لا يطابق (بيانات قديمة/تالفة). */
+function mergeContent(def: Content, saved: unknown): Content {
+  if (!saved || typeof saved !== "object" || Array.isArray(saved)) return def;
+  const s = saved as Record<string, unknown>;
+  const out: Record<string, unknown> = { ...def };
+  for (const [k, d] of Object.entries(def)) {
+    const v = s[k];
+    if (v === undefined || v === null) continue;
+    if (Array.isArray(d) ? !Array.isArray(v) : typeof v !== typeof d || Array.isArray(v)) continue;
+    out[k] = k === "chapters" ? { ...(d as object), ...(v as object) } : v;
+  }
+  return out as Content;
+}
+
+const toLatin = (s: string) => s.replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)));
+
+/** *كلمة* → كلمة ملوّنة بلون الهوية. */
+function rich(s: string): React.ReactNode {
+  return s.split(/(\*[^*]+\*)/g).map((part, i) =>
+    part.length > 2 && part.startsWith("*") && part.endsWith("*")
+      ? <span key={i} style={{ color: "var(--acc)" }}>{part.slice(1, -1)}</span>
+      : part,
+  );
+}
+
+/** نص قابل للتعديل في مكانه (contentEditable) عند تفعيل وضع التعديل. */
+function Ed({ v, on, edit, className = "", multi = false, view }: {
+  v: string; on: (s: string) => void; edit: boolean; className?: string; multi?: boolean; view?: (s: string) => React.ReactNode;
+}) {
+  if (!edit) return <span className={className}>{view ? view(v) : v}</span>;
+  return (
+    <span
+      key={v}
+      contentEditable
+      suppressContentEditableWarning
+      className={`mp-ed ${className}`}
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === "Enter" && !multi) { e.preventDefault(); (e.target as HTMLElement).blur(); }
+      }}
+      onBlur={(e) => {
+        const t = e.currentTarget.innerText.replace(/ /g, " ").trim();
+        if (t !== v) on(t);
+      }}
+    >
+      {v}
+    </span>
+  );
+}
+
+function EdNum({ v, on, edit, className = "" }: { v: number; on: (n: number) => void; edit: boolean; className?: string }) {
+  if (!edit) return <span className={className}>{fmt(v)}</span>;
+  return (
+    <Ed v={String(v)} edit className={className} on={(s) => {
+      const n = Number(toLatin(s).replace(/[^\d.]/g, ""));
+      if (Number.isFinite(n)) on(n);
+    }} />
+  );
+}
+
+/** زر حذف عنصر من قائمة (يظهر بوضع التعديل فقط) — العنصر الأب لازم يكون relative. */
+function Del({ edit, onClick }: { edit: boolean; onClick: () => void }) {
+  if (!edit) return null;
+  return (
+    <button
+      type="button"
+      title="حذف"
+      aria-label="حذف"
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      className="mp-noprint absolute -left-2 -top-2 z-20 grid h-6 w-6 place-items-center rounded-full bg-rose-500 text-white shadow-lg hover:bg-rose-600"
+    >
+      <X size={12} />
+    </button>
+  );
+}
+
+function Add({ edit, onClick, label = "إضافة", className = "" }: { edit: boolean; onClick: () => void; label?: string; className?: string }) {
+  if (!edit) return null;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`mp-noprint flex items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-[var(--line-strong)] px-4 py-3 text-sm font-bold text-[var(--muted)] transition-colors hover:border-[var(--acc)] hover:text-[var(--acc)] ${className}`}
+    >
+      <Plus size={15} /> {label}
+    </button>
+  );
+}
+
+/** حذف/إضافة لعنصر نصّي داخل قائمة (سطر واحد). */
+function InlineDel({ edit, onClick }: { edit: boolean; onClick: () => void }) {
+  if (!edit) return null;
+  return (
+    <button type="button" title="حذف" aria-label="حذف" onClick={(e) => { e.stopPropagation(); onClick(); }}
+      className="mp-noprint mr-auto grid h-5 w-5 shrink-0 place-items-center rounded-full text-rose-500 hover:bg-rose-500/10">
+      <X size={12} />
+    </button>
+  );
+}
+
 /* ──────────────────────────── أدوات صغيرة ──────────────────────────── */
 
 function addDays(d: Date, n: number) {
@@ -271,21 +434,27 @@ function Reveal({ children, className = "", delay = 0 }: { children: React.React
   );
 }
 
-function Chapter({ id, n, kicker, title, lead, children }: {
-  id: string; n: number; kicker: string; title: React.ReactNode; lead?: string; children: React.ReactNode;
+function Chapter({ id, n, ct, edit, onCt, fill, children }: {
+  id: string; n: number; ct: ChapterText; edit: boolean; onCt: (p: Partial<ChapterText>) => void; fill: (s: string) => string; children: React.ReactNode;
 }) {
   return (
     <section id={id} data-chapter={id} className="mp-chapter relative scroll-mt-28 px-4 py-20 sm:px-8 sm:py-28">
       <div className="mx-auto max-w-6xl">
         <Reveal>
           <div className="mb-3 flex items-center gap-3 text-sm font-bold" style={{ color: "var(--acc)" }}>
-            <span className="grid h-8 w-8 place-items-center rounded-full border text-xs" style={{ borderColor: "var(--acc)" }}>
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border text-xs" style={{ borderColor: "var(--acc)" }}>
               {fmt(n)}
             </span>
-            {kicker}
+            <Ed v={ct.kicker} on={(kicker) => onCt({ kicker })} edit={edit} />
           </div>
-          <h2 className="text-3xl font-black leading-tight text-[var(--ink)] sm:text-5xl">{title}</h2>
-          {lead && <p className="mt-4 max-w-2xl text-base leading-relaxed text-[var(--muted)] sm:text-lg">{lead}</p>}
+          <h2 className="text-3xl font-black leading-tight text-[var(--ink)] sm:text-5xl">
+            <Ed v={ct.title} on={(title) => onCt({ title })} edit={edit} view={(s) => rich(fill(s))} />
+          </h2>
+          {(ct.lead || edit) && (
+            <p className="mt-4 max-w-2xl text-base leading-relaxed text-[var(--muted)] sm:text-lg">
+              <Ed v={ct.lead} on={(lead) => onCt({ lead })} edit={edit} multi view={fill} />
+            </p>
+          )}
         </Reveal>
         <div className="mt-10 sm:mt-14">{children}</div>
       </div>
@@ -321,12 +490,83 @@ function MeetingPlanInner() {
     try { localStorage.setItem("mp-theme", next); } catch { /* ignore */ }
   };
   const A = accentOf(P, theme);
+
+  // ─── المحتوى: الافتراضي + المحفوظ + مسودة التعديل ───
+  const [saved, setSaved] = useState<Record<string, unknown>>({});
+  const [drafts, setDrafts] = useState<Partial<Record<ProductKey, Content>>>({});
+  const [canEdit, setCanEdit] = useState(false);
+  const [edit, setEdit] = useState(false);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const base = useMemo(() => mergeContent(defaultContent(P), saved[productKey]), [P, saved, productKey]);
+  const C = drafts[productKey] ?? base;
+  const dirty = !!drafts[productKey];
+
+  useEffect(() => {
+    fetch("/api/public/meeting-plan", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (!j) return;
+        setSaved(j.content ?? {});
+        setCanEdit(!!j.canEdit);
+      })
+      .catch(() => { /* نعرض الافتراضي */ });
+  }, []);
+
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
+  const patch = (fn: (d: Content) => void) => {
+    setSaveState("idle");
+    setDrafts((all) => {
+      const d = structuredClone(all[productKey] ?? base);
+      fn(d);
+      return { ...all, [productKey]: d };
+    });
+  };
+  const clearDraft = () => setDrafts((all) => { const n = { ...all }; delete n[productKey]; return n; });
+  const ch = (id: string) => ({
+    ct: C.chapters[id],
+    edit,
+    onCt: (p: Partial<ChapterText>) => patch((d) => { d.chapters[id] = { ...d.chapters[id], ...p }; }),
+    fill,
+  });
+
+  const putContent = async (content: Content | null) => {
+    setSaveState("saving");
+    try {
+      const r = await fetch("/api/public/meeting-plan", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ product: productKey, content }),
+      });
+      if (!r.ok) throw new Error();
+      setSaved((s) => {
+        const n = { ...s };
+        if (content) n[productKey] = content; else delete n[productKey];
+        return n;
+      });
+      clearDraft();
+      setSaveState("saved");
+    } catch {
+      setSaveState("error");
+    }
+  };
+  const resetDefault = () => {
+    if (window.confirm(`ترجيع كل نصوص «${P.brand}» للمحتوى الافتراضي؟`)) putContent(null);
+  };
+
+  // ─── حالة الاجتماع ───
   const [client, setClient] = useState(params.get("c") ?? "");
   const [tierIdx, setTierIdx] = useState<number>(() => {
     const t = Number(params.get("t") ?? NaN);
-    return Number.isInteger(t) && t >= 0 && t < P.tiers.length ? t : P.defaultTier;
+    return Number.isInteger(t) && t >= 0 ? t : P.defaultTier;
   });
-  const tier = P.tiers[Math.min(tierIdx, P.tiers.length - 1)];
+  const safeTier = Math.max(0, Math.min(tierIdx, C.tiers.length - 1));
+  const tier = C.tiers[safeTier];
 
   const [active, setActive] = useState<string>("intro");
   const [fullscreen, setFullscreen] = useState(false);
@@ -335,10 +575,11 @@ function MeetingPlanInner() {
   const [now, setNow] = useState(() => Date.now());
 
   // checklist / demos
-  const [ready, setReady] = useState<boolean[]>(() => Array(6).fill(false));
+  const [ready, setReady] = useState<Record<number, boolean>>({});
   const [stampsTotal, setStampsTotal] = useState(5);
   const [stamps, setStamps] = useState(2);
-  const [reward, setReward] = useState(P.reward);
+  const [rewardDemo, setRewardDemo] = useState<string | null>(null);
+  const reward = edit ? C.reward : rewardDemo ?? C.reward;
   const [giftAmount, setGiftAmount] = useState(200);
   const [giftTo, setGiftTo] = useState("نورة");
   const [calc, setCalc] = useState<Record<string, number>>(() => Object.fromEntries(P.calc.map((f) => [f.key, f.def])));
@@ -348,8 +589,9 @@ function MeetingPlanInner() {
     const np = PRODUCTS[k];
     setProductKey(k);
     setTierIdx(np.defaultTier);
-    setReward(np.reward);
-    setReady(Array(6).fill(false));
+    setRewardDemo(null);
+    setReady({});
+    setSaveState("idle");
     setCalc(Object.fromEntries(np.calc.map((f) => [f.key, f.def])));
   };
 
@@ -358,9 +600,9 @@ function MeetingPlanInner() {
     const q = new URLSearchParams();
     q.set("p", productKey);
     if (client.trim()) q.set("c", client.trim());
-    q.set("t", String(tierIdx));
+    q.set("t", String(safeTier));
     window.history.replaceState(null, "", `${window.location.pathname}?${q.toString()}`);
-  }, [productKey, client, tierIdx]);
+  }, [productKey, client, safeTier]);
 
   // ساعة الاجتماع
   useEffect(() => {
@@ -397,8 +639,8 @@ function MeetingPlanInner() {
   // تنقّل بالكيبورد (عربي: اليسار = التالي)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      const el = e.target as HTMLElement;
+      if (el?.tagName === "INPUT" || el?.tagName === "TEXTAREA" || el?.isContentEditable) return;
       if (e.key === "ArrowLeft" || e.key === "PageDown") { e.preventDefault(); goTo(activeIdx + 1); }
       if (e.key === "ArrowRight" || e.key === "PageUp") { e.preventDefault(); goTo(activeIdx - 1); }
       if (e.key.toLowerCase() === "f") toggleFs();
@@ -422,21 +664,33 @@ function MeetingPlanInner() {
   };
 
   const today = useMemo(() => new Date(), []);
-  const launchDate = addDays(today, 7);
+  const launchDays = Math.max(0, ...C.activation.map((s) => s.day));
+  const launchDate = addDays(today, launchDays);
+  const trainingDate = addDays(today, Math.max(0, launchDays - 1));
   const who = client.trim() || "عميلنا العزيز";
+  function fill(s: string) {
+    return s
+      .replaceAll("{العميل}", who)
+      .replaceAll("{الباقة}", tier?.name ?? "")
+      .replaceAll("{الأيام}", fmt(launchDays))
+      .replaceAll("{تاريخ_التدريب}", dayLabel(trainingDate));
+  }
 
   const parts = P.compute(calc);
   const monthly = parts.reduce((s, p) => s + p.value, 0);
   const yearly = monthly * 12;
   const roi = tier.yearly > 0 ? yearly / tier.yearly : 0;
   const paybackDays = monthly > 0 ? Math.max(1, Math.ceil(tier.yearly / (monthly / 30))) : 0;
-  const readyCount = ready.filter(Boolean).length;
+  const readyCount = C.fromClient.filter((_, i) => ready[i]).length;
+  const loyaltyTier = C.tiers.find((t) => t.loyalty);
 
   const summaryMsg =
     `السلام عليكم، ملخص اجتماعنا اليوم:\n` +
     `• العميل: ${who}\n• النظام: ${P.brand}\n• الباقة: ${tier.name} — ${fmt(tier.price)} ${tier.period}\n` +
     `• موعد الإطلاق المتوقع: ${launchDate.toLocaleDateString(LOCALE, { day: "numeric", month: "long" })}\n` +
     `• العائد الشهري المتوقع: ~${fmt(monthly)} ريال\n\nنبدأ بإذن الله 🚀`;
+
+  const iconAt = <T,>(arr: { icon: T }[], i: number) => arr[i % arr.length].icon;
 
   return (
     <div
@@ -457,7 +711,11 @@ function MeetingPlanInner() {
         @keyframes mp-pop { 0% { transform: scale(.4); opacity: 0; } 70% { transform: scale(1.15); } 100% { transform: scale(1); opacity: 1; } }
         .mp-pop { animation: mp-pop .35s ease-out both; }
         @keyframes mp-shine { from { transform: translateX(120%) skewX(-20deg); } to { transform: translateX(-220%) skewX(-20deg); } }
-        .mp-shine::after { content: ""; position: absolute; inset: 0; width: 40%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.25), transparent); animation: mp-shine 3.5s ease-in-out infinite; }
+        .mp-shine::after { content: ""; position: absolute; inset: 0; width: 40%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.25), transparent); animation: mp-shine 3.5s ease-in-out infinite; pointer-events: none; }
+        .mp-ed { outline: 1.5px dashed color-mix(in srgb, currentColor 45%, transparent); outline-offset: 3px; border-radius: 6px; cursor: text; min-width: 1.5ch; display: inline-block; transition: background .15s; }
+        .mp-ed:hover { background: color-mix(in srgb, var(--acc) 8%, transparent); }
+        .mp-ed:focus { outline: 2px solid var(--acc); background: color-mix(in srgb, var(--acc) 10%, transparent); }
+        .mp-ed:empty::before { content: "…"; opacity: .4; }
         @media print {
           .mp-noprint { display: none !important; }
           .mp-root { background: white !important; color: #111 !important; }
@@ -496,6 +754,11 @@ function MeetingPlanInner() {
             <span className="hidden items-center gap-1.5 rounded-full border border-[var(--line)] px-3 py-1.5 font-mono text-xs text-[var(--muted)] md:flex" title="مدة الاجتماع">
               <Timer size={13} /> {clock}
             </span>
+            {canEdit && (
+              <IconBtn onClick={() => setEdit((e) => !e)} title={edit ? "إنهاء التعديل" : "تعديل المحتوى"} active={edit}>
+                <Pencil size={16} />
+              </IconBtn>
+            )}
             <IconBtn onClick={copyLink} title="نسخ رابط الاجتماع">{copied ? <Check size={16} /> : <Link2 size={16} />}</IconBtn>
             <IconBtn onClick={() => window.print()} title="طباعة / PDF"><Printer size={16} /></IconBtn>
             <IconBtn onClick={toggleTheme} title={theme === "brand" ? "المظهر الليلي" : "هوية المنصة"}>{theme === "brand" ? <Moon size={16} /> : <Sun size={16} />}</IconBtn>
@@ -525,6 +788,35 @@ function MeetingPlanInner() {
         </div>
       </header>
 
+      {/* ─── شريط وضع التعديل ─── */}
+      {edit && (
+        <div className="mp-noprint fixed inset-x-0 bottom-20 z-50 flex justify-center px-4">
+          <div className="flex w-full max-w-3xl flex-wrap items-center gap-2 rounded-2xl border border-[var(--line)] bg-[var(--glass)] p-2.5 shadow-2xl backdrop-blur-xl">
+            <span className="flex items-center gap-2 px-2 text-xs leading-relaxed text-[var(--muted)]">
+              <Pencil size={14} style={{ color: "var(--acc)" }} className="shrink-0" />
+              <span>
+                اضغط على أي نص وعدّله · <b className="text-[var(--ink)]">*كلمة*</b> للتلوين ·{" "}
+                <b className="text-[var(--ink)]">{"{العميل}"}</b> لاسم العميل — التعديل يخص «{P.brand}» فقط
+              </span>
+            </span>
+            <span className="mr-auto flex items-center gap-1.5">
+              <span className="px-1 text-xs font-bold" style={{ color: saveState === "error" ? "#e11d48" : "var(--faint)" }}>
+                {saveState === "saving" ? "جارٍ الحفظ…" : saveState === "error" ? "تعذّر الحفظ" : saveState === "saved" && !dirty ? "تم الحفظ ✓" : dirty ? "تعديلات غير محفوظة" : ""}
+              </span>
+              <button onClick={resetDefault} className="rounded-xl px-3 py-2 text-xs font-bold text-[var(--muted)] hover:bg-[var(--hover)]" title="ترجيع النصوص الافتراضية">
+                <RotateCcw size={14} className="inline" /> الافتراضي
+              </button>
+              <button onClick={clearDraft} disabled={!dirty} className="rounded-xl px-3 py-2 text-xs font-bold text-[var(--muted)] hover:bg-[var(--hover)] disabled:opacity-40">
+                تراجع
+              </button>
+              <button onClick={() => putContent(C)} disabled={!dirty || saveState === "saving"} className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-black text-white disabled:opacity-40" style={{ background: "var(--acc)" }}>
+                <Save size={14} /> حفظ للجميع
+              </button>
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* ─── ٠. الغلاف ─── */}
       <section id="intro" data-chapter="intro" className="mp-chapter relative flex min-h-[100svh] items-center overflow-hidden px-4 pb-16 pt-36 sm:px-8">
         <div className="mp-glow pointer-events-none absolute inset-0" />
@@ -546,19 +838,23 @@ function MeetingPlanInner() {
               />
               <span className="hidden print:inline" style={{ color: "var(--acc)" }}>{who}</span>
               <br />
-              <span className="bg-clip-text text-transparent" style={{ backgroundImage: "linear-gradient(90deg, var(--ink), var(--acc))" }}>
-                خلّنا نرسم طريق نجاحك
-              </span>
+              {edit ? (
+                <Ed v={C.heroTitle} on={(heroTitle) => patch((d) => { d.heroTitle = heroTitle; })} edit />
+              ) : (
+                <span className="bg-clip-text text-transparent" style={{ backgroundImage: "linear-gradient(90deg, var(--ink), var(--acc))" }}>
+                  {fill(C.heroTitle)}
+                </span>
+              )}
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-relaxed text-[var(--muted)]">
-              {P.pitch} في هذا الاجتماع نمشي معك خطوة بخطوة: من الاشتراك إلى الإطلاق، ومن تدريب فريقك إلى أول تقرير نتائج.
+              <Ed v={C.heroPitch} on={(heroPitch) => patch((d) => { d.heroPitch = heroPitch; })} edit={edit} multi view={fill} />
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <button onClick={() => goTo(1)} className="inline-flex items-center gap-2 rounded-full px-7 py-3.5 font-extrabold text-white shadow-2xl transition-transform hover:-translate-y-0.5" style={{ background: "linear-gradient(135deg, var(--acc), var(--acc-deep))", boxShadow: "0 20px 50px -15px var(--acc)" }}>
                 ابدأ العرض <ChevronLeft size={18} />
               </button>
               <div className="flex items-center gap-2 rounded-full border border-[var(--line)] px-5 py-3.5 text-sm text-[var(--muted)]">
-                <Rocket size={16} style={{ color: GOLD }} /> الإطلاق خلال <b className="text-[var(--ink)]">٧ أيام</b>
+                <Rocket size={16} style={{ color: GOLD }} /> الإطلاق خلال <b className="text-[var(--ink)]">{fmt(launchDays)} أيام</b>
               </div>
             </div>
           </Reveal>
@@ -568,13 +864,15 @@ function MeetingPlanInner() {
             <div className={`${card} p-6`}>
               <div className="mb-4 flex items-center justify-between">
                 <div className="text-sm font-black text-[var(--ink)]">أجندة الاجتماع</div>
-                <div className="text-xs text-[var(--faint)]">~ ٣٠ دقيقة</div>
+                <div className="text-xs text-[var(--faint)]">
+                  <Ed v={C.agendaMins} on={(agendaMins) => patch((d) => { d.agendaMins = agendaMins; })} edit={edit} />
+                </div>
               </div>
               <ol className="space-y-1">
                 {CHAPTERS.slice(1).map((c, i) => (
                   <li key={c.id}>
                     <button onClick={() => goTo(i + 1)} className="group flex w-full items-center gap-3 rounded-xl px-2 py-2 text-right transition-colors hover:bg-[var(--hover)]">
-                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--surface-2)] text-[var(--muted)] transition-colors group-hover:text-[var(--ink)]" style={{}}>
+                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--surface-2)] text-[var(--muted)] transition-colors group-hover:text-[var(--ink)]">
                         <c.icon size={15} />
                       </span>
                       <span className="flex-1 text-sm font-bold text-[var(--body)] group-hover:text-[var(--ink)]">{c.label}</span>
@@ -589,20 +887,29 @@ function MeetingPlanInner() {
       </section>
 
       {/* ─── ١. النظام ─── */}
-      <Chapter id="system" n={1} kicker="تعرّف على النظام" title={<>{P.brand} — <span style={{ color: "var(--acc)" }}>{P.tagline}</span></>} lead="كل اللي يحتاجه مشروعك في مكان واحد، بدون تعقيد ولا أجهزة إضافية.">
+      <Chapter id="system" n={1} {...ch("system")}>
         <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
           <div className="grid gap-4 sm:grid-cols-2">
-            {P.features.map((f, i) => (
-              <Reveal key={f.title} delay={i * 60}>
-                <div className={`${card} group h-full p-6 transition-all hover:-translate-y-1 hover:border-[var(--acc)]/40`}>
-                  <span className="mb-4 grid h-12 w-12 place-items-center rounded-2xl text-[var(--ink)] transition-transform group-hover:scale-110" style={{ background: "color-mix(in srgb, var(--acc) 18%, transparent)", color: "var(--acc)" }}>
-                    <f.icon size={22} />
-                  </span>
-                  <div className="text-lg font-black text-[var(--ink)]">{f.title}</div>
-                  <p className="mt-1.5 text-sm leading-relaxed text-[var(--muted)]">{f.text}</p>
-                </div>
-              </Reveal>
-            ))}
+            {C.features.map((f, i) => {
+              const Icon = iconAt(P.features, i);
+              return (
+                <Reveal key={i} delay={i * 60}>
+                  <div className={`${card} group relative h-full p-6 transition-all hover:-translate-y-1 hover:border-[var(--acc)]/40`}>
+                    <Del edit={edit} onClick={() => patch((d) => { d.features.splice(i, 1); })} />
+                    <span className="mb-4 grid h-12 w-12 place-items-center rounded-2xl transition-transform group-hover:scale-110" style={{ background: "color-mix(in srgb, var(--acc) 18%, transparent)", color: "var(--acc)" }}>
+                      <Icon size={22} />
+                    </span>
+                    <div className="text-lg font-black text-[var(--ink)]">
+                      <Ed v={f.title} on={(title) => patch((d) => { d.features[i].title = title; })} edit={edit} />
+                    </div>
+                    <p className="mt-1.5 text-sm leading-relaxed text-[var(--muted)]">
+                      <Ed v={f.text} on={(text) => patch((d) => { d.features[i].text = text; })} edit={edit} multi />
+                    </p>
+                  </div>
+                </Reveal>
+              );
+            })}
+            <Add edit={edit} label="ميزة جديدة" className="min-h-[120px]" onClick={() => patch((d) => { d.features.push({ title: "ميزة جديدة", text: "وصف الميزة" }); })} />
           </div>
           <Reveal delay={200} className="hidden lg:block">
             <PhoneMock product={P} who={who} />
@@ -611,65 +918,106 @@ function MeetingPlanInner() {
       </Chapter>
 
       {/* ─── ٢. الباقات ─── */}
-      <Chapter id="pricing" n={2} kicker="الباقات والأسعار" title="اختر الباقة اللي تناسب مرحلتك" lead="اضغط على الباقة لاختيارها — كل الحسابات في العرض تتحدّث عليها مباشرة. دعم فني لجميع الباقات.">
-        <div className={`grid gap-4 ${P.tiers.length > 2 ? "sm:grid-cols-2 lg:grid-cols-4" : "mx-auto max-w-3xl sm:grid-cols-2"}`}>
-          {P.tiers.map((t, i) => {
-            const sel = i === tierIdx;
+      <Chapter id="pricing" n={2} {...ch("pricing")}>
+        <div className={`grid gap-4 ${C.tiers.length + (edit ? 1 : 0) > 2 ? "sm:grid-cols-2 lg:grid-cols-4" : "mx-auto max-w-3xl sm:grid-cols-2"}`}>
+          {C.tiers.map((t, i) => {
+            const sel = i === safeTier;
+            const set = (fn: (x: Tier) => void) => patch((d) => { fn(d.tiers[i]); });
             return (
-              <Reveal key={t.name} delay={i * 70}>
-                <button
+              <Reveal key={i} delay={i * 70}>
+                <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setTierIdx(i)}
-                  className={`relative flex h-full w-full flex-col rounded-3xl border p-6 text-right transition-all ${sel ? "-translate-y-1" : "hover:-translate-y-0.5"}`}
+                  onKeyDown={(e) => { if (e.key === "Enter") setTierIdx(i); }}
+                  className={`relative flex h-full w-full cursor-pointer flex-col rounded-3xl border p-6 text-right transition-all ${sel ? "-translate-y-1" : "hover:-translate-y-0.5"}`}
                   style={sel
                     ? { borderColor: "var(--acc)", background: "linear-gradient(180deg, color-mix(in srgb, var(--acc) 16%, transparent), var(--surface))", boxShadow: "0 30px 60px -30px var(--acc)" }
                     : { borderColor: "var(--line)", background: "var(--surface)" }}
                 >
-                  {t.badge && (
-                    <span className="absolute -top-3 left-5 rounded-full px-3 py-1 text-[11px] font-black text-[#1a1306]" style={{ background: GOLD }}>{t.badge}</span>
+                  {C.tiers.length > 1 && <Del edit={edit} onClick={() => patch((d) => { d.tiers.splice(i, 1); })} />}
+                  {(t.badge || edit) && (
+                    <span className="absolute -top-3 left-5 rounded-full px-3 py-1 text-[11px] font-black text-[#1a1306]" style={{ background: GOLD }}>
+                      <Ed v={t.badge ?? ""} on={(badge) => set((x) => { x.badge = badge; })} edit={edit} />
+                    </span>
                   )}
-                  <div className="flex items-center justify-between">
-                    <span className="text-lg font-black text-[var(--ink)]">{t.name}</span>
-                    <span className="grid h-6 w-6 place-items-center rounded-full border-2 transition-colors" style={{ borderColor: sel ? "var(--acc)" : "var(--line-strong)", background: sel ? "var(--acc)" : "transparent" }}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-lg font-black text-[var(--ink)]">
+                      <Ed v={t.name} on={(name) => set((x) => { x.name = name; })} edit={edit} />
+                    </span>
+                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full border-2 transition-colors" style={{ borderColor: sel ? "var(--acc)" : "var(--line-strong)", background: sel ? "var(--acc)" : "transparent" }}>
                       {sel && <Check size={13} className="text-white" />}
                     </span>
                   </div>
                   <div className="mt-4 flex items-baseline gap-1.5">
-                    <span className="text-4xl font-black text-[var(--ink)]">{fmt(t.price)}</span>
-                    <span className="text-sm text-[var(--muted)]">{t.period}</span>
+                    <EdNum v={t.price} on={(price) => set((x) => { x.price = price; })} edit={edit} className="text-4xl font-black text-[var(--ink)]" />
+                    <span className="text-sm text-[var(--muted)]">
+                      <Ed v={t.period} on={(period) => set((x) => { x.period = period; })} edit={edit} />
+                    </span>
                   </div>
-                  <p className="mt-1 text-xs text-[var(--faint)]">{t.note}</p>
+                  <p className="mt-1 text-xs text-[var(--faint)]">
+                    <Ed v={t.note} on={(note) => set((x) => { x.note = note; })} edit={edit} multi />
+                  </p>
+                  {edit && (
+                    <div className="mp-noprint mt-3 space-y-1.5 rounded-xl bg-[var(--surface-2)] p-2.5 text-[11px] text-[var(--muted)]">
+                      <div className="flex items-center justify-between gap-2">
+                        <span>التكلفة السنوية (لحساب العائد)</span>
+                        <EdNum v={t.yearly} on={(yearly) => set((x) => { x.yearly = yearly; })} edit className="font-black text-[var(--ink)]" />
+                      </div>
+                      <label className="flex cursor-pointer items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        <input type="checkbox" checked={t.loyalty} onChange={(e) => set((x) => { x.loyalty = e.target.checked; })} />
+                        تشمل الولاء والهدايا
+                      </label>
+                    </div>
+                  )}
                   <ul className="mt-5 space-y-2.5 border-t border-[var(--line)] pt-5">
-                    {t.features.map((f) => (
-                      <li key={f} className="flex items-start gap-2 text-sm text-[var(--body)]">
-                        <Check size={15} className="mt-0.5 shrink-0" style={{ color: "var(--acc)" }} /> {f}
+                    {t.features.map((f, j) => (
+                      <li key={j} className="flex items-start gap-2 text-sm text-[var(--body)]">
+                        <Check size={15} className="mt-0.5 shrink-0" style={{ color: "var(--acc)" }} />
+                        <Ed v={f} on={(v) => set((x) => { x.features[j] = v; })} edit={edit} />
+                        <InlineDel edit={edit} onClick={() => set((x) => { x.features.splice(j, 1); })} />
                       </li>
                     ))}
                   </ul>
-                </button>
+                  {edit && (
+                    <button type="button" onClick={(e) => { e.stopPropagation(); set((x) => { x.features.push("ميزة جديدة"); }); }}
+                      className="mp-noprint mt-3 flex items-center gap-1 text-xs font-bold text-[var(--muted)] hover:text-[var(--acc)]">
+                      <Plus size={13} /> سطر
+                    </button>
+                  )}
+                </div>
               </Reveal>
             );
           })}
+          <Add edit={edit} label="باقة جديدة" className="min-h-[200px]" onClick={() => patch((d) => {
+            d.tiers.push({ name: "باقة جديدة", price: 0, period: "ريال/سنة", yearly: 0, note: "", features: ["ميزة"], loyalty: false });
+          })} />
         </div>
-        {!tier.loyalty && (
+        {!tier.loyalty && loyaltyTier && (
           <Reveal>
             <p className="mt-6 text-center text-sm text-[var(--faint)]">
-              💡 بطاقات الولاء والهدايا متاحة في باقة <b className="text-[var(--body)]">{P.tiers.find((t) => t.loyalty)?.name}</b> — وهي اللي تصنع العميل المتكرّر.
+              💡 بطاقات الولاء والهدايا متاحة في باقة <b className="text-[var(--body)]">{loyaltyTier.name}</b> — وهي اللي تصنع العميل المتكرّر.
             </p>
           </Reveal>
         )}
       </Chapter>
 
       {/* ─── ٣. التفعيل ─── */}
-      <Chapter id="activation" n={3} kicker="خطوات التفعيل" title={<>من اليوم إلى الإطلاق في <span style={{ color: GOLD }}>٧ أيام</span></>} lead="أنت تركّز على مشروعك، وفريقنا يتكفّل بالباقي. هذا جدولك الفعلي بالتواريخ:">
+      <Chapter id="activation" n={3} {...ch("activation")}>
         <div className="relative">
-          <div className="absolute bottom-0 right-[19px] top-0 w-px bg-gradient-to-b from-[var(--acc)] via-white/10 to-[#F5B301] md:hidden" />
-          <div className="absolute left-0 right-0 top-[19px] hidden h-px bg-gradient-to-l from-[var(--acc)] via-white/10 to-[#F5B301] md:block" />
-          <ol className="grid gap-6 md:grid-cols-7 md:gap-3">
-            {ACTIVATION.map((s, i) => {
-              const last = i === ACTIVATION.length - 1;
+          <div className="absolute bottom-0 right-[19px] top-0 w-px bg-gradient-to-b from-[var(--acc)] via-[var(--line)] to-[#F5B301] md:hidden" />
+          <div className="absolute left-0 right-0 top-[19px] hidden h-px bg-gradient-to-l from-[var(--acc)] via-[var(--line)] to-[#F5B301] md:block" />
+          <ol
+            className="grid gap-6 md:gap-3 md:[grid-template-columns:repeat(var(--n),minmax(0,1fr))]"
+            style={{ ["--n" as string]: Math.max(1, C.activation.length) } as React.CSSProperties}
+          >
+            {C.activation.map((s, i) => {
+              const last = i === C.activation.length - 1;
+              const set = (fn: (x: Content["activation"][number]) => void) => patch((d) => { fn(d.activation[i]); });
               return (
-                <Reveal key={s.title} delay={i * 80}>
+                <Reveal key={i} delay={i * 80}>
                   <li className="relative flex gap-4 md:flex-col md:gap-3">
+                    <Del edit={edit} onClick={() => patch((d) => { d.activation.splice(i, 1); })} />
                     <span
                       className="relative z-10 grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-black"
                       style={last ? { background: GOLD, color: "#1a1306", boxShadow: `0 0 0 6px ${GOLD}22` } : { background: "var(--surface)", color: "var(--acc)", boxShadow: "inset 0 0 0 2px var(--acc)" }}
@@ -677,64 +1025,84 @@ function MeetingPlanInner() {
                       {last ? <Rocket size={17} /> : fmt(i + 1)}
                     </span>
                     <div>
-                      <div className="text-[11px] font-bold text-[var(--faint)]">{s.day === 0 ? "اليوم" : `يوم ${fmt(s.day)}`} · {dayLabel(addDays(today, s.day))}</div>
-                      <div className="mt-0.5 font-black text-[var(--ink)]">{s.title}</div>
-                      <p className="mt-1 text-xs leading-relaxed text-[var(--muted)]">{s.text}</p>
+                      <div className="text-[11px] font-bold text-[var(--faint)]">
+                        {edit ? <>يوم <EdNum v={s.day} on={(day) => set((x) => { x.day = day; })} edit /></> : s.day === 0 ? "اليوم" : `يوم ${fmt(s.day)}`} · {dayLabel(addDays(today, s.day))}
+                      </div>
+                      <div className="mt-0.5 font-black text-[var(--ink)]">
+                        <Ed v={s.title} on={(title) => set((x) => { x.title = title; })} edit={edit} />
+                      </div>
+                      <p className="mt-1 text-xs leading-relaxed text-[var(--muted)]">
+                        <Ed v={s.text} on={(text) => set((x) => { x.text = text; })} edit={edit} multi />
+                      </p>
                     </div>
                   </li>
                 </Reveal>
               );
             })}
           </ol>
+          <Add edit={edit} label="خطوة جديدة" className="mt-6 w-full" onClick={() => patch((d) => {
+            d.activation.push({ day: launchDays + 1, title: "خطوة جديدة", text: "وصف الخطوة" });
+          })} />
         </div>
       </Chapter>
 
       {/* ─── ٤. تجهيز الموقع ─── */}
-      <Chapter id="site" n={4} kicker="خدمة ما بعد البيع · تجهيز الموقع" title={<>نجهّز {P.site} <span style={{ color: "var(--acc)" }}>معك</span>، مو بس لك</>} lead="قائمة واضحة: اللي نحتاجه منك، واللي علينا. علّم على اللي جاهز عندك الحين.">
+      <Chapter id="site" n={4} {...ch("site")}>
         <div className="grid gap-5 lg:grid-cols-[1fr_1fr_260px]">
           <Reveal>
             <div className={`${card} h-full p-6`}>
               <div className="mb-4 flex items-center gap-2 text-sm font-black text-[var(--ink)]"><ClipboardList size={16} style={{ color: GOLD }} /> منك</div>
               <ul className="space-y-2">
-                {P.fromClient.map((it, i) => (
-                  <li key={it.text}>
-                    <button
-                      onClick={() => setReady((r) => r.map((v, j) => (j === i ? !v : v)))}
-                      className="flex w-full items-center gap-3 rounded-2xl border border-[var(--line)] px-3 py-3 text-right transition-all hover:bg-[var(--hover)]"
-                      style={ready[i] ? { borderColor: "color-mix(in srgb, var(--acc) 50%, transparent)", background: "color-mix(in srgb, var(--acc) 8%, transparent)" } : {}}
-                    >
-                      <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg border-2 transition-colors" style={{ borderColor: ready[i] ? "var(--acc)" : "var(--line-strong)", background: ready[i] ? "var(--acc)" : "transparent" }}>
-                        {ready[i] && <Check size={13} className="mp-pop text-white" />}
-                      </span>
-                      <it.icon size={16} className="shrink-0 text-[var(--faint)]" />
-                      <span className={`text-sm font-bold ${ready[i] ? "text-[var(--ink)]" : "text-[var(--body)]"}`}>{it.text}</span>
-                    </button>
-                  </li>
-                ))}
+                {C.fromClient.map((text, i) => {
+                  const Icon = iconAt(P.fromClient, i);
+                  return (
+                    <li key={i}>
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => { if (!edit) setReady((r) => ({ ...r, [i]: !r[i] })); }}
+                        className="flex w-full cursor-pointer items-center gap-3 rounded-2xl border border-[var(--line)] px-3 py-3 text-right transition-all hover:bg-[var(--hover)]"
+                        style={ready[i] ? { borderColor: "color-mix(in srgb, var(--acc) 50%, transparent)", background: "color-mix(in srgb, var(--acc) 8%, transparent)" } : {}}
+                      >
+                        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg border-2 transition-colors" style={{ borderColor: ready[i] ? "var(--acc)" : "var(--line-strong)", background: ready[i] ? "var(--acc)" : "transparent" }}>
+                          {ready[i] && <Check size={13} className="mp-pop text-white" />}
+                        </span>
+                        <Icon size={16} className="shrink-0 text-[var(--faint)]" />
+                        <span className={`text-sm font-bold ${ready[i] ? "text-[var(--ink)]" : "text-[var(--body)]"}`}>
+                          <Ed v={text} on={(v) => patch((d) => { d.fromClient[i] = v; })} edit={edit} />
+                        </span>
+                        <InlineDel edit={edit} onClick={() => patch((d) => { d.fromClient.splice(i, 1); })} />
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
+              <Add edit={edit} label="بند" className="mt-2 w-full py-2" onClick={() => patch((d) => { d.fromClient.push("بند جديد"); })} />
             </div>
           </Reveal>
           <Reveal delay={100}>
             <div className={`${card} h-full p-6`}>
               <div className="mb-4 flex items-center gap-2 text-sm font-black text-[var(--ink)]"><ShieldCheck size={16} style={{ color: "var(--acc)" }} /> علينا</div>
               <ul className="space-y-3">
-                {P.fromUs.map((t) => (
-                  <li key={t} className="flex items-start gap-3 text-sm text-[var(--body)]">
+                {C.fromUs.map((t, i) => (
+                  <li key={i} className="flex items-start gap-3 text-sm text-[var(--body)]">
                     <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full" style={{ background: "color-mix(in srgb, var(--acc) 20%, transparent)" }}>
                       <Check size={12} style={{ color: "var(--acc)" }} />
                     </span>
-                    {t}
+                    <Ed v={t} on={(v) => patch((d) => { d.fromUs[i] = v; })} edit={edit} />
+                    <InlineDel edit={edit} onClick={() => patch((d) => { d.fromUs.splice(i, 1); })} />
                   </li>
                 ))}
               </ul>
+              <Add edit={edit} label="بند" className="mt-3 w-full py-2" onClick={() => patch((d) => { d.fromUs.push("بند جديد"); })} />
             </div>
           </Reveal>
           <Reveal delay={200}>
             <div className={`${card} flex h-full flex-col items-center justify-center p-6 text-center`}>
-              <Ring value={readyCount / P.fromClient.length} />
+              <Ring value={C.fromClient.length ? readyCount / C.fromClient.length : 0} />
               <div className="mt-4 text-sm font-black text-[var(--ink)]">جاهزية البيانات</div>
               <p className="mt-1 text-xs leading-relaxed text-[var(--faint)]">
-                {readyCount === P.fromClient.length ? "كل شي جاهز — نقدر نبدأ البناء اليوم 🎉" : `باقي ${fmt(P.fromClient.length - readyCount)} — نرسل لك القائمة على الواتساب`}
+                {readyCount === C.fromClient.length ? "كل شي جاهز — نقدر نبدأ البناء اليوم 🎉" : `باقي ${fmt(C.fromClient.length - readyCount)} — نرسل لك القائمة على الواتساب`}
               </p>
             </div>
           </Reveal>
@@ -742,7 +1110,7 @@ function MeetingPlanInner() {
       </Chapter>
 
       {/* ─── ٥. الولاء ─── */}
-      <Chapter id="loyalty" n={5} kicker="تجهيز نظام بطاقات الولاء" title={<>عميلك يرجع لك <span style={{ color: "var(--acc)" }}>من نفسه</span></>} lead="بطاقة ختم رقمية في محفظة آبل وقوقل — بدون تطبيق. جرّب: اضغط على البطاقة وأضف ختم.">
+      <Chapter id="loyalty" n={5} {...ch("loyalty")}>
         <div className="grid items-center gap-10 lg:grid-cols-2">
           <Reveal>
             <div className="mx-auto w-full max-w-md">
@@ -809,21 +1177,30 @@ function MeetingPlanInner() {
                     </button>
                   ))}
                 </div>
-                <label className="mb-1.5 mt-4 block text-xs text-[var(--faint)]">المكافأة</label>
-                <input value={reward} onChange={(e) => setReward(e.target.value)} className="w-full rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 text-sm font-bold text-[var(--ink)] outline-none focus:border-[var(--acc)]" />
+                <label className="mb-1.5 mt-4 block text-xs text-[var(--faint)]">{edit ? "المكافأة الافتراضية (تُحفظ)" : "المكافأة"}</label>
+                <input
+                  value={reward}
+                  onChange={(e) => (edit ? patch((d) => { d.reward = e.target.value; }) : setRewardDemo(e.target.value))}
+                  className="w-full rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 text-sm font-bold text-[var(--ink)] outline-none focus:border-[var(--acc)]"
+                />
               </div>
               <div className="grid gap-3 sm:grid-cols-3">
-                {[
-                  { icon: QrCode, t: "يمسح ويضيف", d: "العميل يضيف البطاقة لمحفظته بثانية" },
-                  { icon: Stamp, t: "يجمع الأختام", d: "الكاشير يختم مع كل زيارة" },
-                  { icon: BellRing, t: "يتذكّرك", d: "إشعارات عند القرب وفي المواسم" },
-                ].map((s) => (
-                  <div key={s.t} className={`${card} p-4`}>
-                    <s.icon size={18} style={{ color: "var(--acc)" }} />
-                    <div className="mt-2 text-sm font-black text-[var(--ink)]">{s.t}</div>
-                    <div className="mt-1 text-xs leading-relaxed text-[var(--faint)]">{s.d}</div>
-                  </div>
-                ))}
+                {C.loyaltySteps.map((s, i) => {
+                  const Icon = [QrCode, Stamp, BellRing][i % 3];
+                  return (
+                    <div key={i} className={`${card} relative p-4`}>
+                      <Del edit={edit} onClick={() => patch((d) => { d.loyaltySteps.splice(i, 1); })} />
+                      <Icon size={18} style={{ color: "var(--acc)" }} />
+                      <div className="mt-2 text-sm font-black text-[var(--ink)]">
+                        <Ed v={s.t} on={(t) => patch((d) => { d.loyaltySteps[i].t = t; })} edit={edit} />
+                      </div>
+                      <div className="mt-1 text-xs leading-relaxed text-[var(--faint)]">
+                        <Ed v={s.d} on={(v) => patch((d) => { d.loyaltySteps[i].d = v; })} edit={edit} multi />
+                      </div>
+                    </div>
+                  );
+                })}
+                <Add edit={edit} label="خطوة" onClick={() => patch((d) => { d.loyaltySteps.push({ t: "خطوة", d: "وصف" }); })} />
               </div>
             </div>
           </Reveal>
@@ -831,7 +1208,7 @@ function MeetingPlanInner() {
       </Chapter>
 
       {/* ─── ٦. الهدايا ─── */}
-      <Chapter id="gift" n={6} kicker="تجهيز بطاقات الهدايا" title={<>سيولة <span style={{ color: GOLD }}>قبل الخدمة</span> + عملاء جدد</>} lead="عميلك يهدي صديقه بطاقة باسم مشروعك — أنت تستلم المبلغ اليوم، وتكسب عميل جديد بكرة.">
+      <Chapter id="gift" n={6} {...ch("gift")}>
         <div className="grid items-center gap-10 lg:grid-cols-2">
           <Reveal className="lg:order-2">
             <div className="mp-float relative mx-auto aspect-[1.6] w-full max-w-md overflow-hidden rounded-[28px] p-7 text-white shadow-2xl"
@@ -873,20 +1250,23 @@ function MeetingPlanInner() {
                 <input value={giftTo} onChange={(e) => setGiftTo(e.target.value)} className="w-full rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 text-sm font-bold text-[var(--ink)] outline-none focus:border-[#F5B301]" />
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
-                {[
-                  { e: "💰", t: "دخل مقدّم", d: "تستلم قيمة البطاقة فوراً قبل تقديم الخدمة" },
-                  { e: "🧲", t: "عميل جديد مجاناً", d: "المُهدى إليه يجرّبك لأول مرة بلا تكلفة إعلان" },
-                  { e: "🌙", t: "مواسم ذهبية", d: "رمضان، العيد، اليوم الوطني، المناسبات" },
-                  { e: "🔗", t: "رابط شراء مباشر", d: "تُشترى أونلاين وتُرسل بالواتساب خلال ثوانٍ" },
-                ].map((s) => (
-                  <div key={s.t} className={`${card} flex gap-3 p-4`}>
-                    <span className="text-2xl">{s.e}</span>
+                {C.giftPerks.map((s, i) => (
+                  <div key={i} className={`${card} relative flex gap-3 p-4`}>
+                    <Del edit={edit} onClick={() => patch((d) => { d.giftPerks.splice(i, 1); })} />
+                    <span className="text-2xl">
+                      <Ed v={s.e} on={(e) => patch((d) => { d.giftPerks[i].e = e; })} edit={edit} />
+                    </span>
                     <div>
-                      <div className="text-sm font-black text-[var(--ink)]">{s.t}</div>
-                      <div className="mt-0.5 text-xs leading-relaxed text-[var(--faint)]">{s.d}</div>
+                      <div className="text-sm font-black text-[var(--ink)]">
+                        <Ed v={s.t} on={(t) => patch((d) => { d.giftPerks[i].t = t; })} edit={edit} />
+                      </div>
+                      <div className="mt-0.5 text-xs leading-relaxed text-[var(--faint)]">
+                        <Ed v={s.d} on={(v) => patch((d) => { d.giftPerks[i].d = v; })} edit={edit} multi />
+                      </div>
                     </div>
                   </div>
                 ))}
+                <Add edit={edit} label="ميزة" onClick={() => patch((d) => { d.giftPerks.push({ e: "✨", t: "ميزة", d: "وصف" }); })} />
               </div>
             </div>
           </Reveal>
@@ -894,52 +1274,83 @@ function MeetingPlanInner() {
       </Chapter>
 
       {/* ─── ٧. التدريب ─── */}
-      <Chapter id="training" n={7} kicker="تدريب الموظفين" title="فريقك يتقن النظام من أول يوم" lead={`جلسات عملية قصيرة قبل الإطلاق (${dayLabel(addDays(today, 6))}) — حضورياً أو عن بُعد، مع دليل مختصر ومقاطع مسجّلة للرجوع لها.`}>
+      <Chapter id="training" n={7} {...ch("training")}>
         <div className="grid gap-4 md:grid-cols-3">
-          {TRAINING.map((s, i) => (
-            <Reveal key={s.who} delay={i * 90}>
-              <div className={`${card} h-full p-6`}>
-                <div className="flex items-center justify-between">
-                  <span className="grid h-12 w-12 place-items-center rounded-2xl" style={{ background: "color-mix(in srgb, var(--acc) 18%, transparent)", color: "var(--acc)" }}>
-                    <s.icon size={22} />
-                  </span>
-                  <span className="flex items-center gap-1 rounded-full border border-[var(--line)] px-3 py-1 text-xs font-bold text-[var(--muted)]">
-                    <Clock size={12} /> {fmt(s.mins)} دقيقة
-                  </span>
+          {C.training.map((s, i) => {
+            const Icon = iconAt(TRAINING, i);
+            const set = (fn: (x: Content["training"][number]) => void) => patch((d) => { fn(d.training[i]); });
+            return (
+              <Reveal key={i} delay={i * 90}>
+                <div className={`${card} relative h-full p-6`}>
+                  <Del edit={edit} onClick={() => patch((d) => { d.training.splice(i, 1); })} />
+                  <div className="flex items-center justify-between">
+                    <span className="grid h-12 w-12 place-items-center rounded-2xl" style={{ background: "color-mix(in srgb, var(--acc) 18%, transparent)", color: "var(--acc)" }}>
+                      <Icon size={22} />
+                    </span>
+                    <span className="flex items-center gap-1 rounded-full border border-[var(--line)] px-3 py-1 text-xs font-bold text-[var(--muted)]">
+                      <Clock size={12} /> <EdNum v={s.mins} on={(mins) => set((x) => { x.mins = mins; })} edit={edit} /> دقيقة
+                    </span>
+                  </div>
+                  <div className="mt-4 text-lg font-black text-[var(--ink)]">
+                    <Ed v={s.who} on={(v) => set((x) => { x.who = v; })} edit={edit} />
+                  </div>
+                  <ul className="mt-3 space-y-2">
+                    {s.items.map((it, j) => (
+                      <li key={j} className="flex items-center gap-2 text-sm text-[var(--muted)]">
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--acc)" }} />
+                        <Ed v={it} on={(v) => set((x) => { x.items[j] = v; })} edit={edit} />
+                        <InlineDel edit={edit} onClick={() => set((x) => { x.items.splice(j, 1); })} />
+                      </li>
+                    ))}
+                  </ul>
+                  {edit && (
+                    <button type="button" onClick={() => set((x) => { x.items.push("بند جديد"); })}
+                      className="mp-noprint mt-3 flex items-center gap-1 text-xs font-bold text-[var(--muted)] hover:text-[var(--acc)]">
+                      <Plus size={13} /> سطر
+                    </button>
+                  )}
                 </div>
-                <div className="mt-4 text-lg font-black text-[var(--ink)]">{s.who}</div>
-                <ul className="mt-3 space-y-2">
-                  {s.items.map((it) => (
-                    <li key={it} className="flex items-center gap-2 text-sm text-[var(--muted)]">
-                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--acc)" }} /> {it}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </Reveal>
-          ))}
+              </Reveal>
+            );
+          })}
+          <Add edit={edit} label="جلسة تدريب" className="min-h-[160px]" onClick={() => patch((d) => { d.training.push({ who: "جلسة جديدة", mins: 30, items: ["محور الجلسة"] }); })} />
         </div>
       </Chapter>
 
       {/* ─── ٨. المتابعة ─── */}
-      <Chapter id="followup" n={8} kicker="المتابعة المستمرة" title={<>ما نختفي بعد البيع — <span style={{ color: "var(--acc)" }}>نكبر معك</span></>} lead="مدير حساب يعرف مشروعك بالاسم، وخطة متابعة واضحة طوال فترة اشتراكك.">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          {FOLLOWUP.map((f, i) => (
-            <Reveal key={f.title} delay={i * 80}>
-              <div className={`${card} relative h-full overflow-hidden p-5`}>
-                <div className="absolute inset-x-0 top-0 h-1" style={{ background: `linear-gradient(90deg, var(--acc), ${GOLD})`, opacity: 0.35 + i * 0.15 }} />
-                <div className="text-[11px] font-bold" style={{ color: "var(--acc)" }}>{f.when}</div>
-                <f.icon size={20} className="mt-3 text-[var(--ink)]" />
-                <div className="mt-2 font-black text-[var(--ink)]">{f.title}</div>
-                <p className="mt-1 text-xs leading-relaxed text-[var(--muted)]">{f.text}</p>
-              </div>
-            </Reveal>
-          ))}
+      <Chapter id="followup" n={8} {...ch("followup")}>
+        <div
+          className="grid gap-4 sm:grid-cols-2 lg:[grid-template-columns:repeat(var(--n),minmax(0,1fr))]"
+          style={{ ["--n" as string]: Math.max(1, Math.min(C.followup.length + (edit ? 1 : 0), 6)) } as React.CSSProperties}
+        >
+          {C.followup.map((f, i) => {
+            const Icon = iconAt(FOLLOWUP, i);
+            const set = (fn: (x: Content["followup"][number]) => void) => patch((d) => { fn(d.followup[i]); });
+            return (
+              <Reveal key={i} delay={i * 80}>
+                <div className={`${card} relative h-full overflow-visible p-5`}>
+                  <Del edit={edit} onClick={() => patch((d) => { d.followup.splice(i, 1); })} />
+                  <div className="absolute inset-x-0 top-0 h-1 rounded-t-3xl" style={{ background: `linear-gradient(90deg, var(--acc), ${GOLD})`, opacity: Math.min(1, 0.35 + i * 0.15) }} />
+                  <div className="text-[11px] font-bold" style={{ color: "var(--acc)" }}>
+                    <Ed v={f.when} on={(v) => set((x) => { x.when = v; })} edit={edit} />
+                  </div>
+                  <Icon size={20} className="mt-3 text-[var(--ink)]" />
+                  <div className="mt-2 font-black text-[var(--ink)]">
+                    <Ed v={f.title} on={(v) => set((x) => { x.title = v; })} edit={edit} />
+                  </div>
+                  <p className="mt-1 text-xs leading-relaxed text-[var(--muted)]">
+                    <Ed v={f.text} on={(v) => set((x) => { x.text = v; })} edit={edit} multi />
+                  </p>
+                </div>
+              </Reveal>
+            );
+          })}
+          <Add edit={edit} label="مرحلة" className="min-h-[140px]" onClick={() => patch((d) => { d.followup.push({ when: "متى؟", title: "مرحلة جديدة", text: "وصف" }); })} />
         </div>
       </Chapter>
 
       {/* ─── ٩. النتائج ─── */}
-      <Chapter id="results" n={9} kicker="النتائج المتوقعة" title="خلّنا نحسبها بأرقامك أنت" lead={`حرّك المؤشرات حسب واقع مشروعك — والنتائج تتحدّث مباشرة على باقة «${tier.name}».`}>
+      <Chapter id="results" n={9} {...ch("results")}>
         <div className="grid gap-6 lg:grid-cols-[1fr_1.1fr]">
           <Reveal>
             <div className={`${card} space-y-6 p-6`}>
@@ -1009,8 +1420,17 @@ function MeetingPlanInner() {
         <div className="mp-glow pointer-events-none absolute inset-0 rotate-180" />
         <div className="relative mx-auto max-w-3xl text-center">
           <Reveal>
-            <div className="mb-3 text-sm font-bold" style={{ color: "var(--acc)" }}>الخطوة التالية</div>
-            <h2 className="text-3xl font-black leading-tight text-[var(--ink)] sm:text-5xl">جاهزين نبدأ يا {who}؟</h2>
+            <div className="mb-3 text-sm font-bold" style={{ color: "var(--acc)" }}>
+              <Ed v={C.chapters.next.kicker} on={(kicker) => ch("next").onCt({ kicker })} edit={edit} />
+            </div>
+            <h2 className="text-3xl font-black leading-tight text-[var(--ink)] sm:text-5xl">
+              <Ed v={C.chapters.next.title} on={(title) => ch("next").onCt({ title })} edit={edit} view={(s) => rich(fill(s))} />
+            </h2>
+            {(C.chapters.next.lead || edit) && (
+              <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-[var(--muted)]">
+                <Ed v={C.chapters.next.lead} on={(lead) => ch("next").onCt({ lead })} edit={edit} multi view={fill} />
+              </p>
+            )}
           </Reveal>
           <Reveal delay={100}>
             <div className={`${card} mx-auto mt-10 max-w-xl p-6 text-right`}>
@@ -1065,9 +1485,11 @@ function MeetingPlanInner() {
 
 /* ──────────────────────────── مكوّنات مساعدة ──────────────────────────── */
 
-function IconBtn({ children, onClick, title }: { children: React.ReactNode; onClick: () => void; title: string }) {
+function IconBtn({ children, onClick, title, active = false }: { children: React.ReactNode; onClick: () => void; title: string; active?: boolean }) {
   return (
-    <button onClick={onClick} title={title} aria-label={title} className="grid h-9 w-9 place-items-center rounded-full border border-[var(--line)] text-[var(--muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--ink)]">
+    <button onClick={onClick} title={title} aria-label={title} aria-pressed={active}
+      className="grid h-9 w-9 place-items-center rounded-full border border-[var(--line)] text-[var(--muted)] transition-colors hover:bg-[var(--hover)] hover:text-[var(--ink)]"
+      style={active ? { background: "var(--acc)", borderColor: "var(--acc)", color: "white" } : {}}>
       {children}
     </button>
   );
