@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -8,11 +9,11 @@ import {
   Sun, Moon, Maximize2, Minimize2, Printer, Link2, Check, Sparkles, Coffee, UserCheck, Flower2,
   Calculator, Crown, Gem, Plus, Trash2, X, Send, Copy, RotateCcw, Users, Footprints, Clock,
   PlayCircle, CheckCircle2, Hourglass, Wand2, Scissors, Palette, Brush, Hand, Star, BellRing,
-  Store, Trophy, Repeat, Zap, Gift, UserPlus, Cloud, CloudOff, Loader2, Database, LogIn,
+  Store, Trophy, Repeat, Zap, Gift, UserPlus, Cloud, CloudOff, Loader2, Database, LogIn, ShieldX,
 } from "lucide-react";
 import {
   ADDONS, DEFAULT_SETTINGS, RETENTION_TARGET, SERVICES, SLEEP_DAYS, STAFF, TEMPLATE_DEFAULTS,
-  addonsTotal, applyStatus, buildDemoData, clientAfterVisit, computeMetrics, daysSince, intlPhone, invoice,
+  addonsTotal, applyStatus, clientAfterVisit, computeMetrics, daysSince, intlPhone, invoice,
   isSaudiMobile, isSleeping, localDateKey, winbackSent,
   type Addon, type ApptKind, type ApptRow, type ApptStatus, type ClientRow, type Metrics, type MembershipRow, type PlanIcon,
   type SettingKey, type Settings, type TplKey,
@@ -143,7 +144,7 @@ const CAT_STYLE: Record<string, { color: string; icon: LucideIcon }> = {
 /* ──────────────────────────── البيانات والعمليات ──────────────────────────── */
 
 type Data = { clients: ClientRow[]; appts: ApptRow[]; memberships: MembershipRow[]; settings: Settings };
-type Mode = "loading" | "live" | "guest" | "offline";
+type Mode = "loading" | "live" | "login" | "denied" | "error";
 type NewAppt = { client_name: string; phone: string; service: string; staff: string; starts_at: string; duration_minutes: number; price: number; kind: ApptKind };
 type NewPlan = Omit<MembershipRow, "id" | "sort_order" | "members" | "active">;
 
@@ -159,8 +160,6 @@ type Ops = {
   deletePlan: (m: MembershipRow) => Promise<void>;
 };
 type SetSetting = <K extends SettingKey>(key: K, value: Settings[K]) => void;
-
-const newId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `l${Date.now()}${Math.random()}`);
 
 /* ──────────────────────────── الصفحة ──────────────────────────── */
 
@@ -193,7 +192,7 @@ function SalonGrowthInner() {
   const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
-  // ─── البيانات: من Supabase للمستخدم المسجّل، وتجريبية (غير محفوظة) للزائر ───
+  // ─── البيانات من Supabase — الصفحة خاصة بالسوبر أدمن فقط (يتحقق منها الـ API) ───
   const [mode, setMode] = useState<Mode>("loading");
   const [data, setData] = useState<Data>(() => ({ clients: [], appts: [], memberships: [], settings: DEFAULT_SETTINGS }));
   const [isManager, setIsManager] = useState(false);
@@ -208,8 +207,8 @@ function SalonGrowthInner() {
         setMode("live");
       },
       (e) => {
-        setData({ ...buildDemoData(Date.now()), settings: DEFAULT_SETTINGS });
-        setMode((e as { status?: number }).status === 401 ? "guest" : "offline");
+        const status = (e as { status?: number }).status;
+        setMode(status === 401 ? "login" : status === 403 ? "denied" : "error");
       },
     ), []);
   useEffect(() => { load(); }, [load]);
@@ -224,7 +223,7 @@ function SalonGrowthInner() {
     try { await navigator.clipboard.writeText(text); notify(msg); } catch { notify("تعذّر النسخ", true); }
   };
 
-  // يحفظ على السيرفر لو مربوطة؛ عند الفشل يرجّع البيانات من السيرفر
+  // يحفظ على السيرفر؛ عند الفشل يرجّع البيانات من السيرفر
   const persist = useCallback(async <T,>(fn: () => Promise<T>): Promise<T | null> => {
     if (!live) return null;
     try { return await fn(); } catch (e) {
@@ -249,7 +248,7 @@ function SalonGrowthInner() {
   const replaceAppt = (a: ApptRow) => setData((d) => ({ ...d, appts: d.appts.map((x) => (x.id === a.id ? a : x)) }));
   const replacePlan = (m: MembershipRow) => setData((d) => ({ ...d, memberships: d.memberships.map((x) => (x.id === m.id ? m : x)) }));
 
-  // ─── العمليات: تحديث فوري للواجهة، ثم الحفظ لو مربوطة ───
+  // ─── العمليات: تحديث فوري للواجهة، ثم الحفظ ───
   const ops: Ops = {
     setStatus: async (a, status) => {
       const nowIso = new Date().toISOString();
@@ -281,20 +280,10 @@ function SalonGrowthInner() {
       await persist(() => api(`/appointments/${a.id}`, "DELETE"));
     },
     create: async (f) => {
-      if (live) {
-        const res = await persist(() => api<{ appointment: ApptRow; client: ClientRow }>("/appointments", "POST", f));
-        if (!res) return false;
-        upsertClient(res.client);
-        setData((d) => ({ ...d, appts: [...d.appts, res.appointment] }));
-      } else {
-        const phone = intlPhone(f.phone);
-        const client: ClientRow = data.clients.find((c) => c.phone === phone)
-          ?? { id: newId(), name: f.client_name, phone, favorite_service: null, last_visit_at: null, total_spent: 0, visits: 0, winback_sent_at: null };
-        upsertClient(client);
-        setData((d) => ({ ...d, appts: [...d.appts, {
-          ...f, phone, id: newId(), client_id: client.id, status: "waiting", addons: [], started_at: null, completed_at: null, reminded_at: null,
-        }] }));
-      }
+      const res = await persist(() => api<{ appointment: ApptRow; client: ClientRow }>("/appointments", "POST", f));
+      if (!res) return false;
+      upsertClient(res.client);
+      setData((d) => ({ ...d, appts: [...d.appts, res.appointment] }));
       notify(`أُضيفت ${f.client_name}`);
       return true;
     },
@@ -311,13 +300,9 @@ function SalonGrowthInner() {
       if (res) replacePlan(res.membership);
     },
     addPlan: async (p) => {
-      if (live) {
-        const res = await persist(() => api<{ membership: MembershipRow }>("/memberships", "POST", p));
-        if (!res) return false;
-        setData((d) => ({ ...d, memberships: [...d.memberships, res.membership] }));
-      } else {
-        setData((d) => ({ ...d, memberships: [...d.memberships, { ...p, id: newId(), members: 0, active: true, sort_order: d.memberships.length }] }));
-      }
+      const res = await persist(() => api<{ membership: MembershipRow }>("/memberships", "POST", p));
+      if (!res) return false;
+      setData((d) => ({ ...d, memberships: [...d.memberships, res.membership] }));
       notify(`أُضيفت باقة «${p.name}»`);
       return true;
     },
@@ -405,8 +390,8 @@ function SalonGrowthInner() {
               <Flower2 size={18} />
             </span>
             <div className="min-w-0 leading-tight">
-              <div className="truncate text-sm font-black text-[var(--ink)]">لوحة نمو {salonName}</div>
-              <div className="hidden text-[11px] text-[var(--faint)] sm:block">المبيعات والاحتفاظ بالعميلات</div>
+              <div className="truncate text-sm font-black text-[var(--ink)]">الخطة التسويقية للصالونات</div>
+              <div className="hidden truncate text-[11px] text-[var(--faint)] sm:block">{S.salon_name.trim() || "المبيعات والاحتفاظ بالعميلات"}</div>
             </div>
           </div>
           <div className="ms-auto flex items-center gap-1.5">
@@ -420,7 +405,7 @@ function SalonGrowthInner() {
             <IconBtn onClick={toggleFs} title="وضع العرض">{fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</IconBtn>
           </div>
         </div>
-        <nav className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 pb-2.5 sm:px-6 [scrollbar-width:none]" role="tablist">
+        {live && <nav className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 pb-2.5 sm:px-6 [scrollbar-width:none]" role="tablist">
           {TABS.map((t) => {
             const on = t.id === tab;
             return (
@@ -438,13 +423,15 @@ function SalonGrowthInner() {
               </button>
             );
           })}
-        </nav>
+        </nav>}
       </header>
 
       {mode === "loading" ? (
         <div className="grid min-h-[60vh] place-items-center text-[var(--muted)]">
           <Loader2 className="animate-spin" size={28} />
         </div>
+      ) : !live ? (
+        <AccessGate mode={mode} onRetry={() => { setMode("loading"); load(); }} />
       ) : (
         <>
           {/* ─── المؤشرات السريعة ─── */}
@@ -452,19 +439,6 @@ function SalonGrowthInner() {
             <div className="sg-glow pointer-events-none absolute inset-0" />
             <div className="sg-grid pointer-events-none absolute inset-0" />
             <div className="relative mx-auto max-w-7xl">
-              {!live && (
-                <div className="sg-noprint mb-5 flex flex-wrap items-center gap-3 rounded-2xl border px-4 py-3 text-sm" style={{ borderColor: `${GOLD}66`, background: `color-mix(in srgb, ${GOLD} 8%, transparent)` }}>
-                  <CloudOff size={16} style={{ color: GOLD }} />
-                  <span className="flex-1 font-bold text-[var(--body)]">
-                    {mode === "guest"
-                      ? "وضع العرض التجريبي — البيانات للعرض فقط ولا تُحفظ. سجّل الدخول لربط اللوحة ببيانات صالونك."
-                      : "تعذّر الاتصال بقاعدة البيانات — نعرض بيانات تجريبية مؤقتاً."}
-                  </span>
-                  {mode === "guest"
-                    ? <a href="/login" className={btnPrimary} style={accGrad}><LogIn size={15} /> تسجيل الدخول</a>
-                    : <button onClick={() => { setMode("loading"); load(); }} className={btnGhost}><RotateCcw size={14} /> إعادة المحاولة</button>}
-                </div>
-              )}
               {empty && (
                 <div className="sg-noprint mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm">
                   <Database size={16} style={{ color: "var(--acc)" }} />
@@ -482,17 +456,20 @@ function SalonGrowthInner() {
                     {new Date(now).toLocaleDateString(LOCALE, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
                   </div>
                   <h1 className="text-3xl font-black leading-tight text-[var(--ink)] sm:text-5xl">
-                    لوحة تسريع{" "}
-                    <span className="bg-clip-text text-transparent" style={{ backgroundImage: `linear-gradient(90deg, var(--acc), ${GOLD})` }}>نمو وإيرادات</span>{" "}
+                    الخطة التسويقية{" "}
+                    <span className="bg-clip-text text-transparent" style={{ backgroundImage: `linear-gradient(90deg, var(--acc), ${GOLD})` }}>للصالونات</span>
+                  </h1>
+                  <div className="mt-3 flex items-center gap-2 text-sm font-bold text-[var(--muted)]">
+                    الصالون:
                     <input
                       value={S.salon_name}
                       onChange={(e) => setSetting("salon_name", e.target.value.slice(0, 60))}
                       placeholder="اسم الصالون"
-                      className="sg-noprint inline-block w-[7em] max-w-full rounded-xl border border-dashed border-[var(--line-strong)] bg-transparent px-2 align-baseline text-[0.8em] font-black outline-none placeholder:text-[var(--faint)] focus:border-[var(--acc)]"
+                      className="sg-noprint w-48 max-w-full rounded-xl border border-dashed border-[var(--line-strong)] bg-transparent px-2 py-1 font-black outline-none placeholder:text-[var(--faint)] focus:border-[var(--acc)]"
                       style={{ color: "var(--acc)" }}
                     />
                     <span className="hidden print:inline" style={{ color: "var(--acc)" }}>{salonName}</span>
-                  </h1>
+                  </div>
                   <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[var(--muted)] sm:text-base">
                     أربعة مفاتيح سرّية ترفع الفاتورة وتُرجع العميلات: الاستقبال الفاخر، استشارة الـ ٥ دقائق، العضويات المغلقة، وصيد العميلات النائمات.
                   </p>
@@ -531,7 +508,7 @@ function SalonGrowthInner() {
           </section>
 
           <main key={tab} className="sg-in mx-auto max-w-7xl px-4 pb-24 sm:px-6">
-            {tab === "growth" && <GrowthTab data={data} now={now} ops={ops} setSetting={setSetting} vars={vars} canDelete={!live || isManager} />}
+            {tab === "growth" && <GrowthTab data={data} now={now} ops={ops} setSetting={setSetting} vars={vars} canDelete={isManager} />}
             {tab === "booking" && <BookingTab appts={data.appts} now={now} ops={ops} reminderTpl={S.templates.reminder} vars={vars} />}
             {tab === "automation" && <AutomationTab settings={S} setSetting={setSetting} vars={vars} copy={copy} notify={notify} />}
             {tab === "analytics" && <AnalyticsTab metrics={metrics} />}
@@ -1291,12 +1268,33 @@ function AnalyticsTab({ metrics }: { metrics: Metrics }) {
 
 /* ──────────────────────────── مكوّنات مساعدة ──────────────────────────── */
 
-function ConnChip({ mode }: { mode: Mode }) {
-  if (mode === "loading") return null;
-  const live = mode === "live";
+function AccessGate({ mode, onRetry }: { mode: Mode; onRetry: () => void }) {
+  const meta = mode === "login"
+    ? { icon: LogIn, title: "سجّل الدخول للمتابعة", text: "هذه الصفحة خاصة — سجّل الدخول بحساب المسؤول لعرضها." }
+    : mode === "denied"
+      ? { icon: ShieldX, title: "لا تملك صلاحية الوصول", text: "الخطة التسويقية للصالونات متاحة للمسؤول فقط." }
+      : { icon: CloudOff, title: "تعذّر تحميل البيانات", text: "صار خطأ في الاتصال بقاعدة البيانات — حاول مرة ثانية." };
   return (
-    <span className={`hidden items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold sm:flex ${live ? "border-green-500/40 text-green-600" : "border-[var(--line)] text-[var(--muted)]"}`} title={live ? "البيانات محفوظة في قاعدة البيانات" : "بيانات تجريبية غير محفوظة"}>
-      {live ? <Cloud size={13} /> : <CloudOff size={13} />} {live ? "متصلة" : "تجريبي"}
+    <div className="grid min-h-[70vh] place-items-center px-4">
+      <div className={`${card} sg-in w-full max-w-md p-8 text-center`}>
+        <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl text-[var(--on-acc)]" style={accGrad}><meta.icon size={24} /></span>
+        <h1 className="mt-5 text-xl font-black text-[var(--ink)]">{meta.title}</h1>
+        <p className="mt-2 text-sm leading-relaxed text-[var(--muted)]">{meta.text}</p>
+        <div className="mt-6">
+          {mode === "login" && <Link href="/login" className={btnPrimary} style={accGrad}><LogIn size={15} /> تسجيل الدخول</Link>}
+          {mode === "denied" && <Link href="/" className={btnGhost}>الرجوع للرئيسية</Link>}
+          {mode === "error" && <button onClick={onRetry} className={btnGhost}><RotateCcw size={14} /> إعادة المحاولة</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConnChip({ mode }: { mode: Mode }) {
+  if (mode !== "live") return null;
+  return (
+    <span className="hidden items-center gap-1.5 rounded-full border border-green-500/40 px-3 py-1.5 text-xs font-bold text-green-600 sm:flex" title="البيانات محفوظة في قاعدة البيانات">
+      <Cloud size={13} /> متصلة
     </span>
   );
 }

@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { getTicketAccess } from "@/lib/api/work-ticket-access";
+import { isSuperAdmin } from "@/lib/permissions";
 import { SETTING_KEYS, intlPhone, isSaudiMobile, type Addon, type PlanIcon } from "@/lib/salon-growth";
 
-/** صلاحية «لوحة نمو الصالون»: أي مستخدم مسجّل في المنظمة يقرأ ويكتب؛ الحذف للمدراء. */
+/** صلاحية «الخطة التسويقية للصالونات»: السوبر أدمن فقط (قراءة وكتابة وحذف). */
 export async function getSalonAccess() {
   const access = await getTicketAccess();
   if (!access) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await isSuperAdmin(access.userId))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   return access;
 }
 
