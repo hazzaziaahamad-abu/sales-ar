@@ -10,7 +10,7 @@ export async function PUT(req: NextRequest) {
   if (access instanceof NextResponse) return access;
   const b = ((await req.json().catch(() => ({}))) ?? {}) as Record<string, unknown>;
   if (!isSettingKey(b.key)) return NextResponse.json({ error: "مفتاح غير معروف" }, { status: 400 });
-  if (b.value === undefined || JSON.stringify(b.value).length > 20000) {
+  if (b.value === undefined || JSON.stringify(b.value).length > 60000) {
     return NextResponse.json({ error: "قيمة غير صالحة" }, { status: 400 });
   }
   const { error } = await supabaseAdmin.from("salon_growth_settings").upsert(

@@ -33,9 +33,85 @@ export type Settings = {
   templates: Record<TplKey, string>;
   auto_on: Record<TplKey, boolean>;
   reception: { date: string; checks: Record<string, boolean> };
+  diagnosis: Diagnosis;
 };
 
-export const SETTING_KEYS = ["salon_name", "booking_link", "discount", "templates", "auto_on", "reception"] as const;
+/* ──────────────────────────── التشخيص الأولي (قبل التعاقد) ──────────────────────────── */
+
+export type KpiKey =
+  | "revenue" | "aov" | "invoices" | "active_clients" | "sleeping_count" | "sleeping_pct"
+  | "return60" | "return90" | "upsell_rate" | "rebook_rate" | "noshow_rate" | "utilization"
+  | "revenue_per_staff" | "members" | "google_rating" | "google_reviews" | "reception_score";
+
+export type Diagnosis = {
+  meeting_date: string;
+  owner_name: string;
+  received: Record<string, boolean>;          // المطلوب قبل الاجتماع
+  notes: Record<string, string>;              // إجابات محاور النقاش
+  observed: Record<string, boolean>;          // ملاحظة الاستقبال وقت الزيارة (بنود البروتوكول)
+  baseline: Partial<Record<KpiKey, { value: number | null; estimated: boolean }>>;
+  manual_current: Partial<Record<KpiKey, number | null>>; // للمؤشرات اللي ما تنحسب من النظام
+  baseline_locked_at: string | null;
+  flags: Record<string, boolean>;             // علامات التريّث
+  goals: { kpi: KpiKey | ""; target: number | null }[];
+  quick_win: string;
+  next_review: string;
+};
+
+export const DEFAULT_DIAGNOSIS: Diagnosis = {
+  meeting_date: "", owner_name: "", received: {}, notes: {}, observed: {}, baseline: {}, manual_current: {},
+  baseline_locked_at: null, flags: {}, goals: [{ kpi: "", target: null }, { kpi: "", target: null }, { kpi: "", target: null }],
+  quick_win: "", next_review: "",
+};
+
+export type KpiDef = { key: KpiKey; label: string; unit: string; how: string; lowerIsBetter?: boolean; auto: boolean };
+
+/** بطاقة خط الأساس — auto: يُحسب «الحالي» تلقائياً من بيانات اللوحة. */
+export const KPIS: KpiDef[] = [
+  { key: "revenue", label: "الدخل الشهري", unit: "ر.س", how: "متوسط آخر ٣ أشهر (الحالي: آخر ٣٠ يوم)", auto: true },
+  { key: "aov", label: "متوسط الفاتورة (AOV)", unit: "ر.س", how: "الدخل ÷ عدد الفواتير", auto: true },
+  { key: "invoices", label: "عدد الفواتير شهرياً", unit: "فاتورة", how: "من الكاشير", auto: true },
+  { key: "active_clients", label: "العميلات الفعّالات", unit: "عميلة", how: "زرن خلال آخر ٩٠ يوم", auto: true },
+  { key: "sleeping_count", label: "العميلات النائمات", unit: "عميلة", how: "آخر زيارة قبل أكثر من ٤٥ يوم", lowerIsBetter: true, auto: true },
+  { key: "sleeping_pct", label: "نسبة النائمات", unit: "٪", how: "النائمات ÷ كل العميلات", lowerIsBetter: true, auto: true },
+  { key: "return60", label: "معدل العودة خلال ٦٠ يوم", unit: "٪", how: "من زيارات قبل ٣–٦ أشهر، كم رجعت؟", auto: true },
+  { key: "return90", label: "معدل العودة خلال ٩٠ يوم", unit: "٪", how: "نفس العيّنة خلال ٩٠ يوم", auto: true },
+  { key: "upsell_rate", label: "نسبة البيع الإضافي", unit: "٪", how: "فواتير فيها إضافة ÷ كل الفواتير", auto: true },
+  { key: "rebook_rate", label: "حجز الموعد الجاي قبل المغادرة", unit: "٪", how: "من آخر ٢٠ عميلة", auto: false },
+  { key: "noshow_rate", label: "نسبة الغياب والإلغاء", unit: "٪", how: "مواعيد ما حضرت ÷ كل المواعيد", lowerIsBetter: true, auto: false },
+  { key: "utilization", label: "إشغال الموظفات", unit: "٪", how: "الساعات المحجوزة ÷ الساعات المتاحة", auto: false },
+  { key: "revenue_per_staff", label: "الدخل لكل موظفة", unit: "ر.س", how: "الدخل الشهري ÷ عدد الموظفات", auto: true },
+  { key: "members", label: "عضوات الباقات والرصيد المسبق", unit: "عضوة", how: "مجموع المشتركات في الباقات المفعّلة", auto: true },
+  { key: "google_rating", label: "تقييم قوقل", unit: "من ٥", how: "من حساب قوقل ماب", auto: false },
+  { key: "google_reviews", label: "عدد مراجعات قوقل", unit: "مراجعة", how: "من حساب قوقل ماب", auto: false },
+  { key: "reception_score", label: "درجة الاستقبال", unit: "من ٥", how: "بنود بروتوكول الاستقبال (الحالي: قائمة اليوم)", auto: true },
+];
+
+/** القيم الحالية المحسوبة من بيانات اللوحة (آخر ٣٠ يوم للمؤشرات الشهرية). */
+export function computeCurrentKpis(
+  clients: ClientRow[], appts: ApptRow[], memberships: MembershipRow[], receptionToday: number, now: number,
+): Partial<Record<KpiKey, number | null>> {
+  const last30 = appts.filter((a) => a.status === "done" && Date.parse(a.starts_at) > now - 30 * DAY && Date.parse(a.starts_at) <= now);
+  const revenue = last30.reduce((s, a) => s + invoice(a), 0);
+  const withVisits = clients.filter((c) => c.last_visit_at);
+  const sleeping = withVisits.filter((c) => isSleeping(c, now)).length;
+  const staffCount = new Set(last30.map((a) => a.staff)).size;
+  const m = computeMetrics(clients, appts, now);
+  return {
+    revenue, invoices: last30.length,
+    aov: last30.length ? revenue / last30.length : null,
+    active_clients: withVisits.filter((c) => daysSince(c.last_visit_at, now) <= 90).length,
+    sleeping_count: sleeping,
+    sleeping_pct: withVisits.length ? (sleeping / withVisits.length) * 100 : null,
+    return60: m.returnRates[1].rate, return90: m.returnRates[2].rate,
+    upsell_rate: last30.length ? (last30.filter((a) => a.addons?.length).length / last30.length) * 100 : null,
+    revenue_per_staff: staffCount ? revenue / staffCount : null,
+    members: memberships.filter((p) => p.active).reduce((s, p) => s + p.members, 0),
+    reception_score: receptionToday,
+  };
+}
+
+export const SETTING_KEYS = ["salon_name", "booking_link", "discount", "templates", "auto_on", "reception", "diagnosis"] as const;
 export type SettingKey = (typeof SETTING_KEYS)[number];
 
 export const CLIENT_COLS = "id, name, phone, favorite_service, last_visit_at, total_spent, visits, winback_sent_at";
@@ -87,6 +163,7 @@ export const DEFAULT_SETTINGS: Settings = {
   templates: TEMPLATE_DEFAULTS,
   auto_on: { reminder: true, followup: true, winback: false },
   reception: { date: "", checks: {} },
+  diagnosis: DEFAULT_DIAGNOSIS,
 };
 
 export const DEFAULT_PLANS: Omit<MembershipRow, "id">[] = [

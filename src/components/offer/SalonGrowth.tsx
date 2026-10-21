@@ -9,7 +9,7 @@ import {
   Sun, Moon, Maximize2, Minimize2, Printer, Link2, Check, Sparkles, Coffee, UserCheck, Flower2,
   Calculator, Crown, Gem, Plus, Trash2, X, Send, Copy, RotateCcw, Users, Footprints, Clock,
   PlayCircle, CheckCircle2, Hourglass, Wand2, Scissors, Palette, Brush, Hand, Star, BellRing,
-  Store, Trophy, Repeat, Zap, Gift, UserPlus, Cloud, CloudOff, Loader2, Database, LogIn, ShieldX,
+  Store, Trophy, Repeat, Zap, Gift, UserPlus, Cloud, CloudOff, Loader2, Database, LogIn, ShieldX, Stethoscope,
 } from "lucide-react";
 import {
   ADDONS, DEFAULT_SETTINGS, RETENTION_TARGET, SERVICES, SLEEP_DAYS, STAFF, TEMPLATE_DEFAULTS,
@@ -18,6 +18,7 @@ import {
   type Addon, type ApptKind, type ApptRow, type ApptStatus, type ClientRow, type Metrics, type MembershipRow, type PlanIcon,
   type SettingKey, type Settings, type TplKey,
 } from "@/lib/salon-growth";
+import DiagnosisTab from "@/components/offer/SalonDiagnosis";
 
 /* ──────────────────────────── أدوات عامة ──────────────────────────── */
 
@@ -85,6 +86,7 @@ const input =
 /* ──────────────────────────── ثوابت العرض ──────────────────────────── */
 
 const TABS = [
+  { id: "diagnosis", label: "التشخيص الأولي", short: "التشخيص", icon: Stethoscope },
   { id: "growth", label: "مفاتيح التغيير والنمو", short: "مفاتيح النمو", icon: Rocket },
   { id: "booking", label: "جدول المواعيد والحجز الذكي", short: "المواعيد", icon: CalendarClock },
   { id: "automation", label: "رسائل التواصل الآلي والولاء", short: "الرسائل", icon: MessageCircle },
@@ -508,6 +510,7 @@ function SalonGrowthInner() {
           </section>
 
           <main key={tab} className="sg-in mx-auto max-w-7xl px-4 pb-24 sm:px-6">
+            {tab === "diagnosis" && <DiagnosisTab data={data} now={now} setSetting={setSetting} copy={copy} salonName={salonName} />}
             {tab === "growth" && <GrowthTab data={data} now={now} ops={ops} setSetting={setSetting} vars={vars} canDelete={isManager} />}
             {tab === "booking" && <BookingTab appts={data.appts} now={now} ops={ops} reminderTpl={S.templates.reminder} vars={vars} />}
             {tab === "automation" && <AutomationTab settings={S} setSetting={setSetting} vars={vars} copy={copy} notify={notify} />}

@@ -30,7 +30,11 @@ async function loadAll(orgId: string) {
     clients: clients.map((c) => toNum(c, ["total_spent", "visits"])),
     appts: appts.map((a) => toNum(a, ["price", "duration_minutes"])),
     memberships: ((memberships.data ?? []) as MembershipRow[]).map((m) => toNum(m, ["price", "members"])),
-    settings: { ...settings, templates: { ...DEFAULT_SETTINGS.templates, ...settings.templates } },
+    settings: {
+      ...settings,
+      templates: { ...DEFAULT_SETTINGS.templates, ...settings.templates },
+      diagnosis: { ...DEFAULT_SETTINGS.diagnosis, ...settings.diagnosis },
+    },
   };
 }
 
