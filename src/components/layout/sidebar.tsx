@@ -56,6 +56,7 @@ import {
   BellRing,
   AtSign,
   Presentation,
+  Flower2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
@@ -93,6 +94,7 @@ export const NAV_ITEMS = [
   { label: "عرض للعميل — المنيو", href: "/offer/menu", slug: "offer-menu", icon: Share2, color: "violet", group: "المبيعات والدعم", external: true },
   { label: "عرض للعميل — نحجز", href: "/offer/nahjez", slug: "offer-nahjez", icon: Share2, color: "teal", group: "المبيعات والدعم", external: true },
   { label: "خطة اجتماع العميل", href: "/offer/meeting", slug: "offer-meeting", icon: Presentation, color: "violet", group: "المبيعات والدعم", external: true },
+  { label: "لوحة نمو الصالون", href: "/offer/salon-growth", slug: "offer-salon-growth", icon: Flower2, color: "rose", group: "المبيعات والدعم", external: true },
   { label: "مبيعات الدعم", href: "/support-sales", slug: "support-sales", icon: TrendingUp, color: "orange", group: "المبيعات والدعم" },
   { label: "الدعم", href: "/support", slug: "support", icon: Headphones, color: "orange", group: "المبيعات والدعم" },
   // Hidden: merged into "مهامي" — { label: "دليل المبيعات", href: "/sales-guide", slug: "sales-guide", icon: BookOpen, color: "amber" },
