@@ -1,8 +1,9 @@
 "use client";
 
-// تبويب «التشخيص الأولي» في الخطة التسويقية للصالونات:
-// أول اجتماع قبل التعاقد — المطلوب قبله، محاور النقاش، بطاقة خط الأساس («قبل»)،
-// علامات التريّث، وأهداف ٩٠ يوم مع مقارنة تلقائية بأرقام اللوحة الحالية.
+// «التشخيص الأولي»: أول اجتماع قبل التعاقد — المطلوب قبله، محاور النقاش، بطاقة خط الأساس («قبل»)،
+// علامات التريّث، وأهداف ٩٠ يوم.
+// DiagnosisView يقرأ ويكتب عبر DiagnosisSource — نفس الشاشة تُستخدم في «الخطة التسويقية للصالونات»
+// (مصدرها إعدادات اللوحة + أرقام تلقائية) وفي بطاقة كل صالون في غرفة المستشارين (مصدرها بيانات الصالون).
 
 import React, { useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -99,6 +100,28 @@ const numOrNull = (v: string) => (v.trim() === "" ? null : Number.isFinite(Numbe
 
 /* ──────────────────────────── التبويب ──────────────────────────── */
 
+type BaselineCell = { value: number | null; estimated: boolean };
+
+/** مصدر بيانات التشخيص — كل شاشة تربطه ببياناتها. */
+export type DiagnosisSource = {
+  d: Diagnosis;
+  set: (patch: Partial<Diagnosis>) => void;
+  baseline: (k: KpiKey) => BaselineCell | undefined;
+  setBaseline: (k: KpiKey, patch: Partial<BaselineCell>) => void;
+  goals: Diagnosis["goals"];
+  setGoals: (g: Diagnosis["goals"]) => void;
+  current: (k: KpiDef) => number | null;
+  isAuto: (k: KpiDef) => boolean;
+  setCurrent: (k: KpiKey, v: number | null) => void;
+  owner: string;
+  setOwner: (v: string) => void;
+  nextReview: string;
+  setNextReview: (v: string) => void;
+  /** ملاحظة الاستقبال وقت الزيارة؛ score = درجة الاستقبال للأساس (null لو الأساس معتمد). */
+  observe: (observed: Record<string, boolean>, score: number | null) => void;
+};
+
+/** تبويب «التشخيص الأولي» في الخطة التسويقية للصالونات (تشخيص واحد للمنظمة + «الحالي» من بيانات اللوحة). */
 export default function DiagnosisTab({ data, now, setSetting, copy, salonName }: {
   data: { clients: ClientRow[]; appts: ApptRow[]; memberships: MembershipRow[]; settings: Settings };
   now: number;
@@ -108,7 +131,6 @@ export default function DiagnosisTab({ data, now, setSetting, copy, salonName }:
 }) {
   const d: Diagnosis = { ...DEFAULT_DIAGNOSIS, ...data.settings.diagnosis };
   const set = (patch: Partial<Diagnosis>) => setSetting("diagnosis", { ...d, ...patch });
-  const locked = !!d.baseline_locked_at;
 
   const todayKey = localDateKey(now);
   const receptionToday = data.settings.reception.date === todayKey
@@ -118,47 +140,72 @@ export default function DiagnosisTab({ data, now, setSetting, copy, salonName }:
     () => computeCurrentKpis(data.clients, data.appts, data.memberships, receptionToday, hour * 3_600_000),
     [data.clients, data.appts, data.memberships, receptionToday, hour],
   );
-  const current = (k: KpiDef) => (k.auto ? auto[k.key] ?? null : d.manual_current[k.key] ?? null);
+
+  const src: DiagnosisSource = {
+    d, set,
+    baseline: (k) => d.baseline[k],
+    setBaseline: (k, patch) => set({ baseline: { ...d.baseline, [k]: { value: null, estimated: false, ...d.baseline[k], ...patch } } }),
+    goals: d.goals,
+    setGoals: (goals) => set({ goals }),
+    current: (k) => (k.auto ? auto[k.key] ?? null : d.manual_current[k.key] ?? null),
+    isAuto: (k) => k.auto,
+    setCurrent: (k, v) => set({ manual_current: { ...d.manual_current, [k]: v } }),
+    owner: d.owner_name,
+    setOwner: (v) => set({ owner_name: v }),
+    nextReview: d.next_review,
+    setNextReview: (v) => set({ next_review: v }),
+    observe: (observed, score) => set({ observed, ...(score === null ? {} : { baseline: { ...d.baseline, reception_score: { value: score, estimated: false } } }) }),
+  };
+  return (
+    <DiagnosisView src={src} copy={copy} salonName={salonName}
+      currentHint="سجّل أرقام اليوم واعتمدها مع المالكة. «الحالي» يُحسب تلقائياً من بيانات اللوحة (آخر ٣٠ يوم)، والباقي تدخله يدوياً عند كل مراجعة." />
+  );
+}
+
+export function DiagnosisView({ src, copy, salonName, currentHint, compact = false }: {
+  src: DiagnosisSource; copy: (text: string, msg?: string) => void; salonName: string; currentHint: string; compact?: boolean;
+}) {
+  const d = src.d;
+  const set = src.set;
+  const locked = !!d.baseline_locked_at;
 
   const receivedCount = PREREQS.filter((p) => d.received[p.id]).length;
   const answered = AXES.flatMap((a) => a.questions).filter((q) => (d.notes[q.id] ?? "").trim()).length;
-  const baselineCount = KPIS.filter((k) => d.baseline[k.key]?.value !== null && d.baseline[k.key]?.value !== undefined).length;
+  const baselineCount = KPIS.filter((k) => src.baseline(k.key)?.value !== null && src.baseline(k.key)?.value !== undefined).length;
   const flagCount = FLAGS.filter((f) => d.flags[f.id]).length;
   const observedCount = OBSERVE.filter((o) => d.observed[o.id]).length;
 
   const [open, setOpen] = useState<string | null>("owner");
 
-  const setBaseline = (key: KpiKey, patch: Partial<{ value: number | null; estimated: boolean }>) =>
-    set({ baseline: { ...d.baseline, [key]: { value: null, estimated: false, ...d.baseline[key], ...patch } } });
+  const setBaseline = src.setBaseline;
 
   const toggleObserved = (id: string) => {
     const observed = { ...d.observed, [id]: !d.observed[id] };
-    const score = OBSERVE.filter((o) => observed[o.id]).length;
     // درجة الاستقبال في خط الأساس = ما لاحظته وقت الزيارة (لين ما يُعتمد الأساس)
-    set({ observed, ...(locked ? {} : { baseline: { ...d.baseline, reception_score: { value: score, estimated: false } } }) });
+    src.observe(observed, locked ? null : OBSERVE.filter((o) => observed[o.id]).length);
   };
 
   const requestMsg =
-    `السلام عليكم${d.owner_name.trim() ? ` ${d.owner_name.trim()}` : ""} 🌸\n` +
+    `السلام عليكم${src.owner.trim() ? ` ${src.owner.trim()}` : ""} 🌸\n` +
     `عشان نجهّز لاجتماعنا${d.meeting_date ? ` يوم ${new Date(d.meeting_date).toLocaleDateString(LOCALE, { weekday: "long", day: "numeric", month: "long" })}` : ""} ونطلع بخطة دقيقة لصالونك، نحتاج منك (صور أو ملفات على راحتك):\n` +
     PREREQS.map((p, i) => `${fmt(i + 1)}. ${p.title}`).join("\n") +
     `\n\nلو بعضها مو متوفر عادي — نرتّبها سوا في الاجتماع 🤍`;
 
-  const goalsDefined = d.goals.filter((g) => g.kpi && g.target !== null);
+  const goalsDefined = src.goals.filter((g) => g.kpi && g.target !== null);
   const summaryMsg =
     `ملخص التشخيص الأولي — ${salonName}\n` +
     (d.meeting_date ? `التاريخ: ${new Date(d.meeting_date).toLocaleDateString(LOCALE, { day: "numeric", month: "long", year: "numeric" })}\n` : "") +
     `\n📊 خط الأساس (قبل):\n` +
-    KPIS.filter((k) => d.baseline[k.key]?.value !== null && d.baseline[k.key]?.value !== undefined)
-      .map((k) => `• ${k.label}: ${formatKpi(k, d.baseline[k.key]!.value)}${d.baseline[k.key]!.estimated ? " (تقديري)" : ""}`).join("\n") +
+    KPIS.filter((k) => src.baseline(k.key)?.value !== null && src.baseline(k.key)?.value !== undefined)
+      .map((k) => `• ${k.label}: ${formatKpi(k, src.baseline(k.key)!.value)}${src.baseline(k.key)!.estimated ? " (تقديري)" : ""}`).join("\n") +
     (goalsDefined.length
       ? `\n\n🎯 أهداف ٩٠ يوم:\n` + goalsDefined.map((g) => {
           const k = KPIS.find((x) => x.key === g.kpi)!;
-          return `• ${k.label}: من ${formatKpi(k, d.baseline[k.key]?.value)} إلى ${formatKpi(k, g.target)}`;
+          return `• ${k.label}: من ${formatKpi(k, src.baseline(k.key)?.value)} إلى ${formatKpi(k, g.target)}`;
         }).join("\n")
       : "") +
     (d.quick_win.trim() ? `\n\n⚡ الفوز السريع (أول أسبوعين): ${d.quick_win.trim()}` : "") +
-    (d.next_review ? `\n📅 موعد المراجعة: ${new Date(d.next_review).toLocaleDateString(LOCALE, { day: "numeric", month: "long" })}` : "");
+    (src.nextReview ? `\n📅 موعد المراجعة: ${new Date(src.nextReview).toLocaleDateString(LOCALE, { day: "numeric", month: "long" })}` : "");
 
   return (
     <div className="space-y-5">
@@ -183,16 +230,16 @@ export default function DiagnosisTab({ data, now, setSetting, copy, salonName }:
           </div>
         </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className={`mt-5 grid gap-3 sm:grid-cols-2 ${compact ? "" : "lg:grid-cols-4"}`}>
           <label className="block">
             <span className="mb-1 block text-xs font-bold text-[var(--muted)]">اسم المالكة</span>
-            <input value={d.owner_name} onChange={(e) => set({ owner_name: e.target.value.slice(0, 80) })} placeholder="مثال: أ. نورة" className={input} />
+            <input value={src.owner} onChange={(e) => src.setOwner(e.target.value.slice(0, 80))} placeholder="مثال: أ. نورة" className={input} />
           </label>
           <label className="block">
             <span className="mb-1 block text-xs font-bold text-[var(--muted)]">تاريخ الاجتماع</span>
             <input type="date" value={d.meeting_date} onChange={(e) => set({ meeting_date: e.target.value })} className={input} />
           </label>
-          <div className="col-span-full grid grid-cols-2 gap-3 sm:grid-cols-4 lg:col-span-2">
+          <div className={`col-span-full grid grid-cols-2 gap-3 sm:grid-cols-4 ${compact ? "" : "lg:col-span-2"}`}>
             <Progress label="المطلوب" value={receivedCount} total={PREREQS.length} />
             <Progress label="الأسئلة" value={answered} total={QUESTION_COUNT} />
             <Progress label="خط الأساس" value={baselineCount} total={KPIS.length} />
@@ -206,7 +253,7 @@ export default function DiagnosisTab({ data, now, setSetting, copy, salonName }:
         </div>
       </section>
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_1.15fr]">
+      <div className={`grid gap-5 ${compact ? "" : "lg:grid-cols-[1fr_1.15fr]"}`}>
         {/* ─── ١. المطلوب قبل الاجتماع ─── */}
         <Section n={1} icon={ClipboardList} title="المطلوب قبل الاجتماع" lead="أرسلها للمالكة قبل الاجتماع بيومين–ثلاثة، وعلّم اللي وصلك."
           action={<button onClick={() => copy(requestMsg, "تم نسخ رسالة الطلب")} className={btnGhost}><MessageCircle size={14} /> نسخ رسالة الطلب</button>}>
@@ -290,7 +337,7 @@ export default function DiagnosisTab({ data, now, setSetting, copy, salonName }:
 
       {/* ─── ٣. بطاقة خط الأساس ─── */}
       <Section n={3} icon={Receipt} title="بطاقة خط الأساس — «قبل» مقابل «الحالي»"
-        lead="سجّل أرقام اليوم واعتمدها مع المالكة. «الحالي» يُحسب تلقائياً من بيانات اللوحة (آخر ٣٠ يوم)، والباقي تدخله يدوياً عند كل مراجعة."
+        lead={currentHint}
         action={locked ? <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-black" style={{ color: GOOD, background: `color-mix(in srgb, ${GOOD} 12%, transparent)` }}><Lock size={12} /> الأساس معتمد</span> : null}>
         <div className="-mx-2 overflow-x-auto px-2">
           <table className="w-full min-w-[720px] border-separate border-spacing-y-1.5 text-sm">
@@ -305,8 +352,8 @@ export default function DiagnosisTab({ data, now, setSetting, copy, salonName }:
             </thead>
             <tbody>
               {KPIS.map((k) => {
-                const b = d.baseline[k.key];
-                const cur = current(k);
+                const b = src.baseline(k.key);
+                const cur = src.current(k);
                 const dl = kpiDelta(k, b?.value, cur);
                 return (
                   <tr key={k.key} className="bg-[var(--surface-2)]/60">
@@ -329,10 +376,10 @@ export default function DiagnosisTab({ data, now, setSetting, copy, salonName }:
                       </button>
                     </td>
                     <td className="px-3 py-2.5">
-                      {k.auto ? (
+                      {src.isAuto(k) ? (
                         <span className="font-black text-[var(--ink)]" title="محسوب من بيانات اللوحة">{formatKpi(k, cur)}</span>
                       ) : (
-                        <input type="number" inputMode="decimal" value={d.manual_current[k.key] ?? ""} onChange={(e) => set({ manual_current: { ...d.manual_current, [k.key]: numOrNull(e.target.value) } })}
+                        <input type="number" inputMode="decimal" value={cur ?? ""} onChange={(e) => src.setCurrent(k.key, numOrNull(e.target.value))}
                           className={`${input} !py-1.5`} placeholder="أدخل يدوياً" aria-label={`${k.label} — الحالي`} />
                       )}
                     </td>
@@ -348,7 +395,7 @@ export default function DiagnosisTab({ data, now, setSetting, copy, salonName }:
         </p>
       </Section>
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_1.4fr]">
+      <div className={`grid gap-5 ${compact ? "" : "lg:grid-cols-[1fr_1.4fr]"}`}>
         {/* ─── ٤. علامات التريّث ─── */}
         <Section n={4} icon={TriangleAlert} title="علامات التريّث قبل التعاقد" lead="علّم اللي ينطبق — أي علامة تعني نتفاهم عليها قبل التوقيع.">
           <ul className="space-y-2">
@@ -373,12 +420,12 @@ export default function DiagnosisTab({ data, now, setSetting, copy, salonName }:
         {/* ─── ٥. الأهداف والمخرجات ─── */}
         <Section n={5} icon={Target} title="أهداف ٩٠ يوم والمخرجات" lead="٣ أهداف من بطاقة الأساس — التقدّم يتحسب تلقائياً من «قبل» إلى الهدف.">
           <div className="space-y-3">
-            {d.goals.map((g, i) => {
+            {src.goals.map((g, i) => {
               const k = KPIS.find((x) => x.key === g.kpi);
-              const base = k ? d.baseline[k.key]?.value : null;
-              const cur = k ? current(k) : null;
+              const base = k ? src.baseline(k.key)?.value : null;
+              const cur = k ? src.current(k) : null;
               const p = k ? goalProgress(k, base, cur, g.target) : null;
-              const setGoal = (patch: Partial<Diagnosis["goals"][number]>) => set({ goals: d.goals.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
+              const setGoal = (patch: Partial<Diagnosis["goals"][number]>) => src.setGoals(src.goals.map((x, j) => (j === i ? { ...x, ...patch } : x)));
               return (
                 <div key={i} className="rounded-2xl border border-[var(--line)] p-3">
                   <div className="flex flex-wrap items-center gap-2">
@@ -416,7 +463,7 @@ export default function DiagnosisTab({ data, now, setSetting, copy, salonName }:
             </label>
             <label className="block">
               <span className="mb-1 flex items-center gap-1 text-xs font-bold text-[var(--muted)]"><CalendarDays size={12} /> موعد المراجعة القادمة</span>
-              <input type="date" value={d.next_review} onChange={(e) => set({ next_review: e.target.value })} className={input} />
+              <input type="date" value={src.nextReview} onChange={(e) => src.setNextReview(e.target.value)} className={input} />
             </label>
           </div>
           <div className="mt-4 rounded-2xl bg-[var(--surface-2)] p-3 text-xs leading-relaxed text-[var(--muted)]">

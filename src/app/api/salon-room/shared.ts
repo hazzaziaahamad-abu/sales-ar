@@ -59,6 +59,11 @@ export function parseClient(b: Record<string, unknown>, partial: boolean): Parse
       : [];
   }
   if (has("notes")) f.notes = text(b.notes, 5000);
+  if (has("diagnosis")) {
+    const d = b.diagnosis;
+    if (!d || typeof d !== "object" || Array.isArray(d) || JSON.stringify(d).length > 60000) return { ok: false, error: "تشخيص غير صالح" };
+    f.diagnosis = d;
+  }
   if (has("archived")) f.archived = !!b.archived;
   return { ok: true, fields: f };
 }

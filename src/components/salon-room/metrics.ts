@@ -1,7 +1,7 @@
 // حسابات مشتركة للداشبورد وخطة الاستهداف في غرفة التخطيط والتنفيذ.
 
-import { goalProgress } from "@/lib/salon-growth";
-import { ROOM_KPIS, weekStart, type RoomClient, type RoomLog, type RoomTask, type Stage, type Targets } from "@/lib/salon-room";
+import { KPIS, goalProgress } from "@/lib/salon-growth";
+import { weekStart, type RoomClient, type RoomLog, type RoomTask, type Stage, type Targets } from "@/lib/salon-room";
 
 export const ACTIVE_STAGES: Stage[] = ["discovery", "diagnosis", "proposal", "onboarding", "execution", "review"];
 export const CONTRACT_STAGES: Stage[] = ["onboarding", "execution", "review"];
@@ -38,7 +38,7 @@ export function planProgress(c: RoomClient, tasks: RoomTask[]) {
 export function goalsProgress(c: RoomClient): number | null {
   const ps = c.goals
     .map((g) => {
-      const k = ROOM_KPIS.find((x) => x.key === g.kpi);
+      const k = KPIS.find((x) => x.key === g.kpi);
       return k ? goalProgress(k, c.baseline[k.key] ?? null, c.current[k.key] ?? null, g.target) : null;
     })
     .filter((p): p is number => p !== null);

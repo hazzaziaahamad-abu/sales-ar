@@ -235,6 +235,10 @@ function SalonRoomInner() {
     },
   };
 
+  const copy = async (text: string, msg = "تم النسخ") => {
+    try { await navigator.clipboard.writeText(text); notify(msg); } catch { notify("تعذّر النسخ", true); }
+  };
+
   const chooseMe = (name: string) => {
     setMe(name);
     meRef.current = name;
@@ -309,7 +313,7 @@ function SalonRoomInner() {
             {tab === "team" && <Team data={data} me={me} ops={ops} />}
           </main>
 
-          {openClient && <ClientPanel client={openClient} data={data} me={me} ops={ops} onClose={() => setOpenId(null)} />}
+          {openClient && <ClientPanel client={openClient} data={data} me={me} ops={ops} onClose={() => setOpenId(null)} copy={copy} />}
           {codeModal && <CodeModal onClose={() => setCodeModal(false)} onDone={() => { setCodeModal(false); notify("تم تغيير الكود — كل الجلسات القديمة خرجت"); }} />}
         </>
       )}

@@ -5,11 +5,13 @@
 import React, { useState } from "react";
 import {
   X, Archive, MessageCircle, CheckCircle2, Circle, Plus, Trash2, Target, Package, Lightbulb, ListChecks,
-  BarChart3, History, Send, StickyNote, Crosshair, ArrowLeftCircle, CalendarRange, Wand2,
+  History, Send, StickyNote, Crosshair, ArrowLeftCircle, CalendarRange, Wand2, Stethoscope, ChevronDown, Lock,
 } from "lucide-react";
-import { formatKpi, goalProgress, intlPhone, kpiDelta, type KpiKey } from "@/lib/salon-growth";
+import { DEFAULT_DIAGNOSIS, KPIS, intlPhone, type Diagnosis } from "@/lib/salon-growth";
+import { DiagnosisView, type DiagnosisSource } from "@/components/offer/SalonDiagnosis";
+import { goalsProgress } from "./metrics";
 import {
-  HEALTH, LEAD_STATUSES, LOG_KINDS, PLAYBOOK, PRIORITIES, ROOM_KPIS, SEGMENTS, SOURCES, STAGES, WORK_STAGES, addDays, phaseWindows, stageLabel,
+  HEALTH, LEAD_STATUSES, LOG_KINDS, PLAYBOOK, PRIORITIES, SEGMENTS, SOURCES, STAGES, WORK_STAGES, addDays, phaseWindows, stageLabel,
   type Health, type LogKind, type Priority, type RoomClient, type RoomTask, type Stage,
 } from "@/lib/salon-room";
 import type { RoomData, RoomOps } from "./SalonRoom";
@@ -17,8 +19,8 @@ import { Avatar, Badge, Field, GOLD, SectionTitle, accGrad, btnGhost, btnPrimary
 
 const numOrNull = (v: string) => (v.trim() === "" ? null : Number.isFinite(Number(v)) ? Number(v) : null);
 
-export default function ClientPanel({ client: c, data, me, ops, onClose }: {
-  client: RoomClient; data: RoomData; me: string; ops: RoomOps; onClose: () => void;
+export default function ClientPanel({ client: c, data, me, ops, onClose, copy }: {
+  client: RoomClient; data: RoomData; me: string; ops: RoomOps; onClose: () => void; copy: (text: string, msg?: string) => void;
 }) {
   const today = todayKey();
   const patch = (p: Partial<RoomClient>, debounce = false) => ops.patchClient(c.id, p, debounce);
@@ -37,8 +39,38 @@ export default function ClientPanel({ client: c, data, me, ops, onClose }: {
   const pb = PLAYBOOK.find((p) => p.stage === phase);
   const logs = data.logs.filter((l) => l.client_id === c.id);
   const team = data.team.filter((m) => m.active || m.name === c.consultant);
-  const goals = [0, 1, 2].map((i) => c.goals[i] ?? { kpi: "" as const, target: null });
-  const setGoal = (i: number, g: Partial<RoomClient["goals"][number]>) => patch({ goals: goals.map((x, j) => (j === i ? { ...x, ...g } : x)) }, true);
+
+  // التشخيص: الملاحظات والاعتماد في c.diagnosis، والأرقام في baseline/current/goals (نفس مصدر الداشبورد)
+  const [diagOpen, setDiagOpen] = useState(c.stage === "discovery" || c.stage === "diagnosis" || c.stage === "proposal");
+  const diag: Diagnosis = { ...DEFAULT_DIAGNOSIS, ...c.diagnosis };
+  const goals3 = [0, 1, 2].map((i) => c.goals[i] ?? { kpi: "" as const, target: null });
+  const baselineCount = KPIS.filter((k) => c.baseline[k.key] !== null && c.baseline[k.key] !== undefined).length;
+  const goalsP = goalsProgress(c);
+  const diagSrc: DiagnosisSource = {
+    d: diag,
+    set: (p) => patch({ diagnosis: { ...diag, ...p } }, true),
+    baseline: (k) => {
+      const value = c.baseline[k] ?? null;
+      const estimated = !!diag.baseline[k]?.estimated;
+      return value === null && !estimated ? undefined : { value, estimated };
+    },
+    setBaseline: (k, p) => {
+      const next: Partial<RoomClient> = {};
+      if ("value" in p) next.baseline = { ...c.baseline, [k]: p.value ?? null };
+      if ("estimated" in p) next.diagnosis = { ...diag, baseline: { ...diag.baseline, [k]: { value: c.baseline[k] ?? null, estimated: !!p.estimated } } };
+      patch(next, true);
+    },
+    goals: goals3,
+    setGoals: (goals) => patch({ goals }, true),
+    current: (k) => c.current[k.key] ?? null,
+    isAuto: () => false,
+    setCurrent: (k, v) => patch({ current: { ...c.current, [k]: v } }, true),
+    owner: c.owner_name ?? "",
+    setOwner: (v) => patch({ owner_name: v }, true),
+    nextReview: c.next_review ?? "",
+    setNextReview: (v) => patch({ next_review: v || null }),
+    observe: (observed, score) => patch({ diagnosis: { ...diag, observed }, ...(score === null ? {} : { baseline: { ...c.baseline, reception_score: score } }) }, true),
+  };
 
   const addLog = async () => {
     if (!logBody.trim()) return;
@@ -228,61 +260,29 @@ export default function ClientPanel({ client: c, data, me, ops, onClose }: {
             )}
           </div>}
 
-          {/* ─── المؤشرات والأهداف ─── */}
-          {!lead && <div className={`${card} p-4`}>
-            <SectionTitle icon={BarChart3} title="المؤشرات — قبل / الحالي" />
-            <div className="-mx-1 overflow-x-auto px-1">
-              <table className="w-full min-w-[520px] text-sm">
-                <thead>
-                  <tr className="text-right text-[11px] text-[var(--faint)]"><th className="py-1 font-bold">المؤشر</th><th className="w-32 font-bold">قبل</th><th className="w-32 font-bold">الحالي</th><th className="w-24 font-bold">التغيّر</th></tr>
-                </thead>
-                <tbody>
-                  {ROOM_KPIS.map((k) => {
-                    const b = c.baseline[k.key] ?? null;
-                    const cur = c.current[k.key] ?? null;
-                    const dl = kpiDelta(k, b, cur);
-                    return (
-                      <tr key={k.key} className="border-t border-[var(--line)]">
-                        <td className="py-2"><div className="font-bold text-[var(--ink)]">{k.label}</div><div className="text-[10px] text-[var(--faint)]">{k.unit}</div></td>
-                        <td className="pe-2"><input type="number" inputMode="decimal" value={b ?? ""} onChange={(e) => patch({ baseline: { ...c.baseline, [k.key]: numOrNull(e.target.value) } }, true)} className={`${input} !py-1.5`} aria-label={`${k.label} قبل`} /></td>
-                        <td className="pe-2"><input type="number" inputMode="decimal" value={cur ?? ""} onChange={(e) => patch({ current: { ...c.current, [k.key]: numOrNull(e.target.value) } }, true)} className={`${input} !py-1.5`} aria-label={`${k.label} الحالي`} /></td>
-                        <td className="font-black" style={{ color: dl?.color ?? "var(--faint)" }}>{dl?.text ?? "—"}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+          {/* ─── التشخيص الأولي (خط الأساس، الحالي، الأهداف) ─── */}
+          {!lead && (
+            <div className={`${card} p-4`}>
+              <button onClick={() => setDiagOpen((o) => !o)} className="flex w-full items-center gap-2 text-right" aria-expanded={diagOpen}>
+                <span className="grid h-8 w-8 place-items-center rounded-xl" style={{ color: "var(--acc)", background: "color-mix(in srgb, var(--acc) 12%, transparent)" }}><Stethoscope size={15} /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-base font-black text-[var(--ink)]">التشخيص الأولي والمؤشرات</span>
+                  <span className="block text-[11px] text-[var(--faint)]">
+                    خط الأساس {fmt(baselineCount)} من {fmt(KPIS.length)}، {diag.baseline_locked_at ? `معتمد ${dateLabel(diag.baseline_locked_at.slice(0, 10))}` : "غير معتمد"}
+                    {goalsP !== null ? `، الأهداف ${fmt(goalsP * 100)}٪` : ""}
+                  </span>
+                </span>
+                {diag.baseline_locked_at && <Badge color="#16A34A"><Lock size={10} /> معتمد</Badge>}
+                <ChevronDown size={16} className={`shrink-0 text-[var(--muted)] transition-transform ${diagOpen ? "rotate-180" : ""}`} />
+              </button>
+              {diagOpen && (
+                <div className="mt-4">
+                  <DiagnosisView src={diagSrc} copy={copy} salonName={c.salon_name} compact
+                    currentHint="سجّلي أرقام الصالون اليوم واعتمديها مع المالكة. «الحالي» تحدّثينه عند كل مراجعة شهرية — ومنه يتحسب تقدّم الأهداف في الداشبورد." />
+                </div>
+              )}
             </div>
-            <div className="mt-4 space-y-2">
-              <div className="text-xs font-bold text-[var(--muted)]">أهداف ٩٠ يوم</div>
-              {goals.map((g, i) => {
-                const k = ROOM_KPIS.find((x) => x.key === g.kpi);
-                const p = k ? goalProgress(k, c.baseline[k.key] ?? null, c.current[k.key] ?? null, g.target) : null;
-                return (
-                  <div key={i} className="rounded-2xl border border-[var(--line)] p-2.5">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-black text-[#2A1018]" style={{ background: GOLD }}>{fmt(i + 1)}</span>
-                      <select value={g.kpi} onChange={(e) => setGoal(i, { kpi: e.target.value as KpiKey | "" })} className={`${input} !w-auto min-w-0 flex-1 !py-1.5`} aria-label={`الهدف ${i + 1}`}>
-                        <option value="">اختر المؤشر…</option>
-                        {ROOM_KPIS.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}
-                      </select>
-                      <input type="number" value={g.target ?? ""} disabled={!g.kpi} onChange={(e) => setGoal(i, { target: numOrNull(e.target.value) })} placeholder="الهدف" className={`${input} !w-24 !py-1.5`} aria-label="القيمة المستهدفة" />
-                    </div>
-                    {k && (
-                      <div className="mt-2">
-                        <div className="mb-1 flex justify-between text-[10px] font-bold text-[var(--faint)]">
-                          <span>قبل {formatKpi(k, c.baseline[k.key])}</span><span>الحالي {formatKpi(k, c.current[k.key])}</span><span>الهدف {formatKpi(k, g.target)}</span>
-                        </div>
-                        <div className="h-2 overflow-hidden rounded-full bg-[var(--surface-2)]">
-                          <div className="h-full rounded-full" style={{ width: `${(p ?? 0) * 100}%`, background: p === 1 ? "#16A34A" : `linear-gradient(90deg, var(--acc), ${GOLD})` }} />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>}
+          )}
 
           {/* ─── ملاحظات ─── */}
           <div className={`${card} p-4`}>
