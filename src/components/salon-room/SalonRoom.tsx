@@ -281,17 +281,17 @@ function SalonRoomInner() {
           <header className="sticky inset-x-0 top-0 z-40 border-b border-[var(--line)] bg-[var(--glass)] backdrop-blur-xl">
             <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:px-6">
               <BackToPlatform compact />
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-[var(--on-acc)]" style={accGrad}><Briefcase size={18} /></span>
+              <span className="hidden h-9 w-9 shrink-0 place-items-center rounded-xl text-[var(--on-acc)] sm:grid" style={accGrad}><Briefcase size={18} /></span>
               <div className="min-w-0 leading-tight">
                 <div className="truncate text-sm font-black text-[var(--ink)]">غرفة التخطيط والتنفيذ</div>
                 <div className="hidden text-[11px] text-[var(--faint)] sm:block">فريق مستشاري الصالونات</div>
               </div>
-              <div className="ms-auto flex items-center gap-1.5">
-                <button onClick={() => setPhase("name")} className="flex items-center gap-2 rounded-full border border-[var(--line)] py-1 pe-3 ps-1 text-xs font-bold text-[var(--body)] hover:bg-[var(--hover)]" title="تغيير المستشارة">
-                  <Avatar name={me} size={26} /> <span className="max-w-[7rem] truncate">{me}</span>
+              <div className="ms-auto flex shrink-0 items-center gap-1 sm:gap-1.5">
+                <button onClick={() => setPhase("name")} className="flex items-center gap-2 rounded-full border border-[var(--line)] p-1 text-xs font-bold text-[var(--body)] hover:bg-[var(--hover)] sm:pe-3" title={`تغيير المستشارة (${me})`}>
+                  <Avatar name={me} size={26} /> <span className="hidden max-w-[7rem] truncate sm:inline">{me}</span>
                 </button>
                 {session.isOwner && <IconBtn onClick={() => setCodeModal(true)} title="تغيير كود الدخول"><KeyRound size={16} /></IconBtn>}
-                <IconBtn onClick={toggleTheme} title={theme === "brand" ? "المظهر الليلي" : "المظهر الفاتح"}>{theme === "brand" ? <Moon size={16} /> : <Sun size={16} />}</IconBtn>
+                <span className="hidden sm:contents"><IconBtn onClick={toggleTheme} title={theme === "brand" ? "المظهر الليلي" : "المظهر الفاتح"}>{theme === "brand" ? <Moon size={16} /> : <Sun size={16} />}</IconBtn></span>
                 <IconBtn onClick={logout} title="خروج"><LogOut size={16} /></IconBtn>
               </div>
             </div>
@@ -652,7 +652,7 @@ function Week({ data, me, ops, onOpen }: { data: RoomData; me: string; ops: Room
         <button onClick={() => ops.patchTask(t, { done: true })} className="text-[var(--faint)] hover:text-[#16A34A]" aria-label="إنجاز"><Circle size={18} /></button>
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-bold text-[var(--ink)]">{t.title}</div>
-          <button onClick={() => onOpen(c.id)} className="truncate text-[11px] font-bold hover:underline" style={{ color: "var(--acc)" }}>{c.salon_name} · {stageLabel(t.phase)}</button>
+          <button onClick={() => onOpen(c.id)} className="block w-full truncate text-right text-[11px] font-bold hover:underline" style={{ color: "var(--acc)" }}>{c.salon_name} · {stageLabel(t.phase)}</button>
         </div>
         {!mine && t.assignee && <Avatar name={t.assignee} size={22} />}
       </li>
@@ -660,7 +660,7 @@ function Week({ data, me, ops, onOpen }: { data: RoomData; me: string; ops: Room
   };
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.4fr_1fr]">
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-black text-[var(--ink)]">المهام المستحقة</h2>
@@ -770,7 +770,7 @@ function Playbook() {
         <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">
           ٦ مراحل ثابتة لكل صالون. كل صالون جديد تنزل له مهام هذا الدليل تلقائياً، والمستشارة تضيف عليها حسب حالته.
         </p>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {KEYS.map((k) => (
             <div key={k.title} className="rounded-2xl border border-[var(--line)] p-3">
               <k.icon size={18} style={{ color: GOLD }} />
@@ -791,10 +791,10 @@ function Playbook() {
                 <Badge color={GOLD}><Clock size={10} /> {p.duration}</Badge>
               </div>
               <p className="mt-1 flex items-center gap-1.5 text-sm font-bold text-[var(--body)]"><Target size={14} style={{ color: "var(--acc)" }} /> {p.goal}</p>
-              <ul className="mt-3 grid gap-1.5 sm:grid-cols-2">
+              <ul className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                 {p.tasks.map((t) => <li key={t} className="flex items-start gap-2 text-sm text-[var(--body)]"><CheckCircle2 size={14} className="mt-0.5 shrink-0 text-[var(--faint)]" /> {t}</li>)}
               </ul>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <div className="rounded-2xl bg-[var(--surface-2)] p-3 text-xs"><span className="flex items-center gap-1 font-black text-[var(--ink)]"><Package size={12} /> المُخرَج</span><span className="mt-0.5 block text-[var(--muted)]">{p.deliverable}</span></div>
                 <div className="rounded-2xl p-3 text-xs" style={{ background: `color-mix(in srgb, ${GOLD} 10%, transparent)` }}><span className="flex items-center gap-1 font-black text-[var(--ink)]"><Lightbulb size={12} style={{ color: GOLD }} /> نصيحة القائد</span><span className="mt-0.5 block text-[var(--muted)]">{p.tip}</span></div>
               </div>
@@ -805,7 +805,7 @@ function Playbook() {
 
       <div className={`${card} p-5 sm:p-6`}>
         <SectionTitle icon={Repeat} title="إيقاع الفريق" />
-        <ul className="grid gap-2 text-sm text-[var(--body)] sm:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-2 text-sm text-[var(--body)] sm:grid-cols-3">
           <li className="rounded-2xl border border-[var(--line)] p-3"><b className="text-[var(--ink)]">يومياً:</b> افتحي «هذا الأسبوع» وخلّصي مهام اليوم، وسجّلي أي تواصل في سجل الصالون.</li>
           <li className="rounded-2xl border border-[var(--line)] p-3"><b className="text-[var(--ink)]">أسبوعياً (اجتماع الغرفة):</b> نمرّ على «بحاجة انتباه» والمهام المتأخرة والمراجعات القادمة — ٣٠ دقيقة.</li>
           <li className="rounded-2xl border border-[var(--line)] p-3"><b className="text-[var(--ink)]">شهرياً:</b> تحديث «الحالي» في مؤشرات كل صالون، ومقارنته بخط الأساس والأهداف.</li>
@@ -829,7 +829,7 @@ function Team({ data, me, ops }: { data: RoomData; me: string; ops: RoomOps }) {
     <div className="space-y-5">
       <div className={`${card} p-5`}>
         <SectionTitle icon={UserPlus} title="إضافة عضو للفريق" />
-        <div className="grid gap-2 sm:grid-cols-[1fr_1fr_1fr_auto]">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_1fr_auto]">
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="الاسم" className={input} />
           <input value={role} onChange={(e) => setRole(e.target.value)} placeholder="الدور" className={input} />
           <input dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="05xxxxxxxx" className={`${input} text-left`} />

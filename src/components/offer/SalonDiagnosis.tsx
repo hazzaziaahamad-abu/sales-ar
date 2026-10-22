@@ -213,7 +213,7 @@ export function DiagnosisView({ src, copy, salonName, currentHint, compact = fal
       <section className={`${card} p-5 sm:p-6`}>
         <div className="flex flex-wrap items-start gap-4">
           <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-[var(--on-acc)]" style={accGrad}><Stethoscope size={22} /></span>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-[12rem] flex-1">
             <h2 className="text-xl font-black text-[var(--ink)]">التشخيص الأولي — أول اجتماع قبل التعاقد</h2>
             <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">
               ثلاث نتائج: <b className="text-[var(--body)]">تشخيص</b> وين يضيع الدخل، <b className="text-[var(--body)]">خط أساس</b> نقيس عليه التطور، و<b className="text-[var(--body)]">اتفاق</b> على ٣ أهداف لـ ٩٠ يوم.
@@ -230,7 +230,7 @@ export function DiagnosisView({ src, copy, salonName, currentHint, compact = fal
           </div>
         </div>
 
-        <div className={`mt-5 grid gap-3 sm:grid-cols-2 ${compact ? "" : "lg:grid-cols-4"}`}>
+        <div className={`mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 ${compact ? "" : "lg:grid-cols-4"}`}>
           <label className="block">
             <span className="mb-1 block text-xs font-bold text-[var(--muted)]">اسم المالكة</span>
             <input value={src.owner} onChange={(e) => src.setOwner(e.target.value.slice(0, 80))} placeholder="مثال: أ. نورة" className={input} />
@@ -253,7 +253,7 @@ export function DiagnosisView({ src, copy, salonName, currentHint, compact = fal
         </div>
       </section>
 
-      <div className={`grid gap-5 ${compact ? "" : "lg:grid-cols-[1fr_1.15fr]"}`}>
+      <div className={`grid grid-cols-1 gap-5 ${compact ? "" : "lg:grid-cols-[1fr_1.15fr]"}`}>
         {/* ─── ١. المطلوب قبل الاجتماع ─── */}
         <Section n={1} icon={ClipboardList} title="المطلوب قبل الاجتماع" lead="أرسلها للمالكة قبل الاجتماع بيومين–ثلاثة، وعلّم اللي وصلك."
           action={<button onClick={() => copy(requestMsg, "تم نسخ رسالة الطلب")} className={btnGhost}><MessageCircle size={14} /> نسخ رسالة الطلب</button>}>
@@ -395,7 +395,7 @@ export function DiagnosisView({ src, copy, salonName, currentHint, compact = fal
         </p>
       </Section>
 
-      <div className={`grid gap-5 ${compact ? "" : "lg:grid-cols-[1fr_1.4fr]"}`}>
+      <div className={`grid grid-cols-1 gap-5 ${compact ? "" : "lg:grid-cols-[1fr_1.4fr]"}`}>
         {/* ─── ٤. علامات التريّث ─── */}
         <Section n={4} icon={TriangleAlert} title="علامات التريّث قبل التعاقد" lead="علّم اللي ينطبق — أي علامة تعني نتفاهم عليها قبل التوقيع.">
           <ul className="space-y-2">
@@ -456,7 +456,7 @@ export function DiagnosisView({ src, copy, salonName, currentHint, compact = fal
               );
             })}
           </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
             <label className="block">
               <span className="mb-1 flex items-center gap-1 text-xs font-bold text-[var(--muted)]"><Zap size={12} style={{ color: GOLD }} /> الفوز السريع (أول أسبوعين)</span>
               <input value={d.quick_win} onChange={(e) => set({ quick_win: e.target.value.slice(0, 300) })} placeholder="مثال: حملة استرجاع النائمات + تفعيل التذكير بالمواعيد" className={input} />
@@ -487,7 +487,7 @@ function Section({ n, icon: Icon, title, lead, action, children }: {
           <Icon size={20} />
           <span className="absolute -left-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full text-[10px] font-black text-[#2A1018]" style={{ background: GOLD }}>{fmt(n)}</span>
         </span>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-[12rem] flex-1">
           <h2 className="text-lg font-black leading-snug text-[var(--ink)] sm:text-xl">{title}</h2>
           {lead && <p className="mt-1 text-xs leading-relaxed text-[var(--muted)] sm:text-sm">{lead}</p>}
         </div>

@@ -109,9 +109,9 @@ export function EmptyState({ icon: Icon, text }: { icon: LucideIcon; text: strin
 
 export function SectionTitle({ icon: Icon, title, action }: { icon: LucideIcon; title: string; action?: React.ReactNode }) {
   return (
-    <div className="mb-3 flex items-center gap-2">
-      <span className="grid h-8 w-8 place-items-center rounded-xl" style={{ color: "var(--acc)", background: "color-mix(in srgb, var(--acc) 12%, transparent)" }}><Icon size={15} /></span>
-      <h3 className="flex-1 text-base font-black text-[var(--ink)]">{title}</h3>
+    <div className="mb-3 flex flex-wrap items-center gap-2">
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl" style={{ color: "var(--acc)", background: "color-mix(in srgb, var(--acc) 12%, transparent)" }}><Icon size={15} /></span>
+      <h3 className="min-w-[10rem] flex-1 text-base font-black text-[var(--ink)]">{title}</h3>
       {action}
     </div>
   );

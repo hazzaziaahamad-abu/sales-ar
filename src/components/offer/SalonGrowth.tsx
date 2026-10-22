@@ -569,7 +569,7 @@ function GrowthTab({ data, now, ops, setSetting, vars, canDelete }: {
   const recoverable = sleepers.filter((c) => !winbackSent(c)).reduce((s, c) => s + (c.visits ? c.total_spent / c.visits : 0), 0);
 
   return (
-    <div className="grid gap-5 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
       {/* ─── ١. بروتوكول الاستقبال ─── */}
       <Panel n={1} icon={Store} title="بروتوكول الاستقبال الـ ٣ دقائق" lead="أول ٣ دقائق تحدّد هل العميلة بترجع أو لا. القائمة تتصفّر تلقائياً كل صباح.">
         <div className="mb-4 flex items-center gap-4">
@@ -644,7 +644,7 @@ function GrowthTab({ data, now, ops, setSetting, vars, canDelete }: {
         {plans.length === 0 ? (
           <EmptyState icon={Crown} text="ما فيه باقات عضوية بعد — أضيفي أول باقة." />
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {plans.map((p, i) => {
               const Icon = PLAN_ICON[p.icon] ?? Gem;
               const featured = i === 0;
@@ -720,7 +720,7 @@ function GrowthTab({ data, now, ops, setSetting, vars, canDelete }: {
           <EmptyState icon={MoonStar} text={`ما فيه عميلات نائمات — كل عميلاتك زرنك خلال آخر ${fmt(SLEEP_DAYS)} يوم 🎉`} />
         ) : (
           <>
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               {sleepers.slice(0, limit).map((c) => {
                 const days = daysSince(c.last_visit_at, now);
                 const sent = winbackSent(c);
@@ -841,9 +841,9 @@ function BookingTab({ appts, now, ops, reminderTpl, vars }: {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex w-full rounded-full border border-[var(--line)] bg-[var(--surface)] p-1 text-sm font-bold sm:w-auto">
+        <div className="flex w-full rounded-full border border-[var(--line)] bg-[var(--surface)] p-1 text-xs font-bold sm:w-auto sm:text-sm">
           {([["booking", "مواعيد اليوم", CalendarClock], ["walkin", "الحضور المباشر", Footprints]] as const).map(([k, l, I]) => (
-            <button key={k} onClick={() => { setView(k); setStatusFilter("all"); }} className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 py-2 transition-all sm:flex-none sm:px-4" style={view === k ? { ...accGrad, color: "var(--on-acc)" } : { color: "var(--muted)" }}>
+            <button key={k} onClick={() => { setView(k); setStatusFilter("all"); }} className="flex min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-full px-2 py-2 transition-all sm:flex-none sm:gap-1.5 sm:px-4" style={view === k ? { ...accGrad, color: "var(--on-acc)" } : { color: "var(--muted)" }}>
               <I size={15} /> {l}
               <span className="rounded-full bg-black/10 px-1.5 text-[11px]">{fmt(today.filter((a) => a.kind === k && a.status !== "done").length)}</span>
             </button>
@@ -866,7 +866,7 @@ function BookingTab({ appts, now, ops, reminderTpl, vars }: {
       {list.length === 0 ? (
         <EmptyState icon={CalendarClock} text={ofView.length ? "لا توجد مواعيد بهذا التصنيف" : view === "walkin" ? "ما فيه حضور مباشر اليوم" : "ما فيه مواعيد اليوم — أضيفي أول حجز"} />
       ) : (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {list.map((a) => {
             const meta = STATUS_META[a.status];
             const extra = addonsTotal(a);
@@ -965,7 +965,7 @@ function UpsellModal({ appt, onClose, onAdd }: { appt: ApptRow; onClose: () => v
   return (
     <Modal title={`إضافة خدمة لـ ${appt.client_name}`} onClose={onClose}>
       <p className="mb-4 text-sm text-[var(--muted)]">نص مقترح للخبيرة: «شعرك يحتاج ترطيب بسيط، أضيف لك {ADDONS[0].name} بـ {fmt(ADDONS[0].price)} ريال بس؟ بيفرق معك كثير 💕»</p>
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {ADDONS.map((o) => {
           const taken = appt.addons.some((x) => x.name === o.name);
           const I = ADDON_ICON[o.name] ?? Sparkles;
@@ -1068,7 +1068,7 @@ function AutomationTab({ settings, setSetting, vars, copy, notify }: {
 
   return (
     <div className="space-y-5">
-      <div className={`${card} grid gap-4 p-5 lg:grid-cols-[1fr_auto_auto]`}>
+      <div className={`${card} grid grid-cols-1 gap-4 p-5 lg:grid-cols-[1fr_auto_auto]`}>
         <div>
           <div className="mb-3 flex items-center gap-2 text-sm font-black text-[var(--ink)]"><Sparkles size={16} style={{ color: "var(--acc)" }} /> بيانات المعاينة</div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -1092,7 +1092,7 @@ function AutomationTab({ settings, setSetting, vars, copy, notify }: {
         </div>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
         {TEMPLATE_META.map((m) => {
           const k = m.key;
           const preview = fill(templates[k], vars(sample));
@@ -1169,7 +1169,7 @@ function AnalyticsTab({ metrics }: { metrics: Metrics }) {
   });
 
   return (
-    <div className="grid gap-5 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
       <Panel icon={Palette} title="توزيع المبيعات حسب نوع الخدمة" lead="مبيعات هذا الشهر (المواعيد المكتملة) — مرّري على أي قسم لعرض تفاصيله.">
         <div className="flex flex-col items-center gap-6 sm:flex-row">
           <div className="relative h-48 w-48 shrink-0">
@@ -1240,7 +1240,7 @@ function AnalyticsTab({ metrics }: { metrics: Metrics }) {
       </Panel>
 
       <Panel icon={Repeat} title="معدل عودة العميلات خلال ٣٠ / ٦٠ / ٩٠ يوماً" lead="من زيارات قبل ٣–٦ أشهر: كم زيارة رجعت صاحبتها لزيارة ثانية خلال الفترة." className="lg:col-span-2">
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           {metrics.returnRates.map((rr) => {
             const rate = rr.rate ?? 0;
             const hit = rate >= RETENTION_TARGET;
@@ -1349,7 +1349,7 @@ function Panel({ n, icon: Icon, title, lead, action, className = "", children }:
           <Icon size={20} />
           {n !== undefined && <span className="absolute -left-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full text-[10px] font-black text-[#2A1018]" style={{ background: GOLD }}>{fmt(n)}</span>}
         </span>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-[12rem] flex-1">
           <h2 className="text-lg font-black leading-snug text-[var(--ink)] sm:text-xl">{title}</h2>
           {lead && <p className="mt-1 text-xs leading-relaxed text-[var(--muted)] sm:text-sm">{lead}</p>}
         </div>

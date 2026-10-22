@@ -47,7 +47,7 @@ export default function Targeting({ data, me, ops, onOpen }: { data: RoomData; m
         {editTargets ? (
           <TargetsForm targets={t} onSave={(x) => { ops.setTargets(x); setEditTargets(false); }} />
         ) : (
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Meter label="محاولات تواصل" value={w.contacts} target={t.contacts} icon={Phone} />
             <Meter label="اجتماعات محجوزة (تحويل لعميل)" value={w.meetings} target={t.meetings} icon={CalendarDays} />
             <Meter label="تعاقدات" value={w.contracts} target={t.contracts} icon={Check} />
@@ -74,7 +74,7 @@ export default function Targeting({ data, me, ops, onOpen }: { data: RoomData; m
         </div>
         <div className="flex rounded-full border border-[var(--line)] p-0.5 text-xs font-bold">
           {(["all", "A", "B", "C"] as const).map((k) => (
-            <button key={k} onClick={() => setPrio(k)} className="rounded-full px-3 py-1" style={prio === k ? { ...accGrad, color: "var(--on-acc)" } : { color: "var(--muted)" }} title={k === "all" ? "" : PRIORITIES[k].hint}>
+            <button key={k} onClick={() => setPrio(k)} className="whitespace-nowrap rounded-full px-2.5 py-1 sm:px-3" style={prio === k ? { ...accGrad, color: "var(--on-acc)" } : { color: "var(--muted)" }} title={k === "all" ? "" : PRIORITIES[k].hint}>
               {k === "all" ? "كل الأولويات" : `أولوية ${PRIORITIES[k].label}`}
             </button>
           ))}
@@ -170,7 +170,7 @@ function Meter({ label, value, target, icon: Icon }: { label: string; value: num
 function TargetsForm({ targets, onSave }: { targets: Targets; onSave: (t: Targets) => void }) {
   const [t, setT] = useState(targets);
   return (
-    <div className="grid items-end gap-3 sm:grid-cols-[1fr_1fr_1fr_auto]">
+    <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-[1fr_1fr_1fr_auto]">
       <Field label="محاولات تواصل / أسبوع"><input type="number" min={0} value={t.contacts} onChange={(e) => setT({ ...t, contacts: Number(e.target.value) })} className={input} /></Field>
       <Field label="اجتماعات محجوزة / أسبوع"><input type="number" min={0} value={t.meetings} onChange={(e) => setT({ ...t, meetings: Number(e.target.value) })} className={input} /></Field>
       <Field label="تعاقدات / أسبوع"><input type="number" min={0} value={t.contracts} onChange={(e) => setT({ ...t, contracts: Number(e.target.value) })} className={input} /></Field>

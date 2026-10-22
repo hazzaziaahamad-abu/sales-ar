@@ -101,7 +101,7 @@ export default function Dashboard({ data, onOpen }: { data: RoomData; onOpen: (i
         <Kpi icon={AlertTriangle} label="بحاجة انتباه" value={fmt(attention.length)} sub="حالة أو مهام أو مراجعة" tone={attention.length ? "#D9A21B" : undefined} />
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         {/* ─── قمع التحويل ─── */}
         <div className={`${card} p-5`}>
           <SectionTitle icon={Filter} title="قمع التحويل" />

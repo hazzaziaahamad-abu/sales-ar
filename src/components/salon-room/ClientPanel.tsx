@@ -116,7 +116,7 @@ export default function ClientPanel({ client: c, data, me, ops, onClose, copy }:
           </div>
 
           {/* ─── البيانات ─── */}
-          <div className={`${card} grid gap-3 p-4 sm:grid-cols-3`}>
+          <div className={`${card} grid grid-cols-1 gap-3 p-4 sm:grid-cols-3`}>
             <Field label="المالكة"><input value={c.owner_name ?? ""} onChange={(e) => patch({ owner_name: e.target.value }, true)} className={input} /></Field>
             <Field label="الجوال">
               <div className="flex gap-1.5">
@@ -154,7 +154,7 @@ export default function ClientPanel({ client: c, data, me, ops, onClose, copy }:
                   </button>
                 ))}
               </div>
-              <div className="grid gap-3 sm:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
                 <Field label="الأولوية" group>
                   <div className="flex gap-1">
                     {(["A", "B", "C"] as Priority[]).map((p) => (
@@ -253,7 +253,7 @@ export default function ClientPanel({ client: c, data, me, ops, onClose, copy }:
               <button onClick={() => { if (newTask.trim()) { ops.addTask(c.id, phase, newTask.trim()); setNewTask(""); } }} disabled={!newTask.trim()} className={`${btnPrimary} shrink-0 !px-3`} style={accGrad} aria-label="إضافة مهمة"><Plus size={15} /></button>
             </div>
             {pb && (
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <div className="rounded-2xl bg-[var(--surface-2)] p-3 text-xs"><span className="flex items-center gap-1 font-black text-[var(--ink)]"><Package size={12} /> المُخرَج</span><span className="mt-0.5 block text-[var(--muted)]">{pb.deliverable}</span></div>
                 <div className="rounded-2xl p-3 text-xs" style={{ background: `color-mix(in srgb, ${GOLD} 10%, transparent)` }}><span className="flex items-center gap-1 font-black text-[var(--ink)]"><Lightbulb size={12} style={{ color: GOLD }} /> نصيحة</span><span className="mt-0.5 block text-[var(--muted)]">{pb.tip}</span></div>
               </div>
