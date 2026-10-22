@@ -87,6 +87,38 @@ export const KPIS: KpiDef[] = [
   { key: "reception_score", label: "درجة الاستقبال", unit: "من ٥", how: "بنود بروتوكول الاستقبال (الحالي: قائمة اليوم)", auto: true },
 ];
 
+const KPI_LOCALE = "ar-SA-u-ca-gregory";
+const fmtKpiNum = (n: number, digits = 0) => n.toLocaleString(KPI_LOCALE, { maximumFractionDigits: digits, minimumFractionDigits: 0 });
+const KPI_GOOD = "#16A34A";
+const KPI_BAD = "#DC2626";
+
+export function formatKpi(k: KpiDef, v: number | null | undefined) {
+  if (v === null || v === undefined || !Number.isFinite(v)) return "—";
+  if (k.unit === "ر.س") return `${fmtKpiNum(v)} ر.س`;
+  if (k.unit === "٪") return `${fmtKpiNum(v)}٪`;
+  if (k.unit === "من ٥") return `${fmtKpiNum(v, 1)} من ٥`;
+  return `${fmtKpiNum(v)} ${k.unit}`;
+}
+
+/** الفرق بين «قبل» و«الحالي» — للنسب بالنقاط، ولغيرها كنسبة تغيّر. */
+export function kpiDelta(k: KpiDef, base: number | null | undefined, cur: number | null | undefined) {
+  if (base === null || base === undefined || cur === null || cur === undefined) return null;
+  const diff = cur - base;
+  const better = k.lowerIsBetter ? diff < 0 : diff > 0;
+  const color = diff === 0 ? "var(--muted)" : better ? KPI_GOOD : KPI_BAD;
+  const sign = diff > 0 ? "+" : diff < 0 ? "−" : "";
+  if (k.unit === "٪") return { text: `${sign}${fmtKpiNum(Math.abs(diff))} نقطة`, color };
+  if (k.unit === "من ٥") return { text: `${sign}${fmtKpiNum(Math.abs(diff), 1)}`, color };
+  if (base === 0) return { text: `${sign}${fmtKpiNum(Math.abs(diff))}`, color };
+  return { text: `${sign}${fmtKpiNum(Math.abs((diff / base) * 100))}٪`, color };
+}
+
+/** تقدّم الهدف: كم قطعنا من المسافة بين «قبل» والهدف. */
+export function goalProgress(k: KpiDef, base: number | null | undefined, cur: number | null | undefined, target: number | null) {
+  if (base === null || base === undefined || cur === null || cur === undefined || target === null || target === base) return null;
+  return Math.min(1, Math.max(0, (cur - base) / (target - base)));
+}
+
 /** القيم الحالية المحسوبة من بيانات اللوحة (آخر ٣٠ يوم للمؤشرات الشهرية). */
 export function computeCurrentKpis(
   clients: ClientRow[], appts: ApptRow[], memberships: MembershipRow[], receptionToday: number, now: number,

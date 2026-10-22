@@ -95,6 +95,7 @@ export const NAV_ITEMS = [
   { label: "عرض للعميل — نحجز", href: "/offer/nahjez", slug: "offer-nahjez", icon: Share2, color: "teal", group: "المبيعات والدعم", external: true },
   { label: "خطة اجتماع العميل", href: "/offer/meeting", slug: "offer-meeting", icon: Presentation, color: "violet", group: "المبيعات والدعم", external: true },
   { label: "الخطة التسويقية للصالونات", href: "/offer/salon-growth", slug: "offer-salon-growth", icon: Flower2, color: "rose", group: "المبيعات والدعم", external: true, superOnly: true },
+  { label: "غرفة مستشاري الصالونات", href: "/salon-room", slug: "salon-room", icon: Briefcase, color: "rose", group: "المبيعات والدعم", external: true, superOnly: true },
   { label: "مبيعات الدعم", href: "/support-sales", slug: "support-sales", icon: TrendingUp, color: "orange", group: "المبيعات والدعم" },
   { label: "الدعم", href: "/support", slug: "support", icon: Headphones, color: "orange", group: "المبيعات والدعم" },
   // Hidden: merged into "مهامي" — { label: "دليل المبيعات", href: "/sales-guide", slug: "sales-guide", icon: BookOpen, color: "amber" },

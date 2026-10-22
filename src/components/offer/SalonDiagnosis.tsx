@@ -12,7 +12,7 @@ import {
   Scissors, MessageCircle, Zap, Flower2, Coffee, UserCheck,
 } from "lucide-react";
 import {
-  DEFAULT_DIAGNOSIS, KPIS, computeCurrentKpis, localDateKey,
+  DEFAULT_DIAGNOSIS, KPIS, computeCurrentKpis, formatKpi, goalProgress, kpiDelta, localDateKey,
   type ApptRow, type ClientRow, type Diagnosis, type KpiDef, type KpiKey, type MembershipRow, type Settings,
 } from "@/lib/salon-growth";
 
@@ -94,33 +94,6 @@ const FLAGS = [
 ];
 
 /* ──────────────────────────── أدوات ──────────────────────────── */
-
-function formatKpi(k: KpiDef, v: number | null | undefined) {
-  if (v === null || v === undefined || !Number.isFinite(v)) return "—";
-  if (k.unit === "ر.س") return `${fmt(v)} ر.س`;
-  if (k.unit === "٪") return `${fmt(v)}٪`;
-  if (k.unit === "من ٥") return `${fmt(v, 1)} من ٥`;
-  return `${fmt(v)} ${k.unit}`;
-}
-
-/** الفرق بين «قبل» و«الحالي» — للنسب بالنقاط، ولغيرها كنسبة تغيّر. */
-function delta(k: KpiDef, base: number | null | undefined, cur: number | null | undefined) {
-  if (base === null || base === undefined || cur === null || cur === undefined) return null;
-  const diff = cur - base;
-  const better = k.lowerIsBetter ? diff < 0 : diff > 0;
-  const color = diff === 0 ? "var(--muted)" : better ? GOOD : BAD;
-  const sign = diff > 0 ? "+" : diff < 0 ? "−" : "";
-  if (k.unit === "٪") return { text: `${sign}${fmt(Math.abs(diff))} نقطة`, color };
-  if (k.unit === "من ٥") return { text: `${sign}${fmt(Math.abs(diff), 1)}`, color };
-  if (base === 0) return { text: `${sign}${fmt(Math.abs(diff))}`, color };
-  return { text: `${sign}${fmt(Math.abs((diff / base) * 100))}٪`, color };
-}
-
-/** تقدّم الهدف: كم قطعنا من المسافة بين «قبل» والهدف. */
-function goalProgress(k: KpiDef, base: number | null | undefined, cur: number | null | undefined, target: number | null) {
-  if (base === null || base === undefined || cur === null || cur === undefined || target === null || target === base) return null;
-  return Math.min(1, Math.max(0, (cur - base) / (target - base)));
-}
 
 const numOrNull = (v: string) => (v.trim() === "" ? null : Number.isFinite(Number(v)) ? Number(v) : null);
 
@@ -334,7 +307,7 @@ export default function DiagnosisTab({ data, now, setSetting, copy, salonName }:
               {KPIS.map((k) => {
                 const b = d.baseline[k.key];
                 const cur = current(k);
-                const dl = delta(k, b?.value, cur);
+                const dl = kpiDelta(k, b?.value, cur);
                 return (
                   <tr key={k.key} className="bg-[var(--surface-2)]/60">
                     <td className="rounded-r-2xl px-3 py-2.5">
