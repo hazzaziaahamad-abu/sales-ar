@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getRoomAccess } from "@/lib/api/salon-room-auth";
 import { CLIENT_COLS, LOG_COLS, PLAYBOOK, TASK_COLS, TEAM_COLS, stageLabel, type Stage } from "@/lib/salon-room";
-import { parseClient, parseLog, parseTask, parseTeam } from "../shared";
+import { CONTRACTED_STAGES, parseClient, parseLog, parseTask, parseTeam } from "../shared";
 
 export const runtime = "nodejs";
 
@@ -23,8 +23,14 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ entity: st
   if (entity === "clients") {
     const p = parseClient(b, false);
     if (!p.ok) return NextResponse.json({ error: p.error }, { status: 400 });
+    const stage = (p.fields.stage as Stage | undefined) ?? "lead";
+    const now = new Date().toISOString();
     const { data: client, error } = await supabaseAdmin
-      .from("consult_clients").insert({ ...p.fields, org_id: orgId }).select(CLIENT_COLS).single();
+      .from("consult_clients").insert({
+        ...p.fields, org_id: orgId,
+        converted_at: stage !== "lead" ? now : null,
+        contracted_at: CONTRACTED_STAGES.includes(stage) ? now : null,
+      }).select(CLIENT_COLS).single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     // مهام دليل الآلية لكل المراحل
     const rows = PLAYBOOK.flatMap((ph) => ph.tasks.map((title, i) => ({
@@ -61,7 +67,17 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ entity: st
     const { data, error } = await supabaseAdmin.from("consult_logs")
       .insert({ ...p.fields, org_id: orgId, author }).select(LOG_COLS).single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ log: data });
+    // محاولة تواصل: آخر تواصل + «جديد» يصير «تم التواصل»
+    let client = null;
+    if (p.fields.kind === "contact") {
+      const now = new Date().toISOString();
+      await supabaseAdmin.from("consult_clients").update({ lead_status: "contacted" })
+        .eq("id", p.fields.client_id as string).eq("org_id", orgId).eq("lead_status", "new");
+      const res = await supabaseAdmin.from("consult_clients").update({ last_contact_at: now, updated_at: now })
+        .eq("id", p.fields.client_id as string).eq("org_id", orgId).select(CLIENT_COLS).single();
+      client = res.data;
+    }
+    return NextResponse.json({ log: data, client });
   }
 
   if (entity === "team") {

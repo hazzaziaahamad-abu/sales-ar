@@ -782,7 +782,7 @@ function PlanModal({ onClose, onSave }: { onClose: () => void; onSave: (p: NewPl
             </select>
           </Field>
         </div>
-        <Field label="الأيقونة">
+        <Field label="الأيقونة" group>
           <div className="flex gap-2">
             {(Object.keys(PLAN_ICON) as PlanIcon[]).map((k) => {
               const I = PLAN_ICON[k];
@@ -1005,7 +1005,7 @@ function NewApptModal({ kind, onClose, onSave }: { kind: ApptKind; onClose: () =
             {SERVICES.map((s, i) => <option key={s.name} value={i}>{s.name} — {fmt(s.price)} ر.س</option>)}
           </select>
         </Field>
-        <Field label="الخبيرة">
+        <Field label="الخبيرة" group>
           <div className="flex flex-wrap gap-1.5">
             {STAFF.map((s) => (
               <button key={s} onClick={() => setStaff(s)} className="rounded-full border px-3 py-1.5 text-xs font-bold transition-colors" style={staff === s ? { ...accGrad, color: "var(--on-acc)", borderColor: "transparent" } : { borderColor: "var(--line)", color: "var(--body)" }}>{s}</button>
@@ -1436,7 +1436,16 @@ function Avatar({ name }: { name: string }) {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children, group }: { label: string; children: React.ReactNode; group?: boolean }) {
+  // group: مجموعة أزرار — div مع role=group بدل label (الـ label يضغط أول زر لو ضغطت على العنوان)
+  if (group) {
+    return (
+      <div role="group" aria-label={label}>
+        <span className="mb-1 block text-xs font-bold text-[var(--muted)]">{label}</span>
+        {children}
+      </div>
+    );
+  }
   return (
     <label className="block">
       <span className="mb-1 block text-xs font-bold text-[var(--muted)]">{label}</span>

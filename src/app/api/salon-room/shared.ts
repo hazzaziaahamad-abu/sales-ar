@@ -1,5 +1,5 @@
 import { KPIS, type KpiKey } from "@/lib/salon-growth";
-import { STAGE_IDS, type Health, type LogKind, type Stage } from "@/lib/salon-room";
+import { LEAD_STATUS_IDS, STAGE_IDS, type Health, type LeadStatus, type LogKind, type Priority, type Stage } from "@/lib/salon-room";
 
 const str = (v: unknown, max: number) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 const text = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
@@ -40,7 +40,13 @@ export function parseClient(b: Record<string, unknown>, partial: boolean): Parse
     if (!HEALTHS.includes(b.health as Health)) return { ok: false, error: "حالة غير صالحة" };
     f.health = b.health;
   }
-  for (const k of ["start_date", "next_review"] as const) if (has(k)) f[k] = date(b[k]);
+  for (const k of ["start_date", "next_review", "next_followup"] as const) if (has(k)) f[k] = date(b[k]);
+  for (const k of ["source", "segment"] as const) if (has(k)) f[k] = str(b[k], 60) || null;
+  if (has("priority")) f.priority = (["A", "B", "C"] as Priority[]).includes(b.priority as Priority) ? b.priority : "B";
+  if (has("lead_status")) {
+    if (!LEAD_STATUS_IDS.includes(b.lead_status as LeadStatus)) return { ok: false, error: "حالة استهداف غير صالحة" };
+    f.lead_status = b.lead_status;
+  }
   if (has("contract_value")) f.contract_value = numOrNull(b.contract_value);
   if (has("baseline")) f.baseline = kpiValues(b.baseline);
   if (has("current")) f.current = kpiValues(b.current);
@@ -78,11 +84,22 @@ export function parseTask(b: Record<string, unknown>, partial: boolean): Parsed 
 
 export function parseLog(b: Record<string, unknown>): Parsed {
   if (typeof b.client_id !== "string") return { ok: false, error: "العميل مطلوب" };
-  const kind = (["note", "checkin", "meeting"] as LogKind[]).includes(b.kind as LogKind) ? b.kind : "note";
+  const kind = (["note", "checkin", "meeting", "contact"] as LogKind[]).includes(b.kind as LogKind) ? b.kind : "note";
   const body = text(b.body, 2000);
   if (!body) return { ok: false, error: "اكتب الملاحظة" };
   return { ok: true, fields: { client_id: b.client_id, kind, body } };
 }
+
+export function parseTargets(b: Record<string, unknown>) {
+  const n = (v: unknown, def: number) => {
+    const x = Math.round(Number(v));
+    return Number.isFinite(x) ? Math.min(Math.max(x, 0), 1000) : def;
+  };
+  return { contacts: n(b.contacts, 30), meetings: n(b.meetings, 5), contracts: n(b.contracts, 2) };
+}
+
+/** مراحل ما بعد التوقيع — أول دخول لها = تاريخ التعاقد. */
+export const CONTRACTED_STAGES: Stage[] = ["onboarding", "execution", "review", "done"];
 
 export function parseTeam(b: Record<string, unknown>, partial: boolean): Parsed {
   const f: Record<string, unknown> = {};

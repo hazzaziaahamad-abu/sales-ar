@@ -80,7 +80,16 @@ export function Badge({ color, children }: { color: string; children: React.Reac
   return <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black" style={{ color, background: `color-mix(in srgb, ${color} 13%, transparent)` }}>{children}</span>;
 }
 
-export function Field({ label, children }: { label: string; children: React.ReactNode }) {
+export function Field({ label, children, group }: { label: string; children: React.ReactNode; group?: boolean }) {
+  // group: مجموعة أزرار — div مع role=group بدل label (الـ label يضغط أول زر لو ضغطت على العنوان)
+  if (group) {
+    return (
+      <div role="group" aria-label={label}>
+        <span className="mb-1 block text-xs font-bold text-[var(--muted)]">{label}</span>
+        {children}
+      </div>
+    );
+  }
   return (
     <label className="block">
       <span className="mb-1 block text-xs font-bold text-[var(--muted)]">{label}</span>

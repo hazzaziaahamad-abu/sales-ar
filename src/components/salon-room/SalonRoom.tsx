@@ -6,15 +6,17 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
-  KeyRound, Loader2, LogOut, Moon, Sun, LayoutGrid, CalendarDays, BookOpen, Users, Plus, Search, ChevronLeft,
+  KeyRound, Loader2, LogOut, Moon, Sun, LayoutGrid, CalendarDays, BookOpen, Users, Plus, Search, ChevronLeft, BarChart3, Crosshair, Phone,
   ChevronRight, AlertTriangle, Clock, CheckCircle2, Circle, Target, Lightbulb, Package, ShieldCheck,
   UserPlus, Trash2, Check, X, Briefcase, Eye, EyeOff, Repeat, Sparkles, Store, Crown, MoonStar, Flower2,
 } from "lucide-react";
 import {
-  HEALTH, PLAYBOOK, ROOM_MIN_CODE, STAGES, stageLabel,
-  type LogKind, type RoomClient, type RoomLog, type RoomTask, type Stage, type TeamMember,
+  DEFAULT_TARGETS, HEALTH, PLAYBOOK, ROOM_MIN_CODE, STAGES, leadStatusMeta, stageLabel,
+  type LogKind, type Priority, type RoomClient, type RoomLog, type RoomTask, type Stage, type Targets, type TeamMember,
 } from "@/lib/salon-room";
 import ClientPanel from "./ClientPanel";
+import Dashboard from "./Dashboard";
+import Targeting from "./Targeting";
 import {
   THEMES, Avatar, Badge, EmptyState, Field, IconBtn, Modal, SectionTitle, GOLD, accGrad, addDaysKey, btnGhost, btnPrimary,
   card, dateLabel, fmt, input, todayKey, type ThemeKey,
@@ -22,11 +24,17 @@ import {
 
 /* ──────────────────────────── البيانات ──────────────────────────── */
 
-export type RoomData = { clients: RoomClient[]; tasks: RoomTask[]; logs: RoomLog[]; team: TeamMember[] };
+export type RoomData = { clients: RoomClient[]; tasks: RoomTask[]; logs: RoomLog[]; team: TeamMember[]; targets: Targets };
+const EMPTY: RoomData = { clients: [], tasks: [], logs: [], team: [], targets: DEFAULT_TARGETS };
 type ClientPatch = Partial<Omit<RoomClient, "id" | "created_at" | "updated_at">>;
 
 export type RoomOps = {
-  addClient: (f: { salon_name: string; owner_name: string; phone: string; city: string; consultant: string; stage: Stage }) => Promise<boolean>;
+  addClient: (f: {
+    salon_name: string; owner_name: string; phone: string; city: string; consultant: string; stage: Stage;
+    source?: string; segment?: string; priority?: Priority; next_followup?: string;
+  }) => Promise<boolean>;
+  generatePlan: (clientId: string, start: string, overwrite: boolean) => Promise<void>;
+  setTargets: (t: Targets) => void;
   patchClient: (id: string, patch: ClientPatch, debounce?: boolean) => void;
   addTask: (clientId: string, phase: Stage, title: string) => Promise<void>;
   patchTask: (t: RoomTask, patch: { done?: boolean; due_date?: string | null; assignee?: string | null }) => void;
@@ -38,15 +46,17 @@ export type RoomOps = {
 };
 
 type Phase = "loading" | "gate" | "name" | "room";
-type TabId = "board" | "week" | "playbook" | "team";
+type TabId = "dashboard" | "board" | "targeting" | "week" | "playbook" | "team";
 const TABS: { id: TabId; label: string; icon: LucideIcon }[] = [
-  { id: "board", label: "لوحة الغرفة", icon: LayoutGrid },
+  { id: "dashboard", label: "الداشبورد", icon: BarChart3 },
+  { id: "board", label: "لوحة التنفيذ", icon: LayoutGrid },
+  { id: "targeting", label: "خطة الاستهداف", icon: Crosshair },
   { id: "week", label: "هذا الأسبوع", icon: CalendarDays },
   { id: "playbook", label: "آلية العميل", icon: BookOpen },
   { id: "team", label: "الفريق", icon: Users },
 ];
 
-const isDone = (c: RoomClient) => c.stage === "done" || c.stage === "paused";
+const isDone = (c: RoomClient) => c.stage === "done" || c.stage === "paused" || c.stage === "lead";
 const overdueTasks = (tasks: RoomTask[], clientId: string, today: string) =>
   tasks.filter((t) => t.client_id === clientId && !t.done_at && t.due_date && t.due_date < today);
 export const needsAttention = (c: RoomClient, tasks: RoomTask[], today: string) =>
@@ -74,11 +84,11 @@ function SalonRoomInner() {
 
   const [phase, setPhase] = useState<Phase>("loading");
   const [session, setSession] = useState({ configured: false, isOwner: false });
-  const [data, setData] = useState<RoomData>({ clients: [], tasks: [], logs: [], team: [] });
+  const [data, setData] = useState<RoomData>(EMPTY);
   const [me, setMe] = useState<string>(() => { try { return localStorage.getItem("room-user") ?? ""; } catch { return ""; } });
   const meRef = useRef(me);
   useEffect(() => { meRef.current = me; }, [me]);
-  const [tab, setTab] = useState<TabId>("board");
+  const [tab, setTab] = useState<TabId>("dashboard");
   const [openId, setOpenId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null);
   const [codeModal, setCodeModal] = useState(false);
@@ -184,10 +194,29 @@ function SalonRoomInner() {
     },
     addLog: async (clientId, kind, body) => {
       try {
-        const res = await api<{ log: RoomLog }>("/logs", "POST", { client_id: clientId, kind, body });
-        setData((d) => ({ ...d, logs: [res.log, ...d.logs] }));
+        const res = await api<{ log: RoomLog; client: RoomClient | null }>("/logs", "POST", { client_id: clientId, kind, body });
+        setData((d) => ({
+          ...d, logs: [res.log, ...d.logs],
+          clients: res.client ? d.clients.map((c) => (c.id === clientId ? { ...c, last_contact_at: res.client!.last_contact_at, lead_status: res.client!.lead_status } : c)) : d.clients,
+        }));
         return true;
       } catch (e) { fail(e); return false; }
+    },
+    generatePlan: async (clientId, start, overwrite) => {
+      try {
+        const res = await api<{ client: RoomClient; tasks: RoomTask[]; log: RoomLog | null }>(`/clients/${clientId}`, "POST", { start_date: start, overwrite });
+        setData((d) => ({
+          ...d,
+          clients: d.clients.map((c) => (c.id === clientId ? { ...res.client, contract_value: res.client.contract_value === null ? null : Number(res.client.contract_value) } : c)),
+          tasks: [...d.tasks.filter((t) => t.client_id !== clientId), ...res.tasks],
+          logs: res.log ? [res.log, ...d.logs] : d.logs,
+        }));
+        notify("تم توليد خطة التنفيذ بالتواريخ");
+      } catch (e) { fail(e); }
+    },
+    setTargets: (t) => {
+      setData((d) => ({ ...d, targets: t }));
+      api("/targets", "PUT", t).then(() => notify("تم حفظ أهداف الأسبوع")).catch(fail);
     },
     addMember: async (name, role, phone) => {
       try {
@@ -215,7 +244,7 @@ function SalonRoomInner() {
 
   const logout = async () => {
     await api("/session", "DELETE").catch(() => {});
-    setData({ clients: [], tasks: [], logs: [], team: [] });
+    setData(EMPTY);
     setPhase("gate");
   };
 
@@ -272,7 +301,9 @@ function SalonRoomInner() {
           </header>
 
           <main key={tab} className="sr-in mx-auto max-w-7xl px-4 pb-24 pt-6 sm:px-6">
+            {tab === "dashboard" && <Dashboard data={data} onOpen={setOpenId} />}
             {tab === "board" && <Board data={data} me={me} ops={ops} onOpen={setOpenId} />}
+            {tab === "targeting" && <Targeting data={data} me={me} ops={ops} onOpen={setOpenId} />}
             {tab === "week" && <Week data={data} me={me} ops={ops} onOpen={setOpenId} />}
             {tab === "playbook" && <Playbook />}
             {tab === "team" && <Team data={data} me={me} ops={ops} />}
@@ -442,7 +473,7 @@ function Board({ data, me, ops, onOpen }: { data: RoomData; me: string; ops: Roo
   const [showClosed, setShowClosed] = useState(false);
   const [newModal, setNewModal] = useState(false);
 
-  const clients = data.clients.filter((c) =>
+  const clients = data.clients.filter((c) => c.stage !== "lead" &&
     (who === "all" || (who === "me" ? c.consultant === me : c.consultant === who)) &&
     (!q.trim() || [c.salon_name, c.owner_name, c.city].some((x) => x?.includes(q.trim()))));
   const active = clients.filter((c) => !isDone(c));
@@ -450,10 +481,10 @@ function Board({ data, me, ops, onOpen }: { data: RoomData; me: string; ops: Roo
   const ids = new Set(clients.map((c) => c.id));
   const overdue = data.tasks.filter((t) => ids.has(t.client_id) && !t.done_at && t.due_date && t.due_date < today);
   const reviews = active.filter((c) => c.next_review && c.next_review >= today && c.next_review <= in7);
-  const columns = STAGES.filter((s) => showClosed || !["done", "paused"].includes(s.id));
+  const columns = STAGES.filter((s) => s.id !== "lead" && (showClosed || !["done", "paused"].includes(s.id)));
 
   const move = (c: RoomClient, dir: 1 | -1) => {
-    const order = STAGES.filter((s) => s.id !== "paused").map((s) => s.id);
+    const order = STAGES.filter((s) => s.id !== "paused" && s.id !== "lead").map((s) => s.id);
     const i = order.indexOf(c.stage);
     const next = order[Math.max(0, Math.min(order.length - 1, (i < 0 ? 0 : i) + dir))];
     if (next !== c.stage) ops.patchClient(c.id, { stage: next });
@@ -485,8 +516,8 @@ function Board({ data, me, ops, onOpen }: { data: RoomData; me: string; ops: Roo
         <button onClick={() => setNewModal(true)} className={btnPrimary} style={accGrad}><Plus size={15} /> صالون جديد</button>
       </div>
 
-      {data.clients.length === 0 ? (
-        <EmptyState icon={Store} text="الغرفة فاضية — أضيفي أول صالون وتنزل مهام الآلية له تلقائياً." />
+      {data.clients.every((c) => c.stage === "lead") ? (
+        <EmptyState icon={Store} text="ما فيه عملاء في التنفيذ بعد — حوّلي صالون من «خطة الاستهداف» أو أضيفي صالون مباشرة." />
       ) : (
         <div className="-mx-4 overflow-x-auto px-4 pb-2 sm:-mx-6 sm:px-6">
           <div className="flex gap-3" style={{ minWidth: columns.length * 248 }}>
@@ -554,7 +585,7 @@ function ClientCard({ c, tasks, today, onOpen, onMove }: { c: RoomClient; tasks:
 function NewClientModal({ team, me, onClose, onSave }: {
   team: TeamMember[]; me: string; onClose: () => void; onSave: (f: Parameters<RoomOps["addClient"]>[0]) => Promise<void>;
 }) {
-  const [f, setF] = useState({ salon_name: "", owner_name: "", phone: "", city: "", consultant: me, stage: "lead" as Stage });
+  const [f, setF] = useState({ salon_name: "", owner_name: "", phone: "", city: "", consultant: me, stage: "discovery" as Stage });
   const [busy, setBusy] = useState(false);
   return (
     <Modal title="صالون جديد" onClose={onClose}>
@@ -571,7 +602,7 @@ function NewClientModal({ team, me, onClose, onSave }: {
         <div className="col-span-2">
           <Field label="المرحلة الحالية">
             <select value={f.stage} onChange={(e) => setF({ ...f, stage: e.target.value as Stage })} className={input}>
-              {STAGES.filter((s) => s.id !== "done" && s.id !== "paused").map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+              {STAGES.filter((s) => !["lead", "done", "paused"].includes(s.id)).map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
             </select>
           </Field>
         </div>
@@ -601,6 +632,8 @@ function Week({ data, me, ops, onOpen }: { data: RoomData; me: string; ops: Room
   const clientsMine = data.clients.filter((c) => !isDone(c) && (!mine || c.consultant === me));
   const reviews = clientsMine.filter((c) => c.next_review && c.next_review <= in7).sort((a, b) => a.next_review!.localeCompare(b.next_review!));
   const attention = clientsMine.filter((c) => needsAttention(c, data.tasks, today));
+  const followups = data.clients.filter((c) => c.stage === "lead" && c.lead_status !== "not_interested" && c.next_followup && c.next_followup <= in7
+    && (!mine || c.consultant === me)).sort((a, b) => a.next_followup!.localeCompare(b.next_followup!));
   const noDue = data.tasks.filter((t) => !t.done_at && !t.due_date && byId.has(t.client_id) && (!mine || isMine(t))
     && byId.get(t.client_id)!.stage === t.phase).length;
 
@@ -653,6 +686,22 @@ function Week({ data, me, ops, onOpen }: { data: RoomData; me: string; ops: Room
       </div>
 
       <div className="space-y-4">
+        <div className={`${card} p-4`}>
+          <SectionTitle icon={Phone} title="متابعات الاستهداف" />
+          {followups.length ? (
+            <ul className="space-y-1.5">
+              {followups.map((c) => (
+                <li key={c.id}>
+                  <button onClick={() => onOpen(c.id)} className="flex w-full items-center gap-2 rounded-2xl border border-[var(--line)] p-2.5 text-right hover:bg-[var(--hover)]">
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: leadStatusMeta(c.lead_status).color }} title={leadStatusMeta(c.lead_status).label} />
+                    <span className="min-w-0 flex-1 truncate text-sm font-bold text-[var(--ink)]">{c.salon_name}</span>
+                    <Badge color={c.next_followup! < today ? "#DC2626" : "#7A6570"}>{dateLabel(c.next_followup)}</Badge>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="text-xs text-[var(--faint)]">ما فيه متابعات استهداف خلال ٧ أيام.</p>}
+        </div>
         <div className={`${card} p-4`}>
           <SectionTitle icon={CalendarDays} title="مراجعات قادمة" />
           {reviews.length ? (

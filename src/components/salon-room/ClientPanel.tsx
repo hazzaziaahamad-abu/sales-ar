@@ -5,12 +5,12 @@
 import React, { useState } from "react";
 import {
   X, Archive, MessageCircle, CheckCircle2, Circle, Plus, Trash2, Target, Package, Lightbulb, ListChecks,
-  BarChart3, History, Send, StickyNote,
+  BarChart3, History, Send, StickyNote, Crosshair, ArrowLeftCircle, CalendarRange, Wand2,
 } from "lucide-react";
 import { formatKpi, goalProgress, intlPhone, kpiDelta, type KpiKey } from "@/lib/salon-growth";
 import {
-  HEALTH, LOG_KINDS, PLAYBOOK, ROOM_KPIS, STAGES, WORK_STAGES, stageLabel,
-  type Health, type LogKind, type RoomClient, type Stage,
+  HEALTH, LEAD_STATUSES, LOG_KINDS, PLAYBOOK, PRIORITIES, ROOM_KPIS, SEGMENTS, SOURCES, STAGES, WORK_STAGES, addDays, phaseWindows, stageLabel,
+  type Health, type LogKind, type Priority, type RoomClient, type RoomTask, type Stage,
 } from "@/lib/salon-room";
 import type { RoomData, RoomOps } from "./SalonRoom";
 import { Avatar, Badge, Field, GOLD, SectionTitle, accGrad, btnGhost, btnPrimary, card, dateLabel, fmt, input, timeAgo, todayKey } from "./ui";
@@ -24,7 +24,11 @@ export default function ClientPanel({ client: c, data, me, ops, onClose }: {
   const patch = (p: Partial<RoomClient>, debounce = false) => ops.patchClient(c.id, p, debounce);
   const [phase, setPhase] = useState<Stage>(WORK_STAGES.includes(c.stage) ? c.stage : "discovery");
   const [newTask, setNewTask] = useState("");
-  const [logKind, setLogKind] = useState<Exclude<LogKind, "stage">>("checkin");
+  const lead = c.stage === "lead";
+  const [logKind, setLogKind] = useState<Exclude<LogKind, "stage">>(lead ? "contact" : "checkin");
+  const [planStart, setPlanStart] = useState(c.start_date ?? today);
+  const [overwrite, setOverwrite] = useState(false);
+  const [planning, setPlanning] = useState(false);
   const [logBody, setLogBody] = useState("");
   const [sending, setSending] = useState(false);
 
@@ -105,8 +109,68 @@ export default function ClientPanel({ client: c, data, me, ops, onClose }: {
             <Field label="قيمة العقد (ر.س)"><input type="number" value={c.contract_value ?? ""} onChange={(e) => patch({ contract_value: numOrNull(e.target.value) }, true)} className={input} /></Field>
           </div>
 
+          {/* ─── الاستهداف (قبل التحويل لعميل) ─── */}
+          {lead && (
+            <div className={`${card} p-4`}>
+              <SectionTitle icon={Crosshair} title="خطة الاستهداف"
+                action={<button onClick={() => { if (confirm(`تحويل «${c.salon_name}» لعميل؟`)) patch({ stage: "discovery", lead_status: "meeting" }); }} className={`${btnPrimary} !px-3 !py-1.5 !text-xs`} style={accGrad}><ArrowLeftCircle size={13} /> تحويل لعميل</button>} />
+              <div className="mb-3 flex flex-wrap gap-1.5">
+                {LEAD_STATUSES.map((st) => (
+                  <button key={st.id} onClick={() => patch({ lead_status: st.id })} className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold"
+                    style={c.lead_status === st.id ? { borderColor: st.color, color: st.color, background: `color-mix(in srgb, ${st.color} 10%, transparent)` } : { borderColor: "var(--line)", color: "var(--muted)" }}>
+                    <span className="h-2 w-2 rounded-full" style={{ background: st.color }} /> {st.label}
+                  </button>
+                ))}
+              </div>
+              <div className="grid gap-3 sm:grid-cols-4">
+                <Field label="الأولوية" group>
+                  <div className="flex gap-1">
+                    {(["A", "B", "C"] as Priority[]).map((p) => (
+                      <button key={p} onClick={() => patch({ priority: p })} title={PRIORITIES[p].hint} className="flex-1 rounded-xl border py-2 text-sm font-black"
+                        style={c.priority === p ? { ...accGrad, color: "var(--on-acc)", borderColor: "transparent" } : { borderColor: "var(--line)", color: "var(--muted)" }}>{PRIORITIES[p].label}</button>
+                    ))}
+                  </div>
+                </Field>
+                <Field label="المصدر">
+                  <select value={c.source ?? ""} onChange={(e) => patch({ source: e.target.value || null })} className={input}><option value="">—</option>{SOURCES.map((x) => <option key={x}>{x}</option>)}</select>
+                </Field>
+                <Field label="حجم الصالون">
+                  <select value={c.segment ?? ""} onChange={(e) => patch({ segment: e.target.value || null })} className={input}><option value="">—</option>{SEGMENTS.map((x) => <option key={x}>{x}</option>)}</select>
+                </Field>
+                <Field label="المتابعة الجاية">
+                  <input type="date" value={c.next_followup ?? ""} onChange={(e) => patch({ next_followup: e.target.value || null })} className={input}
+                    style={c.next_followup && c.next_followup <= today ? { borderColor: "#DC2626" } : {}} />
+                </Field>
+              </div>
+              <p className="mt-3 text-[11px] text-[var(--faint)]">
+                {fmt(logs.filter((l) => l.kind === "contact").length)} محاولة تواصل{c.last_contact_at ? ` · آخرها ${timeAgo(c.last_contact_at)}` : ""} — سجّلي كل محاولة من «سجل المتابعة» تحت.
+              </p>
+            </div>
+          )}
+
+          {/* ─── خطة التنفيذ (الجدول الزمني) ─── */}
+          {!lead && (
+            <div className={`${card} p-4`}>
+              <SectionTitle icon={CalendarRange} title="خطة التنفيذ" />
+              <div className="flex flex-wrap items-end gap-2">
+                <Field label="تاريخ بداية الرحلة"><input type="date" value={planStart} onChange={(e) => setPlanStart(e.target.value)} className={`${input} !w-auto`} /></Field>
+                <label className="mb-2 flex items-center gap-1.5 text-xs font-bold text-[var(--muted)]">
+                  <input type="checkbox" checked={overwrite} onChange={(e) => setOverwrite(e.target.checked)} className="h-3.5 w-3.5 accent-[var(--acc)]" /> أعيدي توزيع التواريخ الموجودة
+                </label>
+                <button disabled={!planStart || planning} onClick={async () => { setPlanning(true); await ops.generatePlan(c.id, planStart, overwrite); setPlanning(false); }} className={`${btnPrimary} mb-0.5`} style={accGrad}>
+                  <Wand2 size={14} /> {c.start_date ? "تحديث الخطة" : "توليد خطة التنفيذ"}
+                </button>
+              </div>
+              {c.start_date ? <Timeline start={c.start_date} stage={c.stage} tasks={tasks} today={today} /> : (
+                <p className="mt-3 rounded-2xl bg-[var(--surface-2)] p-3 text-xs text-[var(--muted)]">
+                  اختاري تاريخ البداية وولّدي الخطة — تنزل تواريخ لكل مهام المراحل (١٢٨ يوم: استكشاف ← تشخيص ← تعاقد ← تأسيس ← ٩٠ يوم تنفيذ ← مراجعة)، ومراجعة أولى بعد ٣٠ يوم.
+                </p>
+              )}
+            </div>
+          )}
+
           {/* ─── مهام المراحل ─── */}
-          <div className={`${card} p-4`}>
+          {!lead && <div className={`${card} p-4`}>
             <SectionTitle icon={ListChecks} title="مهام الآلية" />
             <div className="-mx-1 mb-3 flex gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
               {WORK_STAGES.map((s) => {
@@ -162,10 +226,10 @@ export default function ClientPanel({ client: c, data, me, ops, onClose }: {
                 <div className="rounded-2xl p-3 text-xs" style={{ background: `color-mix(in srgb, ${GOLD} 10%, transparent)` }}><span className="flex items-center gap-1 font-black text-[var(--ink)]"><Lightbulb size={12} style={{ color: GOLD }} /> نصيحة</span><span className="mt-0.5 block text-[var(--muted)]">{pb.tip}</span></div>
               </div>
             )}
-          </div>
+          </div>}
 
           {/* ─── المؤشرات والأهداف ─── */}
-          <div className={`${card} p-4`}>
+          {!lead && <div className={`${card} p-4`}>
             <SectionTitle icon={BarChart3} title="المؤشرات — قبل / الحالي" />
             <div className="-mx-1 overflow-x-auto px-1">
               <table className="w-full min-w-[520px] text-sm">
@@ -218,7 +282,7 @@ export default function ClientPanel({ client: c, data, me, ops, onClose }: {
                 );
               })}
             </div>
-          </div>
+          </div>}
 
           {/* ─── ملاحظات ─── */}
           <div className={`${card} p-4`}>
@@ -231,14 +295,14 @@ export default function ClientPanel({ client: c, data, me, ops, onClose }: {
             <SectionTitle icon={History} title="سجل المتابعة" />
             <div className="rounded-2xl border border-[var(--line)] p-3">
               <div className="mb-2 flex flex-wrap gap-1.5">
-                {(["checkin", "meeting", "note"] as const).map((k) => (
+                {(lead ? (["contact", "note"] as const) : (["checkin", "meeting", "note", "contact"] as const)).map((k) => (
                   <button key={k} onClick={() => setLogKind(k)} className="rounded-full border px-3 py-1 text-xs font-bold"
                     style={logKind === k ? { ...accGrad, color: "var(--on-acc)", borderColor: "transparent" } : { borderColor: "var(--line)", color: "var(--muted)" }}>
                     {LOG_KINDS[k]}
                   </button>
                 ))}
               </div>
-              <textarea rows={2} value={logBody} onChange={(e) => setLogBody(e.target.value)} placeholder={logKind === "checkin" ? "وش صار هالأسبوع؟ الأرقام، العوائق، الخطوة الجاية…" : "اكتبي…"} className={`${input} resize-y`} />
+              <textarea rows={2} value={logBody} onChange={(e) => setLogBody(e.target.value)} placeholder={logKind === "checkin" ? "وش صار هالأسبوع؟ الأرقام، العوائق، الخطوة الجاية…" : logKind === "contact" ? "اتصال / واتساب / زيارة — وش كانت النتيجة؟" : "اكتبي…"} className={`${input} resize-y`} />
               <div className="mt-2 flex items-center justify-between">
                 <span className="text-[11px] text-[var(--faint)]">باسم: {me}</span>
                 <button onClick={addLog} disabled={!logBody.trim() || sending} className={btnPrimary} style={accGrad}><Send size={14} /> تسجيل</button>
@@ -264,6 +328,46 @@ export default function ClientPanel({ client: c, data, me, ops, onClose }: {
           <p className="pb-4 text-center text-[11px] text-[var(--faint)]">أُضيف {dateLabel(c.created_at.slice(0, 10))} · آخر تحديث {timeAgo(c.updated_at)}</p>
         </div>
       </aside>
+    </div>
+  );
+}
+
+/** الجدول الزمني للمراحل: شريط لكل مرحلة على نافذتها، تعبئته = نسبة المهام المنجزة، وخط «اليوم». */
+function Timeline({ start, stage, tasks, today }: { start: string; stage: Stage; tasks: RoomTask[]; today: string }) {
+  const windows = phaseWindows(start);
+  const end = addDays(start, PLAYBOOK[PLAYBOOK.length - 1].to);
+  const span = (Date.parse(end) - Date.parse(start)) || 1;
+  const pos = (k: string) => Math.min(100, Math.max(0, ((Date.parse(k) - Date.parse(start)) / span) * 100));
+  const todayPos = pos(today);
+  return (
+    <div className="mt-4">
+      <div className="relative space-y-2">
+        {windows.map((w) => {
+          const list = tasks.filter((t) => t.phase === w.stage);
+          const done = list.filter((t) => t.done_at).length;
+          const p = list.length ? done / list.length : 0;
+          const current = w.stage === stage;
+          const late = !current && p < 1 && w.to < today;
+          return (
+            <div key={w.stage} className="grid grid-cols-[6.5rem_1fr] items-center gap-2 text-[11px]" title={`${stageLabel(w.stage)}: ${dateLabel(w.from)} – ${dateLabel(w.to)} (${fmt(done)}/${fmt(list.length)})`}>
+              <span className={`truncate font-bold ${current ? "text-[var(--ink)]" : "text-[var(--muted)]"}`}>{stageLabel(w.stage)}</span>
+              <div className="relative h-5 rounded-md bg-[var(--surface-2)]">
+                <div className="absolute inset-y-0 overflow-hidden rounded-md" style={{ insetInlineStart: `${pos(w.from)}%`, width: `${Math.max(2, pos(w.to) - pos(w.from))}%`, background: "color-mix(in srgb, var(--acc) 18%, transparent)", outline: current ? "2px solid var(--acc)" : late ? "1px solid #DC2626" : "none" }}>
+                  <div className="h-full" style={{ width: `${p * 100}%`, background: p === 1 ? "#16A34A" : "var(--acc)" }} />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        {todayPos > 0 && todayPos < 100 && (
+          <div className="pointer-events-none absolute inset-y-0 ms-[7rem]" style={{ insetInlineStart: 0, width: "calc(100% - 7rem)" }}>
+            <div className="absolute inset-y-[-4px] w-0.5 rounded" style={{ insetInlineStart: `${todayPos}%`, background: GOLD }} title="اليوم" />
+          </div>
+        )}
+      </div>
+      <div className="mt-2 flex justify-between ps-[7rem] text-[10px] text-[var(--faint)]">
+        <span>{dateLabel(start)}</span><span style={{ color: GOLD }}>▍ اليوم</span><span>{dateLabel(end)}</span>
+      </div>
     </div>
   );
 }
