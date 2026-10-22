@@ -15,6 +15,7 @@ import {
   type LogKind, type Priority, type RoomClient, type RoomLog, type RoomTask, type Stage, type Targets, type TeamMember,
 } from "@/lib/salon-room";
 import ClientPanel from "./ClientPanel";
+import BackToPlatform from "@/components/offer/BackToPlatform";
 import Dashboard from "./Dashboard";
 import Targeting from "./Targeting";
 import {
@@ -279,6 +280,7 @@ function SalonRoomInner() {
         <>
           <header className="sticky inset-x-0 top-0 z-40 border-b border-[var(--line)] bg-[var(--glass)] backdrop-blur-xl">
             <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:px-6">
+              <BackToPlatform compact />
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-[var(--on-acc)]" style={accGrad}><Briefcase size={18} /></span>
               <div className="min-w-0 leading-tight">
                 <div className="truncate text-sm font-black text-[var(--ink)]">غرفة التخطيط والتنفيذ</div>
@@ -351,6 +353,7 @@ function Gate({ session, theme, toggleTheme, onEnter }: {
     <div className="relative grid min-h-screen place-items-center px-4 py-10">
       <div className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(60% 50% at 50% 0%, color-mix(in srgb, var(--acc) 18%, transparent), transparent 70%)" }} />
       <div className="absolute left-4 top-4"><IconBtn onClick={toggleTheme} title="المظهر">{theme === "brand" ? <Moon size={16} /> : <Sun size={16} />}</IconBtn></div>
+      <div className="absolute right-4 top-4"><BackToPlatform /></div>
       <div className={`${card} sr-in relative w-full max-w-sm p-7 text-center`}>
         <span className="mx-auto grid h-16 w-16 place-items-center rounded-3xl text-[var(--on-acc)] shadow-xl" style={accGrad}><Briefcase size={28} /></span>
         <h1 className="mt-5 text-2xl font-black text-[var(--ink)]">غرفة التخطيط والتنفيذ</h1>
@@ -438,7 +441,8 @@ function NamePicker({ team, current, onPick, addMember }: { team: TeamMember[]; 
     if (ok) onPick(n);
   };
   return (
-    <div className="grid min-h-screen place-items-center px-4 py-10">
+    <div className="relative grid min-h-screen place-items-center px-4 py-10">
+      <div className="absolute right-4 top-4"><BackToPlatform /></div>
       <div className={`${card} sr-in w-full max-w-md p-7`}>
         <h1 className="text-center text-xl font-black text-[var(--ink)]">مين أنتِ؟</h1>
         <p className="mt-1 text-center text-sm text-[var(--muted)]">اختاري اسمك — يُستخدم لإسناد المهام وتوقيع السجل.</p>

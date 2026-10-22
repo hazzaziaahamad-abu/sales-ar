@@ -19,6 +19,7 @@ import {
   type SettingKey, type Settings, type TplKey,
 } from "@/lib/salon-growth";
 import DiagnosisTab from "@/components/offer/SalonDiagnosis";
+import BackToPlatform from "@/components/offer/BackToPlatform";
 
 /* ──────────────────────────── أدوات عامة ──────────────────────────── */
 
@@ -387,6 +388,7 @@ function SalonGrowthInner() {
       {/* ─── شريط علوي ─── */}
       <header className="sg-noprint sticky inset-x-0 top-0 z-50 border-b border-[var(--line)] bg-[var(--glass)] backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:px-6">
+          <BackToPlatform />
           <div className="flex min-w-0 items-center gap-2">
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-[var(--on-acc)]" style={accGrad}>
               <Flower2 size={18} />
@@ -402,9 +404,9 @@ function SalonGrowthInner() {
               <Clock size={13} /> {new Date(now).toLocaleTimeString(LOCALE, { hour: "numeric", minute: "2-digit" })}
             </span>
             <IconBtn onClick={() => copy(window.location.href, "تم نسخ رابط اللوحة")} title="نسخ الرابط"><Link2 size={16} /></IconBtn>
-            <IconBtn onClick={() => window.print()} title="طباعة / PDF"><Printer size={16} /></IconBtn>
+            <span className="hidden sm:contents"><IconBtn onClick={() => window.print()} title="طباعة / PDF"><Printer size={16} /></IconBtn></span>
             <IconBtn onClick={toggleTheme} title={theme === "brand" ? "المظهر الليلي" : "هوية الصالون"}>{theme === "brand" ? <Moon size={16} /> : <Sun size={16} />}</IconBtn>
-            <IconBtn onClick={toggleFs} title="وضع العرض">{fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</IconBtn>
+            <span className="hidden sm:contents"><IconBtn onClick={toggleFs} title="وضع العرض">{fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</IconBtn></span>
           </div>
         </div>
         {live && <nav className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 pb-2.5 sm:px-6 [scrollbar-width:none]" role="tablist">
@@ -444,7 +446,7 @@ function SalonGrowthInner() {
               {empty && (
                 <div className="sg-noprint mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm">
                   <Database size={16} style={{ color: "var(--acc)" }} />
-                  <span className="flex-1 font-bold text-[var(--body)]">اللوحة مربوطة بقاعدة البيانات وما فيها بيانات بعد — ابدأ بإضافة المواعيد، أو عبّها ببيانات تجريبية لتجربة كل المزايا.</span>
+                  <span className="min-w-[14rem] flex-1 font-bold text-[var(--body)]">اللوحة مربوطة بقاعدة البيانات وما فيها بيانات بعد — ابدأ بإضافة المواعيد، أو عبّها ببيانات تجريبية لتجربة كل المزايا.</span>
                   <button onClick={seed} disabled={seeding} className={btnPrimary} style={accGrad}>
                     {seeding ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />} تعبئة ببيانات تجريبية
                   </button>
