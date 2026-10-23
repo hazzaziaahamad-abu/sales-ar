@@ -1756,6 +1756,29 @@ export async function deleteFollowUpNote(id: string): Promise<void> {
   if (error) throw error;
 }
 
+/** معرّفات الصفقات التي فيها ملاحظة كتبها موظف في السجل (الملاحظات التلقائية لا تُحتسب) */
+export async function fetchDealIdsWithManualNotes(): Promise<Set<string>> {
+  const supabase = createClient();
+  const PAGE = 1000;
+  const ids = new Set<string>();
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("follow_up_notes")
+      .select("entity_id")
+      .eq("org_id", getOrgId())
+      .eq("entity_type", "deal")
+      .not("note", "like", "📝 تحديث تلقائي%")
+      .not("note", "like", "🔄 تم إنشاء تجديد تلقائي%")
+      .not("note", "like", "ℹ️ تجديد تلقائي%")
+      .order("id", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    (data ?? []).forEach((n) => ids.add(n.entity_id as string));
+    if (!data || data.length < PAGE) break;
+  }
+  return ids;
+}
+
 export async function fetchRecentFollowUpNotes(limit = 20): Promise<(FollowUpNote & { entity_name?: string })[]> {
   const supabase = createClient();
   const orgId = getOrgId();
