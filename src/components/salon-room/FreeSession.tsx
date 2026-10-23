@@ -4,12 +4,12 @@
 // وقياس التحويل مقابل نقطة التعادل (تكلفة الجلسة ÷ متوسط قيمة العقد).
 
 import React, { useState } from "react";
-import { Gift, CheckCircle2, Circle, Copy, Send, XCircle, CalendarDays, Clock, TriangleAlert, Sparkles, Undo2 } from "lucide-react";
+import { Gift, CheckCircle2, Circle, Copy, Send, XCircle, CalendarDays, Clock, TriangleAlert, Sparkles, Undo2, Settings2, Check } from "lucide-react";
 import {
   QUALIFICATION, SESSION_NAME, SESSION_STATES, proposalDue, sessionState, weekStart,
   type FreeSession, type RoomClient, type Targets,
 } from "@/lib/salon-room";
-import { Badge, GOLD, SectionTitle, accGrad, btnGhost, btnPrimary, card, dateLabel, fmt, input, todayKey } from "./ui";
+import { Badge, Field, GOLD, Modal, SectionTitle, accGrad, btnGhost, btnPrimary, card, dateLabel, fmt, input, todayKey } from "./ui";
 
 export const EMPTY_SESSION: FreeSession = {
   is_free: false, session_date: null, qual: {}, booked_at: null, booked_by: null, held_at: null,
@@ -63,6 +63,62 @@ export function sessionMetrics(clients: RoomClient[], t: Targets, now: number) {
     spend: held.length * t.session_cost,
     revenue: contracted.reduce((s, c) => s + (c.contract_value ?? 0), 0),
   };
+}
+
+/* ──────────────────────────── إعدادات الجلسة (تعديل سريع من أي مكان) ──────────────────────────── */
+
+export function SessionSettingsButton({ targets, avgContract, onSave, label = "إعدادات الجلسة" }: {
+  targets: Targets; avgContract?: number | null; onSave: (t: Targets) => void; label?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button onClick={() => setOpen(true)} className={`${btnGhost} !px-3 !py-1.5 !text-xs`} title="تعديل التكلفة والسقف والقيمة المعلنة">
+        <Settings2 size={13} /> {label}
+      </button>
+      {open && <SessionSettingsModal targets={targets} avgContract={avgContract ?? null} onClose={() => setOpen(false)} onSave={(t) => { onSave(t); setOpen(false); }} />}
+    </>
+  );
+}
+
+function SessionSettingsModal({ targets, avgContract, onClose, onSave }: {
+  targets: Targets; avgContract: number | null; onClose: () => void; onSave: (t: Targets) => void;
+}) {
+  const [cap, setCap] = useState(String(targets.sessions_cap));
+  const [cost, setCost] = useState(String(targets.session_cost));
+  const [value, setValue] = useState(String(targets.session_value));
+  const num = (v: string) => (v.trim() === "" || !Number.isFinite(Number(v)) || Number(v) < 0 ? null : Math.round(Number(v)));
+  const nCap = num(cap), nCost = num(cost), nValue = num(value);
+  const valid = nCap !== null && nCost !== null && nValue !== null;
+  const be = avgContract && nCost !== null ? nCost / avgContract : null;
+  return (
+    <Modal title={`إعدادات جلسة «${SESSION_NAME}»`} onClose={onClose}>
+      <div className="space-y-3">
+        <Field label="سقف الجلسات لكل مستشارة في الأسبوع">
+          <input type="number" min={0} inputMode="numeric" value={cap} onChange={(e) => setCap(e.target.value)} className={input} autoFocus />
+        </Field>
+        <Field label="تكلفة الجلسة الفعلية علينا (ر.س)">
+          <input type="number" min={0} inputMode="numeric" value={cost} onChange={(e) => setCost(e.target.value)} className={input} />
+        </Field>
+        <p className="-mt-1 text-[11px] text-[var(--faint)]">ساعات المستشارة (تحضير + جلسة + مواصلات + كتابة العرض) × تكلفة الساعة.</p>
+        <Field label="القيمة المعلنة في رسالة الدعوة (ر.س)">
+          <input type="number" min={0} inputMode="numeric" value={value} onChange={(e) => setValue(e.target.value)} className={input} />
+        </Field>
+        <div className="rounded-2xl bg-[var(--surface-2)] p-3 text-xs text-[var(--muted)]">
+          {be !== null
+            ? <>بهالتكلفة تصير <b className="text-[var(--ink)]">نقطة التعادل {fmt(be * 100)}٪</b> (متوسط العقد الحالي {fmt(avgContract!)} ر.س) — يعني يكفي إن جلسة من كل {fmt(Math.ceil(1 / Math.max(be, 1e-9)))} تتحول لعقد.</>
+            : "نقطة التعادل تنحسب لما تتسجّل قيمة العقود في بطاقات الصالونات المتعاقدة."}
+          <div className="mt-1">التغيير ينطبق فوراً على الداشبورد وعدّاد السقف ورسالة الدعوة.</div>
+        </div>
+      </div>
+      <div className="mt-5 flex justify-end gap-2">
+        <button onClick={onClose} className={btnGhost}>إلغاء</button>
+        <button disabled={!valid} onClick={() => onSave({ ...targets, sessions_cap: nCap!, session_cost: nCost!, session_value: nValue! })} className={btnPrimary} style={accGrad}>
+          <Check size={15} /> حفظ
+        </button>
+      </div>
+    </Modal>
+  );
 }
 
 /* ──────────────────────────── حقول الحجز (من نافذة التواصل) ──────────────────────────── */

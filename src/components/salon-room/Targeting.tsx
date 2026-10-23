@@ -12,7 +12,7 @@ import {
 } from "@/lib/salon-room";
 import type { RoomData, RoomOps } from "./SalonRoom";
 import { isLead, ratio, weekProgress } from "./metrics";
-import { BookingFields, EMPTY_SESSION, inviteMessage, sessionMetrics, sessionOf } from "./FreeSession";
+import { BookingFields, EMPTY_SESSION, SessionSettingsButton, inviteMessage, sessionMetrics, sessionOf } from "./FreeSession";
 import { Avatar, Badge, EmptyState, Field, GOLD, Modal, SectionTitle, accGrad, btnGhost, btnPrimary, card, dateLabel, fmt, input, timeAgo, todayKey } from "./ui";
 
 export default function Targeting({ data, me, ops, onOpen, copy }: {
@@ -57,6 +57,12 @@ export default function Targeting({ data, me, ops, onOpen, copy }: {
             <Meter label="اجتماعات محجوزة (تحويل لعميل)" value={w.meetings} target={t.meetings} icon={CalendarDays} />
             <Meter label="جلسات تشخيص مجانية (السقف)" value={sm.thisWeek} target={t.sessions_cap * consultants} icon={Gift} cap />
             <Meter label="تعاقدات" value={w.contracts} target={t.contracts} icon={Check} />
+          </div>
+        )}
+        {!editTargets && (
+          <div className="mt-3 flex flex-wrap items-center justify-end gap-2 text-[11px] text-[var(--faint)]">
+            الجلسة المجانية: سقف {fmt(t.sessions_cap)} لكل مستشارة، تكلفة {fmt(t.session_cost)} ر.س
+            <SessionSettingsButton targets={t} avgContract={sm.avgContract} onSave={ops.setTargets} label="تعديل" />
           </div>
         )}
         {w.byMember.size > 0 && (

@@ -18,7 +18,7 @@ import ClientPanel from "./ClientPanel";
 import BackToPlatform from "@/components/offer/BackToPlatform";
 import Dashboard from "./Dashboard";
 import Targeting from "./Targeting";
-import { sessionOf } from "./FreeSession";
+import { SessionSettingsButton, sessionOf } from "./FreeSession";
 import {
   THEMES, Avatar, Badge, EmptyState, Field, IconBtn, Modal, SectionTitle, GOLD, accGrad, addDaysKey, btnGhost, btnPrimary,
   card, dateLabel, fmt, input, todayKey, type ThemeKey,
@@ -218,7 +218,7 @@ function SalonRoomInner() {
     },
     setTargets: (t) => {
       setData((d) => ({ ...d, targets: t }));
-      api("/targets", "PUT", t).then(() => notify("تم حفظ أهداف الأسبوع")).catch(fail);
+      api("/targets", "PUT", t).then(() => notify("تم الحفظ")).catch(fail);
     },
     addMember: async (name, role, phone) => {
       try {
@@ -308,11 +308,11 @@ function SalonRoomInner() {
           </header>
 
           <main key={tab} className="sr-in mx-auto max-w-7xl px-4 pb-24 pt-6 sm:px-6">
-            {tab === "dashboard" && <Dashboard data={data} onOpen={setOpenId} />}
+            {tab === "dashboard" && <Dashboard data={data} onOpen={setOpenId} onSaveTargets={ops.setTargets} />}
             {tab === "board" && <Board data={data} me={me} ops={ops} onOpen={setOpenId} />}
             {tab === "targeting" && <Targeting data={data} me={me} ops={ops} onOpen={setOpenId} copy={copy} />}
             {tab === "week" && <Week data={data} me={me} ops={ops} onOpen={setOpenId} />}
-            {tab === "playbook" && <Playbook />}
+            {tab === "playbook" && <Playbook targets={data.targets} onSaveTargets={ops.setTargets} />}
             {tab === "team" && <Team data={data} me={me} ops={ops} />}
           </main>
 
@@ -791,7 +791,7 @@ const KEYS = [
   { icon: MoonStar, title: "صيد العميلات النائمات", text: "رسالة شخصية بعد ٤٥ يوم غياب — أسرع فوز." },
 ];
 
-function Playbook() {
+function Playbook({ targets, onSaveTargets }: { targets: Targets; onSaveTargets: (t: Targets) => void }) {
   return (
     <div className="space-y-6">
       <div className={`${card} p-5 sm:p-6`}>
@@ -811,7 +811,8 @@ function Playbook() {
       </div>
 
       <div className={`${card} p-5 sm:p-6`} style={{ borderColor: `${GOLD}88` }}>
-        <SectionTitle icon={Gift} title={`جلسة «${SESSION_NAME}» المجانية — بوابة الاستقطاب`} />
+        <SectionTitle icon={Gift} title={`جلسة «${SESSION_NAME}» المجانية — بوابة الاستقطاب`}
+          action={<SessionSettingsButton targets={targets} onSave={onSaveTargets} />} />
         <p className="text-sm leading-relaxed text-[var(--muted)]">
           هي نفسها اجتماع «التشخيص الأولي» — نقدّمها مجاناً بقيمة معلنة ولعدد محدود، عشان المالكة تشوف قيمتنا بأرقامها هي قبل ما تدفع.
         </p>

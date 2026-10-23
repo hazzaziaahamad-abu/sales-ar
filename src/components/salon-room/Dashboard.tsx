@@ -9,12 +9,13 @@ import { HEALTH, SESSION_NAME, STAGES, stageLabel, type Health, type Stage } fro
 import { needsAttention, type RoomData } from "./SalonRoom";
 import { ACTIVE_STAGES, CONTRACT_STAGES, goalsProgress, isActive, isLead, lastActivity, planProgress, ratio, weekProgress } from "./metrics";
 import { Avatar, Badge, EmptyState, GOLD, SectionTitle, card, dateLabel, fmt, timeAgo, todayKey } from "./ui";
-import { sessionMetrics } from "./FreeSession";
+import { SessionSettingsButton, sessionMetrics } from "./FreeSession";
+import type { Targets } from "@/lib/salon-room";
 
 type SortKey = "salon" | "stage" | "health" | "plan" | "goals" | "review" | "activity";
 const HEALTH_ORDER: Health[] = ["off_track", "at_risk", "on_track"];
 
-export default function Dashboard({ data, onOpen }: { data: RoomData; onOpen: (id: string) => void }) {
+export default function Dashboard({ data, onOpen, onSaveTargets }: { data: RoomData; onOpen: (id: string) => void; onSaveTargets: (t: Targets) => void }) {
   const today = todayKey();
   const [now] = useState(() => Date.now());
   const [stageF, setStageF] = useState<Stage | "all">("all");
@@ -105,7 +106,8 @@ export default function Dashboard({ data, onOpen }: { data: RoomData; onOpen: (i
 
       {/* ─── تحويل الجلسات المجانية ─── */}
       <div className={`${card} p-5`} style={{ borderColor: `${GOLD}66` }}>
-        <SectionTitle icon={Gift} title={`تحويل الجلسات المجانية — «${SESSION_NAME}»`} />
+        <SectionTitle icon={Gift} title={`تحويل الجلسات المجانية — «${SESSION_NAME}»`}
+          action={<SessionSettingsButton targets={data.targets} avgContract={sm.avgContract} onSave={onSaveTargets} />} />
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {[
             { l: "محجوزة", v: sm.booked },
