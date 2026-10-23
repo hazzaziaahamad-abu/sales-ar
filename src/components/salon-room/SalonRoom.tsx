@@ -8,16 +8,17 @@ import type { LucideIcon } from "lucide-react";
 import {
   KeyRound, Loader2, LogOut, Moon, Sun, LayoutGrid, CalendarDays, BookOpen, Users, Plus, Search, ChevronLeft, BarChart3, Crosshair, Phone,
   ChevronRight, AlertTriangle, Clock, CheckCircle2, Circle, Target, Lightbulb, Package, ShieldCheck,
-  UserPlus, Trash2, Check, X, Briefcase, Eye, EyeOff, Repeat, Sparkles, Store, Crown, MoonStar, Flower2,
+  UserPlus, Trash2, Check, X, Briefcase, Eye, EyeOff, Repeat, Sparkles, Store, Crown, MoonStar, Flower2, Gift,
 } from "lucide-react";
 import {
-  DEFAULT_TARGETS, HEALTH, PLAYBOOK, ROOM_MIN_CODE, STAGES, leadStatusMeta, stageLabel,
+  DEFAULT_TARGETS, HEALTH, PLAYBOOK, ROOM_MIN_CODE, SESSION_NAME, STAGES, leadStatusMeta, proposalDue, sessionState, stageLabel,
   type LogKind, type Priority, type RoomClient, type RoomLog, type RoomTask, type Stage, type Targets, type TeamMember,
 } from "@/lib/salon-room";
 import ClientPanel from "./ClientPanel";
 import BackToPlatform from "@/components/offer/BackToPlatform";
 import Dashboard from "./Dashboard";
 import Targeting from "./Targeting";
+import { sessionOf } from "./FreeSession";
 import {
   THEMES, Avatar, Badge, EmptyState, Field, IconBtn, Modal, SectionTitle, GOLD, accGrad, addDaysKey, btnGhost, btnPrimary,
   card, dateLabel, fmt, input, todayKey, type ThemeKey,
@@ -309,7 +310,7 @@ function SalonRoomInner() {
           <main key={tab} className="sr-in mx-auto max-w-7xl px-4 pb-24 pt-6 sm:px-6">
             {tab === "dashboard" && <Dashboard data={data} onOpen={setOpenId} />}
             {tab === "board" && <Board data={data} me={me} ops={ops} onOpen={setOpenId} />}
-            {tab === "targeting" && <Targeting data={data} me={me} ops={ops} onOpen={setOpenId} />}
+            {tab === "targeting" && <Targeting data={data} me={me} ops={ops} onOpen={setOpenId} copy={copy} />}
             {tab === "week" && <Week data={data} me={me} ops={ops} onOpen={setOpenId} />}
             {tab === "playbook" && <Playbook />}
             {tab === "team" && <Team data={data} me={me} ops={ops} />}
@@ -640,6 +641,10 @@ function Week({ data, me, ops, onOpen }: { data: RoomData; me: string; ops: Room
   const clientsMine = data.clients.filter((c) => !isDone(c) && (!mine || c.consultant === me));
   const reviews = clientsMine.filter((c) => c.next_review && c.next_review <= in7).sort((a, b) => a.next_review!.localeCompare(b.next_review!));
   const attention = clientsMine.filter((c) => needsAttention(c, data.tasks, today));
+  const [weekNow] = useState(() => Date.now());
+  const sessions = data.clients.filter((c) => (!mine || c.consultant === me) && (
+    (sessionState(c) === "booked" && c.free_session.session_date && c.free_session.session_date <= in7) || sessionState(c) === "held"))
+    .sort((a, b) => (a.free_session.session_date ?? "").localeCompare(b.free_session.session_date ?? ""));
   const followups = data.clients.filter((c) => c.stage === "lead" && c.lead_status !== "not_interested" && c.next_followup && c.next_followup <= in7
     && (!mine || c.consultant === me)).sort((a, b) => a.next_followup!.localeCompare(b.next_followup!));
   const noDue = data.tasks.filter((t) => !t.done_at && !t.due_date && byId.has(t.client_id) && (!mine || isMine(t))
@@ -711,6 +716,30 @@ function Week({ data, me, ops, onOpen }: { data: RoomData; me: string; ops: Room
           ) : <p className="text-xs text-[var(--faint)]">ما فيه متابعات استهداف خلال ٧ أيام.</p>}
         </div>
         <div className={`${card} p-4`}>
+          <SectionTitle icon={Gift} title="الجلسات المجانية والعروض" />
+          {sessions.length ? (
+            <ul className="space-y-1.5">
+              {sessions.map((c) => {
+                const held = sessionState(c) === "held";
+                const due = held ? proposalDue(c.free_session) : null;
+                const late = due ? Date.parse(due) < weekNow : !!c.free_session.session_date && c.free_session.session_date < today;
+                return (
+                  <li key={c.id}>
+                    <button onClick={() => onOpen(c.id)} className="flex w-full items-center gap-2 rounded-2xl border border-[var(--line)] p-2.5 text-right hover:bg-[var(--hover)]">
+                      <Gift size={14} className="shrink-0" style={{ color: GOLD }} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-bold text-[var(--ink)]">{c.salon_name}</span>
+                        <span className="block truncate text-[11px] text-[var(--faint)]">{held ? "تمّت الجلسة — أرسلي العرض" : `جلسة ${SESSION_NAME}`}</span>
+                      </span>
+                      <Badge color={late ? "#DC2626" : "#7A6570"}>{held ? (late ? "العرض متأخر" : "خلال ٤٨ س") : dateLabel(sessionOf(c).session_date)}</Badge>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : <p className="text-xs text-[var(--faint)]">ما فيه جلسات مجانية أو عروض مستحقة خلال ٧ أيام.</p>}
+        </div>
+        <div className={`${card} p-4`}>
           <SectionTitle icon={CalendarDays} title="مراجعات قادمة" />
           {reviews.length ? (
             <ul className="space-y-1.5">
@@ -778,6 +807,19 @@ function Playbook() {
               <div className="mt-0.5 text-xs leading-relaxed text-[var(--muted)]">{k.text}</div>
             </div>
           ))}
+        </div>
+      </div>
+
+      <div className={`${card} p-5 sm:p-6`} style={{ borderColor: `${GOLD}88` }}>
+        <SectionTitle icon={Gift} title={`جلسة «${SESSION_NAME}» المجانية — بوابة الاستقطاب`} />
+        <p className="text-sm leading-relaxed text-[var(--muted)]">
+          هي نفسها اجتماع «التشخيص الأولي» — نقدّمها مجاناً بقيمة معلنة ولعدد محدود، عشان المالكة تشوف قيمتنا بأرقامها هي قبل ما تدفع.
+        </p>
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-2xl border border-[var(--line)] p-3 text-xs leading-relaxed text-[var(--body)]"><b className="mb-1 block text-sm text-[var(--ink)]">١. التأهيل قبل الحجز</b>أولوية أ أو ب · المالكة تحضر بنفسها · ترسل المبيعات وقائمة العميلات قبلها.</div>
+          <div className="rounded-2xl border border-[var(--line)] p-3 text-xs leading-relaxed text-[var(--body)]"><b className="mb-1 block text-sm text-[var(--ink)]">٢. نطاق ثابت (٦٠ د)</b>بطاقة خط أساس + ٣ ملاحظات بالأرقام + فرصة سريعة وحدة. الخطة الكاملة والتنفيذ ما ينعطون — هذي في العقد.</div>
+          <div className="rounded-2xl border border-[var(--line)] p-3 text-xs leading-relaxed text-[var(--body)]"><b className="mb-1 block text-sm text-[var(--ink)]">٣. بعدها مباشرة</b>ملخص الجلسة يوصلها نفس اليوم، والعرض خلال ٤٨ ساعة، وموعد متابعة قبل ما نطلع.</div>
+          <div className="rounded-2xl border border-[var(--line)] p-3 text-xs leading-relaxed text-[var(--body)]"><b className="mb-1 block text-sm text-[var(--ink)]">٤. سقف وقياس</b>سقف أسبوعي لكل مستشارة، والتحويل يُقاس مقابل نقطة التعادل في الداشبورد.</div>
         </div>
       </div>
 

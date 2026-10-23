@@ -4,11 +4,12 @@
 
 import React, { useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
-import { Crosshair, Store, FileSignature, Wallet, TrendingUp, AlertTriangle, Filter, Layers, HeartPulse, Users, Table2, ArrowUpDown } from "lucide-react";
-import { HEALTH, STAGES, stageLabel, type Health, type Stage } from "@/lib/salon-room";
+import { Crosshair, Store, FileSignature, Wallet, TrendingUp, AlertTriangle, Filter, Layers, HeartPulse, Users, Table2, ArrowUpDown, Gift } from "lucide-react";
+import { HEALTH, SESSION_NAME, STAGES, stageLabel, type Health, type Stage } from "@/lib/salon-room";
 import { needsAttention, type RoomData } from "./SalonRoom";
 import { ACTIVE_STAGES, CONTRACT_STAGES, goalsProgress, isActive, isLead, lastActivity, planProgress, ratio, weekProgress } from "./metrics";
-import { Avatar, Badge, EmptyState, SectionTitle, card, dateLabel, fmt, timeAgo, todayKey } from "./ui";
+import { Avatar, Badge, EmptyState, GOLD, SectionTitle, card, dateLabel, fmt, timeAgo, todayKey } from "./ui";
+import { sessionMetrics } from "./FreeSession";
 
 type SortKey = "salon" | "stage" | "health" | "plan" | "goals" | "review" | "activity";
 const HEALTH_ORDER: Health[] = ["off_track", "at_risk", "on_track"];
@@ -29,6 +30,7 @@ export default function Dashboard({ data, onOpen }: { data: RoomData; onOpen: (i
   const everConverted = all.filter((c) => c.converted_at).length;
   const conversion = all.length ? everConverted / all.length : 0;
   const w = weekProgress(all, data.logs, now);
+  const sm = sessionMetrics(all, data.targets, now);
 
   // قمع التحويل: كل مرحلة = اللي وصلوها أو تعدّوها
   const contactedIds = new Set(data.logs.filter((l) => l.kind === "contact").map((l) => l.client_id));
@@ -99,6 +101,50 @@ export default function Dashboard({ data, onOpen }: { data: RoomData; onOpen: (i
         <Kpi icon={Wallet} label="قيمة العقود" value={`${fmt(contractValue)} ر.س`} sub="مجموع العقود الموقّعة" />
         <Kpi icon={TrendingUp} label="نسبة التحويل" value={`${fmt(conversion * 100)}٪`} sub="من مستهدف إلى عميل" />
         <Kpi icon={AlertTriangle} label="بحاجة انتباه" value={fmt(attention.length)} sub="حالة أو مهام أو مراجعة" tone={attention.length ? "#D9A21B" : undefined} />
+      </div>
+
+      {/* ─── تحويل الجلسات المجانية ─── */}
+      <div className={`${card} p-5`} style={{ borderColor: `${GOLD}66` }}>
+        <SectionTitle icon={Gift} title={`تحويل الجلسات المجانية — «${SESSION_NAME}»`} />
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          {[
+            { l: "محجوزة", v: sm.booked },
+            { l: "تمّت", v: sm.held },
+            { l: "تعاقدت", v: sm.contracted, tone: "#16A34A" },
+            { l: "عروض متأخرة (+٤٨ س)", v: sm.overdue.length, tone: sm.overdue.length ? "#DC2626" : undefined },
+          ].map((x) => (
+            <div key={x.l} className="rounded-2xl border border-[var(--line)] p-3">
+              <div className="text-[11px] font-bold text-[var(--muted)]">{x.l}</div>
+              <div className="mt-0.5 text-xl font-black" style={{ color: x.tone ?? "var(--ink)" }}>{fmt(x.v)}</div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4">
+          <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2 text-xs">
+            <span className="font-bold text-[var(--body)]">نسبة التحويل (من الجلسات اللي انتهت بقرار)</span>
+            <span className="text-[var(--muted)]">
+              <b className="text-sm text-[var(--ink)]">{sm.conversion === null ? "—" : `${fmt(sm.conversion * 100)}٪`}</b>
+              {sm.breakEven !== null && <> — نقطة التعادل {fmt(sm.breakEven * 100)}٪</>}
+            </span>
+          </div>
+          <div className="relative h-4 rounded-full bg-[var(--surface-2)]" title={sm.breakEven !== null ? `نقطة التعادل = تكلفة الجلسة ${fmt(data.targets.session_cost)} ÷ متوسط العقد ${fmt(sm.avgContract ?? 0)}` : ""}>
+            <div className="h-full rounded-full transition-all" style={{ width: `${(sm.conversion ?? 0) * 100}%`, background: sm.conversion !== null && sm.breakEven !== null && sm.conversion < sm.breakEven ? "#DC2626" : "var(--acc)" }} />
+            {sm.breakEven !== null && <span className="absolute -top-1 h-6 w-0.5 rounded" style={{ insetInlineStart: `${Math.min(100, sm.breakEven * 100)}%`, background: GOLD }} />}
+          </div>
+          <p className="mt-2 text-xs font-bold" style={{ color: sm.conversion === null || sm.breakEven === null ? "var(--faint)" : sm.conversion >= sm.breakEven ? "#16A34A" : "#DC2626" }}>
+            {sm.conversion === null
+              ? "ما فيه جلسات انتهت بقرار بعد (تعاقد أو ما تعاقد)."
+              : sm.breakEven === null
+                ? "سجّلي قيمة العقود في بطاقات الصالونات المتعاقدة عشان تنحسب نقطة التعادل."
+                : sm.conversion >= sm.breakEven
+                  ? "الجلسات المجانية مجدية — التحويل فوق نقطة التعادل."
+                  : "التحويل تحت نقطة التعادل — شدّدي شروط التأهيل قبل الحجز."}
+          </p>
+          <p className="mt-1 text-[11px] text-[var(--faint)]">
+            تكلفة الجلسات اللي تمّت: {fmt(sm.spend)} ر.س — عقود جاءت منها: {fmt(sm.revenue)} ر.س
+            {sm.avgContract !== null && <> — متوسط العقد {fmt(sm.avgContract)} ر.س</>}
+          </p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">

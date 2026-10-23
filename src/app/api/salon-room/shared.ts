@@ -59,6 +59,11 @@ export function parseClient(b: Record<string, unknown>, partial: boolean): Parse
       : [];
   }
   if (has("notes")) f.notes = text(b.notes, 5000);
+  if (has("free_session")) {
+    const fs = b.free_session;
+    if (!fs || typeof fs !== "object" || Array.isArray(fs) || JSON.stringify(fs).length > 10000) return { ok: false, error: "بيانات الجلسة غير صالحة" };
+    f.free_session = fs;
+  }
   if (has("diagnosis")) {
     const d = b.diagnosis;
     if (!d || typeof d !== "object" || Array.isArray(d) || JSON.stringify(d).length > 60000) return { ok: false, error: "تشخيص غير صالح" };
@@ -100,7 +105,14 @@ export function parseTargets(b: Record<string, unknown>) {
     const x = Math.round(Number(v));
     return Number.isFinite(x) ? Math.min(Math.max(x, 0), 1000) : def;
   };
-  return { contacts: n(b.contacts, 30), meetings: n(b.meetings, 5), contracts: n(b.contracts, 2) };
+  const money = (v: unknown, def: number) => {
+    const x = Math.round(Number(v));
+    return Number.isFinite(x) ? Math.min(Math.max(x, 0), 1_000_000) : def;
+  };
+  return {
+    contacts: n(b.contacts, 30), meetings: n(b.meetings, 5), contracts: n(b.contracts, 2),
+    sessions_cap: n(b.sessions_cap, 3), session_value: money(b.session_value, 1500), session_cost: money(b.session_cost, 600),
+  };
 }
 
 /** مراحل ما بعد التوقيع — أول دخول لها = تاريخ التعاقد. */

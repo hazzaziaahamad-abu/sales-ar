@@ -10,6 +10,7 @@ import {
 import { DEFAULT_DIAGNOSIS, KPIS, intlPhone, type Diagnosis } from "@/lib/salon-growth";
 import { DiagnosisView, type DiagnosisSource } from "@/components/offer/SalonDiagnosis";
 import { goalsProgress } from "./metrics";
+import { SessionCard } from "./FreeSession";
 import {
   HEALTH, LEAD_STATUSES, LOG_KINDS, PLAYBOOK, PRIORITIES, SEGMENTS, SOURCES, STAGES, WORK_STAGES, addDays, phaseWindows, stageLabel,
   type Health, type LogKind, type Priority, type RoomClient, type RoomTask, type Stage,
@@ -179,6 +180,9 @@ export default function ClientPanel({ client: c, data, me, ops, onClose, copy }:
               </p>
             </div>
           )}
+
+          {/* ─── الجلسة المجانية (الاستقطاب) ─── */}
+          <SessionCard client={c} targets={data.targets} patch={patch} copy={copy} />
 
           {/* ─── خطة التنفيذ (الجدول الزمني) ─── */}
           {!lead && (

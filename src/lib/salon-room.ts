@@ -18,6 +18,8 @@ export type RoomClient = {
   last_contact_at: string | null; next_followup: string | null; converted_at: string | null; contracted_at: string | null;
   /** التشخيص الأولي (أرقام قبل/الحالي والأهداف في baseline/current/goals). */
   diagnosis: Partial<Diagnosis>;
+  /** جلسة التشخيص المجانية (الاستقطاب). */
+  free_session: Partial<FreeSession>;
 };
 export type RoomTask = {
   id: string; client_id: string; phase: Stage; title: string; due_date: string | null; assignee: string | null;
@@ -26,7 +28,7 @@ export type RoomTask = {
 export type RoomLog = { id: string; client_id: string; kind: LogKind; body: string; author: string | null; created_at: string };
 export type TeamMember = { id: string; name: string; role: string; phone: string | null; active: boolean };
 
-export const CLIENT_COLS = "id, salon_name, owner_name, phone, city, consultant, stage, health, start_date, next_review, contract_value, baseline, current, goals, notes, archived, created_at, updated_at, source, priority, segment, lead_status, last_contact_at, next_followup, converted_at, contracted_at, diagnosis";
+export const CLIENT_COLS = "id, salon_name, owner_name, phone, city, consultant, stage, health, start_date, next_review, contract_value, baseline, current, goals, notes, archived, created_at, updated_at, source, priority, segment, lead_status, last_contact_at, next_followup, converted_at, contracted_at, diagnosis, free_session";
 export const TASK_COLS = "id, client_id, phase, title, due_date, assignee, done_at, done_by, custom, sort_order";
 export const LOG_COLS = "id, client_id, kind, body, author, created_at";
 export const TEAM_COLS = "id, name, role, phone, active";
@@ -75,8 +77,59 @@ export const PRIORITIES: Record<Priority, { label: string; hint: string }> = {
 export const SOURCES = ["إنستقرام", "قوقل ماب", "إحالة", "زيارة ميدانية", "عميل نحجز", "معرض / فعالية", "أخرى"];
 export const SEGMENTS = ["صغير (١–٣ كراسي)", "متوسط (٤–٨ كراسي)", "كبير (+٨ كراسي)", "سبا / مركز تجميل"];
 
-export type Targets = { contacts: number; meetings: number; contracts: number };
-export const DEFAULT_TARGETS: Targets = { contacts: 30, meetings: 5, contracts: 2 };
+export type Targets = {
+  contacts: number; meetings: number; contracts: number;
+  /** الجلسة المجانية: سقف لكل مستشارة أسبوعياً، القيمة المعلنة، وتكلفتها الفعلية علينا. */
+  sessions_cap: number; session_value: number; session_cost: number;
+};
+export const DEFAULT_TARGETS: Targets = { contacts: 30, meetings: 5, contracts: 2, sessions_cap: 3, session_value: 1500, session_cost: 600 };
+
+/* ──────────────────────────── جلسة التشخيص المجانية ──────────────────────────── */
+
+export type FreeSession = {
+  is_free: boolean;
+  session_date: string | null;
+  qual: { fit?: boolean; owner?: boolean; data?: boolean };
+  booked_at: string | null;
+  booked_by: string | null;
+  held_at: string | null;
+  findings: string[];
+  quick_win: string;
+  proposal_sent_at: string | null;
+  declined: boolean;
+};
+
+export const SESSION_NAME = "تشخيص نمو الصالون";
+
+/** شروط التأهيل قبل حجز الجلسة المجانية. */
+export const QUALIFICATION: { id: keyof FreeSession["qual"]; label: string; hint: string }[] = [
+  { id: "fit", label: "الصالون أولوية أ أو ب", hint: "حجم وفرصة تستاهل وقت المستشارة" },
+  { id: "owner", label: "المالكة نفسها بتحضر", hint: "مو موظفة — صاحبة القرار" },
+  { id: "data", label: "أرسلت البيانات قبل الجلسة", hint: "المبيعات وقائمة العميلات على الأقل" },
+];
+
+export type SessionState = "none" | "booked" | "held" | "proposal" | "contracted" | "declined";
+export const SESSION_STATES: Record<Exclude<SessionState, "none">, { label: string; color: string }> = {
+  booked: { label: "جلسة محجوزة", color: "#3B82F6" },
+  held: { label: "تمّت — العرض مطلوب", color: "#D9A21B" },
+  proposal: { label: "العرض مُرسل", color: "#7A6570" },
+  contracted: { label: "تعاقد", color: "#16A34A" },
+  declined: { label: "ما تعاقد", color: "#DC2626" },
+};
+
+export function sessionState(c: Pick<RoomClient, "free_session" | "contracted_at">): SessionState {
+  const f = c.free_session ?? {};
+  if (!f.is_free) return "none";
+  if (f.held_at && c.contracted_at) return "contracted";
+  if (f.declined) return "declined";
+  if (f.proposal_sent_at) return "proposal";
+  if (f.held_at) return "held";
+  return "booked";
+}
+
+/** العرض لازم يوصل خلال ٤٨ ساعة من الجلسة. */
+export const proposalDue = (f: Partial<FreeSession>) =>
+  f.held_at ? new Date(Date.parse(f.held_at) + 48 * 3_600_000).toISOString() : null;
 
 /** بداية أسبوع العمل (الأحد) بتوقيت الجهاز. */
 export function weekStart(ms: number) {

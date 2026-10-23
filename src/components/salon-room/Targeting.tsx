@@ -4,7 +4,7 @@
 
 import React, { useState } from "react";
 import {
-  Crosshair, Phone, Plus, Search, ArrowLeftCircle, Pencil, Check, Loader2, CalendarDays, Clock, Target, Users,
+  Crosshair, Phone, Plus, Search, ArrowLeftCircle, Pencil, Check, Loader2, CalendarDays, Clock, Target, Users, Gift,
 } from "lucide-react";
 import {
   LEAD_STATUSES, PRIORITIES, SEGMENTS, SOURCES, addDays, leadStatusMeta,
@@ -12,9 +12,12 @@ import {
 } from "@/lib/salon-room";
 import type { RoomData, RoomOps } from "./SalonRoom";
 import { isLead, ratio, weekProgress } from "./metrics";
+import { BookingFields, EMPTY_SESSION, inviteMessage, sessionMetrics, sessionOf } from "./FreeSession";
 import { Avatar, Badge, EmptyState, Field, GOLD, Modal, SectionTitle, accGrad, btnGhost, btnPrimary, card, dateLabel, fmt, input, timeAgo, todayKey } from "./ui";
 
-export default function Targeting({ data, me, ops, onOpen }: { data: RoomData; me: string; ops: RoomOps; onOpen: (id: string) => void }) {
+export default function Targeting({ data, me, ops, onOpen, copy }: {
+  data: RoomData; me: string; ops: RoomOps; onOpen: (id: string) => void; copy: (t: string, m?: string) => void;
+}) {
   const today = todayKey();
   const [now] = useState(() => Date.now());
   const [who, setWho] = useState<"all" | "me">("all");
@@ -31,6 +34,8 @@ export default function Targeting({ data, me, ops, onOpen }: { data: RoomData; m
   const attempts = (id: string) => data.logs.filter((l) => l.client_id === id && l.kind === "contact").length;
   const w = weekProgress(data.clients, data.logs, now);
   const t = data.targets;
+  const sm = sessionMetrics(data.clients, t, now);
+  const consultants = data.team.filter((m) => m.active).length || 1;
   const dueFollowups = data.clients.filter((c) => isLead(c) && c.lead_status !== "not_interested" && c.next_followup && c.next_followup <= today).length;
 
   const convert = (c: RoomClient) => {
@@ -47,9 +52,10 @@ export default function Targeting({ data, me, ops, onOpen }: { data: RoomData; m
         {editTargets ? (
           <TargetsForm targets={t} onSave={(x) => { ops.setTargets(x); setEditTargets(false); }} />
         ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Meter label="محاولات تواصل" value={w.contacts} target={t.contacts} icon={Phone} />
             <Meter label="اجتماعات محجوزة (تحويل لعميل)" value={w.meetings} target={t.meetings} icon={CalendarDays} />
+            <Meter label="جلسات تشخيص مجانية (السقف)" value={sm.thisWeek} target={t.sessions_cap * consultants} icon={Gift} cap />
             <Meter label="تعاقدات" value={w.contracts} target={t.contracts} icon={Check} />
           </div>
         )}
@@ -84,6 +90,7 @@ export default function Targeting({ data, me, ops, onOpen }: { data: RoomData; m
           <Search size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--faint)]" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="بحث بالصالون أو المصدر" className={`${input} ps-8`} />
         </div>
+        <button onClick={() => copy(inviteMessage(t), "تم نسخ رسالة الدعوة للجلسة المجانية")} className={btnGhost} title="رسالة دعوة للجلسة المجانية"><Gift size={15} /> رسالة الدعوة</button>
         <button onClick={() => setAddModal(true)} className={btnPrimary} style={accGrad}><Plus size={15} /> صالون مستهدف</button>
       </div>
 
@@ -147,14 +154,27 @@ export default function Targeting({ data, me, ops, onOpen }: { data: RoomData; m
       )}
 
       {addModal && <AddLeadModal team={data.team} me={me} onClose={() => setAddModal(false)} onSave={async (f) => { if (await ops.addClient(f)) setAddModal(false); }} />}
-      {contactFor && <ContactModal client={contactFor} ops={ops} onClose={() => setContactFor(null)} />}
+      {contactFor && <ContactModal client={contactFor} ops={ops} targets={t} used={sm.byConsultant.get(contactFor.consultant ?? "—") ?? 0} onClose={() => setContactFor(null)} />}
     </div>
   );
 }
 
-function Meter({ label, value, target, icon: Icon }: { label: string; value: number; target: number; icon: typeof Phone }) {
+function Meter({ label, value, target, icon: Icon, cap }: { label: string; value: number; target: number; icon: typeof Phone; cap?: boolean }) {
   const p = ratio(value, target);
   const hit = target > 0 && value >= target;
+  if (cap) {
+    // سقف مو هدف: الوصول له تنبيه (وقت الفريق)، مو إنجاز
+    return (
+      <div className="rounded-2xl border border-[var(--line)] p-3" title={`${fmt(value)} من سقف ${fmt(target)}`}>
+        <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--muted)]"><Icon size={13} /> {label}</div>
+        <div className="mt-1 text-2xl font-black text-[var(--ink)]">{fmt(value)} <span className="text-sm font-bold text-[var(--faint)]">/ {fmt(target)}</span></div>
+        <div className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--surface-2)]">
+          <div className="h-full rounded-full transition-all" style={{ width: `${p * 100}%`, background: value > target ? "#DC2626" : hit ? "#D9A21B" : GOLD }} />
+        </div>
+        <div className="mt-1 text-[11px] font-bold" style={{ color: value > target ? "#DC2626" : hit ? "#D9A21B" : "var(--faint)" }}>{value > target ? "فوق السقف" : hit ? "وصل السقف" : `متاح ${fmt(target - value)}`}</div>
+      </div>
+    );
+  }
   return (
     <div className="rounded-2xl border border-[var(--line)] p-3" title={`${fmt(value)} من ${fmt(target)}`}>
       <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--muted)]"><Icon size={13} /> {label}</div>
@@ -170,11 +190,22 @@ function Meter({ label, value, target, icon: Icon }: { label: string; value: num
 function TargetsForm({ targets, onSave }: { targets: Targets; onSave: (t: Targets) => void }) {
   const [t, setT] = useState(targets);
   return (
-    <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-[1fr_1fr_1fr_auto]">
-      <Field label="محاولات تواصل / أسبوع"><input type="number" min={0} value={t.contacts} onChange={(e) => setT({ ...t, contacts: Number(e.target.value) })} className={input} /></Field>
-      <Field label="اجتماعات محجوزة / أسبوع"><input type="number" min={0} value={t.meetings} onChange={(e) => setT({ ...t, meetings: Number(e.target.value) })} className={input} /></Field>
-      <Field label="تعاقدات / أسبوع"><input type="number" min={0} value={t.contracts} onChange={(e) => setT({ ...t, contracts: Number(e.target.value) })} className={input} /></Field>
-      <button onClick={() => onSave(t)} className={btnPrimary} style={accGrad}><Check size={15} /> حفظ</button>
+    <div className="space-y-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Field label="محاولات تواصل / أسبوع"><input type="number" min={0} value={t.contacts} onChange={(e) => setT({ ...t, contacts: Number(e.target.value) })} className={input} /></Field>
+        <Field label="اجتماعات محجوزة / أسبوع"><input type="number" min={0} value={t.meetings} onChange={(e) => setT({ ...t, meetings: Number(e.target.value) })} className={input} /></Field>
+        <Field label="تعاقدات / أسبوع"><input type="number" min={0} value={t.contracts} onChange={(e) => setT({ ...t, contracts: Number(e.target.value) })} className={input} /></Field>
+      </div>
+      <div className="rounded-2xl border border-[var(--line)] p-3">
+        <div className="mb-2 flex items-center gap-1.5 text-xs font-black text-[var(--ink)]"><Gift size={13} style={{ color: GOLD }} /> الجلسة المجانية</div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <Field label="سقف الجلسات لكل مستشارة / أسبوع"><input type="number" min={0} value={t.sessions_cap} onChange={(e) => setT({ ...t, sessions_cap: Number(e.target.value) })} className={input} /></Field>
+          <Field label="القيمة المعلنة للجلسة (ر.س)"><input type="number" min={0} value={t.session_value} onChange={(e) => setT({ ...t, session_value: Number(e.target.value) })} className={input} /></Field>
+          <Field label="تكلفتها الفعلية علينا (ر.س)"><input type="number" min={0} value={t.session_cost} onChange={(e) => setT({ ...t, session_cost: Number(e.target.value) })} className={input} /></Field>
+        </div>
+        <p className="mt-2 text-[11px] text-[var(--faint)]">التكلفة = ساعات المستشارة (تحضير + جلسة + مواصلات + كتابة العرض) × تكلفة الساعة. منها تنحسب نقطة التعادل في الداشبورد.</p>
+      </div>
+      <div className="flex justify-end"><button onClick={() => onSave(t)} className={btnPrimary} style={accGrad}><Check size={15} /> حفظ</button></div>
     </div>
   );
 }
@@ -225,7 +256,11 @@ function AddLeadModal({ team, me, onClose, onSave }: {
   );
 }
 
-function ContactModal({ client: c, ops, onClose }: { client: RoomClient; ops: RoomOps; onClose: () => void }) {
+function ContactModal({ client: c, ops, targets, used, onClose }: { client: RoomClient; ops: RoomOps; targets: Targets; used: number; onClose: () => void }) {
+  const [session, setSession] = useState(() => {
+    const cur = sessionOf(c);
+    return cur.is_free ? cur : { ...EMPTY_SESSION, is_free: true, session_date: addDays(todayKey(), 3), qual: { fit: c.priority !== "C" } };
+  });
   const [status, setStatus] = useState<LeadStatus>(c.lead_status === "new" ? "contacted" : c.lead_status);
   const [note, setNote] = useState("");
   const [followup, setFollowup] = useState(addDays(todayKey(), 3));
@@ -236,10 +271,14 @@ function ContactModal({ client: c, ops, onClose }: { client: RoomClient; ops: Ro
     const body = `${leadStatusMeta(status).label}${note.trim() ? ` — ${note.trim()}` : ""}`;
     if (await ops.addLog(c.id, "contact", body)) {
       const toClient = status === "meeting" && convert;
+      const bookSession = status === "meeting" && session.is_free && !c.free_session?.is_free;
       ops.patchClient(c.id, {
         lead_status: status,
         next_followup: status === "not_interested" || toClient ? null : followup || null,
         ...(toClient ? { stage: "discovery" as const } : {}),
+        ...(status === "meeting" && session.is_free ? {
+          free_session: { ...session, ...(bookSession ? { booked_at: new Date().toISOString(), booked_by: c.consultant } : {}) },
+        } : {}),
       });
       onClose();
     }
@@ -259,6 +298,9 @@ function ContactModal({ client: c, ops, onClose }: { client: RoomClient; ops: Ro
           </div>
         </Field>
         <Field label="ملاحظة"><textarea autoFocus rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder="وش قالت المالكة؟ الاعتراض؟ الموعد؟" className={`${input} resize-y`} /></Field>
+        {status === "meeting" && (
+          <BookingFields value={session} onChange={setSession} used={used} cap={targets.sessions_cap} consultant={c.consultant} />
+        )}
         {status === "meeting" ? (
           <label className="flex items-center gap-2 rounded-2xl bg-[var(--surface-2)] p-3 text-sm font-bold text-[var(--body)]">
             <input type="checkbox" checked={convert} onChange={(e) => setConvert(e.target.checked)} className="h-4 w-4 accent-[var(--acc)]" />
