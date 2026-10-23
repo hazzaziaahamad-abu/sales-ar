@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { Deal, Marketer, Package, Employee, EmployeeTask } from "@/types";
 import { triggerSaleCelebration } from "@/components/layout/sale-celebration";
-import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createFollowUpNote, fetchRecentFollowUpNotes, fetchPackages, fetchQuoteCommitments, addQuoteCommitment, removeQuoteCommitment, fetchEmployees, fetchEmployeeTasks, createEmployeeTask, createRenewal, fetchRenewals, createDealKpiStages, upsertDailyGoal, fetchDailyGoals, pingPresence, fetchPresence, fetchTargetedDealIds, fetchDealIdsWithManualNotes, addDealToTargeting, removeDealFromTargeting } from "@/lib/supabase/db";
+import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createFollowUpNote, fetchRecentFollowUpNotes, fetchPackages, fetchQuoteCommitments, addQuoteCommitment, removeQuoteCommitment, fetchEmployees, fetchEmployeeTasks, createEmployeeTask, createRenewal, fetchRenewals, createDealKpiStages, upsertDailyGoal, fetchDailyGoals, pingPresence, fetchPresence, fetchTargetedDealIds, fetchDealLastManualNoteAt, addDealToTargeting, removeDealFromTargeting } from "@/lib/supabase/db";
 import { checkDealsForFollowUp, buildFollowUpTask, type FollowUpAction } from "@/lib/auto-followup";
 import { StarEmployeeCard, Leaderboard } from "@/components/star-employee";
 import { AssignTaskModal } from "@/components/tasks/AssignTaskModal";
@@ -672,14 +672,15 @@ export function SalesSection({ salesType }: SalesPageProps) {
     setCategoryFilter(null);
   }, [salesType]);
   const [targetOnly, setTargetOnly] = useState(false);
-  // «جاري التعامل بدون تحديث في السجل»: صفقة مفتوحة وما كتب أحد عنها ملاحظة
-  const [noLogOnly, setNoLogOnly] = useState(false);
-  const [manualNoteDealIds, setManualNoteDealIds] = useState<Set<string> | null>(null);
+  // «جاري التعامل بدون تحديث في السجل»: صفقة مفتوحة وما كتب أحد عنها ملاحظة —
+  // "never" = أبداً، أو رقم = ما فيه ملاحظة آخر N أيام
+  const [noLogFilter, setNoLogFilter] = useState<"never" | 3 | 7 | null>(null);
+  const [lastManualNoteAt, setLastManualNoteAt] = useState<Map<string, string> | null>(null);
   useEffect(() => {
-    if (!noLogOnly) return;
-    // نعيد الجلب عند كل تفعيل عشان الملاحظات الجديدة تُحتسب
-    fetchDealIdsWithManualNotes().then(setManualNoteDealIds).catch(console.error);
-  }, [noLogOnly]);
+    if (!noLogFilter) return;
+    // نعيد الجلب عند كل تغيير عشان الملاحظات الجديدة تُحتسب
+    fetchDealLastManualNoteAt().then(setLastManualNoteAt).catch(console.error);
+  }, [noLogFilter]);
   const [clientSearch, setClientSearch] = useState("");
   const [searchAllTime, setSearchAllTime] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -850,9 +851,16 @@ export function SalesSection({ salesType }: SalesPageProps) {
     if (targetOnly && !dailyTargetIds.has(d.id)) return false;
     return true;
   });
-  const isNoLogDeal = (d: Deal) => !CLOSED_STAGES.has(d.stage) && !!manualNoteDealIds && !manualNoteDealIds.has(d.id);
-  const noLogCount = manualNoteDealIds ? baseListDeals.filter(isNoLogDeal).length : null;
-  const listDeals = noLogOnly ? baseListDeals.filter(isNoLogDeal) : baseListDeals;
+  const isNoLogDeal = (d: Deal) => {
+    if (!noLogFilter || !lastManualNoteAt || CLOSED_STAGES.has(d.stage)) return false;
+    const last = lastManualNoteAt.get(d.id);
+    if (noLogFilter === "never") return !last;
+    // المرجع آخر ملاحظة، أو تاريخ إضافة الصفقة لو ما فيه — الصفقة المضافة اليوم ما تُعد متأخرة
+    const ref = new Date(last || d.created_at).getTime();
+    return Date.now() - ref >= noLogFilter * 86400000;
+  };
+  const noLogCount = noLogFilter && lastManualNoteAt ? baseListDeals.filter(isNoLogDeal).length : null;
+  const listDeals = noLogFilter ? baseListDeals.filter(isNoLogDeal) : baseListDeals;
   /* الضغط على خيار من التفصيل (مرحلة / موظف) يحصر الجدول تحت فيه.
      التفصيلان متقاطعان: أرقام المراحل حسب الموظف المحدد، وأرقام الموظفين حسب المرحلة المحددة */
   const breakdownRepName = (d: Deal) => d.assigned_rep_name || "بدون موظف";
@@ -956,7 +964,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const totalPages = Math.max(1, Math.ceil(filteredDeals.length / DEALS_PER_PAGE));
   const paginatedDeals = filteredDeals.slice((currentPage - 1) * DEALS_PER_PAGE, currentPage * DEALS_PER_PAGE);
 
-  useEffect(() => { setCurrentPage(1); }, [clientSearch, stageFilter, categoryFilter, targetOnly, noLogOnly, achieveFilter, repFilter, tableDateFilter, tableCustomFrom, tableCustomTo, trialDaysFilter]);
+  useEffect(() => { setCurrentPage(1); }, [clientSearch, stageFilter, categoryFilter, targetOnly, noLogFilter, achieveFilter, repFilter, tableDateFilter, tableCustomFrom, tableCustomTo, trialDaysFilter]);
 
   /* Deep-link from قائمة الاستهداف: ?deal=<id> reveals & flashes the row. */
   useEffect(() => {
@@ -2076,18 +2084,26 @@ export function SalesSection({ salesType }: SalesPageProps) {
             <FlaskConical className="w-3 h-3" />
             تجريبي +30ي
           </button>
-          <button
-            onClick={() => setNoLogOnly((v) => !v)}
-            className={`flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded-lg border font-semibold transition-all whitespace-nowrap ${
-              noLogOnly
-                ? "bg-cc-purple/20 border-cc-purple/50 text-cc-purple ring-1 ring-cc-purple/30"
-                : "bg-cc-purple/[0.06] border-cc-purple/20 text-cc-purple/70 hover:border-cc-purple/40 hover:text-cc-purple"
-            }`}
-            title="صفقات جاري التعامل معها (غير مكتملة أو مرفوضة) وما فيها أي ملاحظة مكتوبة في السجل — التحديثات التلقائية لا تُحتسب"
-          >
-            📝 بدون تحديث في السجل
-            {noLogOnly && noLogCount !== null && <span className="font-bold">({noLogCount})</span>}
-          </button>
+          {/* صفقات جاري التعامل معها بلا ملاحظة مكتوبة في السجل — التحديثات التلقائية لا تُحتسب */}
+          {([
+            { key: "never", label: "📝 بدون تحديث أبداً", title: "ما فيها أي ملاحظة مكتوبة في السجل" },
+            { key: 3, label: "📝 بدون تحديث +3ي", title: "ما انكتب عنها شي في السجل آخر 3 أيام" },
+            { key: 7, label: "📝 بدون تحديث +7ي", title: "ما انكتب عنها شي في السجل آخر 7 أيام" },
+          ] as const).map((opt) => (
+            <button
+              key={opt.key}
+              onClick={() => setNoLogFilter(noLogFilter === opt.key ? null : opt.key)}
+              className={`flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded-lg border font-semibold transition-all whitespace-nowrap ${
+                noLogFilter === opt.key
+                  ? "bg-cc-purple/20 border-cc-purple/50 text-cc-purple ring-1 ring-cc-purple/30"
+                  : "bg-cc-purple/[0.06] border-cc-purple/20 text-cc-purple/70 hover:border-cc-purple/40 hover:text-cc-purple"
+              }`}
+              title={`صفقات جاري التعامل معها (غير مكتملة أو مرفوضة) — ${opt.title}`}
+            >
+              {opt.label}
+              {noLogFilter === opt.key && noLogCount !== null && <span className="font-bold">({noLogCount})</span>}
+            </button>
+          ))}
           {filteredDeals.length > 0 && filteredDeals.every((d) => dailyTargetIds.has(d.id)) ? (
             <button onClick={deselectAll} className="text-[12px] px-2.5 py-1.5 rounded-lg border border-cc-red/30 text-cc-red hover:bg-cc-red/10 transition-colors whitespace-nowrap">
               <SquareCheck className="w-3 h-3 inline-block ml-1" />إلغاء تحديد الكل

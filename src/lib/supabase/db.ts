@@ -1756,15 +1756,15 @@ export async function deleteFollowUpNote(id: string): Promise<void> {
   if (error) throw error;
 }
 
-/** معرّفات الصفقات التي فيها ملاحظة كتبها موظف في السجل (الملاحظات التلقائية لا تُحتسب) */
-export async function fetchDealIdsWithManualNotes(): Promise<Set<string>> {
+/** آخر ملاحظة كتبها موظف في سجل كل صفقة: معرّف الصفقة ← وقتها (الملاحظات التلقائية لا تُحتسب) */
+export async function fetchDealLastManualNoteAt(): Promise<Map<string, string>> {
   const supabase = createClient();
   const PAGE = 1000;
-  const ids = new Set<string>();
+  const latest = new Map<string, string>();
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await supabase
       .from("follow_up_notes")
-      .select("entity_id")
+      .select("entity_id, created_at")
       .eq("org_id", getOrgId())
       .eq("entity_type", "deal")
       .not("note", "like", "📝 تحديث تلقائي%")
@@ -1773,10 +1773,15 @@ export async function fetchDealIdsWithManualNotes(): Promise<Set<string>> {
       .order("id", { ascending: true })
       .range(from, from + PAGE - 1);
     if (error) throw error;
-    (data ?? []).forEach((n) => ids.add(n.entity_id as string));
+    for (const n of data ?? []) {
+      const id = n.entity_id as string;
+      const at = n.created_at as string;
+      const prev = latest.get(id);
+      if (!prev || new Date(at) > new Date(prev)) latest.set(id, at);
+    }
     if (!data || data.length < PAGE) break;
   }
-  return ids;
+  return latest;
 }
 
 export async function fetchRecentFollowUpNotes(limit = 20): Promise<(FollowUpNote & { entity_name?: string })[]> {
