@@ -661,6 +661,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const [stageFilter, setStageFilter] = useState<string | null>(null);
   // فلتر تفصيل «فعلية / محاولات اتصال»: اسم مرحلة، أو مجموعة كاملة
   const [breakdownFilter, setBreakdownFilter] = useState<string | null>(null);
+  const [breakdownRep, setBreakdownRep] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   // تبديل القسم (مبيعات/دعم...) يرجّع الفلاتر للكل بدل ما تبقى من القسم السابق
   useEffect(() => {
@@ -838,13 +839,18 @@ export function SalesSection({ salesType }: SalesPageProps) {
     if (targetOnly && !dailyTargetIds.has(d.id)) return false;
     return true;
   });
-  /* الضغط على خيار من التفصيل يحصر الجدول تحت فيه */
-  const filteredDeals = breakdownFilter
+  /* الضغط على خيار من التفصيل (مرحلة / موظف) يحصر الجدول تحت فيه.
+     التفصيلان متقاطعان: أرقام المراحل حسب الموظف المحدد، وأرقام الموظفين حسب المرحلة المحددة */
+  const breakdownRepName = (d: Deal) => d.assigned_rep_name || "بدون موظف";
+  const repScopedDeals = breakdownRep ? listDeals.filter((d) => breakdownRepName(d) === breakdownRep) : listDeals;
+  const stageScopedDeals = breakdownFilter
     ? listDeals.filter((d) =>
         breakdownFilter === BREAKDOWN_ACTUAL ? !NON_ACTUAL_STAGES.has(d.stage)
         : breakdownFilter === BREAKDOWN_NON_ACTUAL ? NON_ACTUAL_STAGES.has(d.stage)
         : d.stage === breakdownFilter)
     : listDeals;
+  const filteredDeals = breakdownRep ? stageScopedDeals.filter((d) => breakdownRepName(d) === breakdownRep) : stageScopedDeals;
+  const listActualCount = listDeals.filter((d) => !NON_ACTUAL_STAGES.has(d.stage)).length;
 
   /* distinct categories present across all deals (for filter + form suggestions) */
   const categoryOptions = useMemo(
@@ -860,7 +866,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
   /* تفصيل عدد القائمة: فعلية مقابل محاولات اتصال، مع عدد كل مرحلة */
   const dealsBreakdown = useMemo(() => {
     const byStage = new Map<string, number>();
-    for (const d of listDeals) byStage.set(d.stage, (byStage.get(d.stage) || 0) + 1);
+    for (const d of repScopedDeals) byStage.set(d.stage, (byStage.get(d.stage) || 0) + 1);
     const stages = Array.from(byStage.entries()).sort((a, b) => b[1] - a[1]);
     const actual = stages.filter(([st]) => !NON_ACTUAL_STAGES.has(st));
     const nonActual = stages.filter(([st]) => NON_ACTUAL_STAGES.has(st));
@@ -870,18 +876,39 @@ export function SalesSection({ salesType }: SalesPageProps) {
       actualCount: actual.reduce((n, [, c]) => n + c, 0),
       nonActualCount: nonActual.reduce((n, [, c]) => n + c, 0),
     };
-  }, [listDeals]);
+  }, [repScopedDeals]);
 
+  /* تفصيل حسب الموظف: إجمالي كل موظف وكم منها فعلية */
+  const repBreakdown = useMemo(() => {
+    const byRep = new Map<string, { total: number; actual: number }>();
+    for (const d of stageScopedDeals) {
+      const r = byRep.get(breakdownRepName(d)) || { total: 0, actual: 0 };
+      r.total += 1;
+      if (!NON_ACTUAL_STAGES.has(d.stage)) r.actual += 1;
+      byRep.set(breakdownRepName(d), r);
+    }
+    // الموظف المحدد يبقى ظاهراً حتى لو صار عدده صفر بعد اختيار مرحلة
+    if (breakdownRep && !byRep.has(breakdownRep)) byRep.set(breakdownRep, { total: 0, actual: 0 });
+    return Array.from(byRep.entries()).sort((a, b) => b[1].total - a[1].total);
+  }, [stageScopedDeals, breakdownRep]);
+
+  function scrollToDealsRows() {
+    if (!dealsTableOpen) toggleDealsTable();
+    setTimeout(() => {
+      document.getElementById("sales-table-rows")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 150);
+  }
   function toggleBreakdownFilter(key: string) {
     const next = breakdownFilter === key ? null : key;
     setBreakdownFilter(next);
     setCurrentPage(1);
-    if (next) {
-      if (!dealsTableOpen) toggleDealsTable();
-      setTimeout(() => {
-        document.getElementById("sales-table-rows")?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 150);
-    }
+    if (next) scrollToDealsRows();
+  }
+  function toggleBreakdownRep(rep: string) {
+    const next = breakdownRep === rep ? null : rep;
+    setBreakdownRep(next);
+    setCurrentPage(1);
+    if (next) scrollToDealsRows();
   }
 
   const totalPages = Math.max(1, Math.ceil(filteredDeals.length / DEALS_PER_PAGE));
@@ -1818,7 +1845,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
             <span className="text-[12px] text-muted-foreground">({listDeals.length})</span>
             {listDeals.length > 0 && (
               <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-cc-green/15 text-cc-green border border-cc-green/30">
-                فعلية {dealsBreakdown.actualCount}
+                فعلية {listActualCount}
               </span>
             )}
           </div>
@@ -1874,10 +1901,29 @@ export function SalesSection({ salesType }: SalesPageProps) {
                 ))}
               </div>
             )}
-            {breakdownFilter && (
+            {repBreakdown.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="px-1.5 py-0.5 font-semibold text-cc-blue shrink-0">👤 حسب الموظف:</span>
+                {repBreakdown.map(([rep, r]) => (
+                  <button
+                    key={rep}
+                    type="button"
+                    onClick={() => toggleBreakdownRep(rep)}
+                    className={`px-1.5 py-0.5 rounded-md border transition-colors ${
+                      breakdownRep === rep ? "bg-cc-blue/15 border-cc-blue/40 ring-1 ring-cc-blue/30 text-foreground" : "bg-white/[0.04] border-border text-muted-foreground hover:bg-white/[0.08] hover:text-foreground"
+                    }`}
+                  >
+                    {rep} <span className="font-bold text-foreground">{r.total}</span>
+                    <span className="text-muted-foreground/70"> · فعلية </span>
+                    <span className="font-bold text-cc-green">{r.actual}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {(breakdownFilter || breakdownRep) && (
               <button
                 type="button"
-                onClick={() => setBreakdownFilter(null)}
+                onClick={() => { setBreakdownFilter(null); setBreakdownRep(null); }}
                 className="text-[11px] text-cyan hover:underline"
               >
                 ✕ إلغاء التحديد — عرض الكل ({listDeals.length})
