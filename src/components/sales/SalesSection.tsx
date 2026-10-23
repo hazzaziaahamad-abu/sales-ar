@@ -136,6 +136,8 @@ const STAGE_SUMMARY: { stage: string; color: "green" | "amber" | "cyan" | "purpl
 /* ─── «الصفقات الفعلية» بجانب عدد قائمة الصفقات ─── */
 // محاولات اتصال لا تُحتسب صفقة فعلية
 const NON_ACTUAL_STAGES = new Set(["اعادة الاتصال في وقت اخر", "استهداف خاطئ"]);
+const BREAKDOWN_ACTUAL = "__actual";
+const BREAKDOWN_NON_ACTUAL = "__non_actual";
 const STAGE_TEXT_COLOR: Record<string, string> = {
   green: "text-cc-green", amber: "text-amber", purple: "text-cc-purple", cyan: "text-cyan", red: "text-cc-red", blue: "text-cc-blue",
 };
@@ -657,6 +659,8 @@ export function SalesSection({ salesType }: SalesPageProps) {
 
   /* card filter */
   const [stageFilter, setStageFilter] = useState<string | null>(null);
+  // فلتر تفصيل «فعلية / محاولات اتصال»: اسم مرحلة، أو مجموعة كاملة
+  const [breakdownFilter, setBreakdownFilter] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   // تبديل القسم (مبيعات/دعم...) يرجّع الفلاتر للكل بدل ما تبقى من القسم السابق
   useEffect(() => {
@@ -829,11 +833,18 @@ export function SalesSection({ salesType }: SalesPageProps) {
       )
     : trialFilteredDeals;
   /* category (تصنيف) + daily-target (الهدف) filters */
-  const filteredDeals = searchedDeals.filter((d) => {
+  const listDeals = searchedDeals.filter((d) => {
     if (categoryFilter && (d.category || "") !== categoryFilter) return false;
     if (targetOnly && !dailyTargetIds.has(d.id)) return false;
     return true;
   });
+  /* الضغط على خيار من التفصيل يحصر الجدول تحت فيه */
+  const filteredDeals = breakdownFilter
+    ? listDeals.filter((d) =>
+        breakdownFilter === BREAKDOWN_ACTUAL ? !NON_ACTUAL_STAGES.has(d.stage)
+        : breakdownFilter === BREAKDOWN_NON_ACTUAL ? NON_ACTUAL_STAGES.has(d.stage)
+        : d.stage === breakdownFilter)
+    : listDeals;
 
   /* distinct categories present across all deals (for filter + form suggestions) */
   const categoryOptions = useMemo(
@@ -849,7 +860,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
   /* تفصيل عدد القائمة: فعلية مقابل محاولات اتصال، مع عدد كل مرحلة */
   const dealsBreakdown = useMemo(() => {
     const byStage = new Map<string, number>();
-    for (const d of filteredDeals) byStage.set(d.stage, (byStage.get(d.stage) || 0) + 1);
+    for (const d of listDeals) byStage.set(d.stage, (byStage.get(d.stage) || 0) + 1);
     const stages = Array.from(byStage.entries()).sort((a, b) => b[1] - a[1]);
     const actual = stages.filter(([st]) => !NON_ACTUAL_STAGES.has(st));
     const nonActual = stages.filter(([st]) => NON_ACTUAL_STAGES.has(st));
@@ -859,7 +870,19 @@ export function SalesSection({ salesType }: SalesPageProps) {
       actualCount: actual.reduce((n, [, c]) => n + c, 0),
       nonActualCount: nonActual.reduce((n, [, c]) => n + c, 0),
     };
-  }, [filteredDeals]);
+  }, [listDeals]);
+
+  function toggleBreakdownFilter(key: string) {
+    const next = breakdownFilter === key ? null : key;
+    setBreakdownFilter(next);
+    setCurrentPage(1);
+    if (next) {
+      if (!dealsTableOpen) toggleDealsTable();
+      setTimeout(() => {
+        document.getElementById("sales-table-rows")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 150);
+    }
+  }
 
   const totalPages = Math.max(1, Math.ceil(filteredDeals.length / DEALS_PER_PAGE));
   const paginatedDeals = filteredDeals.slice((currentPage - 1) * DEALS_PER_PAGE, currentPage * DEALS_PER_PAGE);
@@ -1792,8 +1815,8 @@ export function SalesSection({ salesType }: SalesPageProps) {
         >
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-bold text-foreground">قائمة الصفقات</h3>
-            <span className="text-[12px] text-muted-foreground">({filteredDeals.length})</span>
-            {filteredDeals.length > 0 && (
+            <span className="text-[12px] text-muted-foreground">({listDeals.length})</span>
+            {listDeals.length > 0 && (
               <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-cc-green/15 text-cc-green border border-cc-green/30">
                 فعلية {dealsBreakdown.actualCount}
               </span>
@@ -1801,25 +1824,64 @@ export function SalesSection({ salesType }: SalesPageProps) {
           </div>
           <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${dealsTableOpen ? "" : "-rotate-90"}`} />
         </button>
-        {filteredDeals.length > 0 && (
+        {listDeals.length > 0 && (
           <div className="px-4 pb-3 space-y-1.5 text-[11px]">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="font-semibold text-cc-green shrink-0">✅ فعلية {dealsBreakdown.actualCount}:</span>
+              <button
+                type="button"
+                onClick={() => toggleBreakdownFilter(BREAKDOWN_ACTUAL)}
+                className={`px-1.5 py-0.5 rounded-md font-semibold text-cc-green shrink-0 border transition-colors ${
+                  breakdownFilter === BREAKDOWN_ACTUAL ? "bg-cc-green/15 border-cc-green/40 ring-1 ring-cc-green/30" : "border-transparent hover:bg-cc-green/[0.08]"
+                }`}
+              >
+                ✅ فعلية {dealsBreakdown.actualCount}:
+              </button>
               {dealsBreakdown.actual.map(([st, c]) => (
-                <span key={st} className="px-1.5 py-0.5 rounded-md bg-white/[0.04] border border-border text-muted-foreground">
+                <button
+                  key={st}
+                  type="button"
+                  onClick={() => toggleBreakdownFilter(st)}
+                  className={`px-1.5 py-0.5 rounded-md border transition-colors ${
+                    breakdownFilter === st ? "bg-cyan/15 border-cyan/40 ring-1 ring-cyan/30 text-foreground" : "bg-white/[0.04] border-border text-muted-foreground hover:bg-white/[0.08] hover:text-foreground"
+                  }`}
+                >
                   {st} <span className={`font-bold ${STAGE_TEXT_COLOR[STAGE_BADGE_COLOR[st] || "cyan"]}`}>{c}</span>
-                </span>
+                </button>
               ))}
             </div>
             {dealsBreakdown.nonActualCount > 0 && (
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="font-semibold text-muted-foreground shrink-0">📞 محاولات اتصال {dealsBreakdown.nonActualCount}:</span>
+                <button
+                  type="button"
+                  onClick={() => toggleBreakdownFilter(BREAKDOWN_NON_ACTUAL)}
+                  className={`px-1.5 py-0.5 rounded-md font-semibold text-muted-foreground shrink-0 border transition-colors ${
+                    breakdownFilter === BREAKDOWN_NON_ACTUAL ? "bg-white/[0.08] border-white/20 ring-1 ring-white/15 text-foreground" : "border-transparent hover:bg-white/[0.06]"
+                  }`}
+                >
+                  📞 محاولات اتصال {dealsBreakdown.nonActualCount}:
+                </button>
                 {dealsBreakdown.nonActual.map(([st, c]) => (
-                  <span key={st} className="px-1.5 py-0.5 rounded-md bg-white/[0.02] border border-border/60 text-muted-foreground/80">
+                  <button
+                    key={st}
+                    type="button"
+                    onClick={() => toggleBreakdownFilter(st)}
+                    className={`px-1.5 py-0.5 rounded-md border transition-colors ${
+                      breakdownFilter === st ? "bg-cyan/15 border-cyan/40 ring-1 ring-cyan/30 text-foreground" : "bg-white/[0.02] border-border/60 text-muted-foreground/80 hover:bg-white/[0.06] hover:text-foreground"
+                    }`}
+                  >
                     {st} <span className="font-bold">{c}</span>
-                  </span>
+                  </button>
                 ))}
               </div>
+            )}
+            {breakdownFilter && (
+              <button
+                type="button"
+                onClick={() => setBreakdownFilter(null)}
+                className="text-[11px] text-cyan hover:underline"
+              >
+                ✕ إلغاء التحديد — عرض الكل ({listDeals.length})
+              </button>
             )}
           </div>
         )}
@@ -1970,7 +2032,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
             </button>
           )}
         </div>
-        <Table>
+        <Table id="sales-table-rows" className="scroll-mt-20">
           <TableHeader>
             <TableRow>
               <TableHead className="w-10 text-center">هدف</TableHead>
