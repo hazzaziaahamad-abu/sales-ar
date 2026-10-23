@@ -662,6 +662,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
   // فلتر تفصيل «فعلية / محاولات اتصال»: اسم مرحلة، أو مجموعة كاملة
   const [breakdownFilter, setBreakdownFilter] = useState<string | null>(null);
   const [breakdownRep, setBreakdownRep] = useState<string | null>(null);
+  const [breakdownAdder, setBreakdownAdder] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   // تبديل القسم (مبيعات/دعم...) يرجّع الفلاتر للكل بدل ما تبقى من القسم السابق
   useEffect(() => {
@@ -842,13 +843,15 @@ export function SalesSection({ salesType }: SalesPageProps) {
   /* الضغط على خيار من التفصيل (مرحلة / موظف) يحصر الجدول تحت فيه.
      التفصيلان متقاطعان: أرقام المراحل حسب الموظف المحدد، وأرقام الموظفين حسب المرحلة المحددة */
   const breakdownRepName = (d: Deal) => d.assigned_rep_name || "بدون موظف";
-  const repScopedDeals = breakdownRep ? listDeals.filter((d) => breakdownRepName(d) === breakdownRep) : listDeals;
+  const breakdownAdderName = (d: Deal) => d.added_by_name || "غير معروف";
+  const adderScopedDeals = breakdownAdder ? listDeals.filter((d) => breakdownAdderName(d) === breakdownAdder) : listDeals;
+  const repScopedDeals = breakdownRep ? adderScopedDeals.filter((d) => breakdownRepName(d) === breakdownRep) : adderScopedDeals;
   const stageScopedDeals = breakdownFilter
-    ? listDeals.filter((d) =>
+    ? adderScopedDeals.filter((d) =>
         breakdownFilter === BREAKDOWN_ACTUAL ? !NON_ACTUAL_STAGES.has(d.stage)
         : breakdownFilter === BREAKDOWN_NON_ACTUAL ? NON_ACTUAL_STAGES.has(d.stage)
         : d.stage === breakdownFilter)
-    : listDeals;
+    : adderScopedDeals;
   const filteredDeals = breakdownRep ? stageScopedDeals.filter((d) => breakdownRepName(d) === breakdownRep) : stageScopedDeals;
   const listActualCount = listDeals.filter((d) => !NON_ACTUAL_STAGES.has(d.stage)).length;
 
@@ -892,6 +895,26 @@ export function SalesSection({ salesType }: SalesPageProps) {
     return Array.from(byRep.entries()).sort((a, b) => b[1].total - a[1].total);
   }, [stageScopedDeals, breakdownRep]);
 
+  /* تفصيل حسب من أضاف الرقم — حسب المرحلة والموكل له المحددين */
+  const adderBreakdown = useMemo(() => {
+    let base = breakdownFilter
+      ? listDeals.filter((d) =>
+          breakdownFilter === BREAKDOWN_ACTUAL ? !NON_ACTUAL_STAGES.has(d.stage)
+          : breakdownFilter === BREAKDOWN_NON_ACTUAL ? NON_ACTUAL_STAGES.has(d.stage)
+          : d.stage === breakdownFilter)
+      : listDeals;
+    if (breakdownRep) base = base.filter((d) => breakdownRepName(d) === breakdownRep);
+    const byAdder = new Map<string, { total: number; actual: number }>();
+    for (const d of base) {
+      const r = byAdder.get(breakdownAdderName(d)) || { total: 0, actual: 0 };
+      r.total += 1;
+      if (!NON_ACTUAL_STAGES.has(d.stage)) r.actual += 1;
+      byAdder.set(breakdownAdderName(d), r);
+    }
+    if (breakdownAdder && !byAdder.has(breakdownAdder)) byAdder.set(breakdownAdder, { total: 0, actual: 0 });
+    return Array.from(byAdder.entries()).sort((a, b) => b[1].total - a[1].total);
+  }, [listDeals, breakdownFilter, breakdownRep, breakdownAdder]);
+
   function scrollToDealsRows() {
     if (!dealsTableOpen) toggleDealsTable();
     setTimeout(() => {
@@ -901,6 +924,12 @@ export function SalesSection({ salesType }: SalesPageProps) {
   function toggleBreakdownFilter(key: string) {
     const next = breakdownFilter === key ? null : key;
     setBreakdownFilter(next);
+    setCurrentPage(1);
+    if (next) scrollToDealsRows();
+  }
+  function toggleBreakdownAdder(name: string) {
+    const next = breakdownAdder === name ? null : name;
+    setBreakdownAdder(next);
     setCurrentPage(1);
     if (next) scrollToDealsRows();
   }
@@ -1258,7 +1287,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
           if (oldDeal.stage !== form.stage) changes.push(`المرحلة: ${oldDeal.stage} ← ${form.stage}`);
           if (oldDeal.deal_value !== form.deal_value) changes.push(`القيمة: ${oldDeal.deal_value} ← ${form.deal_value} ر.س`);
           if (oldDeal.probability !== form.probability) changes.push(`الاحتمالية: ${oldDeal.probability}% ← ${form.probability}%`);
-          if ((oldDeal.assigned_rep_name || "") !== form.assigned_rep_name) changes.push(`المسؤول: ${oldDeal.assigned_rep_name || "—"} ← ${form.assigned_rep_name || "—"}`);
+          if ((oldDeal.assigned_rep_name || "") !== form.assigned_rep_name) changes.push(`الموكل له: ${oldDeal.assigned_rep_name || "—"} ← ${form.assigned_rep_name || "—"}`);
           if ((oldDeal.plan || "") !== (form.plan || "")) changes.push(`الباقة: ${oldDeal.plan || "—"} ← ${form.plan || "—"}`);
           if ((oldDeal.source || "") !== form.source) changes.push(`المصدر: ${oldDeal.source || "—"} ← ${form.source}`);
           if (changes.length > 0) {
@@ -1288,6 +1317,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
           client_phone: form.client_phone,
           deal_value: form.deal_value,
           assigned_rep_name: form.assigned_rep_name,
+          added_by_name: authUser?.name || undefined,
           source: form.source,
           stage: form.stage,
           plan: form.plan || undefined,
@@ -1903,7 +1933,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
             )}
             {repBreakdown.length > 0 && (
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="px-1.5 py-0.5 font-semibold text-cc-blue shrink-0">👤 حسب الموظف:</span>
+                <span className="px-1.5 py-0.5 font-semibold text-cc-blue shrink-0">👤 الموكل له:</span>
                 {repBreakdown.map(([rep, r]) => (
                   <button
                     key={rep}
@@ -1920,10 +1950,29 @@ export function SalesSection({ salesType }: SalesPageProps) {
                 ))}
               </div>
             )}
-            {(breakdownFilter || breakdownRep) && (
+            {adderBreakdown.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="px-1.5 py-0.5 font-semibold text-cc-purple shrink-0">➕ من أضاف:</span>
+                {adderBreakdown.map(([name, r]) => (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => toggleBreakdownAdder(name)}
+                    className={`px-1.5 py-0.5 rounded-md border transition-colors ${
+                      breakdownAdder === name ? "bg-cc-purple/15 border-cc-purple/40 ring-1 ring-cc-purple/30 text-foreground" : "bg-white/[0.04] border-border text-muted-foreground hover:bg-white/[0.08] hover:text-foreground"
+                    }`}
+                  >
+                    {name} <span className="font-bold text-foreground">{r.total}</span>
+                    <span className="text-muted-foreground/70"> · فعلية </span>
+                    <span className="font-bold text-cc-green">{r.actual}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {(breakdownFilter || breakdownRep || breakdownAdder) && (
               <button
                 type="button"
-                onClick={() => { setBreakdownFilter(null); setBreakdownRep(null); }}
+                onClick={() => { setBreakdownFilter(null); setBreakdownRep(null); setBreakdownAdder(null); }}
                 className="text-[11px] text-cyan hover:underline"
               >
                 ✕ إلغاء التحديد — عرض الكل ({listDeals.length})
@@ -2091,7 +2140,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
               <TableHead>المرحلة</TableHead>
               <TableHead>النبضة</TableHead>
               <TableHead>القيمة</TableHead>
-              <TableHead>المسؤول</TableHead>
+              <TableHead>الموكل له</TableHead>
               <TableHead>التاريخ</TableHead>
               <TableHead>تاريخ الدفع</TableHead>
               <TableHead>آخر تواصل</TableHead>
@@ -2238,6 +2287,9 @@ export function SalesSection({ salesType }: SalesPageProps) {
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs">
                     {deal.assigned_rep_name || "—"}
+                    {deal.added_by_name && deal.added_by_name !== deal.assigned_rep_name && (
+                      <div className="text-[10px] text-muted-foreground/70">أضافه: {deal.added_by_name}</div>
+                    )}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs">
                     {deal.deal_date ? formatDate(deal.deal_date) : "—"}
@@ -3306,15 +3358,16 @@ export function SalesSection({ salesType }: SalesPageProps) {
 
             {/* Rep + Date row */}
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {isAdmin ? (
+              {/* من يضيف الرقم يوكل المبيعة لمختص المبيعات؛ تغييرها لاحقاً للمدير فقط */}
+              {isAdmin || !editingId ? (
                 <div className="grid gap-1.5">
-                  <Label htmlFor="assigned_rep_name">المسؤول</Label>
+                  <Label htmlFor="assigned_rep_name">الموظف الموكل له المبيعة</Label>
                   <Select
                     value={form.assigned_rep_name}
                     onValueChange={(val) => val && setForm({ ...form, assigned_rep_name: val })}
                   >
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder="اختر المسؤول" />
+                      <SelectValue placeholder="اختر الموظف الموكل له" />
                     </SelectTrigger>
                     <SelectContent>
                       {employees.filter((e) => e.status === "نشط" || e.status === "مشغول" || e.status === "متاح").map((e) => (
@@ -3327,7 +3380,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
                 </div>
               ) : (
                 <div className="grid gap-1.5">
-                  <Label>المسؤول</Label>
+                  <Label>الموظف الموكل له المبيعة</Label>
                   <div className="px-3 py-2 rounded-lg border border-border bg-muted/30 text-sm text-foreground">
                     {form.assigned_rep_name || "—"}
                   </div>

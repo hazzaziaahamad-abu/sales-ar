@@ -564,6 +564,7 @@ export async function createDeal(
     ...deal,
     client_name: deal.client_name?.trim(),
     assigned_rep_name: deal.assigned_rep_name?.trim(),
+    added_by_name: deal.added_by_name?.trim(),
     marketer_name: deal.marketer_name?.trim(),
   };
   const { data, error } = await supabase

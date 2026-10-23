@@ -10,7 +10,10 @@ export interface Deal {
   stage: string;
   probability: number;
   assigned_rep_id?: string;
+  /** الموظف الموكل له المبيعة — تُحتسب له */
   assigned_rep_name?: string;
+  /** من أضاف الرقم (قد يختلف عن الموكل له) */
+  added_by_name?: string;
   cycle_days: number;
   deal_date?: string;
   close_date?: string;
