@@ -11,6 +11,7 @@ import {
   Coffee, Scissors, Presentation, ShieldCheck, Star, Pencil, Plus, X, Save, RotateCcw,
 } from "lucide-react";
 import { waLink } from "@/components/offer/OfferCta";
+import BackToPlatform from "@/components/offer/BackToPlatform";
 
 /* ──────────────────────────── بيانات المنتجين ──────────────────────────── */
 
@@ -726,8 +727,9 @@ function MeetingPlanInner() {
 
       {/* ─── شريط علوي ─── */}
       <header className="mp-noprint fixed inset-x-0 top-0 z-50 border-b border-[var(--line)] bg-[var(--glass)] backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-2">
+        <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-3 sm:gap-3 sm:px-6">
+          <BackToPlatform compact />
+          <div className="hidden items-center gap-2 sm:flex">
             <span className="grid h-9 w-9 place-items-center rounded-xl text-white" style={{ background: "linear-gradient(135deg, var(--acc), var(--acc-deep))" }}>
               <P.icon size={18} />
             </span>
@@ -750,7 +752,7 @@ function MeetingPlanInner() {
             ))}
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
             <span className="hidden items-center gap-1.5 rounded-full border border-[var(--line)] px-3 py-1.5 font-mono text-xs text-[var(--muted)] md:flex" title="مدة الاجتماع">
               <Timer size={13} /> {clock}
             </span>
@@ -760,9 +762,9 @@ function MeetingPlanInner() {
               </IconBtn>
             )}
             <IconBtn onClick={copyLink} title="نسخ رابط الاجتماع">{copied ? <Check size={16} /> : <Link2 size={16} />}</IconBtn>
-            <IconBtn onClick={() => window.print()} title="طباعة / PDF"><Printer size={16} /></IconBtn>
+            <span className="hidden sm:contents"><IconBtn onClick={() => window.print()} title="طباعة / PDF"><Printer size={16} /></IconBtn></span>
             <IconBtn onClick={toggleTheme} title={theme === "brand" ? "المظهر الليلي" : "هوية المنصة"}>{theme === "brand" ? <Moon size={16} /> : <Sun size={16} />}</IconBtn>
-            <IconBtn onClick={toggleFs} title="وضع العرض (F)">{fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</IconBtn>
+            <span className="hidden sm:contents"><IconBtn onClick={toggleFs} title="وضع العرض (F)">{fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</IconBtn></span>
           </div>
         </div>
         {/* الأجندة */}
