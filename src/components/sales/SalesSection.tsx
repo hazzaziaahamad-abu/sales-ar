@@ -133,6 +133,13 @@ const STAGE_SUMMARY: { stage: string; color: "green" | "amber" | "cyan" | "purpl
   { stage: "مرفوض مع سبب", color: "red" as const, icon: <XCircle className="w-4 h-4 text-cc-red" /> },
 ];
 
+/* ─── «الصفقات الفعلية» بجانب عدد قائمة الصفقات ─── */
+// محاولات اتصال لا تُحتسب صفقة فعلية
+const NON_ACTUAL_STAGES = new Set(["اعادة الاتصال في وقت اخر", "استهداف خاطئ"]);
+const STAGE_TEXT_COLOR: Record<string, string> = {
+  green: "text-cc-green", amber: "text-amber", purple: "text-cc-purple", cyan: "text-cyan", red: "text-cc-red", blue: "text-cc-blue",
+};
+
 /* ─── Daily focus / stage boxes ─── */
 const STAGE_BOX_COLORS = {
   cyan:   { card: "hover:border-cyan/30 hover:bg-cyan/[0.06]",           active: "bg-cyan/15 border-cyan/40 ring-1 ring-cyan/30",               num: "text-cyan" },
@@ -838,6 +845,21 @@ export function SalesSection({ salesType }: SalesPageProps) {
       ).sort((a, b) => a.localeCompare(b, "ar")),
     [deals]
   );
+
+  /* تفصيل عدد القائمة: فعلية مقابل محاولات اتصال، مع عدد كل مرحلة */
+  const dealsBreakdown = useMemo(() => {
+    const byStage = new Map<string, number>();
+    for (const d of filteredDeals) byStage.set(d.stage, (byStage.get(d.stage) || 0) + 1);
+    const stages = Array.from(byStage.entries()).sort((a, b) => b[1] - a[1]);
+    const actual = stages.filter(([st]) => !NON_ACTUAL_STAGES.has(st));
+    const nonActual = stages.filter(([st]) => NON_ACTUAL_STAGES.has(st));
+    return {
+      actual,
+      nonActual,
+      actualCount: actual.reduce((n, [, c]) => n + c, 0),
+      nonActualCount: nonActual.reduce((n, [, c]) => n + c, 0),
+    };
+  }, [filteredDeals]);
 
   const totalPages = Math.max(1, Math.ceil(filteredDeals.length / DEALS_PER_PAGE));
   const paginatedDeals = filteredDeals.slice((currentPage - 1) * DEALS_PER_PAGE, currentPage * DEALS_PER_PAGE);
@@ -1771,9 +1793,36 @@ export function SalesSection({ salesType }: SalesPageProps) {
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-bold text-foreground">قائمة الصفقات</h3>
             <span className="text-[12px] text-muted-foreground">({filteredDeals.length})</span>
+            {filteredDeals.length > 0 && (
+              <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-cc-green/15 text-cc-green border border-cc-green/30">
+                فعلية {dealsBreakdown.actualCount}
+              </span>
+            )}
           </div>
           <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${dealsTableOpen ? "" : "-rotate-90"}`} />
         </button>
+        {filteredDeals.length > 0 && (
+          <div className="px-4 pb-3 space-y-1.5 text-[11px]">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="font-semibold text-cc-green shrink-0">✅ فعلية {dealsBreakdown.actualCount}:</span>
+              {dealsBreakdown.actual.map(([st, c]) => (
+                <span key={st} className="px-1.5 py-0.5 rounded-md bg-white/[0.04] border border-border text-muted-foreground">
+                  {st} <span className={`font-bold ${STAGE_TEXT_COLOR[STAGE_BADGE_COLOR[st] || "cyan"]}`}>{c}</span>
+                </span>
+              ))}
+            </div>
+            {dealsBreakdown.nonActualCount > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="font-semibold text-muted-foreground shrink-0">📞 محاولات اتصال {dealsBreakdown.nonActualCount}:</span>
+                {dealsBreakdown.nonActual.map(([st, c]) => (
+                  <span key={st} className="px-1.5 py-0.5 rounded-md bg-white/[0.02] border border-border/60 text-muted-foreground/80">
+                    {st} <span className="font-bold">{c}</span>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {dealsTableOpen && (
         <div id="sales-table-body" className="overflow-x-auto border-t border-border">
         {/* Date filter */}
