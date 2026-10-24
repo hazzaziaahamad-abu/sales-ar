@@ -88,6 +88,7 @@ import {
   Tag,
   Layers,
 } from "lucide-react";
+import MeetingPlanButton from "@/components/sales/MeetingPlanButton";
 
 /* ─── Deal health score ─── */
 function getDealHealthScore(deal: { stage: string; updated_at: string; deal_date?: string | null; last_contact?: string | null; created_at: string }): { icon: string; label: string; color: string } {
@@ -2395,6 +2396,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
                       >
                         <PhoneCall className="w-3.5 h-3.5" />
                       </Button>
+                      <MeetingPlanButton dealId={deal.id} />
                       <Button
                         variant="ghost"
                         size="icon-xs"

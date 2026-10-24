@@ -19,6 +19,7 @@ const PUBLIC_PATHS = [
   "/flow",
   "/api/public/contact-flow",
   "/api/public/meeting-plan",
+  "/api/public/client-meeting/",
   "/salon-room",
   "/api/salon-room",
   "/content/",

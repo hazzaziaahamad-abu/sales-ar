@@ -679,14 +679,47 @@ function MeetingPlanInner() {
     setCalc(Object.fromEntries(np.calc.map((f) => [f.key, f.def])));
   };
 
+  // ─── رابط اجتماع مربوط بصفقة (?m=token): اسم العميل والمنتج + تسجيل الفتح والباقة المختارة ───
+  // نقرأها مرة وحدة: مزامنة الرابط تغيّر الـ params وما نبغى نسجّل فتح جديد
+  const [meetingToken] = useState(() => params.get("m"));
+  const [hasClientParam] = useState(() => params.has("c"));
+  useEffect(() => {
+    if (!meetingToken) return;
+    fetch(`/api/public/client-meeting/${encodeURIComponent(meetingToken)}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: { product?: string; client_name?: string } | null) => {
+        if (!j) return;
+        if (!hasClientParam && j.client_name) setClient(j.client_name);
+        if (j.product === "menu" || j.product === "nahjez") {
+          const np = PRODUCTS[j.product];
+          setProductKey(j.product);
+          setTierIdx(np.defaultTier);
+          setCalc(Object.fromEntries(np.calc.map((f) => [f.key, f.def])));
+        }
+      })
+      .catch(() => { /* نكمل العرض عادي */ });
+  }, [meetingToken, hasClientParam]);
+  const chooseTier = (i: number) => {
+    setTierIdx(i);
+    const name = C.tiers[i]?.name;
+    if (meetingToken && name) {
+      fetch(`/api/public/client-meeting/${encodeURIComponent(meetingToken)}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ tier: name }),
+      }).catch(() => {});
+    }
+  };
+
   // مزامنة الرابط ليصير قابل للمشاركة
   useEffect(() => {
     const q = new URLSearchParams();
+    if (meetingToken) q.set("m", meetingToken);
     q.set("p", productKey);
     if (client.trim()) q.set("c", client.trim());
     q.set("t", String(safeTier));
     window.history.replaceState(null, "", `${window.location.pathname}?${q.toString()}`);
-  }, [productKey, client, safeTier]);
+  }, [productKey, client, safeTier, meetingToken]);
 
   // ساعة الاجتماع
   useEffect(() => {
@@ -1088,7 +1121,7 @@ function MeetingPlanInner() {
 
                       <div className="mp-noprint mt-6 flex flex-wrap gap-2">
                         <button
-                          onClick={() => { setTierIdx(i); goTo(2); }}
+                          onClick={() => { chooseTier(i); goTo(2); }}
                           className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-extrabold transition-transform hover:-translate-y-0.5"
                           style={sel ? { background: "var(--acc)", color: "white" } : { background: "var(--ink)", color: "var(--bg)" }}
                         >
@@ -1284,7 +1317,7 @@ function MeetingPlanInner() {
                     {C.tiers.map((t, i) => {
                       const sel = i === safeTier;
                       return (
-                        <button key={i} onClick={() => { setTierIdx(i); setRevealed((r) => Math.max(r, i)); }}
+                        <button key={i} onClick={() => { chooseTier(i); setRevealed((r) => Math.max(r, i)); }}
                           className="flex items-baseline gap-1.5 rounded-full border px-4 py-2 text-sm font-bold transition-colors"
                           style={sel ? { borderColor: "var(--acc)", background: "var(--acc)", color: "white" } : { borderColor: "var(--line)", color: "var(--body)", background: "var(--surface)" }}>
                           {sel && <Check size={14} className="self-center" />}
