@@ -609,6 +609,7 @@ function MeetingPlanInner() {
   };
   const clearDraft = () => setDrafts((all) => { const n = { ...all }; delete n[productKey]; return n; });
   const ch = (id: string) => ({
+    n: chapters.findIndex((c) => c.id === id),
     ct: C.chapters[id],
     edit,
     onCt: (p: Partial<ChapterText>) => patch((d) => { d.chapters[id] = { ...d.chapters[id], ...p }; }),
@@ -706,13 +707,15 @@ function MeetingPlanInner() {
     );
     els.forEach((el) => io.observe(el));
     return () => io.disconnect();
-  }, []);
+  }, [productKey]); // قسم الهدايا يظهر/يختفي حسب المنتج
 
-  const activeIdx = CHAPTERS.findIndex((c) => c.id === active);
+  // الهدايا مخفية حالياً في قائمة الطلبات (تظهر في نحجز فقط)
+  const chapters = useMemo(() => CHAPTERS.filter((c) => !(c.id === "gift" && productKey === "menu")), [productKey]);
+  const activeIdx = chapters.findIndex((c) => c.id === active);
   const goTo = useCallback((i: number) => {
-    const c = CHAPTERS[Math.max(0, Math.min(CHAPTERS.length - 1, i))];
+    const c = chapters[Math.max(0, Math.min(chapters.length - 1, i))];
     document.getElementById(c.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, []);
+  }, [chapters]);
 
   const toggleFs = () => {
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
@@ -858,7 +861,7 @@ function MeetingPlanInner() {
         </div>
         {/* الأجندة */}
         <nav className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 pb-2.5 sm:px-6 [scrollbar-width:none]">
-          {CHAPTERS.map((c, i) => {
+          {chapters.map((c, i) => {
             const on = c.id === active;
             const done = i < activeIdx;
             return (
@@ -875,7 +878,7 @@ function MeetingPlanInner() {
           })}
         </nav>
         <div className="h-[2px] bg-[var(--surface)]">
-          <div className="h-full transition-all duration-500" style={{ width: `${((activeIdx + 1) / CHAPTERS.length) * 100}%`, background: "linear-gradient(90deg, var(--acc), " + GOLD + ")" }} />
+          <div className="h-full transition-all duration-500" style={{ width: `${((activeIdx + 1) / chapters.length) * 100}%`, background: "linear-gradient(90deg, var(--acc), " + GOLD + ")" }} />
         </div>
       </header>
 
@@ -960,7 +963,7 @@ function MeetingPlanInner() {
                 </div>
               </div>
               <ol className="space-y-1">
-                {CHAPTERS.slice(1).map((c, i) => (
+                {chapters.slice(1).map((c, i) => (
                   <li key={c.id}>
                     <button onClick={() => goTo(i + 1)} className="group flex w-full items-center gap-3 rounded-xl px-2 py-2 text-right transition-colors hover:bg-[var(--hover)]">
                       <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--surface-2)] text-[var(--muted)] transition-colors group-hover:text-[var(--ink)]">
@@ -978,7 +981,7 @@ function MeetingPlanInner() {
       </section>
 
       {/* ─── ١. النظام: سؤال احتياج لكل باقة بالترتيب ─── */}
-      <Chapter id="system" n={1} {...ch("system")}>
+      <Chapter id="system" {...ch("system")}>
         <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
           <div className="relative space-y-5">
             <div className="absolute bottom-6 right-[19px] top-6 w-px bg-gradient-to-b from-[var(--acc)] via-[var(--line)] to-transparent" />
@@ -1346,7 +1349,7 @@ function MeetingPlanInner() {
       </Chapter>
 
       {/* ─── ٢. التفعيل ─── */}
-      <Chapter id="activation" n={2} {...ch("activation")}>
+      <Chapter id="activation" {...ch("activation")}>
         {/* عدّاد ٢٤ ساعة + شرط البدء */}
         <Reveal>
           <div className="mb-12 grid items-center gap-6 rounded-3xl p-6 sm:grid-cols-[auto_1fr] sm:p-8"
@@ -1372,7 +1375,7 @@ function MeetingPlanInner() {
                   <Ed v={C.activationNote} on={(activationNote) => patch((d) => { d.activationNote = activationNote; })} edit={edit} multi />
                 </span>
               </div>
-              <button type="button" onClick={() => goTo(CHAPTERS.findIndex((c) => c.id === "site"))}
+              <button type="button" onClick={() => goTo(chapters.findIndex((c) => c.id === "site"))}
                 className="mp-noprint mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-white/75 hover:text-white">
                 وش التفاصيل المطلوبة؟ <ChevronLeft size={14} />
               </button>
@@ -1424,7 +1427,7 @@ function MeetingPlanInner() {
       </Chapter>
 
       {/* ─── ٣. تجهيز الموقع ─── */}
-      <Chapter id="site" n={3} {...ch("site")}>
+      <Chapter id="site" {...ch("site")}>
         <div className="grid gap-5 lg:grid-cols-[1fr_1fr_260px]">
           <Reveal>
             <div className={`${card} h-full p-6`}>
@@ -1486,8 +1489,9 @@ function MeetingPlanInner() {
         </div>
       </Chapter>
 
+      {productKey !== "menu" && (<>
       {/* ─── ٤. الهدايا ─── */}
-      <Chapter id="gift" n={4} {...ch("gift")}>
+      <Chapter id="gift" {...ch("gift")}>
         {/* كيف تزيد المبيعات: شراء ← إهداء ← استفادة */}
         <div className="mb-12 grid gap-3 md:grid-cols-[1fr_auto_1fr_auto_1fr] md:items-stretch">
           {C.giftFlow.map((g, i) => {
@@ -1587,9 +1591,10 @@ function MeetingPlanInner() {
           </Reveal>
         </div>
       </Chapter>
+      </>)}
 
       {/* ─── ٥. التدريب ─── */}
-      <Chapter id="training" n={5} {...ch("training")}>
+      <Chapter id="training" {...ch("training")}>
         <div className="grid gap-4 md:grid-cols-3">
           {C.training.map((s, i) => {
             const Icon = iconAt(TRAINING, i);
@@ -1633,7 +1638,7 @@ function MeetingPlanInner() {
       </Chapter>
 
       {/* ─── ٦. المتابعة ─── */}
-      <Chapter id="followup" n={6} {...ch("followup")}>
+      <Chapter id="followup" {...ch("followup")}>
         <div
           className="grid gap-4 sm:grid-cols-2 lg:[grid-template-columns:repeat(var(--n),minmax(0,1fr))]"
           style={{ ["--n" as string]: Math.max(1, Math.min(C.followup.length + (edit ? 1 : 0), 6)) } as React.CSSProperties}
@@ -1665,7 +1670,7 @@ function MeetingPlanInner() {
       </Chapter>
 
       {/* ─── ٧. النتائج ─── */}
-      <Chapter id="results" n={7} {...ch("results")}>
+      <Chapter id="results" {...ch("results")}>
         <div className="grid gap-6 lg:grid-cols-[1fr_1.1fr]">
           <Reveal>
             <div className={`${card} space-y-6 p-6`}>
@@ -1826,9 +1831,9 @@ function MeetingPlanInner() {
           <ChevronRight size={18} />
         </button>
         <span className="min-w-[110px] px-2 text-center text-xs font-bold text-[var(--body)]">
-          {CHAPTERS[Math.max(0, activeIdx)].label} <span className="text-[var(--faint)]">· {fmt(Math.max(0, activeIdx) + 1)}/{fmt(CHAPTERS.length)}</span>
+          {chapters[Math.max(0, activeIdx)].label} <span className="text-[var(--faint)]">· {fmt(Math.max(0, activeIdx) + 1)}/{fmt(chapters.length)}</span>
         </span>
-        <button onClick={() => goTo(activeIdx + 1)} disabled={activeIdx >= CHAPTERS.length - 1} className="grid h-9 w-9 place-items-center rounded-full text-white disabled:opacity-30" style={{ background: "var(--acc)" }} aria-label="التالي">
+        <button onClick={() => goTo(activeIdx + 1)} disabled={activeIdx >= chapters.length - 1} className="grid h-9 w-9 place-items-center rounded-full text-white disabled:opacity-30" style={{ background: "var(--acc)" }} aria-label="التالي">
           <ChevronLeft size={18} />
         </button>
       </div>
