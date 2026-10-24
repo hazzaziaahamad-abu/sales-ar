@@ -8,7 +8,7 @@ import {
   Wallet, LayoutDashboard, Rocket, Check, ChevronLeft, ChevronRight, ChevronDown, Maximize2, Minimize2, Sun, Moon,
   Printer, Link2, Sparkles, Stamp, BellRing, GraduationCap, Headphones, CalendarCheck,
   TrendingUp, Users, Palette, ImageIcon, ClipboardList, Timer, Handshake, PartyPopper,
-  Coffee, Scissors, Presentation, ShieldCheck, Star, Pencil, Plus, X, Save, RotateCcw,
+  Coffee, Scissors, Presentation, ShieldCheck, Pencil, Plus, X, Save, RotateCcw,
 } from "lucide-react";
 import { waLink } from "@/components/offer/OfferCta";
 import BackToPlatform from "@/components/offer/BackToPlatform";
@@ -214,8 +214,7 @@ const accentOf = (p: Product, t: ThemeKey) =>
 
 const CHAPTERS = [
   { id: "intro", label: "البداية", icon: Handshake },
-  { id: "system", label: "النظام", icon: Sparkles },
-  { id: "pricing", label: "الباقات", icon: Star },
+  { id: "system", label: "النظام والباقات", icon: Sparkles },
   { id: "activation", label: "التفعيل", icon: Rocket },
   { id: "site", label: "تجهيز الموقع", icon: Globe },
   { id: "loyalty", label: "الولاء", icon: Stamp },
@@ -278,8 +277,7 @@ function defaultContent(p: Product): Content {
     heroPitch: `${p.pitch} في هذا الاجتماع نمشي معك خطوة بخطوة: من الاشتراك إلى الإطلاق، ومن تدريب فريقك إلى أول تقرير نتائج.`,
     agendaMins: "~ ٣٠ دقيقة",
     chapters: {
-      system: { kicker: "تعرّف على النظام", title: `${p.brand} — *${p.tagline}*`, lead: "نبدأ من احتياجك: جاوب على الأسئلة بالترتيب، ونوصل مع بعض للباقة اللي تناسبك بالضبط." },
-      pricing: { kicker: "الباقات والأسعار", title: "اختر الباقة اللي تناسب مرحلتك", lead: "اضغط على الباقة لاختيارها — كل الحسابات في العرض تتحدّث عليها مباشرة. دعم فني لجميع الباقات." },
+      system: { kicker: "النظام والباقات", title: `${p.brand} — *${p.tagline}*`, lead: "نبدأ من احتياجك: جاوب على الأسئلة بالترتيب، ونوصل مع بعض للباقة اللي تناسبك بالضبط. دعم فني لجميع الباقات." },
       activation: { kicker: "خطوات التفعيل", title: "من اليوم إلى الإطلاق في *{الأيام} أيام*", lead: "أنت تركّز على مشروعك، وفريقنا يتكفّل بالباقي. هذا جدولك الفعلي بالتواريخ:" },
       site: { kicker: "خدمة ما بعد البيع · تجهيز الموقع", title: `نجهّز ${p.site} *معك*، مو بس لك`, lead: "قائمة واضحة: اللي نحتاجه منك، واللي علينا. علّم على اللي جاهز عندك الحين." },
       loyalty: { kicker: "تجهيز نظام بطاقات الولاء", title: "عميلك يرجع لك *من نفسه*", lead: "بطاقة ختم رقمية في محفظة آبل وقوقل — بدون تطبيق. جرّب: اضغط على البطاقة وأضف ختم." },
@@ -704,7 +702,7 @@ function MeetingPlanInner() {
   return (
     <div
       dir="rtl"
-      className="mp-root min-h-screen w-full overflow-x-hidden bg-[var(--bg)] text-[var(--body)]"
+      className="mp-root min-h-screen w-full overflow-x-clip bg-[var(--bg)] text-[var(--body)]"
       style={{ ...THEMES[theme], ["--acc" as string]: A.acc, ["--acc-deep" as string]: A.deep, colorScheme: theme === "night" ? "dark" : "light", fontFamily: "var(--font-tajawal), system-ui, sans-serif" } as React.CSSProperties}
     >
       <style>{`
@@ -899,7 +897,7 @@ function MeetingPlanInner() {
       {/* ─── ١. النظام: سؤال احتياج لكل باقة بالترتيب ─── */}
       <Chapter id="system" n={1} {...ch("system")}>
         <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
-          <ol className="relative space-y-5">
+          <div className="relative space-y-5">
             <div className="absolute bottom-6 right-[19px] top-6 w-px bg-gradient-to-b from-[var(--acc)] via-[var(--line)] to-transparent" />
             {C.tiers.map((t, i) => {
               if (!edit && i > revealed) return null;
@@ -911,14 +909,15 @@ function MeetingPlanInner() {
               const isLast = i === C.tiers.length - 1;
               return (
                 <Reveal key={i}>
-                  <li className="relative pr-14">
+                  <div className="relative pr-14">
                     <span
                       className="absolute right-0 top-6 z-10 grid h-10 w-10 place-items-center rounded-full text-sm font-black"
                       style={sel ? { background: "var(--acc)", color: "white" } : { background: "var(--surface)", color: "var(--acc)", boxShadow: "inset 0 0 0 2px var(--acc)" }}
                     >
                       {sel ? <Check size={17} /> : fmt(i + 1)}
                     </span>
-                    <div className={`${card} p-6 transition-all`} style={sel ? { borderColor: "var(--acc)", boxShadow: "0 30px 60px -36px var(--acc)" } : {}}>
+                    <div className={`${card} relative p-6 transition-all`} style={sel ? { borderColor: "var(--acc)", boxShadow: "0 30px 60px -36px var(--acc)" } : {}}>
+                      {C.tiers.length > 1 && <Del edit={edit} onClick={() => patch((d) => { d.tiers.splice(i, 1); })} />}
                       <div className="flex items-center gap-2 text-xs font-bold text-[var(--faint)]">
                         <MessageCircle size={13} style={{ color: "var(--acc)" }} /> سؤال {fmt(i + 1)}
                       </div>
@@ -929,10 +928,33 @@ function MeetingPlanInner() {
                       <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl px-4 py-3" style={{ background: "color-mix(in srgb, var(--acc) 10%, transparent)" }}>
                         <Sparkles size={16} style={{ color: "var(--acc)" }} className="shrink-0" />
                         <span className="text-sm text-[var(--body)]">الأنسب لك:</span>
-                        <b className="text-base text-[var(--ink)]">باقة {t.name}</b>
-                        {t.badge && <span className="rounded-full px-2 py-0.5 text-[10px] font-black text-[#1a1306]" style={{ background: GOLD }}>{t.badge}</span>}
-                        <span className="mr-auto text-sm font-black" style={{ color: "var(--acc)" }}>{fmt(t.price)} <span className="text-xs font-bold text-[var(--muted)]">{t.period}</span></span>
+                        <b className="text-base text-[var(--ink)]">باقة <Ed v={t.name} on={(name) => set((x) => { x.name = name; })} edit={edit} /></b>
+                        {(t.badge || edit) && (
+                          <span className="rounded-full px-2 py-0.5 text-[10px] font-black text-[#1a1306]" style={{ background: GOLD }}>
+                            <Ed v={t.badge ?? ""} on={(badge) => set((x) => { x.badge = badge; })} edit={edit} />
+                          </span>
+                        )}
+                        <span className="mr-auto flex items-baseline gap-1" style={{ color: "var(--acc)" }}>
+                          <EdNum v={t.price} on={(price) => set((x) => { x.price = price; })} edit={edit} className="text-2xl font-black" />
+                          <span className="text-xs font-bold text-[var(--muted)]"><Ed v={t.period} on={(period) => set((x) => { x.period = period; })} edit={edit} /></span>
+                        </span>
                       </div>
+                      {(t.note || edit) && (
+                        <p className="mt-2 px-1 text-xs text-[var(--faint)]">
+                          <Ed v={t.note} on={(note) => set((x) => { x.note = note; })} edit={edit} multi />
+                        </p>
+                      )}
+                      {edit && (
+                        <div className="mp-noprint mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl bg-[var(--surface-2)] px-3 py-2.5 text-[11px] text-[var(--muted)]">
+                          <span className="flex items-center gap-2">التكلفة السنوية (لحساب العائد)
+                            <EdNum v={t.yearly} on={(yearly) => set((x) => { x.yearly = yearly; })} edit className="font-black text-[var(--ink)]" />
+                          </span>
+                          <label className="flex cursor-pointer items-center gap-2">
+                            <input type="checkbox" checked={t.loyalty} onChange={(e) => set((x) => { x.loyalty = e.target.checked; })} />
+                            تشمل الولاء والهدايا
+                          </label>
+                        </div>
+                      )}
 
                       <ul className="mt-4 grid gap-2.5 sm:grid-cols-2">
                         {pts.map((pt, j) => (
@@ -970,11 +992,42 @@ function MeetingPlanInner() {
                         )}
                       </div>
                     </div>
-                  </li>
+                  </div>
                 </Reveal>
               );
             })}
-          </ol>
+            <Add edit={edit} label="باقة جديدة" className="mr-14 w-[calc(100%-3.5rem)]" onClick={() => patch((d) => {
+              d.tiers.push({ name: "باقة جديدة", price: 0, period: "ريال/سنة", yearly: 0, note: "", features: [], question: "سؤال الاحتياج؟", points: ["نقطة"], loyalty: false });
+            })} />
+
+            {/* اختيار مباشر لأي باقة + تلميح الولاء */}
+            {!edit && (
+              <Reveal>
+                <div className="mp-noprint mr-14 rounded-2xl border border-dashed border-[var(--line-strong)] p-4">
+                  <div className="mb-3 text-xs font-bold text-[var(--faint)]">أو اختر الباقة مباشرة:</div>
+                  <div className="flex flex-wrap gap-2">
+                    {C.tiers.map((t, i) => {
+                      const sel = i === safeTier;
+                      return (
+                        <button key={i} onClick={() => { setTierIdx(i); setRevealed((r) => Math.max(r, i)); }}
+                          className="flex items-baseline gap-1.5 rounded-full border px-4 py-2 text-sm font-bold transition-colors"
+                          style={sel ? { borderColor: "var(--acc)", background: "var(--acc)", color: "white" } : { borderColor: "var(--line)", color: "var(--body)", background: "var(--surface)" }}>
+                          {sel && <Check size={14} className="self-center" />}
+                          {t.name}
+                          <span className="text-xs font-black" style={{ color: sel ? "white" : "var(--acc)" }}>{fmt(t.price)}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {!tier.loyalty && loyaltyTier && (
+                    <p className="mt-3 text-xs text-[var(--faint)]">
+                      💡 بطاقات الولاء والهدايا متاحة في باقة <b className="text-[var(--body)]">{loyaltyTier.name}</b> — وهي اللي تصنع العميل المتكرّر.
+                    </p>
+                  )}
+                </div>
+              </Reveal>
+            )}
+          </div>
           <div className="hidden lg:block">
             <div className="sticky top-32">
               <PhoneMock product={P} who={who} />
@@ -983,93 +1036,8 @@ function MeetingPlanInner() {
         </div>
       </Chapter>
 
-      {/* ─── ٢. الباقات ─── */}
-      <Chapter id="pricing" n={2} {...ch("pricing")}>
-        <div className={`grid gap-4 ${C.tiers.length + (edit ? 1 : 0) > 2 ? "sm:grid-cols-2 lg:grid-cols-4" : "mx-auto max-w-3xl sm:grid-cols-2"}`}>
-          {C.tiers.map((t, i) => {
-            const sel = i === safeTier;
-            const set = (fn: (x: Tier) => void) => patch((d) => { fn(d.tiers[i]); });
-            return (
-              <Reveal key={i} delay={i * 70}>
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setTierIdx(i)}
-                  onKeyDown={(e) => { if (e.key === "Enter") setTierIdx(i); }}
-                  className={`relative flex h-full w-full cursor-pointer flex-col rounded-3xl border p-6 text-right transition-all ${sel ? "-translate-y-1" : "hover:-translate-y-0.5"}`}
-                  style={sel
-                    ? { borderColor: "var(--acc)", background: "linear-gradient(180deg, color-mix(in srgb, var(--acc) 16%, transparent), var(--surface))", boxShadow: "0 30px 60px -30px var(--acc)" }
-                    : { borderColor: "var(--line)", background: "var(--surface)" }}
-                >
-                  {C.tiers.length > 1 && <Del edit={edit} onClick={() => patch((d) => { d.tiers.splice(i, 1); })} />}
-                  {(t.badge || edit) && (
-                    <span className="absolute -top-3 left-5 rounded-full px-3 py-1 text-[11px] font-black text-[#1a1306]" style={{ background: GOLD }}>
-                      <Ed v={t.badge ?? ""} on={(badge) => set((x) => { x.badge = badge; })} edit={edit} />
-                    </span>
-                  )}
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-lg font-black text-[var(--ink)]">
-                      <Ed v={t.name} on={(name) => set((x) => { x.name = name; })} edit={edit} />
-                    </span>
-                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full border-2 transition-colors" style={{ borderColor: sel ? "var(--acc)" : "var(--line-strong)", background: sel ? "var(--acc)" : "transparent" }}>
-                      {sel && <Check size={13} className="text-white" />}
-                    </span>
-                  </div>
-                  <div className="mt-4 flex items-baseline gap-1.5">
-                    <EdNum v={t.price} on={(price) => set((x) => { x.price = price; })} edit={edit} className="text-4xl font-black text-[var(--ink)]" />
-                    <span className="text-sm text-[var(--muted)]">
-                      <Ed v={t.period} on={(period) => set((x) => { x.period = period; })} edit={edit} />
-                    </span>
-                  </div>
-                  <p className="mt-1 text-xs text-[var(--faint)]">
-                    <Ed v={t.note} on={(note) => set((x) => { x.note = note; })} edit={edit} multi />
-                  </p>
-                  {edit && (
-                    <div className="mp-noprint mt-3 space-y-1.5 rounded-xl bg-[var(--surface-2)] p-2.5 text-[11px] text-[var(--muted)]">
-                      <div className="flex items-center justify-between gap-2">
-                        <span>التكلفة السنوية (لحساب العائد)</span>
-                        <EdNum v={t.yearly} on={(yearly) => set((x) => { x.yearly = yearly; })} edit className="font-black text-[var(--ink)]" />
-                      </div>
-                      <label className="flex cursor-pointer items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                        <input type="checkbox" checked={t.loyalty} onChange={(e) => set((x) => { x.loyalty = e.target.checked; })} />
-                        تشمل الولاء والهدايا
-                      </label>
-                    </div>
-                  )}
-                  <ul className="mt-5 space-y-2.5 border-t border-[var(--line)] pt-5">
-                    {t.features.map((f, j) => (
-                      <li key={j} className="flex items-start gap-2 text-sm text-[var(--body)]">
-                        <Check size={15} className="mt-0.5 shrink-0" style={{ color: "var(--acc)" }} />
-                        <Ed v={f} on={(v) => set((x) => { x.features[j] = v; })} edit={edit} />
-                        <InlineDel edit={edit} onClick={() => set((x) => { x.features.splice(j, 1); })} />
-                      </li>
-                    ))}
-                  </ul>
-                  {edit && (
-                    <button type="button" onClick={(e) => { e.stopPropagation(); set((x) => { x.features.push("ميزة جديدة"); }); }}
-                      className="mp-noprint mt-3 flex items-center gap-1 text-xs font-bold text-[var(--muted)] hover:text-[var(--acc)]">
-                      <Plus size={13} /> سطر
-                    </button>
-                  )}
-                </div>
-              </Reveal>
-            );
-          })}
-          <Add edit={edit} label="باقة جديدة" className="min-h-[200px]" onClick={() => patch((d) => {
-            d.tiers.push({ name: "باقة جديدة", price: 0, period: "ريال/سنة", yearly: 0, note: "", features: ["ميزة"], loyalty: false });
-          })} />
-        </div>
-        {!tier.loyalty && loyaltyTier && (
-          <Reveal>
-            <p className="mt-6 text-center text-sm text-[var(--faint)]">
-              💡 بطاقات الولاء والهدايا متاحة في باقة <b className="text-[var(--body)]">{loyaltyTier.name}</b> — وهي اللي تصنع العميل المتكرّر.
-            </p>
-          </Reveal>
-        )}
-      </Chapter>
-
-      {/* ─── ٣. التفعيل ─── */}
-      <Chapter id="activation" n={3} {...ch("activation")}>
+      {/* ─── ٢. التفعيل ─── */}
+      <Chapter id="activation" n={2} {...ch("activation")}>
         <div className="relative">
           <div className="absolute bottom-0 right-[19px] top-0 w-px bg-gradient-to-b from-[var(--acc)] via-[var(--line)] to-[#F5B301] md:hidden" />
           <div className="absolute left-0 right-0 top-[19px] hidden h-px bg-gradient-to-l from-[var(--acc)] via-[var(--line)] to-[#F5B301] md:block" />
@@ -1112,8 +1080,8 @@ function MeetingPlanInner() {
         </div>
       </Chapter>
 
-      {/* ─── ٤. تجهيز الموقع ─── */}
-      <Chapter id="site" n={4} {...ch("site")}>
+      {/* ─── ٣. تجهيز الموقع ─── */}
+      <Chapter id="site" n={3} {...ch("site")}>
         <div className="grid gap-5 lg:grid-cols-[1fr_1fr_260px]">
           <Reveal>
             <div className={`${card} h-full p-6`}>
@@ -1175,8 +1143,8 @@ function MeetingPlanInner() {
         </div>
       </Chapter>
 
-      {/* ─── ٥. الولاء ─── */}
-      <Chapter id="loyalty" n={5} {...ch("loyalty")}>
+      {/* ─── ٤. الولاء ─── */}
+      <Chapter id="loyalty" n={4} {...ch("loyalty")}>
         <div className="grid items-center gap-10 lg:grid-cols-2">
           <Reveal>
             <div className="mx-auto w-full max-w-md">
@@ -1273,8 +1241,8 @@ function MeetingPlanInner() {
         </div>
       </Chapter>
 
-      {/* ─── ٦. الهدايا ─── */}
-      <Chapter id="gift" n={6} {...ch("gift")}>
+      {/* ─── ٥. الهدايا ─── */}
+      <Chapter id="gift" n={5} {...ch("gift")}>
         <div className="grid items-center gap-10 lg:grid-cols-2">
           <Reveal className="lg:order-2">
             <div className="mp-float relative mx-auto aspect-[1.6] w-full max-w-md overflow-hidden rounded-[28px] p-7 text-white shadow-2xl"
@@ -1339,8 +1307,8 @@ function MeetingPlanInner() {
         </div>
       </Chapter>
 
-      {/* ─── ٧. التدريب ─── */}
-      <Chapter id="training" n={7} {...ch("training")}>
+      {/* ─── ٦. التدريب ─── */}
+      <Chapter id="training" n={6} {...ch("training")}>
         <div className="grid gap-4 md:grid-cols-3">
           {C.training.map((s, i) => {
             const Icon = iconAt(TRAINING, i);
@@ -1383,8 +1351,8 @@ function MeetingPlanInner() {
         </div>
       </Chapter>
 
-      {/* ─── ٨. المتابعة ─── */}
-      <Chapter id="followup" n={8} {...ch("followup")}>
+      {/* ─── ٧. المتابعة ─── */}
+      <Chapter id="followup" n={7} {...ch("followup")}>
         <div
           className="grid gap-4 sm:grid-cols-2 lg:[grid-template-columns:repeat(var(--n),minmax(0,1fr))]"
           style={{ ["--n" as string]: Math.max(1, Math.min(C.followup.length + (edit ? 1 : 0), 6)) } as React.CSSProperties}
@@ -1415,8 +1383,8 @@ function MeetingPlanInner() {
         </div>
       </Chapter>
 
-      {/* ─── ٩. النتائج ─── */}
-      <Chapter id="results" n={9} {...ch("results")}>
+      {/* ─── ٨. النتائج ─── */}
+      <Chapter id="results" n={8} {...ch("results")}>
         <div className="grid gap-6 lg:grid-cols-[1fr_1.1fr]">
           <Reveal>
             <div className={`${card} space-y-6 p-6`}>
@@ -1481,7 +1449,7 @@ function MeetingPlanInner() {
         </div>
       </Chapter>
 
-      {/* ─── ١٠. الخطوة التالية ─── */}
+      {/* ─── ٩. الخطوة التالية ─── */}
       <section id="next" data-chapter="next" className="mp-chapter relative overflow-hidden px-4 pb-32 pt-20 sm:px-8 sm:pt-28">
         <div className="mp-glow pointer-events-none absolute inset-0 rotate-180" />
         <div className="relative mx-auto max-w-3xl text-center">
