@@ -215,7 +215,7 @@ const THEMES: Record<ThemeKey, Record<string, string>> = {
     "--muted": "#666C8E", "--faint": "#9499B4", "--glass": "rgba(255,255,255,.88)", "--grid": "rgba(30,43,122,.06)",
     "--shadow": "0 1px 2px rgba(23,26,58,.04), 0 12px 32px -18px rgba(23,26,58,.18)", "--glow": "22%",
   },
-  // «عصري»: أوف-وايت دافئ + شبكة خفيفة + حبر أسود + لمسة برتقالية واحدة
+  // «عصري»: أوف-وايت دافئ سادة + حبر أسود + لمسة برتقالية واحدة
   editorial: {
     "--bg": "#F2F1EE", "--surface": "#FFFFFF", "--surface-2": "#EEEDE9", "--hover": "#EAE8E3",
     "--line": "#E4E2DC", "--line-strong": "#CFCCC4", "--ink": "#0E0E0E", "--body": "#2A2A28",
@@ -782,7 +782,7 @@ function MeetingPlanInner() {
       <style>{`
         html { scroll-behavior: smooth; }
         .mp-root ::selection { background: var(--acc); color: white; }
-        .mp-root[data-theme="editorial"] { background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 44px 44px; background-attachment: fixed; }
+        .mp-root[data-theme="editorial"] .mp-grid { display: none; }
         .mp-root[data-theme="editorial"] h1, .mp-root[data-theme="editorial"] h2, .mp-root[data-theme="editorial"] h3 { letter-spacing: -0.02em; }
         .mp-root[data-theme="editorial"] .mp-glow { opacity: .5; }
         .mp-glow { background: radial-gradient(60% 60% at 50% 0%, color-mix(in srgb, var(--acc) var(--glow), transparent), transparent 70%); }
