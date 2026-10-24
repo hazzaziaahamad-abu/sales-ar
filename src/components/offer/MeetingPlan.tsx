@@ -272,6 +272,8 @@ type Content = {
   reward: string;
   loyaltySteps: { t: string; d: string }[];
   giftFlow: { t: string; d: string }[];
+  resultsNote: string;     // تنبيه: الأرقام تقديرية وتعتمد على التطبيق
+  resultsTips: string[];   // المتطلبات اللي ترفع الاستفادة
   giftPerks: { e: string; t: string; d: string }[];
   training: { who: string; mins: number; items: string[] }[];
   followup: { when: string; title: string; text: string }[];
@@ -305,6 +307,20 @@ function defaultContent(p: Product): Content {
       { t: "يجمع الأختام", d: "الكاشير يختم مع كل زيارة" },
       { t: "يتذكّرك", d: "إشعارات عند القرب وفي المواسم" },
     ],
+    resultsNote: "هذي أرقام تقديرية، وتعتمد على تجاوبك في تطبيق المتطلبات اللي تساعدك تستفيد من خدماتنا بالكامل:",
+    resultsTips: p.key === "menu"
+      ? [
+          "إبراز المنيو والباركود في جميع الأماكن: الطاولات، الكاونتر، الواجهة، والسوشال ميديا",
+          "تحفيز الموظفين يكونون فعّالين في دعوة العملاء لبطاقات الولاء",
+          "تشجيع العملاء على الطلب من المنيو الإلكتروني بدل الطلب التقليدي",
+          "تفعيل العروض والإشعارات في المواسم بالتنسيق مع فريقنا",
+        ]
+      : [
+          "إبراز رابط الحجز في جميع الأماكن: البايو، قوقل ماب، الواتساب، والمحل",
+          "تحفيز الموظفات يكونون فعّالات في دعوة العميلات لبطاقات الولاء",
+          "تشجيع العميلات على الحجز أونلاين بدل المكالمات والرسائل",
+          "تفعيل العروض والإشعارات في المواسم بالتنسيق مع فريقنا",
+        ],
     giftFlow: [
       { t: "عميلك يشتري البطاقة", d: "يختار المبلغ ويدفع أونلاين — والمبلغ يوصلك مقدّم" },
       { t: "يهديها لشخص عزيز", d: "توصله البطاقة بالواتساب برسالة باسمه خلال ثوانٍ" },
@@ -1591,6 +1607,33 @@ function MeetingPlanInner() {
             </div>
           </Reveal>
         </div>
+
+        {/* الأرقام تقديرية — وتعتمد على تطبيق المتطلبات */}
+        <Reveal>
+          <div className="mt-8 rounded-3xl border p-6 sm:p-7" style={{ borderColor: `${GOLD}77`, background: `linear-gradient(180deg, ${GOLD}17, var(--surface))` }}>
+            <div className="flex items-start gap-3">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-[#1a1306]" style={{ background: GOLD }}>
+                <ShieldCheck size={20} />
+              </span>
+              <div>
+                <div className="text-lg font-black text-[var(--ink)]">النتيجة شراكة بيننا وبينك</div>
+                <p className="mt-1 text-sm leading-relaxed text-[var(--body)]">
+                  <Ed v={C.resultsNote} on={(resultsNote) => patch((d) => { d.resultsNote = resultsNote; })} edit={edit} multi />
+                </p>
+              </div>
+            </div>
+            <ul className="mt-5 grid gap-3 sm:grid-cols-2">
+              {C.resultsTips.map((tip, i) => (
+                <li key={i} className="flex items-start gap-3 rounded-2xl bg-[var(--surface)] p-3.5 text-sm text-[var(--body)] shadow-[var(--shadow)]">
+                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-black text-white" style={{ background: "var(--acc)" }}>{fmt(i + 1)}</span>
+                  <span className="pt-0.5"><Ed v={tip} on={(v) => patch((d) => { d.resultsTips[i] = v; })} edit={edit} multi /></span>
+                  <InlineDel edit={edit} onClick={() => patch((d) => { d.resultsTips.splice(i, 1); })} />
+                </li>
+              ))}
+            </ul>
+            <Add edit={edit} label="متطلب" className="mt-3 w-full py-2" onClick={() => patch((d) => { d.resultsTips.push("متطلب جديد"); })} />
+          </div>
+        </Reveal>
       </Chapter>
 
       {/* ─── ٨. الخطوة التالية ─── */}
