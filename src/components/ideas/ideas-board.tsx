@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Marhey } from "next/font/google";
 import { Heart, Search, Trash2, X, Loader2, Dices, Sparkles, GripVertical, Check, CalendarClock, Plus, Rocket, Trophy, BellRing, Undo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PushCard } from "@/components/push/push-card";
@@ -9,7 +8,7 @@ import { IdeaSlicesPanel, QuickCapture, SliceChip, TodaySlices, useSlices } from
 import { STICKER_KINDS, isReminder, stickerKind, timelineOf, type IdeaSticker, type StickerKind, type TimelineStep } from "@/lib/idea-stickers";
 
 // خط يدوي مرح للاستكرات — يعطي إحساس الكتابة بالقلم على ورق لاصق.
-const hand = Marhey({ subsets: ["arabic"], weight: ["400", "600", "700"], display: "swap", variable: "--font-hand" });
+// خط اليد Marhey معرّف في src/app/fonts.css (متغيّر --font-hand)
 
 /**
  * لوحة «أفكار» — استوديو ورقي: لوحة منقّطة فاتحة، استكرات بأشرطة لاصقة ودبابيس،
@@ -364,7 +363,7 @@ export function IdeasBoard() {
   }, [stickers]);
 
   return (
-    <div className={cn("ib-root space-y-6", hand.variable)}>
+    <div className={"ib-root space-y-6"}>
       <style>{CSS}</style>
 
       {/* ─── الهيرو ─── */}
@@ -718,7 +717,7 @@ function StickerDialog({ sticker, canEdit, liked, onLike, onClose, onSave, onDel
       style={{ top: "calc(env(safe-area-inset-top) + 12px)" }}>
       <X className="w-5 h-5" />
     </button>
-    <div className={cn("ib-root fixed inset-0 z-50 bg-black/70 backdrop-blur-md overflow-y-auto overscroll-contain", hand.variable)} onClick={close}>
+    <div className={"ib-root fixed inset-0 z-50 bg-black/70 backdrop-blur-md overflow-y-auto overscroll-contain"} onClick={close}>
       {/* min-h-full بدل التوسيط المباشر: المحتوى الطويل ما ينقص من فوق ويقدر يتمرر */}
       <div className="min-h-full flex items-center justify-center px-4 py-14">
       <div className="relative flex flex-col items-center gap-6" onClick={(e) => e.stopPropagation()}>

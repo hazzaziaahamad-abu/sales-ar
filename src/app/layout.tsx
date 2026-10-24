@@ -1,12 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { Tajawal } from "next/font/google";
+import "./fonts.css";
 import "./globals.css";
-
-const tajawal = Tajawal({
-  variable: "--font-tajawal",
-  subsets: ["arabic", "latin"],
-  weight: ["200", "300", "400", "500", "700", "800", "900"],
-});
 
 export const metadata: Metadata = {
   title: "لوحة التحكم",
@@ -30,7 +24,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ar" dir="rtl">
-      <body className={`${tajawal.variable} antialiased`}>
+      <body className="antialiased">
         {children}
       </body>
     </html>
