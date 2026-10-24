@@ -182,9 +182,10 @@ const PRODUCTS: Record<ProductKey, Product> = {
   },
 };
 
-const GOLD = "#F5B301";
+const GOLD = "#FFCC00"; // أصفر هوية قائمة الطلبات (شعار MENU)
 // نقاط الباقة اللي تخص الولاء/الهدايا تنبرز داخل بطاقة الباقة
 const LOYALTY_RE = /ولاء|هدايا/;
+const CASHIER_IMG = "/meeting/cashier-devices.jpg";
 // فريم الجوال فقط من بانرات صفحة عرض المنيو
 // framed=false: صورة جوال مقصوصة جاهزة؛ framed=true: لقطة شاشة نحطها داخل فريم جوال
 const LOYALTY_SAMPLES: Record<ProductKey, { src: string; framed: boolean; glow: string }[]> = {
@@ -233,8 +234,13 @@ const THEMES: Record<ThemeKey, Record<string, string>> = {
 
 const EDITORIAL_ACCENT = "#E8552D";
 
+// أزرق شعار قائمة الطلبات
+const MENU_BLUE = "#4734A8";
+
 const accentOf = (p: Product, t: ThemeKey) =>
-  t === "brand" ? { acc: BRAND_ACCENT, deep: BRAND_DEEP }
+  p.key === "menu"
+    ? t === "night" ? { acc: "#7B6AF0", deep: MENU_BLUE } : { acc: MENU_BLUE, deep: t === "editorial" ? "#141414" : "#2B1F73" }
+    : t === "brand" ? { acc: BRAND_ACCENT, deep: BRAND_DEEP }
     : t === "editorial" ? { acc: EDITORIAL_ACCENT, deep: "#141414" }
     : { acc: p.accent, deep: p.accentDeep };
 
@@ -396,7 +402,7 @@ const toLatin = (s: string) => s.replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥
 function rich(s: string): React.ReactNode {
   return s.split(/(\*[^*]+\*)/g).map((part, i) =>
     part.length > 2 && part.startsWith("*") && part.endsWith("*")
-      ? <span key={i} style={{ color: "var(--acc)" }}>{part.slice(1, -1)}</span>
+      ? <span key={i} style={{ color: "var(--acc)", backgroundImage: "linear-gradient(transparent 64%, var(--mark, transparent) 64%, var(--mark, transparent) 92%, transparent 92%)" }}>{part.slice(1, -1)}</span>
       : part,
   );
 }
@@ -777,7 +783,7 @@ function MeetingPlanInner() {
       dir="rtl"
       data-theme={theme}
       className="mp-root min-h-screen w-full overflow-x-clip bg-[var(--bg)] text-[var(--body)]"
-      style={{ ...THEMES[theme], ["--acc" as string]: A.acc, ["--acc-deep" as string]: A.deep, colorScheme: theme === "night" ? "dark" : "light", fontFamily: "var(--font-tajawal), system-ui, sans-serif" } as React.CSSProperties}
+      style={{ ...THEMES[theme], ["--acc" as string]: A.acc, ["--acc-deep" as string]: A.deep, ["--mark" as string]: productKey === "menu" ? `${GOLD}${theme === "night" ? "c0" : "99"}` : "transparent", colorScheme: theme === "night" ? "dark" : "light", fontFamily: "var(--font-tajawal), system-ui, sans-serif" } as React.CSSProperties}
     >
       <style>{`
         html { scroll-behavior: smooth; }
@@ -1087,6 +1093,20 @@ function MeetingPlanInner() {
                       </div>
                     </div>
                   </div>
+                  {productKey === "menu" && /كاشير/.test(t.name) && (
+                    // أجهزة الكاشير مع الطابعة وباركود الطاولة والمنيو على الجوال
+                    <div className="mt-5 pr-14">
+                      <button type="button" onClick={() => setZoom(CASHIER_IMG)}
+                        className="group relative block w-full overflow-hidden rounded-3xl text-right shadow-[var(--shadow)] transition-transform hover:-translate-y-0.5">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={CASHIER_IMG} alt="نظام الكاشير مع الطابعة وباركود الطاولة والمنيو على الجوال" loading="lazy" className="block h-auto w-full" />
+                        <span className="absolute inset-x-0 bottom-0 flex items-center gap-2 bg-gradient-to-t from-black/70 to-transparent px-5 pb-4 pt-12 text-sm font-bold text-white">
+                          <MonitorSmartphone size={16} style={{ color: GOLD }} />
+                          كاشير متكامل + طابعة فواتير + باركود الطاولة + المنيو على جوال العميل
+                        </span>
+                      </button>
+                    </div>
+                  )}
                   {i === loyaltyIdx && (
                     <div id="loyalty" className="mt-5 scroll-mt-32 pr-14">
                       {/* شرح الولاء مباشرة تحت أول باقة فيها الولاء */}
