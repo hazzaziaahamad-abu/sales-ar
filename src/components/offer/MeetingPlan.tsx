@@ -94,7 +94,7 @@ const PRODUCTS: Record<ProductKey, Product> = {
     fromClient: [
       { icon: Palette, text: "الشعار والهوية (الألوان والخط)" },
       { icon: ClipboardList, text: "المنيو: الأصناف والأقسام والأسعار" },
-      { icon: ImageIcon, text: "صور الأصناف (أو نصوّرها لك بالتنسيق)" },
+      { icon: ImageIcon, text: "صور الأصناف" },
       { icon: Coffee, text: "السعرات والمكوّنات والإضافات" },
       { icon: Store, text: "الفروع وأوقات العمل وعدد الطاولات" },
       { icon: Wallet, text: "بيانات حساب الدفع الإلكتروني" },
