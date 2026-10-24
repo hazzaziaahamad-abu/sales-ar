@@ -272,6 +272,8 @@ type Content = {
   reward: string;
   loyaltySteps: { t: string; d: string }[];
   giftFlow: { t: string; d: string }[];
+  problemsTitle: string;   // «المشاكل اللي يحلّها النظام» تحت النظام والباقات
+  problems: { p: string; s: string }[];
   resultsNote: string;     // تنبيه: الأرقام تقديرية وتعتمد على التطبيق
   resultsTips: string[];   // المتطلبات اللي ترفع الاستفادة
   giftPerks: { e: string; t: string; d: string }[];
@@ -307,6 +309,17 @@ function defaultContent(p: Product): Content {
       { t: "يجمع الأختام", d: "الكاشير يختم مع كل زيارة" },
       { t: "يتذكّرك", d: "إشعارات عند القرب وفي المواسم" },
     ],
+    problemsTitle: "وش أهم المشاكل اللي يحلّها النظام؟",
+    problems: p.key === "nahjez"
+      ? [
+          { p: "حساب عمولات العاملات يدوياً، وما تعرف مين الأكثر إنتاجية", s: "تقرير تلقائي لكل عاملة: عدد الخدمات، الدخل اللي جابته، وعمولتها المستحقة — ونتائج أدائها قدامك" },
+          { p: "غياب العميلات وإلغاء المواعيد في آخر لحظة", s: "تأكيد وتذكير تلقائي بالواتساب + عربون يضمن جدّية الحجز" },
+          { p: "حجوزات تضيع خارج الدوام وفي أوقات الانشغال", s: "صفحة حجز ذاتي ٢٤/٧ — العميلة تحجز بنفسها بدون مكالمات" },
+          { p: "تعارض المواعيد والحجوزات المكررة", s: "جدول ذكي يوزّع المواعيد حسب الخدمة والعاملة بدون تعارض" },
+          { p: "ما تعرف دخلك الحقيقي ولا الخدمات الأكثر طلباً", s: "لوحة تقارير لحظية: الإيرادات، أوقات الذروة، والخدمات الأكثر مبيعاً" },
+          { p: "العميلة تجرّب مرة وما ترجع", s: "نقاط الولاء وبطاقات الهدايا ترجّعها لك وتجيب عميلات جدد" },
+        ]
+      : [],
     resultsNote: "هذي أرقام تقديرية، وتعتمد على تجاوبك في تطبيق المتطلبات اللي تساعدك تستفيد من خدماتنا بالكامل:",
     resultsTips: p.key === "menu"
       ? [
@@ -1222,6 +1235,43 @@ function MeetingPlanInner() {
             </div>
           </div>
         </div>
+
+        {/* أهم المشاكل اللي يحلّها النظام */}
+        {(C.problems.length > 0 || edit) && (
+          <div className="mt-16">
+            <Reveal>
+              <h3 className="text-2xl font-black text-[var(--ink)] sm:text-3xl">
+                <Ed v={C.problemsTitle} on={(problemsTitle) => patch((d) => { d.problemsTitle = problemsTitle; })} edit={edit} view={(x) => rich(fill(x))} />
+              </h3>
+            </Reveal>
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              {C.problems.map((pr, i) => (
+                <Reveal key={i} delay={(i % 2) * 80}>
+                  <div className={`${card} relative h-full overflow-hidden p-5`}>
+                    <Del edit={edit} onClick={() => patch((d) => { d.problems.splice(i, 1); })} />
+                    <div className="flex items-start gap-3">
+                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-rose-500/12 text-xs font-black text-rose-600">{fmt(i + 1)}</span>
+                      <div className="flex-1">
+                        <div className="text-[11px] font-black text-rose-600">المشكلة</div>
+                        <div className="mt-0.5 font-black leading-snug text-[var(--ink)]">
+                          <Ed v={pr.p} on={(v) => patch((d) => { d.problems[i].p = v; })} edit={edit} multi />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mr-11 mt-3 flex items-start gap-2 rounded-2xl bg-emerald-500/10 p-3">
+                      <Check size={16} className="mt-0.5 shrink-0 text-emerald-600" />
+                      <div className="text-sm leading-relaxed text-[var(--body)]">
+                        <span className="font-black text-emerald-700">الحل: </span>
+                        <Ed v={pr.s} on={(v) => patch((d) => { d.problems[i].s = v; })} edit={edit} multi />
+                      </div>
+                    </div>
+                  </div>
+                </Reveal>
+              ))}
+              <Add edit={edit} label="مشكلة" className="min-h-[120px]" onClick={() => patch((d) => { d.problems.push({ p: "المشكلة", s: "الحل" }); })} />
+            </div>
+          </div>
+        )}
       </Chapter>
 
       {/* ─── ٢. التفعيل ─── */}
