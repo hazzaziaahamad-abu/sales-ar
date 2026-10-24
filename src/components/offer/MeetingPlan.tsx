@@ -1218,7 +1218,7 @@ function MeetingPlanInner() {
           </div>
           <div className="hidden lg:block">
             <div className="sticky top-32">
-              <PhoneMock product={P} who={who} />
+              <PhoneMock product={P} />
             </div>
           </div>
         </div>
@@ -1752,49 +1752,21 @@ function Ring({ value }: { value: number }) {
   );
 }
 
-function PhoneMock({ product, who }: { product: Product; who: string }) {
-  const isMenu = product.key === "menu";
-  const items = isMenu
-    ? [["لاتيه مثلّج", "18"], ["كرواسون زعتر", "14"], ["سبانش لاتيه", "21"], ["كوكيز", "9"]]
-    : [["قص وتصفيف", "120"], ["صبغة كاملة", "350"], ["مناكير وباديكير", "140"], ["بروتين", "600"]];
+// لقطات حقيقية من منصّاتنا داخل فريم الجوال
+const PHONE_SHOTS: Record<ProductKey, { src: string; alt: string; bg: string }> = {
+  menu: { src: "/meeting/menu-demo.jpg", alt: "مثال منيو إلكتروني من قائمة الطلبات", bg: "#f4efe6" },
+  nahjez: { src: "/meeting/nahjez-demo.jpg", alt: "مثال صفحة حجز من نحجز", bg: "#f3f4ef" },
+};
+
+function PhoneMock({ product }: { product: Product }) {
+  const shot = PHONE_SHOTS[product.key];
   return (
     <div className="mp-float relative mx-auto w-[280px] rounded-[44px] border border-[var(--line)] bg-[#0b0f1a] p-3 shadow-2xl" style={{ boxShadow: "0 50px 100px -40px var(--acc)" }}>
       <div className="mx-auto mb-2 h-5 w-24 rounded-full bg-black" />
-      {isMenu ? (
-        // لقطة منيو حقيقي من قائمة الطلبات
-        <div className="overflow-hidden rounded-[32px] bg-[#f4efe6]">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/meeting/menu-demo.jpg" alt="مثال منيو إلكتروني من قائمة الطلبات" className="block w-full" loading="lazy" />
-        </div>
-      ) : (
-      <div className="overflow-hidden rounded-[32px] bg-[#f8f7f3] text-[#1f1b16]">
-        <div className="p-5 text-white" style={{ background: "linear-gradient(135deg, var(--acc-deep), var(--acc))" }}>
-          <div className="text-[10px] opacity-80">{isMenu ? "المنيو" : "احجزي موعدك"}</div>
-          <div className="text-lg font-black">{who}</div>
-        </div>
-        <div className="flex gap-1.5 px-4 pt-3 text-[10px] font-bold">
-          {(isMenu ? ["الكل", "مشروبات", "حلى"] : ["الكل", "شعر", "أظافر"]).map((t, i) => (
-            <span key={t} className="rounded-full px-2.5 py-1" style={i === 0 ? { background: "var(--acc)", color: "white" } : { background: "#ebe8e0" }}>{t}</span>
-          ))}
-        </div>
-        <ul className="space-y-2 p-4">
-          {items.map(([n, p]) => (
-            <li key={n} className="flex items-center gap-3 rounded-2xl bg-white p-2.5 shadow-sm">
-              <span className="grid h-10 w-10 place-items-center rounded-xl" style={{ background: "color-mix(in srgb, var(--acc) 15%, white)", color: "var(--acc-deep)" }}>
-                {isMenu ? <Coffee size={16} /> : <Scissors size={16} />}
-              </span>
-              <span className="flex-1 text-xs font-bold">{n}</span>
-              <span className="text-xs font-black" style={{ color: "var(--acc-deep)" }}>{p} ر.س</span>
-            </li>
-          ))}
-        </ul>
-        <div className="px-4 pb-5">
-          <div className="rounded-2xl py-2.5 text-center text-xs font-black text-white" style={{ background: "var(--acc-deep)" }}>
-            {isMenu ? "أكمل الطلب والدفع" : "احجزي الآن"}
-          </div>
-        </div>
+      <div className="overflow-hidden rounded-[32px]" style={{ background: shot.bg }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={shot.src} alt={shot.alt} className="block w-full" loading="lazy" />
       </div>
-      )}
     </div>
   );
 }
