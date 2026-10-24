@@ -245,7 +245,7 @@ export const TIERS: Tier[] = [
     star: true,
     gateway: true,
   },
-  { name: "VIP بلس", price: "1079", note: "كل VIP + مزامنة فودكس لفرع واحد · كل فرع إضافي لفودكس ٣٣٠ ريال", gateway: true },
+  { name: "VIP بلس", price: "1079", note: "جميع مزايا VIP بالإضافة إلى فودكس (فرع واحد) · كل فرع إضافي لفودكس ٣٣٠ ريال", gateway: true },
   {
     name: "باقة الكاشير",
     price: "1349",
