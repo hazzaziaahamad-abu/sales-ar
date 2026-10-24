@@ -184,7 +184,7 @@ const PRODUCTS: Record<ProductKey, Product> = {
 
 const GOLD = "#FFCC00"; // أصفر هوية قائمة الطلبات (شعار MENU)
 // نقاط الباقة اللي تخص الولاء/الهدايا تنبرز داخل بطاقة الباقة
-const LOYALTY_RE = /ولاء|هدايا/;
+const LOYALTY_RE = /ولاء|هدايا|بدون أجهزة/;
 const CASHIER_IMG = "/meeting/cashier-devices.jpg";
 // فريم الجوال فقط من بانرات صفحة عرض المنيو
 // framed=false: صورة جوال مقصوصة جاهزة؛ framed=true: لقطة شاشة نحطها داخل فريم جوال
@@ -1038,6 +1038,15 @@ function MeetingPlanInner() {
                           </label>
                         </div>
                       )}
+                      {productKey === "menu" && /كاشير/.test(t.name) && (
+                        <div className="mt-4 flex items-center gap-3 rounded-2xl p-3.5" style={{ background: `linear-gradient(135deg, ${GOLD}38, ${GOLD}14)`, boxShadow: `inset 0 0 0 1px ${GOLD}99` }}>
+                          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-[#1a1306]" style={{ background: GOLD }}><MonitorSmartphone size={18} /></span>
+                          <span>
+                            <span className="block text-base font-black text-[var(--ink)]">بدون أجهزة — نظام فقط</span>
+                            <span className="block text-xs text-[var(--muted)]">ما تحتاج تشتري أجهزة جديدة مع الباقة</span>
+                          </span>
+                        </div>
+                      )}
 
                       <ul className="mt-4 grid gap-2.5 sm:grid-cols-2">
                         {pts.map((pt, j) => (
@@ -1102,7 +1111,10 @@ function MeetingPlanInner() {
                         <img src={CASHIER_IMG} alt="نظام الكاشير مع الطابعة وباركود الطاولة والمنيو على الجوال" loading="lazy" className="block h-auto w-full" />
                         <span className="absolute inset-x-0 bottom-0 flex items-center gap-2 bg-gradient-to-t from-black/70 to-transparent px-5 pb-4 pt-12 text-sm font-bold text-white">
                           <MonitorSmartphone size={16} style={{ color: GOLD }} />
-                          كاشير متكامل + طابعة فواتير + باركود الطاولة + المنيو على جوال العميل
+                          <span>
+                            كاشير متكامل + طابعة فواتير + باركود الطاولة + المنيو على جوال العميل
+                            <span className="block text-[11px] font-medium text-white/70">صورة توضيحية — الباقة نظام فقط والأجهزة غير مشمولة</span>
+                          </span>
                         </span>
                       </button>
                     </div>
