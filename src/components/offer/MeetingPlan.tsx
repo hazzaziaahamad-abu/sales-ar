@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import {
   QrCode, CreditCard, Store, MonitorSmartphone, Bike, Gift, Globe, Clock, MessageCircle,
-  Wallet, LayoutDashboard, Rocket, Check, ChevronLeft, ChevronRight, Maximize2, Minimize2, Sun, Moon,
+  Wallet, LayoutDashboard, Rocket, Check, ChevronLeft, ChevronRight, ChevronDown, Maximize2, Minimize2, Sun, Moon,
   Printer, Link2, Sparkles, Stamp, BellRing, GraduationCap, Headphones, CalendarCheck,
   TrendingUp, Users, Palette, ImageIcon, ClipboardList, Timer, Handshake, PartyPopper,
   Coffee, Scissors, Presentation, ShieldCheck, Star, Pencil, Plus, X, Save, RotateCcw,
@@ -27,6 +27,8 @@ type Tier = {
   highlight?: boolean;
   badge?: string;
   loyalty: boolean;     // هل تشمل الولاء والهدايا
+  question?: string;    // سؤال الاحتياج في قسم «النظام»
+  points?: string[];    // نقاط الباقة تحت السؤال (الافتراضي: features)
 };
 
 type CalcField = { key: string; label: string; min: number; max: number; step: number; def: number; unit: string };
@@ -75,13 +77,17 @@ const PRODUCTS: Record<ProductKey, Product> = {
       { icon: Gift, title: "بطاقات الهدايا والولاء", text: "عميلك يرجع لك عشان الختم القادم — ولاء بلا إعلانات." },
     ],
     tiers: [
-      { name: "الأساسية", price: 349, period: "ريال/سنة", yearly: 349, note: "منيو رقمي كامل", loyalty: false,
+      { name: "الأساسية", price: 349, period: "ريال/سنة", yearly: 349, note: "منيو رقمي كامل", loyalty: false, question: "تحتاج منيو فقط برابط وباركود، مع إضافة كل منتجاتك بتفاصيلها والاشتراطات؟",
+        points: ["منيو إلكتروني برابط خاص وباركود للطاولات", "إضافة كل المنتجات بالصور والأسعار والأوصاف", "السعرات الحرارية والمكوّنات حسب الاشتراطات", "تعديل فوري للأسعار والأصناف بلا تكلفة طباعة"],
         features: ["منيو رقمي بكل التفاصيل", "صور وسعرات ومكوّنات", "تحديث فوري بلا طباعة"] },
-      { name: "VIP", price: 879, period: "ريال/سنة", yearly: 879, note: "لمطاعم الجلوس والوجهات المزدحمة", loyalty: false,
+      { name: "VIP", price: 879, period: "ريال/سنة", yearly: 879, note: "لمطاعم الجلوس والوجهات المزدحمة", loyalty: false, question: "تبغى عميلك يطلب ويدفع أونلاين — من الطاولة أو استلام — مع حجوزات وفروع؟",
+        points: ["كل مزايا الأساسية", "طلب ودفع إلكتروني وطرق استلام", "الطلب والدفع من الطاولة", "الحجوزات ونظام الدور", "عدة فروع + دومين خاص + ربط البيكسل للإعلانات"],
         features: ["منيو رقمي كامل", "طلب ودفع إلكتروني", "الطلب من الطاولة", "الحجوزات والدور", "الفروع والدومين والبيكسل"] },
-      { name: "VIP بلس", price: 1079, period: "ريال/سنة", yearly: 1079, note: "الأقوى — ولاء وهدايا وفودكس", loyalty: true,
+      { name: "VIP بلس", price: 1079, period: "ريال/سنة", yearly: 1079, note: "الأقوى — ولاء وهدايا وفودكس", loyalty: true, question: "تبغى عملاءك يرجعون لك من نفسهم، ونظامك مربوط مع فودكس؟",
+        points: ["كل مزايا VIP", "بطاقات ولاء رقمية في محفظة آبل وقوقل", "بطاقات هدايا تنباع أونلاين", "مزامنة فودكس Foodics"],
         highlight: true, badge: "الموصى بها", features: ["كل مزايا VIP", "بطاقات الهدايا والولاء", "مزامنة فودكس Foodics"] },
-      { name: "الكاشير", price: 1349, period: "ريال/سنة", yearly: 1349, note: "نظام فقط بدون أجهزة · فرع واحد", loyalty: false,
+      { name: "الكاشير", price: 1349, period: "ريال/سنة", yearly: 1349, note: "نظام فقط بدون أجهزة · فرع واحد", loyalty: false, question: "تحتاج نظام كاشير متكامل لفرعك يجمع كل طلباتك في شاشة واحدة؟",
+        points: ["نظام كاشير متكامل (بدون أجهزة)", "كل الطلبات المباشرة على شاشة واحدة", "توحيد طلبات هنقرستيشن وجاهز وكيتا", "كل فرع إضافي ٢٤٩ ريال"],
         features: ["نظام كاشير متكامل", "بدون أجهزة", "كل فرع إضافي ٢٤٩ ريال"] },
     ],
     defaultTier: 2,
@@ -135,9 +141,11 @@ const PRODUCTS: Record<ProductKey, Product> = {
       { icon: Gift, title: "بطاقات الهدايا والولاء", text: "سيولة مقدّمة وعميلات جدد بلا إعلانات." },
     ],
     tiers: [
-      { name: "الأساسية", price: 599, period: "ريال/سنة", yearly: 599, note: "بدل ٧٠٨ شهرياً (٥٩/شهر) · وفّر ١٠٩ — موقع عرض بدون حجوزات", loyalty: false,
+      { name: "الأساسية", price: 599, period: "ريال/سنة", yearly: 599, note: "بدل ٧٠٨ شهرياً (٥٩/شهر) · وفّر ١٠٩ — موقع عرض بدون حجوزات", loyalty: false, question: "تحتاج صفحة احترافية باسم صالونك تعرض خدماتك وأسعارك وفريقك فقط؟",
+        points: ["صفحة/موقع باسم مركزك برابط واحد", "عرض الخدمات والأسعار", "صور الفريق ومعرض الأعمال والتقييمات", "روابط التواصل وأوقات العمل"],
         features: ["صفحة باسم مركزك", "الخدمات والأسعار", "صور الفريق والتقييمات", "روابط التواصل وأوقات العمل"] },
-      { name: "نمو الأعمال", price: 1149, period: "ريال/سنة", yearly: 1149, note: "بدل ١٤٤٠ شهرياً (١٢٠/شهر) · وفّر ٢٩١", loyalty: true,
+      { name: "نمو الأعمال", price: 1149, period: "ريال/سنة", yearly: 1149, note: "بدل ١٤٤٠ شهرياً (١٢٠/شهر) · وفّر ٢٩١", loyalty: true, question: "تبغى عميلاتك يحجزن ويدفعن العربون بأنفسهن ٢٤ ساعة، مع تذكير واتساب؟",
+        points: ["كل مزايا الأساسية", "حجز أونلاين ونظام حجوزات بلا تعارض", "تأكيد وتذكير تلقائي بالواتساب", "عربون ومدفوعات بدون عمولة", "تقارير ولوحة تحكم + بطاقات هدايا وولاء"],
         highlight: true, badge: "الموصى بها",
         features: ["كل مزايا الأساسية", "حجز أونلاين ونظام حجوزات", "تأكيد وتذكير واتساب", "عربون بدون عمولة", "تقارير ولوحة تحكم", "متجر وفروع + هدايا وولاء"] },
     ],
@@ -253,7 +261,6 @@ type Content = {
   heroPitch: string;
   agendaMins: string;
   chapters: Record<string, ChapterText>;
-  features: { title: string; text: string }[];
   tiers: Tier[];
   fromClient: string[];
   fromUs: string[];
@@ -271,7 +278,7 @@ function defaultContent(p: Product): Content {
     heroPitch: `${p.pitch} في هذا الاجتماع نمشي معك خطوة بخطوة: من الاشتراك إلى الإطلاق، ومن تدريب فريقك إلى أول تقرير نتائج.`,
     agendaMins: "~ ٣٠ دقيقة",
     chapters: {
-      system: { kicker: "تعرّف على النظام", title: `${p.brand} — *${p.tagline}*`, lead: "كل اللي يحتاجه مشروعك في مكان واحد، بدون تعقيد ولا أجهزة إضافية." },
+      system: { kicker: "تعرّف على النظام", title: `${p.brand} — *${p.tagline}*`, lead: "نبدأ من احتياجك: جاوب على الأسئلة بالترتيب، ونوصل مع بعض للباقة اللي تناسبك بالضبط." },
       pricing: { kicker: "الباقات والأسعار", title: "اختر الباقة اللي تناسب مرحلتك", lead: "اضغط على الباقة لاختيارها — كل الحسابات في العرض تتحدّث عليها مباشرة. دعم فني لجميع الباقات." },
       activation: { kicker: "خطوات التفعيل", title: "من اليوم إلى الإطلاق في *{الأيام} أيام*", lead: "أنت تركّز على مشروعك، وفريقنا يتكفّل بالباقي. هذا جدولك الفعلي بالتواريخ:" },
       site: { kicker: "خدمة ما بعد البيع · تجهيز الموقع", title: `نجهّز ${p.site} *معك*، مو بس لك`, lead: "قائمة واضحة: اللي نحتاجه منك، واللي علينا. علّم على اللي جاهز عندك الحين." },
@@ -282,8 +289,7 @@ function defaultContent(p: Product): Content {
       results: { kicker: "النتائج المتوقعة", title: "خلّنا نحسبها بأرقامك أنت", lead: "حرّك المؤشرات حسب واقع مشروعك — والنتائج تتحدّث مباشرة على باقة «{الباقة}»." },
       next: { kicker: "الخطوة التالية", title: "جاهزين نبدأ يا {العميل}؟", lead: "" },
     },
-    features: p.features.map(({ title, text }) => ({ title, text })),
-    tiers: p.tiers.map((t) => ({ ...t, features: [...t.features] })),
+    tiers: p.tiers.map((t) => ({ ...t, features: [...t.features], points: [...(t.points ?? t.features)] })),
     fromClient: p.fromClient.map((x) => x.text),
     fromUs: [...p.fromUs],
     activation: ACTIVATION.map((a) => ({ ...a })),
@@ -583,6 +589,7 @@ function MeetingPlanInner() {
   const reward = edit ? C.reward : rewardDemo ?? C.reward;
   const [giftAmount, setGiftAmount] = useState(200);
   const [giftTo, setGiftTo] = useState("نورة");
+  const [revealed, setRevealed] = useState(0); // أسئلة الاحتياج المفتوحة في «النظام»
   const [calc, setCalc] = useState<Record<string, number>>(() => Object.fromEntries(P.calc.map((f) => [f.key, f.def])));
 
   const switchProduct = (k: ProductKey) => {
@@ -591,6 +598,7 @@ function MeetingPlanInner() {
     setProductKey(k);
     setTierIdx(np.defaultTier);
     setRewardDemo(null);
+    setRevealed(0);
     setReady({});
     setSaveState("idle");
     setCalc(Object.fromEntries(np.calc.map((f) => [f.key, f.def])));
@@ -888,34 +896,90 @@ function MeetingPlanInner() {
         </div>
       </section>
 
-      {/* ─── ١. النظام ─── */}
+      {/* ─── ١. النظام: سؤال احتياج لكل باقة بالترتيب ─── */}
       <Chapter id="system" n={1} {...ch("system")}>
         <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
-          <div className="grid gap-4 sm:grid-cols-2">
-            {C.features.map((f, i) => {
-              const Icon = iconAt(P.features, i);
+          <ol className="relative space-y-5">
+            <div className="absolute bottom-6 right-[19px] top-6 w-px bg-gradient-to-b from-[var(--acc)] via-[var(--line)] to-transparent" />
+            {C.tiers.map((t, i) => {
+              if (!edit && i > revealed) return null;
+              const sel = i === safeTier;
+              // محتوى محفوظ قبل إضافة الأسئلة: نرجع لسؤال/نقاط الباقة الافتراضية بنفس الترتيب
+              const question = t.question ?? P.tiers[i]?.question ?? "";
+              const pts = t.points ?? P.tiers[i]?.points ?? t.features;
+              const set = (fn: (x: Tier) => void) => patch((d) => { fn(d.tiers[i]); });
+              const isLast = i === C.tiers.length - 1;
               return (
-                <Reveal key={i} delay={i * 60}>
-                  <div className={`${card} group relative h-full p-6 transition-all hover:-translate-y-1 hover:border-[var(--acc)]/40`}>
-                    <Del edit={edit} onClick={() => patch((d) => { d.features.splice(i, 1); })} />
-                    <span className="mb-4 grid h-12 w-12 place-items-center rounded-2xl transition-transform group-hover:scale-110" style={{ background: "color-mix(in srgb, var(--acc) 18%, transparent)", color: "var(--acc)" }}>
-                      <Icon size={22} />
+                <Reveal key={i}>
+                  <li className="relative pr-14">
+                    <span
+                      className="absolute right-0 top-6 z-10 grid h-10 w-10 place-items-center rounded-full text-sm font-black"
+                      style={sel ? { background: "var(--acc)", color: "white" } : { background: "var(--surface)", color: "var(--acc)", boxShadow: "inset 0 0 0 2px var(--acc)" }}
+                    >
+                      {sel ? <Check size={17} /> : fmt(i + 1)}
                     </span>
-                    <div className="text-lg font-black text-[var(--ink)]">
-                      <Ed v={f.title} on={(title) => patch((d) => { d.features[i].title = title; })} edit={edit} />
+                    <div className={`${card} p-6 transition-all`} style={sel ? { borderColor: "var(--acc)", boxShadow: "0 30px 60px -36px var(--acc)" } : {}}>
+                      <div className="flex items-center gap-2 text-xs font-bold text-[var(--faint)]">
+                        <MessageCircle size={13} style={{ color: "var(--acc)" }} /> سؤال {fmt(i + 1)}
+                      </div>
+                      <h3 className="mt-2 text-xl font-black leading-snug text-[var(--ink)] sm:text-2xl">
+                        <Ed v={question} on={(question) => set((x) => { x.question = question; })} edit={edit} multi />
+                      </h3>
+
+                      <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl px-4 py-3" style={{ background: "color-mix(in srgb, var(--acc) 10%, transparent)" }}>
+                        <Sparkles size={16} style={{ color: "var(--acc)" }} className="shrink-0" />
+                        <span className="text-sm text-[var(--body)]">الأنسب لك:</span>
+                        <b className="text-base text-[var(--ink)]">باقة {t.name}</b>
+                        {t.badge && <span className="rounded-full px-2 py-0.5 text-[10px] font-black text-[#1a1306]" style={{ background: GOLD }}>{t.badge}</span>}
+                        <span className="mr-auto text-sm font-black" style={{ color: "var(--acc)" }}>{fmt(t.price)} <span className="text-xs font-bold text-[var(--muted)]">{t.period}</span></span>
+                      </div>
+
+                      <ul className="mt-4 grid gap-2.5 sm:grid-cols-2">
+                        {pts.map((pt, j) => (
+                          <li key={j} className="flex items-start gap-2 text-sm text-[var(--body)]">
+                            <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full" style={{ background: "color-mix(in srgb, var(--acc) 18%, transparent)" }}>
+                              <Check size={12} style={{ color: "var(--acc)" }} />
+                            </span>
+                            <Ed v={pt} on={(v) => set((x) => { x.points = [...pts]; x.points[j] = v; })} edit={edit} />
+                            <InlineDel edit={edit} onClick={() => set((x) => { x.points = [...pts]; x.points.splice(j, 1); })} />
+                          </li>
+                        ))}
+                      </ul>
+                      {edit && (
+                        <button type="button" onClick={() => set((x) => { x.points = [...pts, "نقطة جديدة"]; })}
+                          className="mp-noprint mt-3 flex items-center gap-1 text-xs font-bold text-[var(--muted)] hover:text-[var(--acc)]">
+                          <Plus size={13} /> نقطة
+                        </button>
+                      )}
+
+                      <div className="mp-noprint mt-6 flex flex-wrap gap-2">
+                        <button
+                          onClick={() => { setTierIdx(i); goTo(2); }}
+                          className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-extrabold transition-transform hover:-translate-y-0.5"
+                          style={sel ? { background: "var(--acc)", color: "white" } : { background: "var(--ink)", color: "var(--bg)" }}
+                        >
+                          {sel ? <><Check size={16} /> هذي باقتك</> : <>هذا اللي أحتاجه <ChevronLeft size={16} /></>}
+                        </button>
+                        {!edit && !isLast && i === revealed && (
+                          <button
+                            onClick={() => setRevealed(i + 1)}
+                            className="inline-flex items-center gap-2 rounded-full border border-[var(--line-strong)] px-5 py-2.5 text-sm font-bold text-[var(--body)] hover:bg-[var(--hover)]"
+                          >
+                            أحتاج أكثر <ChevronDown size={16} />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <p className="mt-1.5 text-sm leading-relaxed text-[var(--muted)]">
-                      <Ed v={f.text} on={(text) => patch((d) => { d.features[i].text = text; })} edit={edit} multi />
-                    </p>
-                  </div>
+                  </li>
                 </Reveal>
               );
             })}
-            <Add edit={edit} label="ميزة جديدة" className="min-h-[120px]" onClick={() => patch((d) => { d.features.push({ title: "ميزة جديدة", text: "وصف الميزة" }); })} />
+          </ol>
+          <div className="hidden lg:block">
+            <div className="sticky top-32">
+              <PhoneMock product={P} who={who} />
+            </div>
           </div>
-          <Reveal delay={200} className="hidden lg:block">
-            <PhoneMock product={P} who={who} />
-          </Reveal>
         </div>
       </Chapter>
 
