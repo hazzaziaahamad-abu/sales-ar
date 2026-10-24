@@ -1074,7 +1074,7 @@ function MeetingPlanInner() {
                             <span key={i} className="grid aspect-square place-items-center rounded-full border-2 border-dashed border-white/40 bg-white/10">
                               {i < stamps && (
                                 <span key={stamps} className="mp-pop grid h-[80%] w-[80%] place-items-center rounded-full bg-white" style={{ color: "var(--acc-deep)" }}>
-                                  {i === stampsTotal - 1 ? <Gift size={18} /> : <P.icon size={18} />}
+                                  {i === stampsTotal - 1 ? <Gift size={18} /> : productKey === "menu" ? <Coffee size={18} /> : <Scissors size={18} />}
                                 </span>
                               )}
                             </span>
