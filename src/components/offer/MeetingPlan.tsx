@@ -185,6 +185,7 @@ const PRODUCTS: Record<ProductKey, Product> = {
 const GOLD = "#F5B301";
 // نقاط الباقة اللي تخص الولاء/الهدايا تنبرز داخل بطاقة الباقة
 const LOYALTY_RE = /ولاء|هدايا/;
+const LOYALTY_SAMPLES = ["/banners/menu-loyalty.jpg", "/banners/menu-loyalty-2.jpg"];
 
 /* ──────────────────────────── المظاهر ──────────────────────────── */
 
@@ -588,6 +589,7 @@ function MeetingPlanInner() {
   const reward = edit ? C.reward : rewardDemo ?? C.reward;
   const [giftAmount, setGiftAmount] = useState(200);
   const [giftTo, setGiftTo] = useState("نورة");
+  const [zoom, setZoom] = useState<string | null>(null); // تكبير صورة نموذج
   const [revealed, setRevealed] = useState(0); // أسئلة الاحتياج المفتوحة في «النظام»
   const [calc, setCalc] = useState<Record<string, number>>(() => Object.fromEntries(P.calc.map((f) => [f.key, f.def])));
 
@@ -651,6 +653,7 @@ function MeetingPlanInner() {
       if (el?.tagName === "INPUT" || el?.tagName === "TEXTAREA" || el?.isContentEditable) return;
       if (e.key === "ArrowLeft" || e.key === "PageDown") { e.preventDefault(); goTo(activeIdx + 1); }
       if (e.key === "ArrowRight" || e.key === "PageUp") { e.preventDefault(); goTo(activeIdx - 1); }
+      if (e.key === "Escape") setZoom(null);
       if (e.key.toLowerCase() === "f") toggleFs();
     };
     window.addEventListener("keydown", onKey);
@@ -1028,6 +1031,26 @@ function MeetingPlanInner() {
                             <Ed v={C.chapters.loyalty.lead} on={(lead) => ch("loyalty").onCt({ lead })} edit={edit} multi view={fill} />
                           </p>
                         )}
+
+                        {/* نماذج حقيقية لبطاقات الولاء (نفس بانرات صفحة عرض المنيو) */}
+                        <div className="mt-6">
+                          <div className="mb-3 flex items-center gap-2 text-xs font-bold text-[var(--faint)]">
+                            <ImageIcon size={14} style={{ color: "#b7791f" }} /> نماذج حقيقية من عملائنا — اضغط للتكبير
+                          </div>
+                          <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 [scrollbar-width:none] sm:grid sm:grid-cols-2 sm:overflow-visible">
+                            {LOYALTY_SAMPLES.map((src, k) => (
+                              <button key={src} type="button" onClick={() => setZoom(src)}
+                                className="group relative w-[72%] shrink-0 snap-center overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow)] transition-transform hover:-translate-y-1 sm:w-auto">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={src} alt={`نموذج بطاقة ولاء ${k + 1}`} loading="lazy" className="block aspect-[9/16] w-full object-cover" />
+                                <span className="absolute bottom-3 left-3 grid h-9 w-9 place-items-center rounded-full bg-black/45 text-white opacity-0 backdrop-blur transition-opacity group-hover:opacity-100">
+                                  <Maximize2 size={15} />
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
                         <div className="mt-7">
                 <div className="grid items-center gap-8 xl:grid-cols-2">
                   <Reveal>
@@ -1536,6 +1559,17 @@ function MeetingPlanInner() {
           </Reveal>
         </div>
       </section>
+
+      {/* ─── تكبير صورة ─── */}
+      {zoom && (
+        <div className="mp-noprint fixed inset-0 z-[60] grid place-items-center bg-black/80 p-4 backdrop-blur-sm" onClick={() => setZoom(null)}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={zoom} alt="" className="max-h-[92vh] w-auto max-w-full rounded-2xl shadow-2xl" />
+          <button type="button" aria-label="إغلاق" className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-white/15 text-white hover:bg-white/25">
+            <X size={18} />
+          </button>
+        </div>
+      )}
 
       {/* ─── تنقّل سفلي ─── */}
       <div className="mp-noprint fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-1 rounded-full border border-[var(--line)] bg-[var(--glass)] p-1.5 shadow-2xl backdrop-blur-xl">
