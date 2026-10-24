@@ -8,7 +8,7 @@ import {
   Wallet, LayoutDashboard, Rocket, Check, ChevronLeft, ChevronRight, ChevronDown, Maximize2, Minimize2, Sun, Moon,
   Printer, Link2, Sparkles, Stamp, BellRing, GraduationCap, Headphones, CalendarCheck,
   TrendingUp, Users, Palette, ImageIcon, ClipboardList, Timer, Handshake, PartyPopper,
-  Coffee, Scissors, Presentation, ShieldCheck, Pencil, Plus, X, Save, RotateCcw,
+  Coffee, Scissors, Presentation, ShieldCheck, Star, Pencil, Plus, X, Save, RotateCcw,
 } from "lucide-react";
 import { waLink } from "@/components/offer/OfferCta";
 import BackToPlatform from "@/components/offer/BackToPlatform";
@@ -183,6 +183,8 @@ const PRODUCTS: Record<ProductKey, Product> = {
 };
 
 const GOLD = "#F5B301";
+// نقاط الباقة اللي تخص الولاء/الهدايا تنبرز داخل بطاقة الباقة
+const LOYALTY_RE = /ولاء|هدايا/;
 
 /* ──────────────────────────── المظاهر ──────────────────────────── */
 
@@ -217,7 +219,6 @@ const CHAPTERS = [
   { id: "system", label: "النظام والباقات", icon: Sparkles },
   { id: "activation", label: "التفعيل", icon: Rocket },
   { id: "site", label: "تجهيز الموقع", icon: Globe },
-  { id: "loyalty", label: "الولاء", icon: Stamp },
   { id: "gift", label: "الهدايا", icon: Gift },
   { id: "training", label: "التدريب", icon: GraduationCap },
   { id: "followup", label: "المتابعة", icon: Headphones },
@@ -690,6 +691,7 @@ function MeetingPlanInner() {
   const paybackDays = monthly > 0 ? Math.max(1, Math.ceil(tier.yearly / (monthly / 30))) : 0;
   const readyCount = C.fromClient.filter((_, i) => ready[i]).length;
   const loyaltyTier = C.tiers.find((t) => t.loyalty);
+  const loyaltyIdx = C.tiers.findIndex((t) => t.loyalty);
 
   const summaryMsg =
     `السلام عليكم، ملخص اجتماعنا اليوم:\n` +
@@ -958,9 +960,10 @@ function MeetingPlanInner() {
 
                       <ul className="mt-4 grid gap-2.5 sm:grid-cols-2">
                         {pts.map((pt, j) => (
-                          <li key={j} className="flex items-start gap-2 text-sm text-[var(--body)]">
-                            <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full" style={{ background: "color-mix(in srgb, var(--acc) 18%, transparent)" }}>
-                              <Check size={12} style={{ color: "var(--acc)" }} />
+                          <li key={j} className={`flex items-start gap-2 text-sm ${LOYALTY_RE.test(pt) ? "-mx-2 rounded-xl px-2 py-1 font-black text-[var(--ink)]" : "text-[var(--body)]"}`}
+                            style={LOYALTY_RE.test(pt) ? { background: `${GOLD}26`, boxShadow: `inset 0 0 0 1px ${GOLD}66` } : {}}>
+                            <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full" style={LOYALTY_RE.test(pt) ? { background: GOLD } : { background: "color-mix(in srgb, var(--acc) 18%, transparent)" }}>
+                              {LOYALTY_RE.test(pt) ? <Star size={11} className="text-[#1a1306]" fill="currentColor" /> : <Check size={12} style={{ color: "var(--acc)" }} />}
                             </span>
                             <Ed v={pt} on={(v) => set((x) => { x.points = [...pts]; x.points[j] = v; })} edit={edit} />
                             <InlineDel edit={edit} onClick={() => set((x) => { x.points = [...pts]; x.points.splice(j, 1); })} />
@@ -971,6 +974,22 @@ function MeetingPlanInner() {
                         <button type="button" onClick={() => set((x) => { x.points = [...pts, "نقطة جديدة"]; })}
                           className="mp-noprint mt-3 flex items-center gap-1 text-xs font-bold text-[var(--muted)] hover:text-[var(--acc)]">
                           <Plus size={13} /> نقطة
+                        </button>
+                      )}
+
+                      {i === loyaltyIdx && (
+                        <button
+                          type="button"
+                          onClick={() => document.getElementById("loyalty")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                          className="mp-noprint mt-5 flex w-full items-center gap-3 rounded-2xl p-3.5 text-right transition-transform hover:-translate-y-0.5"
+                          style={{ background: `linear-gradient(135deg, ${GOLD}33, ${GOLD}12)`, boxShadow: `inset 0 0 0 1px ${GOLD}88` }}
+                        >
+                          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-[#1a1306]" style={{ background: GOLD }}><Gift size={18} /></span>
+                          <span className="flex-1">
+                            <span className="block text-sm font-black text-[var(--ink)]">الميزة الأبرز في الباقة: بطاقات ونقاط الولاء</span>
+                            <span className="block text-xs text-[var(--muted)]">عميلك يرجع لك من نفسه — شوف كيف تشتغل تحت</span>
+                          </span>
+                          <ChevronDown size={18} className="shrink-0 text-[var(--muted)]" />
                         </button>
                       )}
 
@@ -993,6 +1012,121 @@ function MeetingPlanInner() {
                       </div>
                     </div>
                   </div>
+                  {i === loyaltyIdx && (
+                    <div id="loyalty" className="mt-5 scroll-mt-32 pr-14">
+                      {/* شرح الولاء مباشرة تحت أول باقة فيها الولاء */}
+                      <div className="rounded-3xl border p-5 sm:p-7" style={{ borderColor: `${GOLD}66`, background: `linear-gradient(180deg, ${GOLD}14, transparent 60%)` }}>
+                        <div className="mb-2 flex items-center gap-2 text-sm font-bold" style={{ color: "#b7791f" }}>
+                          <Stamp size={16} />
+                          <Ed v={C.chapters.loyalty.kicker} on={(kicker) => ch("loyalty").onCt({ kicker })} edit={edit} />
+                        </div>
+                        <h3 className="text-2xl font-black leading-tight text-[var(--ink)] sm:text-4xl">
+                          <Ed v={C.chapters.loyalty.title} on={(title) => ch("loyalty").onCt({ title })} edit={edit} view={(x) => rich(fill(x))} />
+                        </h3>
+                        {(C.chapters.loyalty.lead || edit) && (
+                          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[var(--muted)] sm:text-base">
+                            <Ed v={C.chapters.loyalty.lead} on={(lead) => ch("loyalty").onCt({ lead })} edit={edit} multi view={fill} />
+                          </p>
+                        )}
+                        <div className="mt-7">
+                <div className="grid items-center gap-8 xl:grid-cols-2">
+                  <Reveal>
+                    <div className="mx-auto w-full max-w-md">
+                      <button
+                        onClick={() => setStamps((s) => (s >= stampsTotal ? 0 : s + 1))}
+                        className="mp-shine relative block w-full overflow-hidden rounded-[28px] p-6 text-right text-white shadow-2xl transition-transform active:scale-[.98]"
+                        style={{ background: `linear-gradient(135deg, var(--acc-deep), var(--acc) 60%, ${GOLD}aa)`, boxShadow: "0 40px 80px -30px var(--acc)" }}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <div className="text-xs font-bold opacity-75">بطاقة الولاء</div>
+                            <div className="mt-0.5 text-xl font-black">{who}</div>
+                          </div>
+                          <span className="rounded-full bg-black/20 px-3 py-1 text-[11px] font-bold">Wallet</span>
+                        </div>
+                        <div className="mt-6 grid gap-2.5" style={{ gridTemplateColumns: `repeat(${Math.min(stampsTotal, 5)}, minmax(0, 1fr))` }}>
+                          {Array.from({ length: stampsTotal }).map((_, i) => (
+                            <span key={i} className="grid aspect-square place-items-center rounded-full border-2 border-dashed border-white/40 bg-white/10">
+                              {i < stamps && (
+                                <span key={stamps} className="mp-pop grid h-[80%] w-[80%] place-items-center rounded-full bg-white" style={{ color: "var(--acc-deep)" }}>
+                                  {i === stampsTotal - 1 ? <Gift size={18} /> : <P.icon size={18} />}
+                                </span>
+                              )}
+                            </span>
+                          ))}
+                        </div>
+                        <div className="mt-5 flex items-center justify-between text-sm">
+                          <span className="font-bold">{fmt(stamps)} / {fmt(stampsTotal)} {P.stampWord}</span>
+                          <span className="opacity-80">{reward}</span>
+                        </div>
+                        {stamps >= stampsTotal && (
+                          <div className="mp-pop absolute inset-0 grid place-items-center bg-black/40 backdrop-blur-sm">
+                            <div className="text-center">
+                              <PartyPopper size={40} className="mx-auto" style={{ color: GOLD }} />
+                              <div className="mt-2 text-2xl font-black">مبروك! {reward}</div>
+                              <div className="mt-1 text-xs opacity-75">اضغط للبدء من جديد</div>
+                            </div>
+                          </div>
+                        )}
+                      </button>
+
+                      {/* إشعار قرب المحل */}
+                      <div className="mx-auto mt-5 flex max-w-sm items-start gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-3.5 backdrop-blur">
+                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-white" style={{ background: "var(--acc)" }}><BellRing size={16} /></span>
+                        <div className="text-xs leading-relaxed">
+                          <div className="font-black text-[var(--ink)]">{who} · الآن</div>
+                          <div className="text-[var(--muted)]">أنت قريب منّا 👋 باقي لك {fmt(Math.max(stampsTotal - stamps, 0))} {P.stampWord} على {reward}!</div>
+                        </div>
+                      </div>
+                    </div>
+                  </Reveal>
+
+                  <Reveal delay={120}>
+                    <div className="space-y-5">
+                      <div className={`${card} p-5`}>
+                        <div className="mb-3 text-sm font-black text-[var(--ink)]">صمّم برنامجك الآن</div>
+                        <label className="mb-1.5 block text-xs text-[var(--faint)]">عدد الأختام للمكافأة</label>
+                        <div className="flex flex-wrap gap-2">
+                          {[4, 5, 6, 8, 10].map((n) => (
+                            <button key={n} onClick={() => { setStampsTotal(n); setStamps((s) => Math.min(s, n)); }}
+                              className="h-10 w-12 rounded-xl border text-sm font-black transition-colors"
+                              style={stampsTotal === n ? { borderColor: "var(--acc)", background: "var(--acc)", color: "white" } : { borderColor: "var(--line)", color: "var(--muted)" }}>
+                              {fmt(n)}
+                            </button>
+                          ))}
+                        </div>
+                        <label className="mb-1.5 mt-4 block text-xs text-[var(--faint)]">{edit ? "المكافأة الافتراضية (تُحفظ)" : "المكافأة"}</label>
+                        <input
+                          value={reward}
+                          onChange={(e) => (edit ? patch((d) => { d.reward = e.target.value; }) : setRewardDemo(e.target.value))}
+                          className="w-full rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 text-sm font-bold text-[var(--ink)] outline-none focus:border-[var(--acc)]"
+                        />
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+                        {C.loyaltySteps.map((s, i) => {
+                          const Icon = [QrCode, Stamp, BellRing][i % 3];
+                          return (
+                            <div key={i} className={`${card} relative p-4`}>
+                              <Del edit={edit} onClick={() => patch((d) => { d.loyaltySteps.splice(i, 1); })} />
+                              <Icon size={18} style={{ color: "var(--acc)" }} />
+                              <div className="mt-2 text-sm font-black text-[var(--ink)]">
+                                <Ed v={s.t} on={(t) => patch((d) => { d.loyaltySteps[i].t = t; })} edit={edit} />
+                              </div>
+                              <div className="mt-1 text-xs leading-relaxed text-[var(--faint)]">
+                                <Ed v={s.d} on={(v) => patch((d) => { d.loyaltySteps[i].d = v; })} edit={edit} multi />
+                              </div>
+                            </div>
+                          );
+                        })}
+                        <Add edit={edit} label="خطوة" onClick={() => patch((d) => { d.loyaltySteps.push({ t: "خطوة", d: "وصف" }); })} />
+                      </div>
+                    </div>
+                  </Reveal>
+                </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </Reveal>
               );
             })}
@@ -1143,106 +1277,8 @@ function MeetingPlanInner() {
         </div>
       </Chapter>
 
-      {/* ─── ٤. الولاء ─── */}
-      <Chapter id="loyalty" n={4} {...ch("loyalty")}>
-        <div className="grid items-center gap-10 lg:grid-cols-2">
-          <Reveal>
-            <div className="mx-auto w-full max-w-md">
-              <button
-                onClick={() => setStamps((s) => (s >= stampsTotal ? 0 : s + 1))}
-                className="mp-shine relative block w-full overflow-hidden rounded-[28px] p-6 text-right text-white shadow-2xl transition-transform active:scale-[.98]"
-                style={{ background: `linear-gradient(135deg, var(--acc-deep), var(--acc) 60%, ${GOLD}aa)`, boxShadow: "0 40px 80px -30px var(--acc)" }}
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="text-xs font-bold opacity-75">بطاقة الولاء</div>
-                    <div className="mt-0.5 text-xl font-black">{who}</div>
-                  </div>
-                  <span className="rounded-full bg-black/20 px-3 py-1 text-[11px] font-bold">Wallet</span>
-                </div>
-                <div className="mt-6 grid gap-2.5" style={{ gridTemplateColumns: `repeat(${Math.min(stampsTotal, 5)}, minmax(0, 1fr))` }}>
-                  {Array.from({ length: stampsTotal }).map((_, i) => (
-                    <span key={i} className="grid aspect-square place-items-center rounded-full border-2 border-dashed border-white/40 bg-white/10">
-                      {i < stamps && (
-                        <span key={stamps} className="mp-pop grid h-[80%] w-[80%] place-items-center rounded-full bg-white" style={{ color: "var(--acc-deep)" }}>
-                          {i === stampsTotal - 1 ? <Gift size={18} /> : <P.icon size={18} />}
-                        </span>
-                      )}
-                    </span>
-                  ))}
-                </div>
-                <div className="mt-5 flex items-center justify-between text-sm">
-                  <span className="font-bold">{fmt(stamps)} / {fmt(stampsTotal)} {P.stampWord}</span>
-                  <span className="opacity-80">{reward}</span>
-                </div>
-                {stamps >= stampsTotal && (
-                  <div className="mp-pop absolute inset-0 grid place-items-center bg-black/40 backdrop-blur-sm">
-                    <div className="text-center">
-                      <PartyPopper size={40} className="mx-auto" style={{ color: GOLD }} />
-                      <div className="mt-2 text-2xl font-black">مبروك! {reward}</div>
-                      <div className="mt-1 text-xs opacity-75">اضغط للبدء من جديد</div>
-                    </div>
-                  </div>
-                )}
-              </button>
-
-              {/* إشعار قرب المحل */}
-              <div className="mx-auto mt-5 flex max-w-sm items-start gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-3.5 backdrop-blur">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-white" style={{ background: "var(--acc)" }}><BellRing size={16} /></span>
-                <div className="text-xs leading-relaxed">
-                  <div className="font-black text-[var(--ink)]">{who} · الآن</div>
-                  <div className="text-[var(--muted)]">أنت قريب منّا 👋 باقي لك {fmt(Math.max(stampsTotal - stamps, 0))} {P.stampWord} على {reward}!</div>
-                </div>
-              </div>
-            </div>
-          </Reveal>
-
-          <Reveal delay={120}>
-            <div className="space-y-5">
-              <div className={`${card} p-5`}>
-                <div className="mb-3 text-sm font-black text-[var(--ink)]">صمّم برنامجك الآن</div>
-                <label className="mb-1.5 block text-xs text-[var(--faint)]">عدد الأختام للمكافأة</label>
-                <div className="flex flex-wrap gap-2">
-                  {[4, 5, 6, 8, 10].map((n) => (
-                    <button key={n} onClick={() => { setStampsTotal(n); setStamps((s) => Math.min(s, n)); }}
-                      className="h-10 w-12 rounded-xl border text-sm font-black transition-colors"
-                      style={stampsTotal === n ? { borderColor: "var(--acc)", background: "var(--acc)", color: "white" } : { borderColor: "var(--line)", color: "var(--muted)" }}>
-                      {fmt(n)}
-                    </button>
-                  ))}
-                </div>
-                <label className="mb-1.5 mt-4 block text-xs text-[var(--faint)]">{edit ? "المكافأة الافتراضية (تُحفظ)" : "المكافأة"}</label>
-                <input
-                  value={reward}
-                  onChange={(e) => (edit ? patch((d) => { d.reward = e.target.value; }) : setRewardDemo(e.target.value))}
-                  className="w-full rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5 text-sm font-bold text-[var(--ink)] outline-none focus:border-[var(--acc)]"
-                />
-              </div>
-              <div className="grid gap-3 sm:grid-cols-3">
-                {C.loyaltySteps.map((s, i) => {
-                  const Icon = [QrCode, Stamp, BellRing][i % 3];
-                  return (
-                    <div key={i} className={`${card} relative p-4`}>
-                      <Del edit={edit} onClick={() => patch((d) => { d.loyaltySteps.splice(i, 1); })} />
-                      <Icon size={18} style={{ color: "var(--acc)" }} />
-                      <div className="mt-2 text-sm font-black text-[var(--ink)]">
-                        <Ed v={s.t} on={(t) => patch((d) => { d.loyaltySteps[i].t = t; })} edit={edit} />
-                      </div>
-                      <div className="mt-1 text-xs leading-relaxed text-[var(--faint)]">
-                        <Ed v={s.d} on={(v) => patch((d) => { d.loyaltySteps[i].d = v; })} edit={edit} multi />
-                      </div>
-                    </div>
-                  );
-                })}
-                <Add edit={edit} label="خطوة" onClick={() => patch((d) => { d.loyaltySteps.push({ t: "خطوة", d: "وصف" }); })} />
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </Chapter>
-
-      {/* ─── ٥. الهدايا ─── */}
-      <Chapter id="gift" n={5} {...ch("gift")}>
+      {/* ─── ٤. الهدايا ─── */}
+      <Chapter id="gift" n={4} {...ch("gift")}>
         <div className="grid items-center gap-10 lg:grid-cols-2">
           <Reveal className="lg:order-2">
             <div className="mp-float relative mx-auto aspect-[1.6] w-full max-w-md overflow-hidden rounded-[28px] p-7 text-white shadow-2xl"
@@ -1307,8 +1343,8 @@ function MeetingPlanInner() {
         </div>
       </Chapter>
 
-      {/* ─── ٦. التدريب ─── */}
-      <Chapter id="training" n={6} {...ch("training")}>
+      {/* ─── ٥. التدريب ─── */}
+      <Chapter id="training" n={5} {...ch("training")}>
         <div className="grid gap-4 md:grid-cols-3">
           {C.training.map((s, i) => {
             const Icon = iconAt(TRAINING, i);
@@ -1351,8 +1387,8 @@ function MeetingPlanInner() {
         </div>
       </Chapter>
 
-      {/* ─── ٧. المتابعة ─── */}
-      <Chapter id="followup" n={7} {...ch("followup")}>
+      {/* ─── ٦. المتابعة ─── */}
+      <Chapter id="followup" n={6} {...ch("followup")}>
         <div
           className="grid gap-4 sm:grid-cols-2 lg:[grid-template-columns:repeat(var(--n),minmax(0,1fr))]"
           style={{ ["--n" as string]: Math.max(1, Math.min(C.followup.length + (edit ? 1 : 0), 6)) } as React.CSSProperties}
@@ -1383,8 +1419,8 @@ function MeetingPlanInner() {
         </div>
       </Chapter>
 
-      {/* ─── ٨. النتائج ─── */}
-      <Chapter id="results" n={8} {...ch("results")}>
+      {/* ─── ٧. النتائج ─── */}
+      <Chapter id="results" n={7} {...ch("results")}>
         <div className="grid gap-6 lg:grid-cols-[1fr_1.1fr]">
           <Reveal>
             <div className={`${card} space-y-6 p-6`}>
@@ -1449,7 +1485,7 @@ function MeetingPlanInner() {
         </div>
       </Chapter>
 
-      {/* ─── ٩. الخطوة التالية ─── */}
+      {/* ─── ٨. الخطوة التالية ─── */}
       <section id="next" data-chapter="next" className="mp-chapter relative overflow-hidden px-4 pb-32 pt-20 sm:px-8 sm:pt-28">
         <div className="mp-glow pointer-events-none absolute inset-0 rotate-180" />
         <div className="relative mx-auto max-w-3xl text-center">
