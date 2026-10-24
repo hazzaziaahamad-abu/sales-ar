@@ -1530,6 +1530,13 @@ function PhoneMock({ product, who }: { product: Product; who: string }) {
   return (
     <div className="mp-float relative mx-auto w-[280px] rounded-[44px] border border-[var(--line)] bg-[#0b0f1a] p-3 shadow-2xl" style={{ boxShadow: "0 50px 100px -40px var(--acc)" }}>
       <div className="mx-auto mb-2 h-5 w-24 rounded-full bg-black" />
+      {isMenu ? (
+        // لقطة منيو حقيقي من قائمة الطلبات
+        <div className="overflow-hidden rounded-[32px] bg-[#f4efe6]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/meeting/menu-demo.jpg" alt="مثال منيو إلكتروني من قائمة الطلبات" className="block w-full" loading="lazy" />
+        </div>
+      ) : (
       <div className="overflow-hidden rounded-[32px] bg-[#f8f7f3] text-[#1f1b16]">
         <div className="p-5 text-white" style={{ background: "linear-gradient(135deg, var(--acc-deep), var(--acc))" }}>
           <div className="text-[10px] opacity-80">{isMenu ? "المنيو" : "احجزي موعدك"}</div>
@@ -1557,6 +1564,7 @@ function PhoneMock({ product, who }: { product: Product; who: string }) {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }
