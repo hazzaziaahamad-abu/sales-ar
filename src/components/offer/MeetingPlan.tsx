@@ -186,7 +186,17 @@ const GOLD = "#F5B301";
 // نقاط الباقة اللي تخص الولاء/الهدايا تنبرز داخل بطاقة الباقة
 const LOYALTY_RE = /ولاء|هدايا/;
 // فريم الجوال فقط من بانرات صفحة عرض المنيو
-const LOYALTY_SAMPLES = ["/meeting/loyalty-1.png", "/meeting/loyalty-2.png"];
+// framed=false: صورة جوال مقصوصة جاهزة؛ framed=true: لقطة شاشة نحطها داخل فريم جوال
+const LOYALTY_SAMPLES: Record<ProductKey, { src: string; framed: boolean; glow: string }[]> = {
+  menu: [
+    { src: "/meeting/loyalty-1.png", framed: false, glow: "#ea580c55" },
+    { src: "/meeting/loyalty-2.png", framed: false, glow: "#3b2a7a55" },
+  ],
+  nahjez: [
+    { src: "/meeting/nahjez-loyalty-1.jpg", framed: true, glow: "#c2410c33" },
+    { src: "/meeting/nahjez-loyalty-2.jpg", framed: true, glow: "#8a5a1a55" },
+  ],
+};
 
 /* ──────────────────────────── المظاهر ──────────────────────────── */
 
@@ -1081,12 +1091,22 @@ function MeetingPlanInner() {
                             <ImageIcon size={14} style={{ color: "#b7791f" }} /> نماذج حقيقية من عملائنا — اضغط للتكبير
                           </div>
                           <div className="flex justify-center gap-4 sm:gap-8">
-                            {LOYALTY_SAMPLES.map((src, k) => (
+                            {LOYALTY_SAMPLES[productKey].map(({ src, framed, glow }, k) => (
                               <button key={src} type="button" onClick={() => setZoom(src)}
                                 className="group relative w-[46%] max-w-[230px] transition-transform hover:-translate-y-1"
-                                style={{ filter: `drop-shadow(0 24px 28px ${k ? "#3b2a7a55" : "#ea580c55"})` }}>
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={src} alt={`نموذج بطاقة ولاء ${k + 1}`} loading="lazy" className="block h-auto w-full" />
+                                style={{ filter: `drop-shadow(0 24px 28px ${glow})` }}>
+                                {framed ? (
+                                  <span className="block rounded-[30px] bg-[#0b0f1a] p-2">
+                                    <span className="mx-auto mb-1.5 block h-3 w-14 rounded-full bg-black" />
+                                    <span className="block overflow-hidden rounded-[22px]">
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img src={src} alt={`نموذج بطاقة ولاء ${k + 1}`} loading="lazy" className="block h-auto w-full" />
+                                    </span>
+                                  </span>
+                                ) : (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={src} alt={`نموذج بطاقة ولاء ${k + 1}`} loading="lazy" className="block h-auto w-full" />
+                                )}
                                 <span className="absolute bottom-3 left-3 grid h-9 w-9 place-items-center rounded-full bg-black/45 text-white opacity-0 backdrop-blur transition-opacity group-hover:opacity-100">
                                   <Maximize2 size={15} />
                                 </span>
