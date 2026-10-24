@@ -271,6 +271,7 @@ type Content = {
   activation: { when: string; title: string; text: string }[];
   reward: string;
   loyaltySteps: { t: string; d: string }[];
+  giftFlow: { t: string; d: string }[];
   giftPerks: { e: string; t: string; d: string }[];
   training: { who: string; mins: number; items: string[] }[];
   followup: { when: string; title: string; text: string }[];
@@ -286,7 +287,7 @@ function defaultContent(p: Product): Content {
       activation: { kicker: "خطوات التفعيل", title: "إطلاق موقعك خلال *{المدة}*", lead: "من لحظة استلام جميع التفاصيل منك، فريقنا يجهّز كل شي ويطلق موقعك — وأنت تركّز على مشروعك." },
       site: { kicker: "خدمة ما بعد البيع · تجهيز الموقع", title: `نجهّز ${p.site} *معك*، مو بس لك`, lead: "قائمة واضحة: اللي نحتاجه منك، واللي علينا. علّم على اللي جاهز عندك الحين." },
       loyalty: { kicker: "تجهيز نظام بطاقات الولاء", title: "عميلك يرجع لك *من نفسه*", lead: "بطاقة ختم رقمية في محفظة آبل وقوقل — بدون تطبيق. جرّب: اضغط على البطاقة وأضف ختم." },
-      gift: { kicker: "تجهيز بطاقات الهدايا", title: "سيولة *قبل الخدمة* + عملاء جدد", lead: "عميلك يهدي صديقه بطاقة باسم مشروعك — أنت تستلم المبلغ اليوم، وتكسب عميل جديد بكرة." },
+      gift: { kicker: "💡 فكرة مبتكرة لزيادة المبيعات", title: "عميلك يشتري بطاقة *ويهديها*", lead: "عميلك يشتري بطاقة هدية باسم مشروعك ويهديها لشخص يستفيد منها — أنت تستلم المبلغ مقدّم، وتكسب عميل جديد يزورك لأول مرة." },
       training: { kicker: "تدريب الموظفين", title: "فريقك يتقن النظام من أول يوم", lead: "التدريب متاح بعد تسليم الموقع مباشرة — جلسات عملية قصيرة حضورياً أو عن بُعد، مع دليل مختصر ومقاطع مسجّلة للرجوع لها." },
       followup: { kicker: "المتابعة المستمرة", title: "ما نختفي بعد البيع — *نكبر معك*", lead: "مدير حساب يعرف مشروعك بالاسم، وخطة متابعة واضحة طوال فترة اشتراكك." },
       results: { kicker: "النتائج المتوقعة", title: "خلّنا نحسبها بأرقامك أنت", lead: "حرّك المؤشرات حسب واقع مشروعك — والنتائج تتحدّث مباشرة على باقة «{الباقة}»." },
@@ -303,6 +304,11 @@ function defaultContent(p: Product): Content {
       { t: "يمسح ويضيف", d: "العميل يضيف البطاقة لمحفظته بثانية" },
       { t: "يجمع الأختام", d: "الكاشير يختم مع كل زيارة" },
       { t: "يتذكّرك", d: "إشعارات عند القرب وفي المواسم" },
+    ],
+    giftFlow: [
+      { t: "عميلك يشتري البطاقة", d: "يختار المبلغ ويدفع أونلاين — والمبلغ يوصلك مقدّم" },
+      { t: "يهديها لشخص عزيز", d: "توصله البطاقة بالواتساب برسالة باسمه خلال ثوانٍ" },
+      { t: "المُهدى إليه يستفيد منها", d: "يزورك ويستخدم رصيده — عميل جديد بلا تكلفة إعلان" },
     ],
     giftPerks: [
       { e: "💰", t: "دخل مقدّم", d: "تستلم قيمة البطاقة فوراً قبل تقديم الخدمة" },
@@ -1345,6 +1351,42 @@ function MeetingPlanInner() {
 
       {/* ─── ٤. الهدايا ─── */}
       <Chapter id="gift" n={4} {...ch("gift")}>
+        {/* كيف تزيد المبيعات: شراء ← إهداء ← استفادة */}
+        <div className="mb-12 grid gap-3 md:grid-cols-[1fr_auto_1fr_auto_1fr] md:items-stretch">
+          {C.giftFlow.map((g, i) => {
+            const Icon = [Wallet, Gift, Store][i % 3];
+            return (
+              <React.Fragment key={i}>
+                {i > 0 && (
+                  <div className="grid place-items-center text-[var(--faint)]">
+                    <ChevronLeft size={22} className="max-md:-rotate-90" />
+                  </div>
+                )}
+                <Reveal delay={i * 120}>
+                  <div className={`${card} relative flex h-full items-start gap-4 p-5`} style={i === 1 ? { borderColor: `${GOLD}88`, background: `linear-gradient(180deg, ${GOLD}1f, var(--surface))` } : {}}>
+                    <Del edit={edit} onClick={() => patch((d) => { d.giftFlow.splice(i, 1); })} />
+                    <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-[#1a1306]" style={{ background: i === 1 ? GOLD : `${GOLD}40` }}>
+                      <Icon size={22} />
+                    </span>
+                    <div>
+                      <div className="text-[11px] font-black" style={{ color: "#b7791f" }}>{fmt(i + 1)}</div>
+                      <div className="font-black text-[var(--ink)]">
+                        <Ed v={g.t} on={(t) => patch((d) => { d.giftFlow[i].t = t; })} edit={edit} />
+                      </div>
+                      <p className="mt-1 text-xs leading-relaxed text-[var(--muted)]">
+                        <Ed v={g.d} on={(v) => patch((d) => { d.giftFlow[i].d = v; })} edit={edit} multi />
+                      </p>
+                    </div>
+                  </div>
+                </Reveal>
+              </React.Fragment>
+            );
+          })}
+          {edit && C.giftFlow.length < 3 && (
+            <Add edit={edit} label="خطوة" onClick={() => patch((d) => { d.giftFlow.push({ t: "خطوة", d: "وصف" }); })} />
+          )}
+        </div>
+
         <div className="grid items-center gap-10 lg:grid-cols-2">
           <Reveal className="lg:order-2">
             <div className="mp-float relative mx-auto aspect-[1.6] w-full max-w-md overflow-hidden rounded-[28px] p-7 text-white shadow-2xl"
