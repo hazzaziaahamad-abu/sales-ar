@@ -185,7 +185,8 @@ const PRODUCTS: Record<ProductKey, Product> = {
 const GOLD = "#F5B301";
 // نقاط الباقة اللي تخص الولاء/الهدايا تنبرز داخل بطاقة الباقة
 const LOYALTY_RE = /ولاء|هدايا/;
-const LOYALTY_SAMPLES = ["/banners/menu-loyalty.jpg", "/banners/menu-loyalty-2.jpg"];
+// فريم الجوال فقط من بانرات صفحة عرض المنيو
+const LOYALTY_SAMPLES = ["/meeting/loyalty-1.png", "/meeting/loyalty-2.png"];
 
 /* ──────────────────────────── المظاهر ──────────────────────────── */
 
@@ -1037,12 +1038,13 @@ function MeetingPlanInner() {
                           <div className="mb-3 flex items-center gap-2 text-xs font-bold text-[var(--faint)]">
                             <ImageIcon size={14} style={{ color: "#b7791f" }} /> نماذج حقيقية من عملائنا — اضغط للتكبير
                           </div>
-                          <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 [scrollbar-width:none] sm:grid sm:grid-cols-2 sm:overflow-visible">
+                          <div className="flex justify-center gap-4 sm:gap-8">
                             {LOYALTY_SAMPLES.map((src, k) => (
                               <button key={src} type="button" onClick={() => setZoom(src)}
-                                className="group relative w-[72%] shrink-0 snap-center overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow)] transition-transform hover:-translate-y-1 sm:w-auto">
+                                className="group relative w-[46%] max-w-[230px] transition-transform hover:-translate-y-1"
+                                style={{ filter: `drop-shadow(0 24px 28px ${k ? "#3b2a7a55" : "#ea580c55"})` }}>
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={src} alt={`نموذج بطاقة ولاء ${k + 1}`} loading="lazy" className="block aspect-[9/16] w-full object-cover" />
+                                <img src={src} alt={`نموذج بطاقة ولاء ${k + 1}`} loading="lazy" className="block h-auto w-full" />
                                 <span className="absolute bottom-3 left-3 grid h-9 w-9 place-items-center rounded-full bg-black/45 text-white opacity-0 backdrop-blur transition-opacity group-hover:opacity-100">
                                   <Maximize2 size={15} />
                                 </span>
