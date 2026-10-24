@@ -228,14 +228,14 @@ const CHAPTERS = [
   { id: "next", label: "الخطوة التالية", icon: Check },
 ] as const;
 
-const ACTIVATION = [
-  { day: 0, title: "الاشتراك والترحيب", text: "اختيار الباقة، تفعيل الحساب، وفتح قروب واتساب خاص بمشروعك." },
-  { day: 1, title: "استلام البيانات", text: "نرسل لك قائمة مختصرة بما نحتاجه — ترسله صور أو ملفات على راحتك." },
-  { day: 2, title: "بناء الموقع", text: "فريقنا يبني كل شي بهويتك ويرفع البيانات والصور." },
-  { day: 4, title: "تجهيز الولاء والهدايا", text: "تصميم بطاقة الولاء وبطاقات الهدايا وربطها بالمحفظة." },
-  { day: 5, title: "المراجعة والاعتماد", text: "نعرض عليك النسخة النهائية وتعدّل اللي تبغاه قبل الإطلاق." },
-  { day: 6, title: "تدريب الفريق", text: "جلسات قصيرة عملية للإدارة والموظفين." },
-  { day: 7, title: "الإطلاق", text: "نطلق معك رسمياً ونكون جنبك أول أسبوع لحظة بلحظة." },
+// خطوات التفعيل: الإطلاق خلال ٢٤ ساعة من استلام جميع التفاصيل من العميل
+const activationFor = (p: Product) => [
+  { when: "الساعة ٠", title: "الاشتراك والترحيب", text: "تفعيل حسابك وفتح قروب واتساب خاص بمشروعك." },
+  { when: "نقطة البداية", title: "استلام جميع التفاصيل", text: `${p.key === "menu" ? "الشعار والمنيو والصور والأسعار" : "الشعار والخدمات والموظفات وأوقات العمل"} — من هنا يبدأ عدّاد الـ٢٤ ساعة.` },
+  { when: "خلال ساعات", title: `بناء ${p.site}`, text: "فريقنا يبني كل شي بهويتك ويرفع التفاصيل كاملة." },
+  { when: "بالتوازي", title: "تجهيز الولاء والهدايا", text: "تصميم بطاقة الولاء وبطاقات الهدايا وربطها بالمحفظة." },
+  { when: "قبل الإطلاق", title: "المراجعة والاعتماد", text: "نعرض عليك النسخة النهائية وتعدّل اللي تبغاه." },
+  { when: "خلال ٢٤ ساعة", title: "الإطلاق", text: "موقعك جاهز ويستقبل عملاءك — ونكون معك لحظة بلحظة." },
 ];
 
 const TRAINING = [
@@ -255,7 +255,7 @@ const FOLLOWUP = [
 /* ──────────────────────────── المحتوى القابل للتعديل ──────────────────────────── */
 
 // كل نصوص الصفحة لكل منتج. المحفوظ في القاعدة يغطّي الافتراضي مفتاحاً بمفتاح.
-// داخل العناوين: *كلمة* = تلوين، و{العميل} {الباقة} {الأيام} {تاريخ_التدريب} = قيم تلقائية.
+// داخل العناوين: *كلمة* = تلوين، و{العميل} {الباقة} {المدة} {تاريخ_التدريب} = قيم تلقائية.
 type ChapterText = { kicker: string; title: string; lead: string };
 
 type Content = {
@@ -266,7 +266,9 @@ type Content = {
   tiers: Tier[];
   fromClient: string[];
   fromUs: string[];
-  activation: { day: number; title: string; text: string }[];
+  launchText: string;      // مدة الإطلاق (مثل «٢٤ ساعة»)
+  activationNote: string;  // شرط بدء العدّاد
+  activation: { when: string; title: string; text: string }[];
   reward: string;
   loyaltySteps: { t: string; d: string }[];
   giftPerks: { e: string; t: string; d: string }[];
@@ -281,11 +283,11 @@ function defaultContent(p: Product): Content {
     agendaMins: "~ ٣٠ دقيقة",
     chapters: {
       system: { kicker: "النظام والباقات", title: `${p.brand} — *${p.tagline}*`, lead: "نبدأ من احتياجك: جاوب على الأسئلة بالترتيب، ونوصل مع بعض للباقة اللي تناسبك بالضبط. دعم فني لجميع الباقات." },
-      activation: { kicker: "خطوات التفعيل", title: "من اليوم إلى الإطلاق في *{الأيام} أيام*", lead: "أنت تركّز على مشروعك، وفريقنا يتكفّل بالباقي. هذا جدولك الفعلي بالتواريخ:" },
+      activation: { kicker: "خطوات التفعيل", title: "إطلاق موقعك خلال *{المدة}*", lead: "من لحظة استلام جميع التفاصيل منك، فريقنا يجهّز كل شي ويطلق موقعك — وأنت تركّز على مشروعك." },
       site: { kicker: "خدمة ما بعد البيع · تجهيز الموقع", title: `نجهّز ${p.site} *معك*، مو بس لك`, lead: "قائمة واضحة: اللي نحتاجه منك، واللي علينا. علّم على اللي جاهز عندك الحين." },
       loyalty: { kicker: "تجهيز نظام بطاقات الولاء", title: "عميلك يرجع لك *من نفسه*", lead: "بطاقة ختم رقمية في محفظة آبل وقوقل — بدون تطبيق. جرّب: اضغط على البطاقة وأضف ختم." },
       gift: { kicker: "تجهيز بطاقات الهدايا", title: "سيولة *قبل الخدمة* + عملاء جدد", lead: "عميلك يهدي صديقه بطاقة باسم مشروعك — أنت تستلم المبلغ اليوم، وتكسب عميل جديد بكرة." },
-      training: { kicker: "تدريب الموظفين", title: "فريقك يتقن النظام من أول يوم", lead: "جلسات عملية قصيرة قبل الإطلاق ({تاريخ_التدريب}) — حضورياً أو عن بُعد، مع دليل مختصر ومقاطع مسجّلة للرجوع لها." },
+      training: { kicker: "تدريب الموظفين", title: "فريقك يتقن النظام من أول يوم", lead: "جلسات عملية قصيرة يوم الإطلاق ({تاريخ_التدريب}) — حضورياً أو عن بُعد، مع دليل مختصر ومقاطع مسجّلة للرجوع لها." },
       followup: { kicker: "المتابعة المستمرة", title: "ما نختفي بعد البيع — *نكبر معك*", lead: "مدير حساب يعرف مشروعك بالاسم، وخطة متابعة واضحة طوال فترة اشتراكك." },
       results: { kicker: "النتائج المتوقعة", title: "خلّنا نحسبها بأرقامك أنت", lead: "حرّك المؤشرات حسب واقع مشروعك — والنتائج تتحدّث مباشرة على باقة «{الباقة}»." },
       next: { kicker: "الخطوة التالية", title: "جاهزين نبدأ يا {العميل}؟", lead: "" },
@@ -293,7 +295,9 @@ function defaultContent(p: Product): Content {
     tiers: p.tiers.map((t) => ({ ...t, features: [...t.features], points: [...(t.points ?? t.features)] })),
     fromClient: p.fromClient.map((x) => x.text),
     fromUs: [...p.fromUs],
-    activation: ACTIVATION.map((a) => ({ ...a })),
+    launchText: "٢٤ ساعة",
+    activationNote: "المدة تبدأ من استلام جميع التفاصيل من العميل — كل ما وصلتنا أسرع، انطلقت أسرع.",
+    activation: activationFor(p),
     reward: p.reward,
     loyaltySteps: [
       { t: "يمسح ويضيف", d: "العميل يضيف البطاقة لمحفظته بثانية" },
@@ -320,6 +324,8 @@ function mergeContent(def: Content, saved: unknown): Content {
     const v = s[k];
     if (v === undefined || v === null) continue;
     if (Array.isArray(d) ? !Array.isArray(v) : typeof v !== typeof d || Array.isArray(v)) continue;
+    // خطوات التفعيل القديمة كانت بالأيام (day) — نرجع للافتراضي الجديد بالساعات
+    if (k === "activation" && !(v as { when?: unknown }[]).every((x) => typeof x?.when === "string")) continue;
     out[k] = k === "chapters" ? { ...(d as object), ...(v as object) } : v;
   }
   return out as Content;
@@ -676,15 +682,16 @@ function MeetingPlanInner() {
   };
 
   const today = useMemo(() => new Date(), []);
-  const launchDays = Math.max(0, ...C.activation.map((s) => s.day));
-  const launchDate = addDays(today, launchDays);
-  const trainingDate = addDays(today, Math.max(0, launchDays - 1));
+  // الإطلاق خلال ٢٤ ساعة من استلام التفاصيل → تقديرياً بكرة إذا وصلت اليوم
+  const launchDate = addDays(today, 1);
+  const trainingDate = launchDate;
   const who = client.trim() || "عميلنا العزيز";
   function fill(s: string) {
     return s
       .replaceAll("{العميل}", who)
       .replaceAll("{الباقة}", tier?.name ?? "")
-      .replaceAll("{الأيام}", fmt(launchDays))
+      .replaceAll("{المدة}", C.launchText)
+      .replaceAll("{الأيام}", C.launchText)
       .replaceAll("{تاريخ_التدريب}", dayLabel(trainingDate));
   }
 
@@ -700,7 +707,7 @@ function MeetingPlanInner() {
   const summaryMsg =
     `السلام عليكم، ملخص اجتماعنا اليوم:\n` +
     `• العميل: ${who}\n• النظام: ${P.brand}\n• الباقة: ${tier.name} — ${fmt(tier.price)} ${tier.period}\n` +
-    `• موعد الإطلاق المتوقع: ${launchDate.toLocaleDateString(LOCALE, { day: "numeric", month: "long" })}\n` +
+    `• الإطلاق: خلال ${C.launchText} من استلام جميع التفاصيل\n` +
     `• العائد الشهري المتوقع: ~${fmt(monthly)} ريال\n\nنبدأ بإذن الله 🚀`;
 
   const iconAt = <T,>(arr: { icon: T }[], i: number) => arr[i % arr.length].icon;
@@ -868,7 +875,7 @@ function MeetingPlanInner() {
                 ابدأ العرض <ChevronLeft size={18} />
               </button>
               <div className="flex items-center gap-2 rounded-full border border-[var(--line)] px-5 py-3.5 text-sm text-[var(--muted)]">
-                <Rocket size={16} style={{ color: GOLD }} /> الإطلاق خلال <b className="text-[var(--ink)]">{fmt(launchDays)} أيام</b>
+                <Rocket size={16} style={{ color: GOLD }} /> الإطلاق خلال <b className="text-[var(--ink)]">{C.launchText}</b>
               </div>
             </div>
           </Reveal>
@@ -1197,6 +1204,39 @@ function MeetingPlanInner() {
 
       {/* ─── ٢. التفعيل ─── */}
       <Chapter id="activation" n={2} {...ch("activation")}>
+        {/* عدّاد ٢٤ ساعة + شرط البدء */}
+        <Reveal>
+          <div className="mb-12 grid items-center gap-6 rounded-3xl p-6 sm:grid-cols-[auto_1fr] sm:p-8"
+            style={{ background: "linear-gradient(120deg, #15172e, var(--acc-deep) 60%, var(--acc))", boxShadow: "0 30px 60px -30px var(--acc)" }}>
+            <div className="relative mx-auto grid h-36 w-36 place-items-center">
+              <svg viewBox="0 0 120 120" className="absolute inset-0 h-full w-full -rotate-90">
+                <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,.15)" strokeWidth="8" />
+                <circle cx="60" cy="60" r="52" fill="none" stroke={GOLD} strokeWidth="8" strokeLinecap="round" strokeDasharray="327" strokeDashoffset="20" />
+              </svg>
+              <div className="text-center text-white">
+                <Clock size={20} className="mx-auto opacity-80" />
+                <div className="mt-1 text-2xl font-black leading-tight">
+                  <Ed v={C.launchText} on={(launchText) => patch((d) => { d.launchText = launchText; })} edit={edit} />
+                </div>
+              </div>
+            </div>
+            <div className="text-white">
+              <div className="text-xl font-black sm:text-2xl">من استلام التفاصيل إلى إطلاق موقعك</div>
+              <div className="mt-4 flex items-start gap-3 rounded-2xl bg-white/10 p-4 text-sm leading-relaxed backdrop-blur">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[#1a1306]" style={{ background: GOLD }}><ClipboardList size={16} /></span>
+                <span className="text-white/90">
+                  <b className="text-white">بشرط: </b>
+                  <Ed v={C.activationNote} on={(activationNote) => patch((d) => { d.activationNote = activationNote; })} edit={edit} multi />
+                </span>
+              </div>
+              <button type="button" onClick={() => goTo(CHAPTERS.findIndex((c) => c.id === "site"))}
+                className="mp-noprint mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-white/75 hover:text-white">
+                وش التفاصيل المطلوبة؟ <ChevronLeft size={14} />
+              </button>
+            </div>
+          </div>
+        </Reveal>
+
         <div className="relative">
           <div className="absolute bottom-0 right-[19px] top-0 w-px bg-gradient-to-b from-[var(--acc)] via-[var(--line)] to-[#F5B301] md:hidden" />
           <div className="absolute left-0 right-0 top-[19px] hidden h-px bg-gradient-to-l from-[var(--acc)] via-[var(--line)] to-[#F5B301] md:block" />
@@ -1206,6 +1246,7 @@ function MeetingPlanInner() {
           >
             {C.activation.map((s, i) => {
               const last = i === C.activation.length - 1;
+              const start = /استلام/.test(s.title);
               const set = (fn: (x: Content["activation"][number]) => void) => patch((d) => { fn(d.activation[i]); });
               return (
                 <Reveal key={i} delay={i * 80}>
@@ -1213,13 +1254,13 @@ function MeetingPlanInner() {
                     <Del edit={edit} onClick={() => patch((d) => { d.activation.splice(i, 1); })} />
                     <span
                       className="relative z-10 grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-black"
-                      style={last ? { background: GOLD, color: "#1a1306", boxShadow: `0 0 0 6px ${GOLD}22` } : { background: "var(--surface)", color: "var(--acc)", boxShadow: "inset 0 0 0 2px var(--acc)" }}
+                      style={last ? { background: GOLD, color: "#1a1306", boxShadow: `0 0 0 6px ${GOLD}22` } : start ? { background: "var(--acc)", color: "white", boxShadow: "0 0 0 6px color-mix(in srgb, var(--acc) 20%, transparent)" } : { background: "var(--surface)", color: "var(--acc)", boxShadow: "inset 0 0 0 2px var(--acc)" }}
                     >
-                      {last ? <Rocket size={17} /> : fmt(i + 1)}
+                      {last ? <Rocket size={17} /> : start ? <Timer size={17} /> : fmt(i + 1)}
                     </span>
                     <div>
-                      <div className="text-[11px] font-bold text-[var(--faint)]">
-                        {edit ? <>يوم <EdNum v={s.day} on={(day) => set((x) => { x.day = day; })} edit /></> : s.day === 0 ? "اليوم" : `يوم ${fmt(s.day)}`} · {dayLabel(addDays(today, s.day))}
+                      <div className="text-[11px] font-black" style={{ color: last ? "#b7791f" : start ? "var(--acc)" : "var(--faint)" }}>
+                        <Ed v={s.when} on={(when) => set((x) => { x.when = when; })} edit={edit} />
                       </div>
                       <div className="mt-0.5 font-black text-[var(--ink)]">
                         <Ed v={s.title} on={(title) => set((x) => { x.title = title; })} edit={edit} />
@@ -1234,7 +1275,7 @@ function MeetingPlanInner() {
             })}
           </ol>
           <Add edit={edit} label="خطوة جديدة" className="mt-6 w-full" onClick={() => patch((d) => {
-            d.activation.push({ day: launchDays + 1, title: "خطوة جديدة", text: "وصف الخطوة" });
+            d.activation.push({ when: "متى؟", title: "خطوة جديدة", text: "وصف الخطوة" });
           })} />
         </div>
       </Chapter>
@@ -1533,8 +1574,8 @@ function MeetingPlanInner() {
               {[
                 ["النظام", P.brand],
                 ["الباقة", `${tier.name} — ${fmt(tier.price)} ${tier.period}`],
-                ["بداية التجهيز", dayLabel(addDays(today, 1))],
-                ["الإطلاق المتوقع", launchDate.toLocaleDateString(LOCALE, { weekday: "long", day: "numeric", month: "long" })],
+                ["بداية التجهيز", "فور استلام جميع التفاصيل"],
+                ["الإطلاق", `خلال ${C.launchText} من استلام التفاصيل`],
                 ["العائد الشهري المتوقع", `~ ${fmt(monthly)} ريال`],
               ].map(([k, v]) => (
                 <div key={k} className="flex items-center justify-between border-b border-[var(--line)] py-3 text-sm last:border-0">
