@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import {
   QrCode, CreditCard, Store, MonitorSmartphone, Bike, Gift, Globe, Clock, MessageCircle,
-  Wallet, LayoutDashboard, Rocket, Check, ChevronLeft, ChevronRight, ChevronDown, Maximize2, Minimize2, Sun, Moon,
+  Wallet, LayoutDashboard, Rocket, Check, ChevronLeft, ChevronRight, ChevronDown, Maximize2, Minimize2, Sun, Moon, Newspaper,
   Printer, Link2, Sparkles, Stamp, BellRing, GraduationCap, Headphones, CalendarCheck,
   TrendingUp, Users, Palette, ImageIcon, ClipboardList, Timer, Handshake, PartyPopper,
   Coffee, Scissors, Presentation, ShieldCheck, Star, Pencil, Plus, X, Save, RotateCcw,
@@ -200,7 +200,9 @@ const LOYALTY_SAMPLES: Record<ProductKey, { src: string; framed: boolean; glow: 
 
 /* ──────────────────────────── المظاهر ──────────────────────────── */
 
-type ThemeKey = "brand" | "night";
+type ThemeKey = "brand" | "editorial" | "night";
+const THEME_ORDER: ThemeKey[] = ["brand", "editorial", "night"];
+const THEME_LABEL: Record<ThemeKey, string> = { brand: "هوية المنصة", editorial: "عصري", night: "ليلي" };
 
 // «هوية المنصة»: نفس ألوان لوحة نحجز (كحلي + بنفسجي على خلفية فاتحة)
 const BRAND_ACCENT = "#5B3FE0";
@@ -213,6 +215,14 @@ const THEMES: Record<ThemeKey, Record<string, string>> = {
     "--muted": "#666C8E", "--faint": "#9499B4", "--glass": "rgba(255,255,255,.88)", "--grid": "rgba(30,43,122,.06)",
     "--shadow": "0 1px 2px rgba(23,26,58,.04), 0 12px 32px -18px rgba(23,26,58,.18)", "--glow": "22%",
   },
+  // «عصري»: أوف-وايت دافئ + شبكة خفيفة + حبر أسود + لمسة برتقالية واحدة
+  editorial: {
+    "--bg": "#F2F1EE", "--surface": "#FFFFFF", "--surface-2": "#EEEDE9", "--hover": "#EAE8E3",
+    "--line": "#E4E2DC", "--line-strong": "#CFCCC4", "--ink": "#0E0E0E", "--body": "#2A2A28",
+    "--muted": "#6E6C67", "--faint": "#9C9A93", "--glass": "rgba(242,241,238,.86)", "--grid": "rgba(14,14,14,.055)",
+    "--shadow": "0 1px 2px rgba(14,14,14,.04), 0 22px 44px -28px rgba(14,14,14,.22)", "--glow": "12%",
+    "--pill": "#0E0E0E", "--dark-from": "#0E0E0E",
+  },
   night: {
     "--bg": "#070A12", "--surface": "rgba(255,255,255,.03)", "--surface-2": "rgba(255,255,255,.06)", "--hover": "rgba(255,255,255,.06)",
     "--line": "rgba(255,255,255,.09)", "--line-strong": "rgba(255,255,255,.2)", "--ink": "#FFFFFF", "--body": "#CBD5E1",
@@ -221,8 +231,12 @@ const THEMES: Record<ThemeKey, Record<string, string>> = {
   },
 };
 
+const EDITORIAL_ACCENT = "#E8552D";
+
 const accentOf = (p: Product, t: ThemeKey) =>
-  t === "brand" ? { acc: BRAND_ACCENT, deep: BRAND_DEEP } : { acc: p.accent, deep: p.accentDeep };
+  t === "brand" ? { acc: BRAND_ACCENT, deep: BRAND_DEEP }
+    : t === "editorial" ? { acc: EDITORIAL_ACCENT, deep: "#141414" }
+    : { acc: p.accent, deep: p.accentDeep };
 
 /* ──────────────────────────── فصول الاجتماع ──────────────────────────── */
 
@@ -540,11 +554,12 @@ function MeetingPlanInner() {
   const P = PRODUCTS[productKey];
   const [theme, setTheme] = useState<ThemeKey>(() => {
     const q = params.get("theme");
-    if (q === "night" || q === "brand") return q;
-    try { return localStorage.getItem("mp-theme") === "night" ? "night" : "brand"; } catch { return "brand"; }
+    const ok = (v: string | null): v is ThemeKey => !!v && (THEME_ORDER as string[]).includes(v);
+    if (ok(q)) return q;
+    try { const v = localStorage.getItem("mp-theme"); return ok(v) ? v : "brand"; } catch { return "brand"; }
   });
   const toggleTheme = () => {
-    const next = theme === "brand" ? "night" : "brand";
+    const next = THEME_ORDER[(THEME_ORDER.indexOf(theme) + 1) % THEME_ORDER.length];
     setTheme(next);
     try { localStorage.setItem("mp-theme", next); } catch { /* ignore */ }
   };
@@ -760,12 +775,16 @@ function MeetingPlanInner() {
   return (
     <div
       dir="rtl"
+      data-theme={theme}
       className="mp-root min-h-screen w-full overflow-x-clip bg-[var(--bg)] text-[var(--body)]"
       style={{ ...THEMES[theme], ["--acc" as string]: A.acc, ["--acc-deep" as string]: A.deep, colorScheme: theme === "night" ? "dark" : "light", fontFamily: "var(--font-tajawal), system-ui, sans-serif" } as React.CSSProperties}
     >
       <style>{`
         html { scroll-behavior: smooth; }
         .mp-root ::selection { background: var(--acc); color: white; }
+        .mp-root[data-theme="editorial"] { background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 44px 44px; background-attachment: fixed; }
+        .mp-root[data-theme="editorial"] h1, .mp-root[data-theme="editorial"] h2, .mp-root[data-theme="editorial"] h3 { letter-spacing: -0.02em; }
+        .mp-root[data-theme="editorial"] .mp-glow { opacity: .5; }
         .mp-glow { background: radial-gradient(60% 60% at 50% 0%, color-mix(in srgb, var(--acc) var(--glow), transparent), transparent 70%); }
         .mp-grid { background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 48px 48px; mask-image: radial-gradient(70% 60% at 50% 30%, black, transparent); }
         .mp-range { -webkit-appearance: none; appearance: none; height: 6px; border-radius: 999px; background: var(--line); outline: none; }
@@ -827,7 +846,7 @@ function MeetingPlanInner() {
             )}
             <IconBtn onClick={copyLink} title="نسخ رابط الاجتماع">{copied ? <Check size={16} /> : <Link2 size={16} />}</IconBtn>
             <span className="hidden sm:contents"><IconBtn onClick={() => window.print()} title="طباعة / PDF"><Printer size={16} /></IconBtn></span>
-            <IconBtn onClick={toggleTheme} title={theme === "brand" ? "المظهر الليلي" : "هوية المنصة"}>{theme === "brand" ? <Moon size={16} /> : <Sun size={16} />}</IconBtn>
+            <IconBtn onClick={toggleTheme} title={`المظهر: ${THEME_LABEL[theme]} — اضغط للتبديل`}>{theme === "brand" ? <Sun size={16} /> : theme === "editorial" ? <Newspaper size={16} /> : <Moon size={16} />}</IconBtn>
             <span className="hidden sm:contents"><IconBtn onClick={toggleFs} title="وضع العرض (F)">{fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</IconBtn></span>
           </div>
         </div>
@@ -841,7 +860,7 @@ function MeetingPlanInner() {
                 key={c.id}
                 onClick={() => goTo(i)}
                 className="flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition-all"
-                style={on ? { background: "var(--acc)", color: "white" } : { color: done ? "var(--body)" : "var(--faint)" }}
+                style={on ? { background: "var(--pill, var(--acc))", color: "white" } : { color: done ? "var(--body)" : "var(--faint)" }}
               >
                 {done ? <Check size={12} style={{ color: "var(--acc)" }} /> : <c.icon size={12} />}
                 {c.label}
@@ -1299,7 +1318,7 @@ function MeetingPlanInner() {
         {/* عدّاد ٢٤ ساعة + شرط البدء */}
         <Reveal>
           <div className="mb-12 grid items-center gap-6 rounded-3xl p-6 sm:grid-cols-[auto_1fr] sm:p-8"
-            style={{ background: "linear-gradient(120deg, #15172e, var(--acc-deep) 60%, var(--acc))", boxShadow: "0 30px 60px -30px var(--acc)" }}>
+            style={{ background: "linear-gradient(120deg, var(--dark-from, #15172e), var(--acc-deep) 60%, var(--acc))", boxShadow: "0 30px 60px -30px var(--acc)" }}>
             <div className="relative mx-auto grid h-36 w-36 place-items-center">
               <svg viewBox="0 0 120 120" className="absolute inset-0 h-full w-full -rotate-90">
                 <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,.15)" strokeWidth="8" />
@@ -1638,7 +1657,7 @@ function MeetingPlanInner() {
 
           <Reveal delay={120}>
             <div className="space-y-4">
-              <div className="relative overflow-hidden rounded-3xl p-7" style={{ background: "linear-gradient(120deg, #15172e, var(--acc-deep) 55%, var(--acc))", boxShadow: "0 30px 60px -30px var(--acc)" }}>
+              <div className="relative overflow-hidden rounded-3xl p-7" style={{ background: "linear-gradient(120deg, var(--dark-from, #15172e), var(--acc-deep) 55%, var(--acc))", boxShadow: "0 30px 60px -30px var(--acc)" }}>
                 <div className="text-sm font-bold text-white/85">عائد إضافي متوقع شهرياً</div>
                 <div className="mt-2 flex items-baseline gap-2">
                   <span className="text-5xl font-black text-white sm:text-6xl">{fmt(monthly)}</span>
