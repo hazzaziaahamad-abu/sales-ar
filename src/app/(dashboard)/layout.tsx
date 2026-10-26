@@ -811,7 +811,7 @@ export default function DashboardLayout({
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
         {/* Content area — has margin on lg+ for sidebar, full-width on mobile/tablet */}
-        <div className="lg:mr-[276px] min-h-screen overflow-x-hidden">
+        <div className="lg:mr-[276px] min-h-screen overflow-x-clip">
           <ImpersonationBanner />
           <Topbar
             unreadCount={unreadCount}
