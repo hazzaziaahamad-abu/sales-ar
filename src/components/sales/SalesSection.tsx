@@ -358,6 +358,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const [assignType, setAssignType] = useState<string | undefined>(undefined);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileQuery, setProfileQuery] = useState("");
+  const [profileFocusName, setProfileFocusName] = useState<string | undefined>(undefined);
   const searchParams = useSearchParams();
 
   const [profileNoteId, setProfileNoteId] = useState<string | undefined>(undefined);
@@ -367,6 +368,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
     const n = searchParams.get("noteId");
     if (p) {
       setProfileQuery(p);
+      setProfileFocusName(undefined);
       setProfileNoteId(n || undefined);
       setProfileOpen(true);
     }
@@ -2256,7 +2258,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
                   </TableCell>
                   <TableCell className="font-medium text-foreground">
                     <button
-                      onClick={() => { setProfileQuery(deal.client_phone || deal.client_name); setProfileOpen(true); }}
+                      onClick={() => { setProfileQuery(deal.client_phone || deal.client_name); setProfileFocusName(deal.client_name); setProfileOpen(true); }}
                       className="hover:text-primary hover:underline transition-colors text-right"
                     >
                       {deal.client_name}
@@ -2273,7 +2275,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs" dir="ltr">
                     <button
-                      onClick={() => { if (deal.client_phone) { setProfileQuery(deal.client_phone); setProfileOpen(true); } }}
+                      onClick={() => { if (deal.client_phone) { setProfileQuery(deal.client_phone); setProfileFocusName(deal.client_name); setProfileOpen(true); } }}
                       className={deal.client_phone ? "hover:text-primary hover:underline transition-colors" : ""}
                     >
                       {deal.client_phone ? formatPhone(deal.client_phone) : "—"}
@@ -2782,7 +2784,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <button
-                            onClick={() => { setProfileQuery(deal.client_phone || deal.client_name); setProfileOpen(true); }}
+                            onClick={() => { setProfileQuery(deal.client_phone || deal.client_name); setProfileFocusName(deal.client_name); setProfileOpen(true); }}
                             className="text-sm font-bold text-foreground hover:text-primary hover:underline transition-colors text-right"
                           >{deal.client_name}</button>
                           <ColorBadge color={STAGE_BADGE_COLOR[deal.stage] || "cyan"} text={deal.stage} />
@@ -3654,6 +3656,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
         open={profileOpen}
         onClose={() => setProfileOpen(false)}
         initialQuery={profileQuery}
+        focusName={profileFocusName}
         highlightNoteId={profileNoteId}
       />
 

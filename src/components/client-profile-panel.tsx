@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   Sheet,
   SheetContent,
@@ -522,18 +522,42 @@ function normalizeBio(text: string): string {
   return splitBioPoints(text).map((p) => `• ${p}`).join("\n");
 }
 
+// مقارنة أسماء المتاجر بدون فرق المسافات وحالة الأحرف
+const normStore = (n: string | null | undefined) => (n || "").trim().replace(/\s+/g, " ").toLowerCase();
+
 interface ClientProfilePanelProps {
   open: boolean;
   onClose: () => void;
   initialQuery?: string;
+  focusName?: string; // اسم المتجر اللي انفتح منه الملخص — لو الرقم عليه أكثر من متجر
   highlightNoteId?: string; // scroll to & highlight a specific note
 }
 
-export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteId }: ClientProfilePanelProps) {
+export function ClientProfilePanel({ open, onClose, initialQuery, focusName, highlightNoteId }: ClientProfilePanelProps) {
   const { user } = useAuth();
   const [search, setSearch] = useState(initialQuery || "");
   const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<ClientProfileData | null>(null);
+  const [rawData, setRawData] = useState<ClientProfileData | null>(null);
+  // رقم واحد ممكن يكون مسجّل عليه أكثر من متجر (نفس المالك) — نفلتر الملخص على المتجر المختار
+  const [storeFilter, setStoreFilter] = useState(focusName || "");
+  const storeNames = useMemo(() => {
+    if (!rawData) return [] as string[];
+    const seen = new Map<string, string>();
+    for (const n of [...rawData.deals.map(d => d.client_name), ...rawData.renewals.map(r => r.customer_name), ...rawData.tickets.map(t => t.client_name)]) {
+      const k = normStore(n);
+      if (k && !seen.has(k)) seen.set(k, n!.trim());
+    }
+    return [...seen.values()];
+  }, [rawData]);
+  const data = useMemo<ClientProfileData | null>(() => {
+    const k = normStore(storeFilter);
+    if (!rawData || !k || storeNames.length < 2 || !storeNames.some(n => normStore(n) === k)) return rawData;
+    const deals = rawData.deals.filter(d => normStore(d.client_name) === k);
+    const renewals = rawData.renewals.filter(r => normStore(r.customer_name) === k);
+    const tickets = rawData.tickets.filter(t => normStore(t.client_name) === k);
+    const ids = new Set([...deals, ...renewals, ...tickets].map(x => x.id));
+    return { deals, renewals, tickets, notes: rawData.notes.filter(n => ids.has(n.entity_id)) };
+  }, [rawData, storeFilter, storeNames]);
   const [searched, setSearched] = useState(false);
   const [bio, setBio] = useState("");
   const [bioEditing, setBioEditing] = useState(false);
@@ -598,9 +622,10 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
   useEffect(() => {
     if (initialQuery && open) {
       setSearch(initialQuery);
+      setStoreFilter(focusName || "");
       doSearch(initialQuery);
     }
-  }, [initialQuery, open]);
+  }, [initialQuery, focusName, open]);
 
   // Scroll to the mentioned note ONCE per open. Doing this via an inline ref
   // callback re-fired scrollIntoView on every render, which kept yanking the
@@ -799,13 +824,13 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
     setBioEditing(false);
     try {
       const result = await fetchClientProfile(q.trim());
-      setData(result);
+      setRawData(result);
       const phone = result.deals[0]?.client_phone || result.renewals[0]?.customer_phone || result.tickets[0]?.client_phone || "";
       const name = result.deals[0]?.client_name || result.renewals[0]?.customer_name || result.tickets[0]?.client_name || "";
       const key = phone || name;
       if (key) loadBio(key);
     } catch {
-      setData(null);
+      setRawData(null);
     } finally {
       setLoading(false);
     }
@@ -813,6 +838,7 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setStoreFilter("");
     doSearch(search);
   };
 
@@ -820,7 +846,8 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
     onClose();
     setTimeout(() => {
       setSearch("");
-      setData(null);
+      setRawData(null);
+      setStoreFilter("");
       setSearched(false);
       setBio("");
       setBioDraft("");
@@ -899,7 +926,7 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
     try {
       const authorName = user?.name || user?.email || "مستخدم";
       const created = await createFollowUpNote(entityType, entityId, quickNote.trim(), authorName);
-      setData(prev => prev ? { ...prev, notes: [created, ...prev.notes] } : prev);
+      setRawData(prev => prev ? { ...prev, notes: [created, ...prev.notes] } : prev);
       const notified = new Set<string>();
       for (const name of mentionNames) {
         if (!quickNote.includes(`@${name}`)) continue;
@@ -1028,6 +1055,27 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
 
           {!loading && hasData && data && (
             <>
+              {/* أكثر من متجر على نفس الرقم — اختيار المتجر */}
+              {storeNames.length > 1 && (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.06] p-2 space-y-1.5">
+                  <p className="text-[11px] text-amber-400">هذا الرقم مسجّل عليه {storeNames.length} متاجر — اختر المتجر:</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[...storeNames, ""].map(n => {
+                      const active = n ? normStore(n) === normStore(storeFilter) : !storeNames.some(x => normStore(x) === normStore(storeFilter));
+                      return (
+                        <button
+                          key={n || "__all"}
+                          onClick={() => setStoreFilter(n)}
+                          className={`text-[11px] px-2 py-0.5 rounded-full border transition-colors ${active ? "border-amber-400 bg-amber-500/20 text-amber-300" : "border-border/50 text-muted-foreground hover:text-foreground"}`}
+                        >
+                          {n || "الكل"}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Client Info Card */}
               <div className="rounded-xl border border-primary/20 bg-primary/[0.04] p-3 space-y-2">
                 <div className="flex items-center gap-3">
