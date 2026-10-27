@@ -3,11 +3,12 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getRoomAccess } from "@/lib/api/salon-room-auth";
 import { CLIENT_COLS, LOG_COLS, PLAYBOOK, TASK_COLS, TEAM_COLS, stageLabel, type Stage } from "@/lib/salon-room";
 import { BOARD_COLS, stepsFor, type BoardCategory } from "@/lib/salon-room-board";
-import { CONTRACTED_STAGES, parseBoard, parseClient, parseLog, parseTask, parseTeam } from "../shared";
+import { MEETING_COLS } from "@/lib/salon-room-meetings";
+import { CONTRACTED_STAGES, parseBoard, parseMeeting, parseClient, parseLog, parseTask, parseTeam } from "../shared";
 
 export const runtime = "nodejs";
 
-/** POST /api/salon-room/{clients|tasks|logs|team|board} → إضافة. */
+/** POST /api/salon-room/{clients|tasks|logs|team|board|meetings} → إضافة. */
 export async function POST(req: NextRequest, ctx: { params: Promise<{ entity: string }> }) {
   const { entity } = await ctx.params;
   const access = await getRoomAccess(req);
@@ -104,6 +105,15 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ entity: st
       ...p.fields, org_id: orgId, created_by: author, sort_order: (first?.sort_order ?? 1) - 1,
       ...(status === "done" ? { completed_at: new Date().toISOString(), completed_by: author } : {}),
     }).select(BOARD_COLS).single();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ item: data });
+  }
+
+  if (entity === "meetings") {
+    const p = parseMeeting(b, false);
+    if (!p.ok) return NextResponse.json({ error: p.error }, { status: 400 });
+    const { data, error } = await supabaseAdmin.from("consult_meetings")
+      .insert({ ...p.fields, org_id: orgId, created_by: author }).select(MEETING_COLS).single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ item: data });
   }

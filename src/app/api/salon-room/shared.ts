@@ -1,5 +1,6 @@
 import { KPIS, type KpiKey } from "@/lib/salon-growth";
 import { LEAD_STATUS_IDS, STAGE_IDS, type Health, type LeadStatus, type LogKind, type Priority, type Stage } from "@/lib/salon-room";
+import { MEETING_KIND_IDS, type AgendaItem, type MeetingAction, type MeetingDecision, type MeetingKind } from "@/lib/salon-room-meetings";
 import { BOARD_CATEGORY_IDS, BOARD_STATUS_IDS, type BoardCategory, type BoardStatus, type BoardStep } from "@/lib/salon-room-board";
 
 const str = (v: unknown, max: number) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
@@ -158,6 +159,52 @@ export function parseBoard(b: Record<string, unknown>, partial: boolean): Parsed
       const s = (x ?? {}) as Record<string, unknown>;
       return { key: str(s.key, 40) || `s${i + 1}`, label: str(s.label, 200) || "خطوة", done_at: iso(s.done_at), done_by: str(s.done_by, 60) || null };
     });
+  }
+  return { ok: true, fields: f };
+}
+
+/** اجتماع الفريق — الأجندة والقرارات والمهام تُستبدل كاملة (مصفوفات صغيرة). */
+export function parseMeeting(b: Record<string, unknown>, partial: boolean): Parsed {
+  const f: Record<string, unknown> = {};
+  const has = (k: string) => k in b;
+  const list = (v: unknown, max: number) => (Array.isArray(v) ? v.slice(0, max).map((x) => (x ?? {}) as Record<string, unknown>) : null);
+  const id = (v: unknown) => str(v, 40) || Math.random().toString(36).slice(2, 10);
+  if (!partial || has("title")) {
+    const title = str(b.title, 160);
+    if (!title) return { ok: false, error: "اكتب عنوان الاجتماع" };
+    f.title = title;
+  }
+  if (!partial || has("meeting_date")) {
+    const d = date(b.meeting_date);
+    if (!d) return { ok: false, error: "حدّد تاريخ الاجتماع" };
+    f.meeting_date = d;
+  }
+  if (!partial || has("kind")) f.kind = MEETING_KIND_IDS.includes(b.kind as MeetingKind) ? b.kind : "other";
+  if (has("start_time")) f.start_time = /^\d{2}:\d{2}$/.test(String(b.start_time ?? "")) ? b.start_time : null;
+  if (has("status")) f.status = b.status === "held" ? "held" : "planned";
+  if (has("facilitator")) f.facilitator = str(b.facilitator, 60) || null;
+  if (has("notes")) f.notes = text(b.notes, 20000);
+  if (has("attendees")) f.attendees = Array.isArray(b.attendees) ? [...new Set(b.attendees.slice(0, 50).map((x) => str(x, 60)).filter(Boolean))] : [];
+  if (has("agenda")) {
+    const a = list(b.agenda, 40);
+    if (!a) return { ok: false, error: "أجندة غير صالحة" };
+    f.agenda = a.map((x): AgendaItem => ({
+      id: id(x.id), title: str(x.title, 300), owner: str(x.owner, 60) || null,
+      minutes: numOrNull(x.minutes, 600), done: !!x.done, notes: text(x.notes, 5000),
+    }));
+  }
+  if (has("decisions")) {
+    const a = list(b.decisions, 50);
+    if (!a) return { ok: false, error: "قرارات غير صالحة" };
+    f.decisions = a.map((x): MeetingDecision => ({ id: id(x.id), body: text(x.body, 1000) }));
+  }
+  if (has("actions")) {
+    const a = list(b.actions, 50);
+    if (!a) return { ok: false, error: "مهام غير صالحة" };
+    f.actions = a.map((x): MeetingAction => ({
+      id: id(x.id), body: text(x.body, 500), assignee: str(x.assignee, 60) || null,
+      due_date: date(x.due_date), task_id: str(x.task_id, 40) || null,
+    }));
   }
   return { ok: true, fields: f };
 }

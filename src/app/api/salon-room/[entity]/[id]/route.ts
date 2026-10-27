@@ -3,11 +3,12 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getRoomAccess } from "@/lib/api/salon-room-auth";
 import { CLIENT_COLS, LOG_COLS, TASK_COLS, TEAM_COLS, addDays, planDueDates, stageLabel, type RoomTask, type Stage } from "@/lib/salon-room";
 import { BOARD_COLS, type BoardUpdate } from "@/lib/salon-room-board";
-import { CONTRACTED_STAGES, parseBoard, parseClient, parseTask, parseTeam } from "../../shared";
+import { MEETING_COLS } from "@/lib/salon-room-meetings";
+import { CONTRACTED_STAGES, parseBoard, parseMeeting, parseClient, parseTask, parseTeam } from "../../shared";
 
 export const runtime = "nodejs";
 
-/** PATCH /api/salon-room/{clients|tasks|team|board}/[id] → تعديل. */
+/** PATCH /api/salon-room/{clients|tasks|team|board|meetings}/[id] → تعديل. */
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ entity: string; id: string }> }) {
   const { entity, id } = await ctx.params;
   const access = await getRoomAccess(req);
@@ -84,6 +85,16 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ entity: s
     return NextResponse.json({ item: data });
   }
 
+  if (entity === "meetings") {
+    const p = parseMeeting(b, true);
+    if (!p.ok) return NextResponse.json({ error: p.error }, { status: 400 });
+    const { data, error } = await supabaseAdmin.from("consult_meetings")
+      .update({ ...p.fields, updated_at: now }).eq("id", id).eq("org_id", orgId).select(MEETING_COLS).maybeSingle();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!data) return NextResponse.json({ error: "غير موجود" }, { status: 404 });
+    return NextResponse.json({ item: data });
+  }
+
   return NextResponse.json({ error: "غير موجود" }, { status: 404 });
 }
 
@@ -125,12 +136,12 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ entity: st
   return NextResponse.json({ client: updated.data, tasks: fresh.data ?? [], log: log.data });
 }
 
-/** DELETE /api/salon-room/{tasks|team|board}/[id] — مهام العملاء المخصّصة فقط (مهام الدليل ثابتة). العملاء تُؤرشف بالتعديل. */
+/** DELETE /api/salon-room/{tasks|team|board|meetings}/[id] — مهام العملاء المخصّصة فقط (مهام الدليل ثابتة). العملاء تُؤرشف بالتعديل. */
 export async function DELETE(req: NextRequest, ctx: { params: Promise<{ entity: string; id: string }> }) {
   const { entity, id } = await ctx.params;
   const access = await getRoomAccess(req);
   if (access instanceof NextResponse) return access;
-  const table = entity === "tasks" ? "consult_tasks" : entity === "team" ? "consult_team" : entity === "board" ? "consult_board_tasks" : null;
+  const table = entity === "tasks" ? "consult_tasks" : entity === "team" ? "consult_team" : entity === "board" ? "consult_board_tasks" : entity === "meetings" ? "consult_meetings" : null;
   if (!table) return NextResponse.json({ error: "غير مسموح" }, { status: 405 });
   let q = supabaseAdmin.from(table).delete().eq("id", id).eq("org_id", access.orgId);
   if (entity === "tasks") q = q.eq("custom", true);

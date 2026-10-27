@@ -6,7 +6,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
-  ClipboardList, KeyRound, Loader2, LogOut, Moon, Sun, LayoutGrid, CalendarDays, BookOpen, Users, Plus, Search, ChevronLeft, BarChart3, Crosshair, Phone,
+  CalendarCheck, ClipboardList, KeyRound, Loader2, LogOut, Moon, Sun, LayoutGrid, CalendarDays, BookOpen, Users, Plus, Search, ChevronLeft, BarChart3, Crosshair, Phone,
   ChevronRight, AlertTriangle, Clock, CheckCircle2, Circle, Target, Lightbulb, Package, ShieldCheck,
   UserPlus, Trash2, Check, X, Briefcase, Eye, EyeOff, Repeat, Sparkles, Store, Crown, MoonStar, Flower2, Gift,
 } from "lucide-react";
@@ -20,6 +20,8 @@ import Dashboard from "./Dashboard";
 import Targeting from "./Targeting";
 import TaskBoard, { type NewBoardTask } from "./TaskBoard";
 import { boardCategory, type BoardTask } from "@/lib/salon-room-board";
+import type { Meeting } from "@/lib/salon-room-meetings";
+import TeamMeeting, { type NewMeeting } from "./TeamMeeting";
 import { SessionSettingsButton, sessionOf } from "./FreeSession";
 import {
   THEMES, Avatar, Badge, EmptyState, Field, IconBtn, Modal, SectionTitle, GOLD, accGrad, addDaysKey, btnGhost, btnPrimary,
@@ -28,8 +30,8 @@ import {
 
 /* ──────────────────────────── البيانات ──────────────────────────── */
 
-export type RoomData = { clients: RoomClient[]; tasks: RoomTask[]; logs: RoomLog[]; team: TeamMember[]; targets: Targets; board: BoardTask[] };
-const EMPTY: RoomData = { clients: [], tasks: [], logs: [], team: [], targets: DEFAULT_TARGETS, board: [] };
+export type RoomData = { clients: RoomClient[]; tasks: RoomTask[]; logs: RoomLog[]; team: TeamMember[]; targets: Targets; board: BoardTask[]; meetings: Meeting[] };
+const EMPTY: RoomData = { clients: [], tasks: [], logs: [], team: [], targets: DEFAULT_TARGETS, board: [], meetings: [] };
 type ClientPatch = Partial<Omit<RoomClient, "id" | "created_at" | "updated_at">>;
 
 export type RoomOps = {
@@ -51,15 +53,19 @@ export type RoomOps = {
   patchBoard: (id: string, patch: Partial<BoardTask>, debounce?: boolean) => void;
   addBoardUpdate: (id: string, body: string) => Promise<boolean>;
   deleteBoard: (id: string) => void;
+  addMeeting: (f: NewMeeting) => Promise<string | null>;
+  patchMeeting: (id: string, patch: Partial<Meeting>, debounce?: boolean) => void;
+  deleteMeeting: (id: string) => void;
 };
 
 type Phase = "loading" | "gate" | "name" | "room";
-type TabId = "dashboard" | "board" | "targeting" | "tasks" | "week" | "playbook" | "team";
+type TabId = "dashboard" | "board" | "targeting" | "tasks" | "meeting" | "week" | "playbook" | "team";
 const TABS: { id: TabId; label: string; icon: LucideIcon }[] = [
   { id: "dashboard", label: "الداشبورد", icon: BarChart3 },
   { id: "board", label: "لوحة التنفيذ", icon: LayoutGrid },
   { id: "targeting", label: "خطة الاستهداف", icon: Crosshair },
   { id: "tasks", label: "جدول المهام", icon: ClipboardList },
+  { id: "meeting", label: "اجتماع الفريق", icon: CalendarCheck },
   { id: "week", label: "هذا الأسبوع", icon: CalendarDays },
   { id: "playbook", label: "آلية العميل", icon: BookOpen },
   { id: "team", label: "الفريق", icon: Users },
@@ -97,6 +103,7 @@ function SalonRoomInner() {
   const [me, setMe] = useState<string>(() => { try { return localStorage.getItem("room-user") ?? ""; } catch { return ""; } });
   const meRef = useRef(me);
   const pendingBoard = useRef(new Map<string, { patch: Partial<BoardTask>; timer: ReturnType<typeof setTimeout> | null }>());
+  const pendingMeeting = useRef(new Map<string, { patch: Partial<Meeting>; timer: ReturnType<typeof setTimeout> | null }>());
   useEffect(() => { meRef.current = me; }, [me]);
   const [tab, setTab] = useState<TabId>("dashboard");
   const [openId, setOpenId] = useState<string | null>(null);
@@ -125,7 +132,11 @@ function SalonRoomInner() {
   const loadData = useCallback(async () => {
     const d = await api<RoomData>("");
     // تعديلات جدول المهام اللي لسا ما انحفظت تبقى فوق نسخة السيرفر
-    setData({ ...d, board: (d.board ?? []).map((t) => ({ ...t, ...pendingBoard.current.get(t.id)?.patch })) });
+    setData({
+      ...d,
+      board: (d.board ?? []).map((t) => ({ ...t, ...pendingBoard.current.get(t.id)?.patch })),
+      meetings: (d.meetings ?? []).map((m) => ({ ...m, ...pendingMeeting.current.get(m.id)?.patch })),
+    });
     return d;
   }, [api]);
 
@@ -174,6 +185,16 @@ function SalonRoomInner() {
     try {
       const res = await api<{ item: BoardTask }>(`/board/${id}`, "PATCH", p.patch);
       setData((d) => ({ ...d, board: pendingBoard.current.has(id) ? d.board : d.board.map((t) => (t.id === id ? res.item : t)) }));
+    } catch (e) { fail(e); }
+  }, [api, fail]);
+
+  const flushMeeting = useCallback(async (id: string) => {
+    const p = pendingMeeting.current.get(id);
+    if (!p) return;
+    pendingMeeting.current.delete(id);
+    try {
+      const res = await api<{ item: Meeting }>(`/meetings/${id}`, "PATCH", p.patch);
+      setData((d) => ({ ...d, meetings: pendingMeeting.current.has(id) ? d.meetings : d.meetings.map((m) => (m.id === id ? res.item : m)) }));
     } catch (e) { fail(e); }
   }, [api, fail]);
 
@@ -283,6 +304,28 @@ function SalonRoomInner() {
         return true;
       } catch (e) { fail(e); return false; }
     },
+    addMeeting: async (f) => {
+      try {
+        const res = await api<{ item: Meeting }>("/meetings", "POST", f);
+        setData((d) => ({ ...d, meetings: [res.item, ...d.meetings] }));
+        notify("تم إنشاء الاجتماع");
+        return res.item.id;
+      } catch (e) { fail(e); return null; }
+    },
+    patchMeeting: (id, patch, debounce = false) => {
+      setData((d) => ({ ...d, meetings: d.meetings.map((m) => (m.id === id ? { ...m, ...patch } : m)) }));
+      const cur = pendingMeeting.current.get(id);
+      if (cur?.timer) clearTimeout(cur.timer);
+      pendingMeeting.current.set(id, { patch: { ...cur?.patch, ...patch }, timer: debounce ? setTimeout(() => flushMeeting(id), 700) : null });
+      if (!debounce) flushMeeting(id);
+    },
+    deleteMeeting: (id) => {
+      const p = pendingMeeting.current.get(id);
+      if (p?.timer) clearTimeout(p.timer);
+      pendingMeeting.current.delete(id);
+      setData((d) => ({ ...d, meetings: d.meetings.filter((m) => m.id !== id) }));
+      api(`/meetings/${id}`, "DELETE").then(() => notify("حُذف الاجتماع")).catch(fail);
+    },
     deleteBoard: (id) => {
       const p = pendingBoard.current.get(id);
       if (p?.timer) clearTimeout(p.timer);
@@ -367,6 +410,7 @@ function SalonRoomInner() {
             {tab === "board" && <Board data={data} me={me} ops={ops} onOpen={setOpenId} />}
             {tab === "targeting" && <Targeting data={data} me={me} ops={ops} onOpen={setOpenId} copy={copy} />}
             {tab === "tasks" && <TaskBoard data={data} me={me} ops={ops} />}
+            {tab === "meeting" && <TeamMeeting data={data} me={me} ops={ops} onOpen={setOpenId} onTasks={() => setTab("tasks")} copy={copy} />}
             {tab === "week" && <Week data={data} me={me} ops={ops} onOpen={setOpenId} onTasks={() => setTab("tasks")} />}
             {tab === "playbook" && <Playbook targets={data.targets} onSaveTargets={ops.setTargets} />}
             {tab === "team" && <Team data={data} me={me} ops={ops} />}
