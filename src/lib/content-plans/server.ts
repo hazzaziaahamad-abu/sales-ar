@@ -10,6 +10,7 @@ import {
   defaultStepTitles, makeStep, planTypeOf,
   type ContentItem, type ContentPlan, type ContentSuggestion, type ContentKind, type TimelineRow, type ContentStep,
 } from "./types";
+import { hookLibraryKey, sampleHooks } from "./hooks";
 
 const KINDS = CONTENT_KINDS.map((k) => k.value) as string[];
 const ITEM_STATUS_VALUES = ITEM_STATUSES.map((s) => s.value) as string[];
@@ -158,6 +159,7 @@ export async function loadPlanPayload(access: Extract<PlanAccess, { ok: true }>)
     : { data: [] };
   return {
     plan: publicPlan(access.plan, access.isOwner),
+    hookLibrary: hookLibraryKey(access.plan.org_id),
     items: (items ?? []) as ContentItem[],
     suggestions: suggestions ?? [],
     canEdit: access.canEdit,
@@ -188,7 +190,7 @@ export function sanitizePlanPatch(body: Record<string, unknown>, isOwner: boolea
 
 export function sanitizeItem(body: Record<string, unknown>) {
   const item: Record<string, unknown> = {};
-  for (const k of ["title", "idea", "script", "caption"] as const) {
+  for (const k of ["title", "hook", "idea", "script", "caption"] as const) {
     const v = str(body[k]);
     if (v !== undefined) item[k] = v;
   }
@@ -237,6 +239,7 @@ export async function generateIdeas(
     .replace("{count}", String(count))
     .replace("{kind}", kind ? kindLabel(kind) + ` (القيمة: ${kind})` : "نوّع بين الأنواع المتاحة")
     .replace("{hint}", str(opts.hint, 1000)?.trim() || "لا يوجد")
+    .replace("{hooks}", sampleHooks(plan.org_id).map((h) => "- " + h).join("\n"))
     .replace("{existing}", existingTitles.length ? existingTitles.slice(0, 60).join(" | ") : "لا يوجد");
   const res = await generateJSON<{ ideas: ContentSuggestion[] }>(prompt);
   return (res.ideas ?? [])
@@ -245,6 +248,7 @@ export async function generateIdeas(
     .map((i) => ({
       kind: (KINDS.includes(i.kind) ? i.kind : kind ?? "video") as ContentKind,
       title: String(i.title ?? ""),
+      hook: String(i.hook ?? "").slice(0, 500),
       idea: String(i.idea ?? ""),
       script: String(i.script ?? ""),
       caption: String(i.caption ?? ""),
@@ -255,20 +259,23 @@ export async function generateIdeas(
 
 export async function generateScript(
   plan: ContentPlan,
-  item: { kind?: string; title?: string; idea?: string; script?: string },
+  item: { kind?: string; title?: string; hook?: string; idea?: string; script?: string },
   instruction?: string
-): Promise<{ script: string; caption: string; timeline: TimelineRow[]; focus_points: string[] }> {
+): Promise<{ hook: string; script: string; caption: string; timeline: TimelineRow[]; focus_points: string[] }> {
   const kind = item.kind && KINDS.includes(item.kind) ? item.kind : "video";
   const prompt = CONTENT_SCRIPT_PROMPT
     .replace("{business}", orgContentProfile(plan.org_id).business)
     .replace("{plan}", JSON.stringify(planContext(plan), null, 2))
     .replace("{kind}", kindLabel(kind))
     .replace("{title}", str(item.title, 500) || "بدون عنوان")
+    .replace("{hook}", str(item.hook, 500)?.trim() || "غير محدد — اختر هوك قوي مناسب")
+    .replace("{hooks}", sampleHooks(plan.org_id, 10).map((h) => "- " + h).join("\n"))
     .replace("{idea}", str(item.idea, 3000) || "غير محددة")
     .replace("{current}", str(item.script, 8000)?.trim() || "لا يوجد")
     .replace("{instruction}", str(instruction, 1000)?.trim() || "اكتب أفضل نسخة ممكنة");
-  const res = await generateJSON<{ script: string; caption: string; timeline?: unknown; focus_points?: unknown }>(prompt);
+  const res = await generateJSON<{ hook?: string; script: string; caption: string; timeline?: unknown; focus_points?: unknown }>(prompt);
   return {
+    hook: String(res.hook ?? "").slice(0, 500),
     script: String(res.script ?? ""),
     caption: String(res.caption ?? ""),
     timeline: cleanTimeline(res.timeline),

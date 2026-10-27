@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Sparkles, Plus, Trash2, Copy, Check, Link2, Video, Image as ImageIcon, Layers, Film, Smartphone,
   X, Loader2, RefreshCw, Pencil, Eye, Calendar, ChevronDown, ChevronUp, Wand2, FileText,
-  Clock, Target, ListChecks, CalendarDays, ExternalLink, LayoutGrid, StickyNote,
+  Clock, Target, ListChecks, CalendarDays, ExternalLink, LayoutGrid, StickyNote, Anchor,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -12,6 +12,8 @@ import {
   planTypeOf, defaultStepTitles, makeStep,
   type ContentItem, type ContentKind, type ContentPlan, type SavedSuggestion, type TimelineRow, type ContentStep,
 } from "@/lib/content-plans/types";
+import type { HookLibraryKey } from "@/lib/content-plans/hooks";
+import { HookLibraryModal } from "./HookLibrary";
 
 const KIND_STYLE: Record<ContentKind, { icon: typeof Video; color: string }> = {
   video: { icon: Video, color: "text-red-400 bg-red-500/15" },
@@ -24,7 +26,10 @@ const KIND_STYLE: Record<ContentKind, { icon: typeof Video; color: string }> = {
 const inputCls =
   "w-full rounded-lg bg-white/[0.06] border border-border px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-violet-500/50 disabled:opacity-70";
 
-type PlanPayload = { plan: ContentPlan; items: ContentItem[]; suggestions: SavedSuggestion[]; canEdit: boolean; isOwner: boolean };
+type PlanPayload = {
+  plan: ContentPlan; items: ContentItem[]; suggestions: SavedSuggestion[]; canEdit: boolean; isOwner: boolean;
+  hookLibrary?: HookLibraryKey;
+};
 
 /**
  * محرر خطة المحتوى. يعمل في لوحة التحكم (apiBase = /api/content-plans/<id>)
@@ -297,6 +302,7 @@ export default function ContentPlanEditor({ apiBase }: { apiBase: string }) {
           item={editing}
           canEdit={canEdit}
           api={api}
+          hookLibrary={data.hookLibrary ?? "menu"}
           stepTitles={defaultStepTitles(planType, editing.kind, plan.step_template)}
           onSaveSteps={(steps) => saveSteps(editing.id, steps)}
           onClose={() => setEditing(null)}
@@ -493,7 +499,7 @@ function AIIdeasPanel({ api, suggestions, setSuggestions, onItemsAdded }: {
         method: "POST",
         body: JSON.stringify({
           items: list.map((x) => ({
-            kind: x.kind, title: x.title, idea: x.idea, script: x.script, caption: x.caption,
+            kind: x.kind, title: x.title, hook: x.hook, idea: x.idea, script: x.script, caption: x.caption,
             timeline: x.timeline, focus_points: x.focus_points, source: "ai", suggestion_id: x.id,
           })),
         }),
@@ -595,6 +601,7 @@ function AIIdeasPanel({ api, suggestions, setSuggestions, onItemsAdded }: {
                           {s.title}
                           {freshIds.includes(s.id) && <span className="mr-2 text-[10px] font-bold text-violet-300">جديدة</span>}
                         </p>
+                        {s.hook && <HookLine hook={s.hook} className="mt-1" />}
                         <p className="text-xs text-muted-foreground mt-0.5">{kindLabel(s.kind)} · {s.idea}</p>
                         {isOpen && (
                           <div className="mt-2 space-y-2">
@@ -673,6 +680,7 @@ function ItemCard({ item, index, canEdit, onOpen, onDelete, onStatus }: {
       <button onClick={onOpen} className="block w-full text-right">
         <h4 className="text-sm font-bold text-foreground mb-1">{item.title || "بدون عنوان"}</h4>
         <StepsProgress steps={item.steps ?? []} />
+        {item.hook && <HookLine hook={item.hook} className="mb-2" />}
         {item.idea && <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{item.idea}</p>}
         {item.script && (
           <p className="text-[11px] text-foreground/70 line-clamp-3 bg-black/15 rounded-md p-2 whitespace-pre-wrap">{item.script}</p>
@@ -693,14 +701,14 @@ function ItemCard({ item, index, canEdit, onOpen, onDelete, onStatus }: {
 
 // ─── محرر العنصر ──────────────────────────────────────────────────────────────
 
-function ItemEditor({ item, canEdit, api, stepTitles, onSaveSteps, onClose, onSave, onDelete }: {
-  item: ContentItem; canEdit: boolean; api: ApiFn; stepTitles: string[];
+function ItemEditor({ item, canEdit, api, hookLibrary, stepTitles, onSaveSteps, onClose, onSave, onDelete }: {
+  item: ContentItem; canEdit: boolean; api: ApiFn; hookLibrary: HookLibraryKey; stepTitles: string[];
   onSaveSteps: (steps: ContentStep[]) => Promise<ContentItem>;
   onClose: () => void; onSave: (i: ContentItem) => Promise<void>; onDelete: () => void;
 }) {
   // عناصر قديمة قد لا تحمل الحقول الجديدة
   const base = useMemo<ContentItem>(
-    () => ({ ...item, timeline: item.timeline ?? [], focus_points: item.focus_points ?? [], publish_time: item.publish_time ?? "", post_url: item.post_url ?? "" }),
+    () => ({ ...item, hook: item.hook ?? "", timeline: item.timeline ?? [], focus_points: item.focus_points ?? [], publish_time: item.publish_time ?? "", post_url: item.post_url ?? "" }),
     [item]
   );
   // المراحل تُحفظ فوراً عند كل تغيير، منفصلة عن نموذج الحفظ
@@ -721,6 +729,7 @@ function ItemEditor({ item, canEdit, api, stepTitles, onSaveSteps, onClose, onSa
   const [aiLoading, setAiLoading] = useState(false);
   const [instruction, setInstruction] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
+  const [showHooks, setShowHooks] = useState(false);
   const scriptLabel = CONTENT_KINDS.find((k) => k.value === form.kind)?.scriptLabel ?? "السكربت";
   const set = <K extends keyof ContentItem>(k: K, v: ContentItem[K]) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -728,12 +737,13 @@ function ItemEditor({ item, canEdit, api, stepTitles, onSaveSteps, onClose, onSa
     if (form.script.trim() && !instruction.trim() && !confirm("سيتم استبدال السكربت الحالي بنسخة محسّنة. متابعة؟")) return;
     setAiLoading(true);
     try {
-      const res = await api<{ script: string; caption: string; timeline: TimelineRow[]; focus_points: string[] }>("/ai", {
+      const res = await api<{ hook: string; script: string; caption: string; timeline: TimelineRow[]; focus_points: string[] }>("/ai", {
         method: "POST",
         body: JSON.stringify({ mode: "script", item: form, instruction }),
       });
       setForm((f) => ({
         ...f,
+        hook: res.hook || f.hook,
         script: res.script || f.script,
         caption: res.caption || f.caption,
         timeline: res.timeline?.length ? res.timeline : f.timeline,
@@ -764,6 +774,13 @@ function ItemEditor({ item, canEdit, api, stepTitles, onSaveSteps, onClose, onSa
   return (
     <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/60 backdrop-blur-sm overflow-y-auto p-3" onClick={close}>
       <div className="w-full max-w-3xl rounded-[14px] glass-surface border border-border p-5 my-6 space-y-4 hover:translate-y-0" onClick={(e) => e.stopPropagation()}>
+        {showHooks && (
+          <HookLibraryModal
+            libraryKey={hookLibrary}
+            onPick={(text) => { set("hook", text); setShowHooks(false); }}
+            onClose={() => setShowHooks(false)}
+          />
+        )}
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold text-foreground">{canEdit ? "تعديل المحتوى" : "تفاصيل المحتوى"}</h3>
           <button onClick={close} className="p-1 rounded-lg hover:bg-white/[0.1] text-muted-foreground"><X className="w-4 h-4" /></button>
@@ -800,6 +817,33 @@ function ItemEditor({ item, canEdit, api, stepTitles, onSaveSteps, onClose, onSa
 
         <Field label="العنوان">
           <input disabled={!canEdit} value={form.title} onChange={(e) => set("title", e.target.value)} className={inputCls} />
+        </Field>
+
+        <Field
+          label="هوك المحتوى — أول 3 ثواني"
+          action={
+            <div className="flex items-center gap-3">
+              {form.hook && (
+                <button onClick={() => copy("hook", form.hook)} className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground">
+                  {copied === "hook" ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />} نسخ
+                </button>
+              )}
+              {canEdit && (
+                <button onClick={() => setShowHooks(true)} className="flex items-center gap-1 text-[11px] font-semibold text-violet-400 hover:text-violet-300">
+                  <Anchor className="w-3 h-3" /> مكتبة الهوكات
+                </button>
+              )}
+            </div>
+          }
+        >
+          <textarea
+            disabled={!canEdit}
+            rows={2}
+            value={form.hook}
+            onChange={(e) => set("hook", e.target.value)}
+            className={cn(inputCls, "resize-y font-semibold")}
+            placeholder="الجملة اللي توقف السكرول — اكتبها أو اختر من مكتبة الهوكات"
+          />
         </Field>
 
         <Field label="الفكرة">
@@ -1170,6 +1214,15 @@ function ScheduleView({ items, onOpen }: { items: ContentItem[]; onOpen: (i: Con
 }
 
 // ─── عناصر صغيرة ──────────────────────────────────────────────────────────────
+
+function HookLine({ hook, className }: { hook: string; className?: string }) {
+  return (
+    <p className={cn("flex items-start gap-1.5 text-xs font-semibold text-violet-300 bg-violet-500/10 rounded-md px-2 py-1.5", className)}>
+      <Anchor className="w-3 h-3 mt-0.5 shrink-0" />
+      <span className="line-clamp-2">{hook}</span>
+    </p>
+  );
+}
 
 function Field({ label, action, children }: { label: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (

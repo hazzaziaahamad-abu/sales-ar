@@ -50,6 +50,7 @@ export interface ContentItem {
   plan_id: string;
   kind: ContentKind;
   title: string;
+  hook: string;   // هوك المحتوى — الجملة اللي توقف السكرول في أول 3 ثواني
   idea: string;
   script: string;
   caption: string;
@@ -72,6 +73,7 @@ export interface ContentItem {
 export interface ContentSuggestion {
   kind: ContentKind;
   title: string;
+  hook: string;
   idea: string;
   script: string;
   caption: string;

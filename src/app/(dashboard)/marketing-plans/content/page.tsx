@@ -9,7 +9,9 @@ import {
   type ContentPlan, type ContentPlanType,
 } from "@/lib/content-plans/types";
 import { MarketingTabs } from "@/components/content-plans/MarketingTabs";
-import { Plus, Clapperboard, Trash2, Link2, FileText, CalendarDays } from "lucide-react";
+import { HookLibraryModal } from "@/components/content-plans/HookLibrary";
+import { hookLibraryKey } from "@/lib/content-plans/hooks";
+import { Plus, Clapperboard, Trash2, Link2, FileText, CalendarDays, Anchor } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const inputCls = "w-full rounded-lg bg-white/[0.06] border border-border px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-violet-500/50";
@@ -28,6 +30,7 @@ export default function ContentMarketingPage() {
     setShowForm(!showForm);
   };
   const [saving, setSaving] = useState(false);
+  const [showHooks, setShowHooks] = useState(false);
 
   const load = useCallback(
     () =>
@@ -72,14 +75,25 @@ export default function ContentMarketingPage() {
           </h1>
           <p className="text-muted-foreground text-sm mt-0.5">خطط إنشاء المحتوى (فيديوهات وبوستات بمراحل تنفيذ) وخطط النشر (جدول بالتاريخ والوقت) — مع توليد أفكار بالذكاء الاصطناعي ورابط مشاركة</p>
         </div>
-        <button
-          onClick={openForm}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-500/20 text-violet-400 hover:bg-violet-500/30 border border-violet-500/20 font-semibold text-sm transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          خطة محتوى جديدة
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={openForm}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-500/20 text-violet-400 hover:bg-violet-500/30 border border-violet-500/20 font-semibold text-sm transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            خطة محتوى جديدة
+          </button>
+          <button
+            onClick={() => setShowHooks(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.04] text-foreground hover:bg-white/[0.08] border border-border font-semibold text-sm transition-colors"
+          >
+            <Anchor className="w-4 h-4 text-violet-400" />
+            مكتبة هوك المحتوى
+          </button>
+        </div>
       </div>
+
+      {showHooks && <HookLibraryModal libraryKey={hookLibraryKey(getOrgId())} onClose={() => setShowHooks(false)} />}
 
       {showForm && (
         <div className="glass-surface rounded-[14px] border border-violet-500/20 p-5 space-y-4">
