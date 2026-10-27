@@ -12,7 +12,7 @@ import {
 } from "@/lib/salon-room-board";
 import type { RoomData, RoomOps } from "./SalonRoom";
 import { NoteEditor, noteToHtml } from "./NoteEditor";
-import { Avatar, Badge, EmptyState, Field, Modal, accGrad, btnGhost, btnPrimary, card, dateLabel, fmt, input, timeAgo, todayKey } from "./ui";
+import { Avatar, Badge, DateInput, EmptyState, Field, Modal, accGrad, btnGhost, btnPrimary, card, dateLabel, fmt, input, timeAgo, todayKey } from "./ui";
 
 const CSS = `
 .tb-hand { font-family: var(--font-hand), var(--font-tajawal), sans-serif; }
@@ -278,8 +278,8 @@ function NewTaskModal({ category, me, members, onClose, onSave }: {
               {members.map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
           </Field>
-          <Field label="الموعد">
-            <input type="date" value={f.due_date ?? ""} onChange={(e) => setF({ ...f, due_date: e.target.value || null })} className={input} />
+          <Field label="الموعد" group>
+            <DateInput value={f.due_date} onChange={(v) => setF({ ...f, due_date: v })} quick label="الموعد" />
           </Field>
           <Field label="الأولوية" group>
             <PriorityPicker value={f.priority} onChange={(priority) => setF({ ...f, priority })} />
@@ -376,8 +376,8 @@ function TaskModal({ t, me, members, ops, today, onClose }: { t: BoardTask; me: 
               {[...new Set([...members, ...(t.assignee ? [t.assignee] : [])])].map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
           </Field>
-          <Field label={late ? "الموعد (متأخرة)" : "الموعد"}>
-            <input type="date" value={t.due_date ?? ""} onChange={(e) => patch({ due_date: e.target.value || null })} className={input} style={late ? { borderColor: "#DC2626" } : undefined} />
+          <Field label={late ? "الموعد (متأخرة)" : "الموعد"} group>
+            <DateInput value={t.due_date} onChange={(v) => patch({ due_date: v })} label="الموعد" invalid={late} />
           </Field>
           <Field label="الأولوية" group>
             <PriorityPicker value={t.priority} onChange={(priority) => patch({ priority })} />

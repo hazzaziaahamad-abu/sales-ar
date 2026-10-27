@@ -135,3 +135,29 @@ export function Modal({ title, onClose, children, wide }: { title: string; onClo
     </div>
   );
 }
+
+/** حقل تاريخ مع اسم اليوم تحته (منتقي الجهاز ما يبيّن اليوم) + اختصارات اختيارية. */
+export function DateInput({ value, onChange, quick, label, required, invalid }: {
+  value: string | null; onChange: (v: string | null) => void; quick?: boolean; label?: string; required?: boolean; invalid?: boolean;
+}) {
+  const today = todayKey();
+  const [y, m, d] = today.split("-").map(Number);
+  const dow = new Date(y, m - 1, d).getDay();
+  const shortcuts = [
+    { label: "اليوم", v: today },
+    { label: "بكرة", v: addDaysKey(today, 1) },
+    { label: "الأحد الجاي", v: addDaysKey(today, dow === 0 ? 7 : 7 - dow) },
+  ];
+  return (
+    <div>
+      <input type="date" value={value ?? ""} onChange={(e) => onChange(e.target.value || null)} className={input} aria-label={label} required={required}
+        style={invalid ? { borderColor: "#DC2626" } : undefined} />
+      <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px]">
+        {value && <span className="font-bold text-[var(--acc)]">{dateLabel(value, true)}{value === today ? " (اليوم)" : ""}</span>}
+        {quick && shortcuts.filter((s) => s.v !== value).map((s) => (
+          <button key={s.label} type="button" onClick={() => onChange(s.v)} className="rounded-full border border-[var(--line)] px-2 py-0.5 font-bold text-[var(--muted)] hover:bg-[var(--hover)]">{s.label}</button>
+        ))}
+      </div>
+    </div>
+  );
+}

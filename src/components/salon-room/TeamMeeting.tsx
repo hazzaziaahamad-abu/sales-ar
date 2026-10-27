@@ -18,7 +18,7 @@ import {
   type AgendaItem, type Meeting, type MeetingAction, type MeetingKind, type TemplateItem,
 } from "@/lib/salon-room-meetings";
 import { NoteEditor, noteToPlain } from "./NoteEditor";
-import { Avatar, Badge, EmptyState, Field, Modal, SectionTitle, accGrad, addDaysKey, btnGhost, btnPrimary, card, dateLabel, fmt, input, todayKey } from "./ui";
+import { Avatar, Badge, DateInput, EmptyState, Field, Modal, SectionTitle, accGrad, addDaysKey, btnGhost, btnPrimary, card, dateLabel, fmt, input, todayKey } from "./ui";
 
 type Props = { data: RoomData; me: string; ops: RoomOps; onOpen: (clientId: string) => void; onTasks: () => void; copy: (t: string, msg?: string) => void };
 
@@ -127,7 +127,7 @@ function NewMeetingModal({ data, me, onClose, onSave }: { data: RoomData; me: st
         </Field>
         <Field label="العنوان"><input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} className={input} /></Field>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Field label="التاريخ"><input type="date" value={f.meeting_date} onChange={(e) => setF({ ...f, meeting_date: e.target.value })} className={input} required /></Field>
+          <Field label="التاريخ" group><DateInput value={f.meeting_date} onChange={(v) => v && setF({ ...f, meeting_date: v })} quick label="تاريخ الاجتماع" required /></Field>
           <Field label="الوقت"><input type="time" value={f.start_time ?? ""} onChange={(e) => setF({ ...f, start_time: e.target.value || null })} className={input} /></Field>
           <Field label="تدير الاجتماع">
             <select value={f.facilitator ?? ""} onChange={(e) => setF({ ...f, facilitator: e.target.value || null })} className={input}>
@@ -222,7 +222,7 @@ function MeetingEditor({ m, data, me, ops, onOpen, onTasks, copy, onDeleted }: P
         </div>
         <input value={m.title} onChange={(e) => upd({ title: e.target.value }, true)} className="mt-3 w-full bg-transparent text-xl font-black text-[var(--ink)] outline-none" aria-label="عنوان الاجتماع" />
         <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <Field label="التاريخ"><input type="date" value={m.meeting_date} onChange={(e) => e.target.value && upd({ meeting_date: e.target.value })} className={input} /></Field>
+          <Field label="التاريخ" group><DateInput value={m.meeting_date} onChange={(v) => v && upd({ meeting_date: v })} label="تاريخ الاجتماع" /></Field>
           <Field label="الوقت"><input type="time" value={m.start_time ?? ""} onChange={(e) => upd({ start_time: e.target.value || null })} className={input} /></Field>
           <Field label="تدير الاجتماع">
             <select value={m.facilitator ?? ""} onChange={(e) => upd({ facilitator: e.target.value || null })} className={input}>
@@ -353,7 +353,7 @@ function MeetingEditor({ m, data, me, ops, onOpen, onTasks, copy, onDeleted }: P
                         <option value="">المسؤولة</option>
                         {people.map((n) => <option key={n} value={n}>{n}</option>)}
                       </select>
-                      <input type="date" value={a.due_date ?? ""} onChange={(e) => editAction(a.id, { due_date: e.target.value || null })} className={input} aria-label="الموعد" />
+                      <DateInput value={a.due_date} onChange={(v) => editAction(a.id, { due_date: v })} label="الموعد" />
                       {a.task_id ? (
                         <button onClick={onTasks} className="flex items-center justify-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold" style={{ color: task ? boardStatus(task.status).color : "var(--muted)", background: "var(--surface-2)" }}>
                           <ClipboardList size={13} /> {task ? `في الجدول: ${boardStatus(task.status).label}` : "حُذفت من الجدول"}

@@ -137,6 +137,7 @@ function SalonRoomInner() {
       ...d,
       board: (d.board ?? []).map((t) => ({ ...t, ...pendingBoard.current.get(t.id)?.patch })),
       meetings: (d.meetings ?? []).map((m) => ({ ...m, ...pendingMeeting.current.get(m.id)?.patch })),
+      templates: d.templates ?? {},
     });
     return d;
   }, [api]);
@@ -372,6 +373,9 @@ function SalonRoomInner() {
       <style>{`
         @keyframes sr-in { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
         .sr-in { animation: sr-in .4s ease-out both; }
+        /* محتوى التبويب: شفافية فقط وبدون fill — الـtransform يخلي النوافذ (fixed) تتموضع نسبة للصفحة بدل الشاشة */
+        @keyframes sr-fade { from { opacity: 0; } to { opacity: 1; } }
+        .sr-page { animation: sr-fade .3s ease-out; }
         @keyframes sr-slide { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
         .sr-slide { animation: sr-slide .3s ease-out both; }
       `}</style>
@@ -414,7 +418,7 @@ function SalonRoomInner() {
             </nav>
           </header>
 
-          <main key={tab} className="sr-in mx-auto max-w-7xl px-4 pb-24 pt-6 sm:px-6">
+          <main key={tab} className="sr-page mx-auto max-w-7xl px-4 pb-24 pt-6 sm:px-6">
             {tab === "dashboard" && <Dashboard data={data} onOpen={setOpenId} onSaveTargets={ops.setTargets} />}
             {tab === "board" && <Board data={data} me={me} ops={ops} onOpen={setOpenId} />}
             {tab === "targeting" && <Targeting data={data} me={me} ops={ops} onOpen={setOpenId} copy={copy} />}
