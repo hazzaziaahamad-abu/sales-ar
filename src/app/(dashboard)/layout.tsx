@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Sidebar } from "@/components/layout/sidebar";
+import { NAV_ITEMS, Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { TopbarProvider } from "@/components/layout/topbar-context";
 import { NotificationPanel } from "@/components/layout/notification-panel";
@@ -49,6 +49,21 @@ import { isFocusActive, useFocusActive } from "@/lib/focus-session";
 const ALWAYS_ALLOWED_SLUGS = ["urgent-followup", "mentions"];
 // صفحات للسوبر أدمن فقط حتى لو الصلاحية مفعّلة للموظف
 const SUPER_ONLY_SLUGS = ["finance"];
+
+/**
+ * أول صفحة يقدر الموظف يفتحها فعلاً — بمسارها الحقيقي من القائمة (الـslug مو دايماً هو المسار:
+ * offer-salon-growth ← /offer/salon-growth). نتخطّى صفحات السوبر أدمن.
+ */
+function landingFor(allowedPages: string[]) {
+  for (const slug of allowedPages) {
+    if (SUPER_ONLY_SLUGS.includes(slug)) continue;
+    const item = NAV_ITEMS.find((i) => i.slug === slug);
+    if (!item) return `/${slug}`; // صفحات مو في القائمة (مخفية/مدموجة) — مسارها نفس الـslug
+    if ((item as { superOnly?: boolean }).superOnly) continue;
+    return item.href;
+  }
+  return "/dashboard";
+}
 
 const PAGE_SLUG_MAP: Record<string, string> = {
   "/dashboard": "dashboard",
@@ -325,14 +340,13 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     if (!loading && user && !user.isSuperAdmin) {
       const slug = PAGE_SLUG_MAP[pathname] || pathname.split("/")[1];
       if (slug && SUPER_ONLY_SLUGS.includes(slug)) {
-        router.replace(`/${user.allowedPages[0] || "dashboard"}`);
+        router.replace(landingFor(user.allowedPages));
         return;
       }
       // صفحات مفتوحة لكل الموظفين بدون صلاحية
       if (slug && ALWAYS_ALLOWED_SLUGS.includes(slug)) return;
       if (slug && !user.allowedPages.includes(slug)) {
-        const firstAllowed = user.allowedPages[0] || "dashboard";
-        router.replace(`/${firstAllowed}`);
+        router.replace(landingFor(user.allowedPages));
       }
     }
   }, [loading, user, pathname, router]);
