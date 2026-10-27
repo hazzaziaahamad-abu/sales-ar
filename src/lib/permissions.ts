@@ -24,6 +24,19 @@ export async function isSuperAdmin(userId: string): Promise<boolean> {
   return data?.is_super_admin === true;
 }
 
+/** يقدر يفتح الصفحة؟ السوبر أدمن دايماً، والباقي لو الصفحة (slug) مفعّلة في دوره. */
+export async function canOpenPage(userId: string, slug: string): Promise<boolean> {
+  const { data } = await supabaseAdmin
+    .from("user_profiles")
+    .select("is_super_admin, roles(allowed_pages)")
+    .eq("id", userId)
+    .single();
+  if (!data) return false;
+  if (data.is_super_admin === true) return true;
+  const role = (Array.isArray(data.roles) ? data.roles[0] : data.roles) as { allowed_pages?: string[] | null } | null;
+  return !!role?.allowed_pages?.includes(slug);
+}
+
 export async function getUserPermissions(
   userId: string
 ): Promise<Record<string, boolean>> {
