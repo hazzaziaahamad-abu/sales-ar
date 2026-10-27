@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     supabaseAdmin.from("consult_tasks").select(TASK_COLS).eq("org_id", o).order("sort_order").limit(10000),
     supabaseAdmin.from("consult_logs").select(LOG_COLS).eq("org_id", o).order("created_at", { ascending: false }).limit(1000),
     supabaseAdmin.from("consult_team").select(TEAM_COLS).eq("org_id", o).order("created_at"),
-    supabaseAdmin.from("consult_room_settings").select("targets").eq("org_id", o).maybeSingle(),
+    supabaseAdmin.from("consult_room_settings").select("targets, meeting_templates").eq("org_id", o).maybeSingle(),
     supabaseAdmin.from("consult_board_tasks").select(BOARD_COLS).eq("org_id", o).order("sort_order").order("created_at", { ascending: false }).limit(2000),
     supabaseAdmin.from("consult_meetings").select(MEETING_COLS).eq("org_id", o).order("meeting_date", { ascending: false }).order("created_at", { ascending: false }).limit(200),
   ]);
@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
       team: team.data ?? [],
       board: board.data ?? [],
       meetings: meetings.data ?? [],
+      templates: settings.data?.meeting_templates ?? {},
       targets: { ...DEFAULT_TARGETS, ...(settings.data?.targets ?? {}) },
     },
     { headers: { "Cache-Control": "no-store" } },

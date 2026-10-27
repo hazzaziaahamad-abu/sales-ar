@@ -20,7 +20,7 @@ import Dashboard from "./Dashboard";
 import Targeting from "./Targeting";
 import TaskBoard, { type NewBoardTask } from "./TaskBoard";
 import { boardCategory, type BoardTask } from "@/lib/salon-room-board";
-import type { Meeting } from "@/lib/salon-room-meetings";
+import type { Meeting, MeetingKind, MeetingTemplates, TemplateItem } from "@/lib/salon-room-meetings";
 import TeamMeeting, { type NewMeeting } from "./TeamMeeting";
 import { SessionSettingsButton, sessionOf } from "./FreeSession";
 import {
@@ -30,8 +30,8 @@ import {
 
 /* ──────────────────────────── البيانات ──────────────────────────── */
 
-export type RoomData = { clients: RoomClient[]; tasks: RoomTask[]; logs: RoomLog[]; team: TeamMember[]; targets: Targets; board: BoardTask[]; meetings: Meeting[] };
-const EMPTY: RoomData = { clients: [], tasks: [], logs: [], team: [], targets: DEFAULT_TARGETS, board: [], meetings: [] };
+export type RoomData = { clients: RoomClient[]; tasks: RoomTask[]; logs: RoomLog[]; team: TeamMember[]; targets: Targets; board: BoardTask[]; meetings: Meeting[]; templates: MeetingTemplates };
+const EMPTY: RoomData = { clients: [], tasks: [], logs: [], team: [], targets: DEFAULT_TARGETS, board: [], meetings: [], templates: {} };
 type ClientPatch = Partial<Omit<RoomClient, "id" | "created_at" | "updated_at">>;
 
 export type RoomOps = {
@@ -56,6 +56,7 @@ export type RoomOps = {
   addMeeting: (f: NewMeeting) => Promise<string | null>;
   patchMeeting: (id: string, patch: Partial<Meeting>, debounce?: boolean) => void;
   deleteMeeting: (id: string) => void;
+  saveTemplate: (kind: MeetingKind, agenda: TemplateItem[] | null) => Promise<boolean>;
 };
 
 type Phase = "loading" | "gate" | "name" | "room";
@@ -318,6 +319,14 @@ function SalonRoomInner() {
       if (cur?.timer) clearTimeout(cur.timer);
       pendingMeeting.current.set(id, { patch: { ...cur?.patch, ...patch }, timer: debounce ? setTimeout(() => flushMeeting(id), 700) : null });
       if (!debounce) flushMeeting(id);
+    },
+    saveTemplate: async (kind, agenda) => {
+      try {
+        const res = await api<{ templates: MeetingTemplates }>("/templates", "PUT", { kind, agenda });
+        setData((d) => ({ ...d, templates: res.templates }));
+        notify(agenda ? "انحفظت كأجندة افتراضية" : "رجعت الأجندة الافتراضية الأصلية");
+        return true;
+      } catch (e) { fail(e); return false; }
     },
     deleteMeeting: (id) => {
       const p = pendingMeeting.current.get(id);

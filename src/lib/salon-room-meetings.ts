@@ -54,7 +54,14 @@ export const meetingKind = (id: string) => MEETING_KINDS.find((k) => k.id === id
 const rid = () => Math.random().toString(36).slice(2, 10);
 export const newId = rid;
 
-export const agendaFor = (kind: MeetingKind): AgendaItem[] =>
-  meetingKind(kind).agenda.map(([title, minutes]) => ({ id: rid(), title, owner: null, minutes, done: false, notes: "" }));
+/** قالب أجندة محفوظ من الفريق لنوع اجتماع (يحلّ محل القالب المدمج). */
+export type TemplateItem = { title: string; minutes: number | null; owner: string | null };
+export type MeetingTemplates = Partial<Record<MeetingKind, TemplateItem[]>>;
+
+export const agendaFor = (kind: MeetingKind, templates?: MeetingTemplates): AgendaItem[] => {
+  const custom = templates?.[kind];
+  const items: TemplateItem[] = custom ?? meetingKind(kind).agenda.map(([title, minutes]) => ({ title, minutes, owner: null }));
+  return items.map((t) => ({ id: rid(), title: t.title, owner: t.owner, minutes: t.minutes, done: false, notes: "" }));
+};
 
 export const agendaMinutes = (m: Pick<Meeting, "agenda">) => m.agenda.reduce((s, a) => s + (a.minutes ?? 0), 0);

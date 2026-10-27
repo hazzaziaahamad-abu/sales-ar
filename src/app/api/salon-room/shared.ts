@@ -1,6 +1,6 @@
 import { KPIS, type KpiKey } from "@/lib/salon-growth";
 import { LEAD_STATUS_IDS, STAGE_IDS, type Health, type LeadStatus, type LogKind, type Priority, type Stage } from "@/lib/salon-room";
-import { MEETING_KIND_IDS, type AgendaItem, type MeetingAction, type MeetingDecision, type MeetingKind } from "@/lib/salon-room-meetings";
+import { MEETING_KIND_IDS, type MeetingTemplates, type TemplateItem, type AgendaItem, type MeetingAction, type MeetingDecision, type MeetingKind } from "@/lib/salon-room-meetings";
 import { BOARD_CATEGORY_IDS, BOARD_STATUS_IDS, type BoardCategory, type BoardStatus, type BoardStep } from "@/lib/salon-room-board";
 
 const str = (v: unknown, max: number) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
@@ -207,4 +207,18 @@ export function parseMeeting(b: Record<string, unknown>, partial: boolean): Pars
     }));
   }
   return { ok: true, fields: f };
+}
+
+/** قوالب الأجندة: لكل نوع قائمة بنود (عنوان، دقائق، مسؤولة)؛ null يرجّع القالب المدمج. */
+export function parseTemplates(v: unknown): MeetingTemplates {
+  const out: MeetingTemplates = {};
+  if (!v || typeof v !== "object") return out;
+  for (const [k, items] of Object.entries(v as Record<string, unknown>)) {
+    if (!MEETING_KIND_IDS.includes(k as MeetingKind) || !Array.isArray(items)) continue;
+    out[k as MeetingKind] = items.slice(0, 40).map((x): TemplateItem => {
+      const o = (x ?? {}) as Record<string, unknown>;
+      return { title: str(o.title, 300), minutes: numOrNull(o.minutes, 600), owner: str(o.owner, 60) || null };
+    }).filter((x) => x.title);
+  }
+  return out;
 }

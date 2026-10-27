@@ -6,7 +6,7 @@
 
 import React, { useMemo, useState } from "react";
 import {
-  AlertTriangle, ArrowDown, ArrowUp, CalendarCheck, CalendarDays, Check, ClipboardList, Copy, FileText, Gavel,
+  AlertTriangle, ArrowDown, Bookmark, RotateCcw, ArrowUp, CalendarCheck, CalendarDays, Check, ClipboardList, Copy, FileText, Gavel,
   ListChecks, ListTodo, Plus, Sparkles, Trash2, Users, X,
 } from "lucide-react";
 import { needsAttention, type RoomData, type RoomOps } from "./SalonRoom";
@@ -15,7 +15,7 @@ import { sessionMetrics } from "./FreeSession";
 import { boardStatus } from "@/lib/salon-room-board";
 import {
   MEETING_KINDS, agendaFor, agendaMinutes, meetingKind, newId,
-  type AgendaItem, type Meeting, type MeetingAction, type MeetingKind,
+  type AgendaItem, type Meeting, type MeetingAction, type MeetingKind, type TemplateItem,
 } from "@/lib/salon-room-meetings";
 import { NoteEditor, noteToPlain } from "./NoteEditor";
 import { Avatar, Badge, EmptyState, Field, Modal, SectionTitle, accGrad, addDaysKey, btnGhost, btnPrimary, card, dateLabel, fmt, input, todayKey } from "./ui";
@@ -105,11 +105,11 @@ function NewMeetingModal({ data, me, onClose, onSave }: { data: RoomData; me: st
   const team = data.team.filter((m) => m.active).map((m) => m.name);
   const [f, setF] = useState<NewMeeting>({
     title: MEETING_KINDS[0].title, kind: "weekly", meeting_date: dow === 0 ? today : addDaysKey(today, 7 - dow), start_time: "10:00",
-    facilitator: me || null, attendees: team, agenda: agendaFor("weekly"),
+    facilitator: me || null, attendees: team, agenda: agendaFor("weekly", data.templates),
   });
   const [busy, setBusy] = useState(false);
   const pickKind = (kind: MeetingKind) => setF((p) => ({
-    ...p, kind, agenda: agendaFor(kind),
+    ...p, kind, agenda: agendaFor(kind, data.templates),
     title: MEETING_KINDS.some((k) => k.title === p.title) || !p.title.trim() ? meetingKind(kind).title : p.title,
   }));
   return (
@@ -138,7 +138,7 @@ function NewMeetingModal({ data, me, onClose, onSave }: { data: RoomData; me: st
         </div>
         {f.agenda.length > 0 && (
           <div className="rounded-2xl bg-[var(--surface-2)] p-3 text-xs text-[var(--body)]">
-            <b className="text-[var(--ink)]">الأجندة الجاهزة ({fmt(agendaMinutes(f))} دقيقة):</b>
+            <b className="text-[var(--ink)]">{data.templates[f.kind] ? "أجندة الفريق المحفوظة" : "الأجندة الجاهزة"} ({fmt(agendaMinutes(f))} دقيقة):</b>
             <ol className="mt-1 list-inside list-decimal space-y-0.5">{f.agenda.map((a) => <li key={a.id}>{a.title}</li>)}</ol>
             <div className="mt-1 text-[var(--muted)]">تقدرين تعدّلينها وتضيفين بنود بعد الإنشاء.</div>
           </div>
@@ -311,6 +311,7 @@ function MeetingEditor({ m, data, me, ops, onOpen, onTasks, copy, onDeleted }: P
                 );
               })}
             </ol>
+            <TemplateBar m={m} data={data} ops={ops} />
           </div>
 
           {/* ملاحظات عامة */}
@@ -484,5 +485,34 @@ function Prep({ m, data, onOpen, onTasks, addItem }: {
         </div>
       )}
     </>
+  );
+}
+
+/* ──────────────────────────── الأجندة الافتراضية ──────────────────────────── */
+
+function TemplateBar({ m, data, ops }: { m: Meeting; data: RoomData; ops: RoomOps }) {
+  const k = meetingKind(m.kind);
+  const custom = data.templates[m.kind];
+  const items: TemplateItem[] = m.agenda.filter((a) => a.title.trim()).map((a) => ({ title: a.title.trim(), minutes: a.minutes, owner: a.owner }));
+  const current = agendaFor(m.kind, data.templates).map((a) => ({ title: a.title, minutes: a.minutes, owner: a.owner }));
+  const same = JSON.stringify(items) === JSON.stringify(current);
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    if (!items.length || !confirm(`تصير هذي الأجندة (${fmt(items.length)} بنود) هي الافتراضية لكل اجتماع «${k.label}» جديد. الاجتماعات الحالية ما تتغيّر.`)) return;
+    setBusy(true); await ops.saveTemplate(m.kind, items); setBusy(false);
+  };
+  const reset = async () => {
+    if (!confirm(`نرجّع الأجندة الأصلية لاجتماعات «${k.label}» الجديدة؟`)) return;
+    setBusy(true); await ops.saveTemplate(m.kind, null); setBusy(false);
+  };
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2 rounded-2xl bg-[var(--surface-2)] px-3 py-2 text-[11px]">
+      <Bookmark size={13} className="shrink-0 text-[var(--acc)]" />
+      <span className="min-w-0 flex-1 font-bold text-[var(--muted)]">
+        {same ? `هذي هي الأجندة الافتراضية لاجتماعات «${k.label}»${custom ? " (محفوظة من الفريق)" : ""}` : `عدّلتي الأجندة؟ احفظيها عشان تنضاف تلقائياً لكل اجتماع «${k.label}» جديد`}
+      </span>
+      {!same && <button onClick={save} disabled={busy || !items.length} className={`${btnPrimary} !px-3 !py-1.5 text-xs`} style={accGrad}><Bookmark size={12} /> احفظ كأجندة افتراضية</button>}
+      {custom && <button onClick={reset} disabled={busy} className={`${btnGhost} !px-3 !py-1.5 text-xs`}><RotateCcw size={12} /> رجوع للأصلية</button>}
+    </div>
   );
 }
