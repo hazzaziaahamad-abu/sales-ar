@@ -17,6 +17,7 @@ import {
   MEETING_KINDS, agendaFor, agendaMinutes, meetingKind, newId,
   type AgendaItem, type Meeting, type MeetingAction, type MeetingKind,
 } from "@/lib/salon-room-meetings";
+import { NoteEditor, noteToPlain } from "./NoteEditor";
 import { Avatar, Badge, EmptyState, Field, Modal, SectionTitle, accGrad, addDaysKey, btnGhost, btnPrimary, card, dateLabel, fmt, input, todayKey } from "./ui";
 
 type Props = { data: RoomData; me: string; ops: RoomOps; onOpen: (clientId: string) => void; onTasks: () => void; copy: (t: string, msg?: string) => void };
@@ -195,10 +196,10 @@ function MeetingEditor({ m, data, me, ops, onOpen, onTasks, copy, onDeleted }: P
       lines.push("", "🗂️ الأجندة:");
       m.agenda.forEach((a, i) => {
         lines.push(`${i + 1}. ${a.title}${a.done ? " ✓" : ""}`);
-        if (a.notes.trim()) lines.push(...a.notes.trim().split("\n").map((l) => `   • ${l}`));
+        if (a.notes.trim()) lines.push(...noteToPlain(a.notes).trim().split("\n").filter((l) => l.trim()).map((l) => `   • ${l.trim()}`));
       });
     }
-    if (m.notes.trim()) lines.push("", "📝 ملاحظات عامة:", m.notes.trim());
+    if (m.notes.trim()) lines.push("", "📝 ملاحظات عامة:", noteToPlain(m.notes).trim());
     const decisions = m.decisions.filter((d) => d.body.trim());
     if (decisions.length) lines.push("", "✅ القرارات:", ...decisions.map((d) => `- ${d.body.trim()}`));
     const actions = m.actions.filter((a) => a.body.trim());
@@ -301,8 +302,10 @@ function MeetingEditor({ m, data, me, ops, onOpen, onTasks, copy, onDeleted }: P
                       <button onClick={() => setAgenda((x) => x.filter((y) => y.id !== a.id))} className="mt-1 shrink-0 p-0.5 text-[var(--faint)] hover:text-red-600" aria-label="حذف البند"><X size={14} /></button>
                     </div>
                     {notesOpen && (
-                      <textarea value={a.notes} onChange={(e) => editItem(a.id, { notes: e.target.value }, true)} rows={a.notes ? Math.min(6, a.notes.split("\n").length + 1) : 2}
-                        placeholder="وش انقال في هالبند؟ أرقام، عوائق، اتفاقات…" className={`${input} mt-2 resize-y text-[13px]`} aria-label={`ملاحظات البند ${i + 1}`} />
+                      <div className="mt-2">
+                        <NoteEditor value={a.notes} onChange={(v) => editItem(a.id, { notes: v }, true)} minLines={2}
+                          placeholder="وش انقال في هالبند؟ أرقام، عوائق، اتفاقات…" label={`ملاحظات البند ${i + 1}`} />
+                      </div>
                     )}
                   </li>
                 );
@@ -313,7 +316,7 @@ function MeetingEditor({ m, data, me, ops, onOpen, onTasks, copy, onDeleted }: P
           {/* ملاحظات عامة */}
           <div className={`${card} p-4 sm:p-5`}>
             <SectionTitle icon={FileText} title="ملاحظات الاجتماع" />
-            <textarea value={m.notes} onChange={(e) => upd({ notes: e.target.value }, true)} rows={5} className={`${input} resize-y`} placeholder="أي شي انقال خارج البنود، أفكار، ملاحظات للمتابعة…" aria-label="ملاحظات الاجتماع" />
+            <NoteEditor value={m.notes} onChange={(v) => upd({ notes: v }, true)} minLines={6} placeholder="أي شي انقال خارج البنود، أفكار، ملاحظات للمتابعة… وظلّلي المهم" label="ملاحظات الاجتماع" />
           </div>
 
           {/* القرارات */}

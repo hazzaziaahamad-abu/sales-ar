@@ -11,6 +11,7 @@ import {
   type BoardCategory, type BoardStatus, type BoardStep, type BoardTask,
 } from "@/lib/salon-room-board";
 import type { RoomData, RoomOps } from "./SalonRoom";
+import { NoteEditor, noteToHtml } from "./NoteEditor";
 import { Avatar, Badge, EmptyState, Field, Modal, accGrad, btnGhost, btnPrimary, card, dateLabel, fmt, input, timeAgo, todayKey } from "./ui";
 
 const CSS = `
@@ -36,6 +37,7 @@ const CSS = `
   font-family: var(--font-hand), sans-serif; font-weight:700; font-size:13px; border:2px solid currentColor; background:rgba(255,255,255,.7); }
 .tb-tag { font-size:11px; font-weight:800; opacity:.72; }
 .tb-title { font-family: var(--font-hand), sans-serif; font-size:18px; font-weight:700; line-height:1.4; margin:6px 0 4px; word-break:break-word; }
+.tb-body span[style*="background"] { border-radius:4px; padding:0 2px; -webkit-box-decoration-break:clone; box-decoration-break:clone; color:#2A1018; }
 .tb-body { font-size:12.5px; line-height:1.65; white-space:pre-wrap; word-break:break-word; opacity:.82;
   display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
 .tb-foot { margin-top:auto; padding-top:10px; display:flex; flex-wrap:wrap; align-items:center; gap:5px; font-size:10.5px; font-weight:800; }
@@ -225,7 +227,7 @@ function Sticker({ t, late, onOpen }: { t: BoardTask; late: boolean; onOpen: () 
           {(t.status === "done" || t.status === "review") && <span className="tb-stamp" style={{ color: t.status === "done" ? "#047857" : "#a16207" }}>{t.status === "done" ? "منجزة ✓" : "مراجعة"}</span>}
           <div className="tb-tag">{c.emoji} {c.label}{t.priority === "A" ? " · 🔥" : ""}</div>
           <div className="tb-title">{t.title}</div>
-          {t.body && <div className="tb-body">{t.body}</div>}
+          {t.body && <div className="tb-body" dangerouslySetInnerHTML={{ __html: noteToHtml(t.body) }} />}
           <div className="tb-meter" title={`التقدّم ${Math.round(pct * 100)}٪`}><i style={{ width: `${Math.round(pct * 100)}%` }} /></div>
           <div className="tb-foot">
             {t.assignee ? <span className="tb-chip"><Avatar name={t.assignee} size={15} /> {t.assignee.split(" ")[0]}</span> : <span className="tb-chip">بدون مسؤولة</span>}
@@ -341,7 +343,7 @@ function TaskModal({ t, me, members, ops, today, onClose }: { t: BoardTask; me: 
         {/* العنوان والتفاصيل على ورقة بلون التصنيف */}
         <div className="rounded-2xl p-4" style={{ background: `linear-gradient(170deg, color-mix(in srgb, ${c.paper} 55%, #fff), ${c.paper} 80%)`, color: c.ink }}>
           <textarea value={t.title} onChange={(e) => patch({ title: e.target.value.replace(/\n/g, " ") }, true)} rows={2} className="tb-hand w-full resize-none bg-transparent text-lg font-bold leading-snug outline-none placeholder:opacity-40" aria-label="العنوان" />
-          <textarea value={t.body} onChange={(e) => patch({ body: e.target.value }, true)} rows={3} placeholder="التفاصيل…" className="mt-1 w-full resize-none bg-transparent text-sm leading-relaxed outline-none placeholder:opacity-40" aria-label="التفاصيل" />
+          <div className="mt-2"><NoteEditor value={t.body} onChange={(v) => patch({ body: v }, true)} variant="bare" minLines={3} placeholder="التفاصيل… وظلّلي المهم" label="التفاصيل" /></div>
           <div className="mt-2 flex items-center gap-2 text-xs font-extrabold">
             <div className="tb-meter flex-1 !mt-0"><i style={{ width: `${Math.round(pct * 100)}%` }} /></div>
             <span>{fmt(Math.round(pct * 100))}٪</span>
