@@ -1,12 +1,12 @@
 "use client";
 
-// «غرفة التخطيط والتنفيذ» — مساحة فريق مستشاري الصالونات لتنفيذ آلية العميل.
+// «إدارة مستشاري الصالونات» (التخطيط والتنفيذ) — مساحة فريق مستشاري الصالونات لتنفيذ آلية العميل.
 // الدخول بكود الفريق (تحقق على السيرفر + كوكي موقّع)، وبعدها تختار المستشارة اسمها.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
-  KeyRound, Loader2, LogOut, Moon, Sun, LayoutGrid, CalendarDays, BookOpen, Users, Plus, Search, ChevronLeft, BarChart3, Crosshair, Phone,
+  ClipboardList, KeyRound, Loader2, LogOut, Moon, Sun, LayoutGrid, CalendarDays, BookOpen, Users, Plus, Search, ChevronLeft, BarChart3, Crosshair, Phone,
   ChevronRight, AlertTriangle, Clock, CheckCircle2, Circle, Target, Lightbulb, Package, ShieldCheck,
   UserPlus, Trash2, Check, X, Briefcase, Eye, EyeOff, Repeat, Sparkles, Store, Crown, MoonStar, Flower2, Gift,
 } from "lucide-react";
@@ -18,6 +18,8 @@ import ClientPanel from "./ClientPanel";
 import BackToPlatform from "@/components/offer/BackToPlatform";
 import Dashboard from "./Dashboard";
 import Targeting from "./Targeting";
+import TaskBoard, { type NewBoardTask } from "./TaskBoard";
+import { boardCategory, type BoardTask } from "@/lib/salon-room-board";
 import { SessionSettingsButton, sessionOf } from "./FreeSession";
 import {
   THEMES, Avatar, Badge, EmptyState, Field, IconBtn, Modal, SectionTitle, GOLD, accGrad, addDaysKey, btnGhost, btnPrimary,
@@ -26,8 +28,8 @@ import {
 
 /* ──────────────────────────── البيانات ──────────────────────────── */
 
-export type RoomData = { clients: RoomClient[]; tasks: RoomTask[]; logs: RoomLog[]; team: TeamMember[]; targets: Targets };
-const EMPTY: RoomData = { clients: [], tasks: [], logs: [], team: [], targets: DEFAULT_TARGETS };
+export type RoomData = { clients: RoomClient[]; tasks: RoomTask[]; logs: RoomLog[]; team: TeamMember[]; targets: Targets; board: BoardTask[] };
+const EMPTY: RoomData = { clients: [], tasks: [], logs: [], team: [], targets: DEFAULT_TARGETS, board: [] };
 type ClientPatch = Partial<Omit<RoomClient, "id" | "created_at" | "updated_at">>;
 
 export type RoomOps = {
@@ -45,14 +47,19 @@ export type RoomOps = {
   addMember: (name: string, role?: string, phone?: string) => Promise<boolean>;
   patchMember: (m: TeamMember, patch: Partial<TeamMember>) => void;
   deleteMember: (m: TeamMember) => void;
+  addBoard: (f: NewBoardTask) => Promise<string | null>;
+  patchBoard: (id: string, patch: Partial<BoardTask>, debounce?: boolean) => void;
+  addBoardUpdate: (id: string, body: string) => Promise<boolean>;
+  deleteBoard: (id: string) => void;
 };
 
 type Phase = "loading" | "gate" | "name" | "room";
-type TabId = "dashboard" | "board" | "targeting" | "week" | "playbook" | "team";
+type TabId = "dashboard" | "board" | "targeting" | "tasks" | "week" | "playbook" | "team";
 const TABS: { id: TabId; label: string; icon: LucideIcon }[] = [
   { id: "dashboard", label: "الداشبورد", icon: BarChart3 },
   { id: "board", label: "لوحة التنفيذ", icon: LayoutGrid },
   { id: "targeting", label: "خطة الاستهداف", icon: Crosshair },
+  { id: "tasks", label: "جدول المهام", icon: ClipboardList },
   { id: "week", label: "هذا الأسبوع", icon: CalendarDays },
   { id: "playbook", label: "آلية العميل", icon: BookOpen },
   { id: "team", label: "الفريق", icon: Users },
@@ -89,6 +96,7 @@ function SalonRoomInner() {
   const [data, setData] = useState<RoomData>(EMPTY);
   const [me, setMe] = useState<string>(() => { try { return localStorage.getItem("room-user") ?? ""; } catch { return ""; } });
   const meRef = useRef(me);
+  const pendingBoard = useRef(new Map<string, { patch: Partial<BoardTask>; timer: ReturnType<typeof setTimeout> | null }>());
   useEffect(() => { meRef.current = me; }, [me]);
   const [tab, setTab] = useState<TabId>("dashboard");
   const [openId, setOpenId] = useState<string | null>(null);
@@ -116,7 +124,8 @@ function SalonRoomInner() {
 
   const loadData = useCallback(async () => {
     const d = await api<RoomData>("");
-    setData(d);
+    // تعديلات جدول المهام اللي لسا ما انحفظت تبقى فوق نسخة السيرفر
+    setData({ ...d, board: (d.board ?? []).map((t) => ({ ...t, ...pendingBoard.current.get(t.id)?.patch })) });
     return d;
   }, [api]);
 
@@ -154,6 +163,17 @@ function SalonRoomInner() {
         clients: pending.current.has(id) ? d.clients : d.clients.map((c) => (c.id === id ? { ...res.client, contract_value: res.client.contract_value === null ? null : Number(res.client.contract_value) } : c)),
         logs: res.log ? [res.log, ...d.logs] : d.logs,
       }));
+    } catch (e) { fail(e); }
+  }, [api, fail]);
+
+  // ─── جدول المهام: نفس أسلوب العميل (فوري للواجهة، والنصوص مؤجّلة) ───
+  const flushBoard = useCallback(async (id: string) => {
+    const p = pendingBoard.current.get(id);
+    if (!p) return;
+    pendingBoard.current.delete(id);
+    try {
+      const res = await api<{ item: BoardTask }>(`/board/${id}`, "PATCH", p.patch);
+      setData((d) => ({ ...d, board: pendingBoard.current.has(id) ? d.board : d.board.map((t) => (t.id === id ? res.item : t)) }));
     } catch (e) { fail(e); }
   }, [api, fail]);
 
@@ -235,6 +255,41 @@ function SalonRoomInner() {
       setData((d) => ({ ...d, team: d.team.filter((x) => x.id !== m.id) }));
       api(`/team/${m.id}`, "DELETE").catch(fail);
     },
+    addBoard: async (f) => {
+      try {
+        const res = await api<{ item: BoardTask }>("/board", "POST", f);
+        setData((d) => ({ ...d, board: [res.item, ...d.board] }));
+        notify("أُضيفت المهمة للجدول");
+        return res.item.id;
+      } catch (e) { fail(e); return null; }
+    },
+    patchBoard: (id, patch, debounce = false) => {
+      const local: Partial<BoardTask> = { ...patch };
+      if (patch.status) {
+        const cur = data.board.find((t) => t.id === id);
+        if (cur && cur.status !== patch.status) Object.assign(local, patch.status === "done" ? { completed_at: new Date().toISOString(), completed_by: meRef.current || null } : { completed_at: null, completed_by: null });
+      }
+      setData((d) => ({ ...d, board: d.board.map((t) => (t.id === id ? { ...t, ...local } : t)) }));
+      const cur = pendingBoard.current.get(id);
+      if (cur?.timer) clearTimeout(cur.timer);
+      pendingBoard.current.set(id, { patch: { ...cur?.patch, ...patch }, timer: debounce ? setTimeout(() => flushBoard(id), 700) : null });
+      if (!debounce) flushBoard(id);
+      if (patch.status === "done") notify("أحسنتِ — المهمة منجزة 🎉");
+    },
+    addBoardUpdate: async (id, body) => {
+      try {
+        const res = await api<{ item: BoardTask }>(`/board/${id}`, "PATCH", { add_update: body });
+        setData((d) => ({ ...d, board: d.board.map((t) => (t.id === id ? { ...t, updates: res.item.updates, updated_at: res.item.updated_at } : t)) }));
+        return true;
+      } catch (e) { fail(e); return false; }
+    },
+    deleteBoard: (id) => {
+      const p = pendingBoard.current.get(id);
+      if (p?.timer) clearTimeout(p.timer);
+      pendingBoard.current.delete(id);
+      setData((d) => ({ ...d, board: d.board.filter((t) => t.id !== id) }));
+      api(`/board/${id}`, "DELETE").then(() => notify("حُذفت المهمة")).catch(fail);
+    },
   };
 
   const copy = async (text: string, msg = "تم النسخ") => {
@@ -284,8 +339,8 @@ function SalonRoomInner() {
               <BackToPlatform compact />
               <span className="hidden h-9 w-9 shrink-0 place-items-center rounded-xl text-[var(--on-acc)] sm:grid" style={accGrad}><Briefcase size={18} /></span>
               <div className="min-w-0 leading-tight">
-                <div className="truncate text-sm font-black text-[var(--ink)]">غرفة التخطيط والتنفيذ</div>
-                <div className="hidden text-[11px] text-[var(--faint)] sm:block">فريق مستشاري الصالونات</div>
+                <div className="truncate text-sm font-black text-[var(--ink)]">إدارة مستشاري الصالونات</div>
+                <div className="hidden text-[11px] text-[var(--faint)] sm:block">التخطيط والتنفيذ</div>
               </div>
               <div className="ms-auto flex shrink-0 items-center gap-1 sm:gap-1.5">
                 <button onClick={() => setPhase("name")} className="flex items-center gap-2 rounded-full border border-[var(--line)] p-1 text-xs font-bold text-[var(--body)] hover:bg-[var(--hover)] sm:pe-3" title={`تغيير المستشارة (${me})`}>
@@ -311,7 +366,8 @@ function SalonRoomInner() {
             {tab === "dashboard" && <Dashboard data={data} onOpen={setOpenId} onSaveTargets={ops.setTargets} />}
             {tab === "board" && <Board data={data} me={me} ops={ops} onOpen={setOpenId} />}
             {tab === "targeting" && <Targeting data={data} me={me} ops={ops} onOpen={setOpenId} copy={copy} />}
-            {tab === "week" && <Week data={data} me={me} ops={ops} onOpen={setOpenId} />}
+            {tab === "tasks" && <TaskBoard data={data} me={me} ops={ops} />}
+            {tab === "week" && <Week data={data} me={me} ops={ops} onOpen={setOpenId} onTasks={() => setTab("tasks")} />}
             {tab === "playbook" && <Playbook targets={data.targets} onSaveTargets={ops.setTargets} />}
             {tab === "team" && <Team data={data} me={me} ops={ops} />}
           </main>
@@ -357,8 +413,8 @@ function Gate({ session, theme, toggleTheme, onEnter }: {
       <div className="absolute right-4 top-4"><BackToPlatform /></div>
       <div className={`${card} sr-in relative w-full max-w-sm p-7 text-center`}>
         <span className="mx-auto grid h-16 w-16 place-items-center rounded-3xl text-[var(--on-acc)] shadow-xl" style={accGrad}><Briefcase size={28} /></span>
-        <h1 className="mt-5 text-2xl font-black text-[var(--ink)]">غرفة التخطيط والتنفيذ</h1>
-        <p className="mt-1 text-sm text-[var(--muted)]">فريق مستشاري الصالونات</p>
+        <h1 className="mt-5 text-2xl font-black text-[var(--ink)]">إدارة مستشاري الصالونات</h1>
+        <p className="mt-1 text-sm text-[var(--muted)]">التخطيط والتنفيذ ومتابعة الفريق</p>
 
         {session.configured ? (
           <form onSubmit={submit} className="mt-6 space-y-3 text-right">
@@ -373,11 +429,11 @@ function Gate({ session, theme, toggleTheme, onEnter }: {
             </Field>
             {error && <p className="text-center text-xs font-bold text-red-500">{error}</p>}
             <button type="submit" disabled={!code.trim() || busy} className={`${btnPrimary} w-full !py-3`} style={accGrad}>
-              {busy ? <Loader2 size={16} className="animate-spin" /> : <KeyRound size={16} />} دخول الغرفة
+              {busy ? <Loader2 size={16} className="animate-spin" /> : <KeyRound size={16} />} دخول
             </button>
           </form>
         ) : (
-          <p className="mt-6 rounded-2xl bg-[var(--surface-2)] p-4 text-sm font-bold text-[var(--muted)]">الغرفة ما تفعّلت بعد — المسؤول يضبط كود الدخول أولاً.</p>
+          <p className="mt-6 rounded-2xl bg-[var(--surface-2)] p-4 text-sm font-bold text-[var(--muted)]">الصفحة ما تفعّلت بعد — المسؤول يضبط كود الدخول أولاً.</p>
         )}
 
         {session.isOwner && (
@@ -417,7 +473,7 @@ function CodeForm({ onDone }: { onDone: () => void }) {
       </Field>
       {b && a !== b && <p className="text-xs font-bold text-red-500">الكودين مو متطابقين</p>}
       {error && <p className="text-xs font-bold text-red-500">{error}</p>}
-      <p className="text-[11px] text-[var(--faint)]">تغيير الكود يُخرج كل المستشارات من الغرفة لين يدخلن الكود الجديد.</p>
+      <p className="text-[11px] text-[var(--faint)]">تغيير الكود يُخرج كل المستشارات لين يدخلن الكود الجديد.</p>
       <button onClick={save} disabled={!valid || busy} className={`${btnPrimary} w-full`} style={accGrad}>
         {busy ? <Loader2 size={15} className="animate-spin" /> : <ShieldCheck size={15} />} حفظ الكود
       </button>
@@ -426,7 +482,7 @@ function CodeForm({ onDone }: { onDone: () => void }) {
 }
 
 function CodeModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
-  return <Modal title="تغيير كود دخول الغرفة" onClose={onClose}><CodeForm onDone={onDone} /></Modal>;
+  return <Modal title="تغيير كود الدخول" onClose={onClose}><CodeForm onDone={onDone} /></Modal>;
 }
 
 function NamePicker({ team, current, onPick, addMember }: { team: TeamMember[]; current: string; onPick: (n: string) => void; addMember: RoomOps["addMember"] }) {
@@ -629,7 +685,7 @@ function NewClientModal({ team, me, onClose, onSave }: {
 
 /* ══════════════════════════ هذا الأسبوع ══════════════════════════ */
 
-function Week({ data, me, ops, onOpen }: { data: RoomData; me: string; ops: RoomOps; onOpen: (id: string) => void }) {
+function Week({ data, me, ops, onOpen, onTasks }: { data: RoomData; me: string; ops: RoomOps; onOpen: (id: string) => void; onTasks: () => void }) {
   const today = todayKey();
   const in7 = addDaysKey(today, 7);
   const [mine, setMine] = useState(true);
@@ -647,6 +703,8 @@ function Week({ data, me, ops, onOpen }: { data: RoomData; me: string; ops: Room
     .sort((a, b) => (a.free_session.session_date ?? "").localeCompare(b.free_session.session_date ?? ""));
   const followups = data.clients.filter((c) => c.stage === "lead" && c.lead_status !== "not_interested" && c.next_followup && c.next_followup <= in7
     && (!mine || c.consultant === me)).sort((a, b) => a.next_followup!.localeCompare(b.next_followup!));
+  const boardDue = data.board.filter((t) => t.status !== "done" && t.due_date && t.due_date <= in7 && (!mine || t.assignee === me))
+    .sort((a, b) => a.due_date!.localeCompare(b.due_date!));
   const noDue = data.tasks.filter((t) => !t.done_at && !t.due_date && byId.has(t.client_id) && (!mine || isMine(t))
     && byId.get(t.client_id)!.stage === t.phase).length;
 
@@ -699,6 +757,21 @@ function Week({ data, me, ops, onOpen }: { data: RoomData; me: string; ops: Room
       </div>
 
       <div className="space-y-4">
+        <div className={`${card} p-4`}>
+          <SectionTitle icon={ClipboardList} title="جدول المهام" action={<button onClick={onTasks} className="text-xs font-bold hover:underline" style={{ color: "var(--acc)" }}>فتح الجدول</button>} />
+          {boardDue.length ? (
+            <ul className="space-y-1.5">
+              {boardDue.map((t) => (
+                <li key={t.id} className="flex items-center gap-2 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-2.5">
+                  <span className="shrink-0">{boardCategory(t.category).emoji}</span>
+                  <button onClick={onTasks} className="min-w-0 flex-1 truncate text-right text-sm font-bold text-[var(--ink)] hover:underline">{t.title}</button>
+                  {!mine && t.assignee && <Avatar name={t.assignee} size={22} />}
+                  <Badge color={t.due_date! < today ? "#DC2626" : "#7A6570"}>{dateLabel(t.due_date)}</Badge>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="text-xs text-[var(--faint)]">ما فيه مهام عامة مستحقة خلال ٧ أيام.</p>}
+        </div>
         <div className={`${card} p-4`}>
           <SectionTitle icon={Phone} title="متابعات الاستهداف" />
           {followups.length ? (
@@ -850,7 +923,7 @@ function Playbook({ targets, onSaveTargets }: { targets: Targets; onSaveTargets:
         <SectionTitle icon={Repeat} title="إيقاع الفريق" />
         <ul className="grid grid-cols-1 gap-2 text-sm text-[var(--body)] sm:grid-cols-3">
           <li className="rounded-2xl border border-[var(--line)] p-3"><b className="text-[var(--ink)]">يومياً:</b> افتحي «هذا الأسبوع» وخلّصي مهام اليوم، وسجّلي أي تواصل في سجل الصالون.</li>
-          <li className="rounded-2xl border border-[var(--line)] p-3"><b className="text-[var(--ink)]">أسبوعياً (اجتماع الغرفة):</b> نمرّ على «بحاجة انتباه» والمهام المتأخرة والمراجعات القادمة — ٣٠ دقيقة.</li>
+          <li className="rounded-2xl border border-[var(--line)] p-3"><b className="text-[var(--ink)]">أسبوعياً (اجتماع الفريق):</b> نمرّ على «بحاجة انتباه» والمهام المتأخرة والمراجعات القادمة — ٣٠ دقيقة.</li>
           <li className="rounded-2xl border border-[var(--line)] p-3"><b className="text-[var(--ink)]">شهرياً:</b> تحديث «الحالي» في مؤشرات كل صالون، ومقارنته بخط الأساس والأهداف.</li>
         </ul>
       </div>

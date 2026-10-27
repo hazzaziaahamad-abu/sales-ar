@@ -1,5 +1,6 @@
 import { KPIS, type KpiKey } from "@/lib/salon-growth";
 import { LEAD_STATUS_IDS, STAGE_IDS, type Health, type LeadStatus, type LogKind, type Priority, type Stage } from "@/lib/salon-room";
+import { BOARD_CATEGORY_IDS, BOARD_STATUS_IDS, type BoardCategory, type BoardStatus, type BoardStep } from "@/lib/salon-room-board";
 
 const str = (v: unknown, max: number) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 const text = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
@@ -129,5 +130,34 @@ export function parseTeam(b: Record<string, unknown>, partial: boolean): Parsed 
   if (has("role")) f.role = str(b.role, 60) || "مستشارة";
   if (has("phone")) f.phone = str(b.phone, 30) || null;
   if (has("active")) f.active = !!b.active;
+  return { ok: true, fields: f };
+}
+
+/** مهمة في «جدول المهام» — الخطوات تُستبدل كاملة، والتحديثات تُضاف واحد واحد (add_update) عشان ما تضيع تحديثات زميلة. */
+export function parseBoard(b: Record<string, unknown>, partial: boolean): Parsed {
+  const f: Record<string, unknown> = {};
+  const has = (k: string) => k in b;
+  if (!partial || has("title")) {
+    const title = str(b.title, 200);
+    if (!title) return { ok: false, error: "اكتب عنوان المهمة" };
+    f.title = title;
+  }
+  if (!partial || has("category")) f.category = BOARD_CATEGORY_IDS.includes(b.category as BoardCategory) ? b.category : "other";
+  if (has("body")) f.body = text(b.body, 5000);
+  if (has("assignee")) f.assignee = str(b.assignee, 60) || null;
+  if (has("priority")) f.priority = (["A", "B", "C"] as Priority[]).includes(b.priority as Priority) ? b.priority : "B";
+  if (has("status")) {
+    if (!BOARD_STATUS_IDS.includes(b.status as BoardStatus)) return { ok: false, error: "حالة غير صالحة" };
+    f.status = b.status;
+  }
+  if (has("due_date")) f.due_date = date(b.due_date);
+  if (has("steps")) {
+    if (!Array.isArray(b.steps) || b.steps.length > 30) return { ok: false, error: "خطوات غير صالحة" };
+    const iso = (v: unknown) => (typeof v === "string" && !Number.isNaN(Date.parse(v)) ? v : null);
+    f.steps = b.steps.map((x, i): BoardStep => {
+      const s = (x ?? {}) as Record<string, unknown>;
+      return { key: str(s.key, 40) || `s${i + 1}`, label: str(s.label, 200) || "خطوة", done_at: iso(s.done_at), done_by: str(s.done_by, 60) || null };
+    });
+  }
   return { ok: true, fields: f };
 }

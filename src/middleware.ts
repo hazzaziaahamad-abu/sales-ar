@@ -9,7 +9,7 @@ import { createMiddlewareClient } from "@/lib/supabase/middleware";
 // /content/<token> + /api/public/content-plan — رابط مشاركة خطة المحتوى (محروس بالتوكن)
 // /flow + /api/public/contact-flow — مسار الاتصال للموظفين، عرض فقط (مفاتيح محدّدة)
 // /api/public/meeting-plan — محتوى خطة اجتماع العميل (قراءة عامة، التعديل يتحقق من السوبر أدمن داخل المسار)
-// /salon-room + /api/salon-room — غرفة مستشاري الصالونات (محروسة بكود الفريق وكوكي موقّع داخل المسارات)
+// /salon-room + /api/salon-room — إدارة مستشاري الصالونات (محروسة بكود الفريق وكوكي موقّع داخل المسارات)
 const PUBLIC_PATHS = [
   "/login",
   "/auth/callback",

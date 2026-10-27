@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getRoomAccess } from "@/lib/api/salon-room-auth";
 import { CLIENT_COLS, LOG_COLS, PLAYBOOK, TASK_COLS, TEAM_COLS, stageLabel, type Stage } from "@/lib/salon-room";
-import { CONTRACTED_STAGES, parseClient, parseLog, parseTask, parseTeam } from "../shared";
+import { BOARD_COLS, stepsFor, type BoardCategory } from "@/lib/salon-room-board";
+import { CONTRACTED_STAGES, parseBoard, parseClient, parseLog, parseTask, parseTeam } from "../shared";
 
 export const runtime = "nodejs";
 
-/** POST /api/salon-room/{clients|tasks|logs|team} → إضافة. */
+/** POST /api/salon-room/{clients|tasks|logs|team|board} → إضافة. */
 export async function POST(req: NextRequest, ctx: { params: Promise<{ entity: string }> }) {
   const { entity } = await ctx.params;
   const access = await getRoomAccess(req);
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ entity: st
       supabaseAdmin.from("consult_tasks").insert(rows).select(TASK_COLS),
       supabaseAdmin.from("consult_logs").insert({
         org_id: orgId, client_id: client.id, kind: "stage", author,
-        body: `أُضيف الصالون للغرفة — المرحلة: ${stageLabel(client.stage as Stage)}`,
+        body: `أُضيف الصالون — المرحلة: ${stageLabel(client.stage as Stage)}`,
       }).select(LOG_COLS).single(),
     ]);
     if (tasks.error) return NextResponse.json({ error: tasks.error.message }, { status: 500 });
@@ -89,6 +90,22 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ entity: st
       return NextResponse.json({ error: dup ? "الاسم موجود في الفريق" : error.message }, { status: dup ? 409 : 500 });
     }
     return NextResponse.json({ member: data });
+  }
+
+  if (entity === "board") {
+    const p = parseBoard(b, false);
+    if (!p.ok) return NextResponse.json({ error: p.error }, { status: 400 });
+    // المهمة الجديدة أول اللوحة؛ خطواتها من قالب التصنيف لو ما انرسلت
+    const { data: first } = await supabaseAdmin.from("consult_board_tasks").select("sort_order")
+      .eq("org_id", orgId).order("sort_order").limit(1).maybeSingle();
+    const status = (p.fields.status as string | undefined) ?? "todo";
+    const { data, error } = await supabaseAdmin.from("consult_board_tasks").insert({
+      steps: stepsFor(p.fields.category as BoardCategory),
+      ...p.fields, org_id: orgId, created_by: author, sort_order: (first?.sort_order ?? 1) - 1,
+      ...(status === "done" ? { completed_at: new Date().toISOString(), completed_by: author } : {}),
+    }).select(BOARD_COLS).single();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ item: data });
   }
 
   return NextResponse.json({ error: "غير موجود" }, { status: 404 });

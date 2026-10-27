@@ -88,7 +88,7 @@ export default function ClientPanel({ client: c, data, me, ops, onClose, copy }:
           <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: HEALTH[c.health].color }} />
           <input value={c.salon_name} onChange={(e) => patch({ salon_name: e.target.value.slice(0, 120) }, true)}
             className="min-w-0 flex-1 rounded-xl border border-transparent bg-transparent px-2 py-1 text-lg font-black text-[var(--ink)] outline-none hover:border-[var(--line)] focus:border-[var(--acc)]" aria-label="اسم الصالون" />
-          <button onClick={() => { if (confirm(`أرشفة «${c.salon_name}»؟ تختفي من الغرفة.`)) patch({ archived: true }); }} className={`${btnGhost} !px-3`} title="أرشفة"><Archive size={14} /></button>
+          <button onClick={() => { if (confirm(`أرشفة «${c.salon_name}»؟ تختفي من القوائم.`)) patch({ archived: true }); }} className={`${btnGhost} !px-3`} title="أرشفة"><Archive size={14} /></button>
           <button onClick={onClose} className="grid h-9 w-9 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--hover)]" aria-label="إغلاق"><X size={18} /></button>
         </div>
 

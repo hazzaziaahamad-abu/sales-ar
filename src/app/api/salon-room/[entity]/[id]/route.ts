@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getRoomAccess } from "@/lib/api/salon-room-auth";
 import { CLIENT_COLS, LOG_COLS, TASK_COLS, TEAM_COLS, addDays, planDueDates, stageLabel, type RoomTask, type Stage } from "@/lib/salon-room";
-import { CONTRACTED_STAGES, parseClient, parseTask, parseTeam } from "../../shared";
+import { BOARD_COLS, type BoardUpdate } from "@/lib/salon-room-board";
+import { CONTRACTED_STAGES, parseBoard, parseClient, parseTask, parseTeam } from "../../shared";
 
 export const runtime = "nodejs";
 
-/** PATCH /api/salon-room/{clients|tasks|team}/[id] → تعديل. */
+/** PATCH /api/salon-room/{clients|tasks|team|board}/[id] → تعديل. */
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ entity: string; id: string }> }) {
   const { entity, id } = await ctx.params;
   const access = await getRoomAccess(req);
@@ -62,6 +63,27 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ entity: s
     return NextResponse.json({ member: data });
   }
 
+  if (entity === "board") {
+    const p = parseBoard(b, true);
+    if (!p.ok) return NextResponse.json({ error: p.error }, { status: 400 });
+    const { data: before } = await supabaseAdmin.from("consult_board_tasks").select("status, updates").eq("id", id).eq("org_id", orgId).maybeSingle();
+    if (!before) return NextResponse.json({ error: "غير موجود" }, { status: 404 });
+    const fields: Record<string, unknown> = { ...p.fields, updated_at: now };
+    if (p.fields.status && p.fields.status !== before.status) {
+      Object.assign(fields, p.fields.status === "done" ? { completed_at: now, completed_by: author } : { completed_at: null, completed_by: null });
+    }
+    const note = String(b.add_update ?? "").trim().slice(0, 2000);
+    if (note) {
+      const entry: BoardUpdate = { id: crypto.randomUUID(), body: note, author, at: now };
+      fields.updates = [entry, ...((before.updates as BoardUpdate[] | null) ?? [])].slice(0, 200);
+    }
+    const { data, error } = await supabaseAdmin.from("consult_board_tasks")
+      .update(fields).eq("id", id).eq("org_id", orgId).select(BOARD_COLS).maybeSingle();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!data) return NextResponse.json({ error: "غير موجود" }, { status: 404 });
+    return NextResponse.json({ item: data });
+  }
+
   return NextResponse.json({ error: "غير موجود" }, { status: 404 });
 }
 
@@ -103,12 +125,12 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ entity: st
   return NextResponse.json({ client: updated.data, tasks: fresh.data ?? [], log: log.data });
 }
 
-/** DELETE /api/salon-room/{tasks|team}/[id] — المهام المخصّصة فقط (مهام الدليل ثابتة). العملاء تُؤرشف بالتعديل. */
+/** DELETE /api/salon-room/{tasks|team|board}/[id] — مهام العملاء المخصّصة فقط (مهام الدليل ثابتة). العملاء تُؤرشف بالتعديل. */
 export async function DELETE(req: NextRequest, ctx: { params: Promise<{ entity: string; id: string }> }) {
   const { entity, id } = await ctx.params;
   const access = await getRoomAccess(req);
   if (access instanceof NextResponse) return access;
-  const table = entity === "tasks" ? "consult_tasks" : entity === "team" ? "consult_team" : null;
+  const table = entity === "tasks" ? "consult_tasks" : entity === "team" ? "consult_team" : entity === "board" ? "consult_board_tasks" : null;
   if (!table) return NextResponse.json({ error: "غير مسموح" }, { status: 405 });
   let q = supabaseAdmin.from(table).delete().eq("id", id).eq("org_id", access.orgId);
   if (entity === "tasks") q = q.eq("custom", true);

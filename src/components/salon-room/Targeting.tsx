@@ -39,7 +39,7 @@ export default function Targeting({ data, me, ops, onOpen, copy }: {
   const dueFollowups = data.clients.filter((c) => isLead(c) && c.lead_status !== "not_interested" && c.next_followup && c.next_followup <= today).length;
 
   const convert = (c: RoomClient) => {
-    if (!confirm(`تحويل «${c.salon_name}» لعميل؟ ينتقل لمرحلة «الاستكشاف» في لوحة الغرفة.`)) return;
+    if (!confirm(`تحويل «${c.salon_name}» لعميل؟ ينتقل لمرحلة «الاستكشاف» في لوحة التنفيذ.`)) return;
     ops.patchClient(c.id, { stage: "discovery", lead_status: "meeting" });
   };
 
@@ -310,7 +310,7 @@ function ContactModal({ client: c, ops, targets, used, onClose }: { client: Room
         {status === "meeting" ? (
           <label className="flex items-center gap-2 rounded-2xl bg-[var(--surface-2)] p-3 text-sm font-bold text-[var(--body)]">
             <input type="checkbox" checked={convert} onChange={(e) => setConvert(e.target.checked)} className="h-4 w-4 accent-[var(--acc)]" />
-            حوّليه لعميل الآن (مرحلة «الاستكشاف» في لوحة الغرفة)
+            حوّليه لعميل الآن (مرحلة «الاستكشاف» في لوحة التنفيذ)
           </label>
         ) : status !== "not_interested" && (
           <Field label="المتابعة الجاية"><input type="date" value={followup} onChange={(e) => setFollowup(e.target.value)} className={input} /></Field>
