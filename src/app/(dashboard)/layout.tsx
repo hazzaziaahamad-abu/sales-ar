@@ -51,18 +51,25 @@ const ALWAYS_ALLOWED_SLUGS = ["urgent-followup", "mentions"];
 const SUPER_ONLY_SLUGS = ["finance"];
 
 /**
- * أول صفحة يقدر الموظف يفتحها فعلاً — بمسارها الحقيقي من القائمة (الـslug مو دايماً هو المسار:
- * offer-salon-growth ← /offer/salon-growth). نتخطّى صفحات السوبر أدمن.
+ * أول صفحة داخل المنصة يقدر الموظف يفتحها فعلاً — بمسارها الحقيقي من القائمة (الـslug مو دايماً
+ * هو المسار: offer-salon-growth ← /offer/salon-growth). نتخطّى صفحات السوبر أدمن والصفحات
+ * المستقلة (external): التحويل لها يحبس الموظف — زر «رجوع» يرجّعه للمنصة واللي ترجّعه لها.
+ * null = ما عنده صفحة داخل المنصة → نعرض «صفحاتك».
  */
-function landingFor(allowedPages: string[]) {
+function landingFor(allowedPages: string[]): string | null {
   for (const slug of allowedPages) {
     if (SUPER_ONLY_SLUGS.includes(slug)) continue;
     const item = NAV_ITEMS.find((i) => i.slug === slug);
     if (!item) return `/${slug}`; // صفحات مو في القائمة (مخفية/مدموجة) — مسارها نفس الـslug
-    if ((item as { superOnly?: boolean }).superOnly) continue;
+    if ((item as { superOnly?: boolean }).superOnly || (item as { external?: boolean }).external) continue;
     return item.href;
   }
-  return "/dashboard";
+  return null;
+}
+
+/** الصفحات المستقلة المسموحة للموظف (تنفتح برّا هيكل المنصة). */
+function externalPagesFor(allowedPages: string[]) {
+  return NAV_ITEMS.filter((i) => allowedPages.includes(i.slug) && (i as { external?: boolean }).external && !(i as { superOnly?: boolean }).superOnly);
 }
 
 const PAGE_SLUG_MAP: Record<string, string> = {
@@ -335,21 +342,14 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     }
   }, [loading, user, router]);
 
-  // Redirect if user doesn't have access to current page
+  // الصفحة الحالية مو مسموحة؟ نحوّل لأول صفحة مسموحة داخل المنصة، ولو ما فيه نعرض «صفحاتك»
+  const slug = PAGE_SLUG_MAP[pathname] || pathname.split("/")[1];
+  const blocked = !!user && !user.isSuperAdmin && !!slug && !ALWAYS_ALLOWED_SLUGS.includes(slug)
+    && (SUPER_ONLY_SLUGS.includes(slug) || !user.allowedPages.includes(slug));
+  const landing = user ? landingFor(user.allowedPages) : null;
   useEffect(() => {
-    if (!loading && user && !user.isSuperAdmin) {
-      const slug = PAGE_SLUG_MAP[pathname] || pathname.split("/")[1];
-      if (slug && SUPER_ONLY_SLUGS.includes(slug)) {
-        router.replace(landingFor(user.allowedPages));
-        return;
-      }
-      // صفحات مفتوحة لكل الموظفين بدون صلاحية
-      if (slug && ALWAYS_ALLOWED_SLUGS.includes(slug)) return;
-      if (slug && !user.allowedPages.includes(slug)) {
-        router.replace(landingFor(user.allowedPages));
-      }
-    }
-  }, [loading, user, pathname, router]);
+    if (!loading && blocked && landing && landing !== pathname) router.replace(landing);
+  }, [loading, blocked, landing, pathname, router]);
 
   if (loading || !user) {
     return (
@@ -364,7 +364,40 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     );
   }
 
+  if (blocked && !landing) return <MyPages pages={externalPagesFor(user.allowedPages)} name={user.name} />;
+
   return <>{children}</>;
+}
+
+/** «صفحاتك»: لموظف كل صفحاته مستقلة (مثل مستشاري الصالونات) — بدل ما نحوّله لها ويعلق بين المنصة والصفحة. */
+function MyPages({ pages, name }: { pages: ReturnType<typeof externalPagesFor>; name: string }) {
+  const { signOut, isImpersonating, stopImpersonating } = useAuth();
+  return (
+    <div dir="rtl" className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
+      <div className="w-full max-w-md space-y-5">
+        <div className="text-center">
+          <h1 className="text-2xl font-black text-foreground">أهلاً {name?.split(" ")[0] || ""} 👋</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{pages.length ? "اختر الصفحة اللي تبي تفتحها" : "ما فيه صفحات مفعّلة لحسابك — تواصل مع المسؤول"}</p>
+        </div>
+        <div className="space-y-2.5">
+          {pages.map((p) => (
+            <a key={p.slug} href={p.href} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 transition-colors hover:bg-accent">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><p.icon className="h-5 w-5" /></span>
+              <span className="flex-1 text-base font-bold text-foreground">{p.label}</span>
+              <span className="text-muted-foreground">←</span>
+            </a>
+          ))}
+        </div>
+        <div className="flex justify-center">
+          {isImpersonating ? (
+            <button onClick={stopImpersonating} className="rounded-full border border-border px-4 py-2 text-sm font-bold text-foreground hover:bg-accent">رجوع لحسابي</button>
+          ) : (
+            <button onClick={() => signOut()} className="rounded-full border border-border px-4 py-2 text-sm font-bold text-muted-foreground hover:bg-accent">تسجيل الخروج</button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 
