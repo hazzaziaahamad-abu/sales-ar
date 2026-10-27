@@ -107,10 +107,16 @@ export function NoteEditor({ value, onChange, placeholder, label, minLines = 3, 
   const emitted = useRef<string | null>(null);
   const saved = useRef<Range | null>(null);
 
-  // نحدّث المحتوى بس لو القيمة تغيّرت من برّا (تحميل، زميلة عدّلت) — مو مع كل حرف
+  const composing = useRef(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onChangeRef = useRef(onChange);
+  useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
+
+  // نحدّث المحتوى بس لو القيمة تغيّرت من برّا (تحميل، زميلة عدّلت) — وأبداً وقت الكتابة:
+  // لمس الـDOM وقت ما الكيبورد (خصوصاً أندرويد) يركّب الكلمة يلخبط ترتيب الحروف والمؤشر
   useEffect(() => {
     const el = ref.current;
-    if (el && value !== emitted.current) {
+    if (el && value !== emitted.current && document.activeElement !== el && !composing.current) {
       el.innerHTML = noteToHtml(value);
       emitted.current = value;
     }
@@ -127,12 +133,30 @@ export function NoteEditor({ value, onChange, placeholder, label, minLines = 3, 
   }, []);
 
   const emit = () => {
+    if (timer.current) { clearTimeout(timer.current); timer.current = null; }
     if (!ref.current) return;
     const v = serializeNote(ref.current);
     if (v === emitted.current) return;
     emitted.current = v;
-    onChange(v);
+    onChangeRef.current(v);
   };
+  // الحفظ بعد ما توقف الكتابة شوي (مو مع كل حرف) — كل حفظ يعيد رسم الصفحة، والرسم مع كل حرف
+  // يبطّئ الكيبورد على الأجهزة اللوحية ويخربط تركيب الكلمات
+  const schedule = () => {
+    if (composing.current) return;
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(emit, 400);
+  };
+  // لا تضيع آخر كتابة لو انقفلت النافذة قبل الحفظ (العنصر نمسكه هنا لأن الـref ينفصل قبل التنظيف)
+  useEffect(() => {
+    const el = ref.current;
+    return () => {
+      if (!timer.current || !el) return;
+      clearTimeout(timer.current);
+      const v = serializeNote(el);
+      if (v !== emitted.current) { emitted.current = v; onChangeRef.current(v); }
+    };
+  }, []);
 
   const run = (cmd: "hiliteColor" | "bold", arg?: string) => {
     const el = ref.current;
@@ -170,8 +194,10 @@ export function NoteEditor({ value, onChange, placeholder, label, minLines = 3, 
         aria-label={label}
         data-placeholder={placeholder ?? ""}
         data-empty={!value ? "true" : "false"}
-        onInput={emit}
-        onBlur={emit}
+        onInput={schedule}
+        onCompositionStart={() => { composing.current = true; }}
+        onCompositionEnd={() => { composing.current = false; schedule(); }}
+        onBlur={() => { composing.current = false; emit(); }}
         onPaste={(e) => { e.preventDefault(); document.execCommand("insertText", false, e.clipboardData.getData("text/plain")); }}
         className={`nb-edit ${variant === "paper" ? "nb-paper" : "nb-bare"}`}
         style={{ minHeight: minLines * lh + (variant === "paper" ? 16 : 0), lineHeight: `${lh}px` }}
