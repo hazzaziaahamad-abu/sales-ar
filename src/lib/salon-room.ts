@@ -1,6 +1,7 @@
 // «غرفة التخطيط والتنفيذ»: المراحل ودليل آلية العميل والأنواع — مشتركة بين الواجهة ومسارات الـ API.
 
 import { KPIS, type Diagnosis, type KpiDef, type KpiKey } from "@/lib/salon-growth";
+import type { Marketing } from "@/lib/salon-campaigns";
 
 export type Stage = "lead" | "discovery" | "diagnosis" | "proposal" | "onboarding" | "execution" | "review" | "done" | "paused";
 export type Health = "on_track" | "at_risk" | "off_track";
@@ -20,6 +21,8 @@ export type RoomClient = {
   diagnosis: Partial<Diagnosis>;
   /** جلسة التشخيص المجانية (الاستقطاب). */
   free_session: Partial<FreeSession>;
+  /** التسويق الرقمي والحملات. */
+  marketing: Partial<Marketing>;
 };
 export type RoomTask = {
   id: string; client_id: string; phase: Stage; title: string; due_date: string | null; assignee: string | null;
@@ -28,7 +31,7 @@ export type RoomTask = {
 export type RoomLog = { id: string; client_id: string; kind: LogKind; body: string; author: string | null; created_at: string };
 export type TeamMember = { id: string; name: string; role: string; phone: string | null; active: boolean };
 
-export const CLIENT_COLS = "id, salon_name, owner_name, phone, city, consultant, stage, health, start_date, next_review, contract_value, baseline, current, goals, notes, archived, created_at, updated_at, source, priority, segment, lead_status, last_contact_at, next_followup, converted_at, contracted_at, diagnosis, free_session";
+export const CLIENT_COLS = "id, salon_name, owner_name, phone, city, consultant, stage, health, start_date, next_review, contract_value, baseline, current, goals, notes, archived, created_at, updated_at, source, priority, segment, lead_status, last_contact_at, next_followup, converted_at, contracted_at, diagnosis, free_session, marketing";
 export const TASK_COLS = "id, client_id, phase, title, due_date, assignee, done_at, done_by, custom, sort_order";
 export const LOG_COLS = "id, client_id, kind, body, author, created_at";
 export const TEAM_COLS = "id, name, role, phone, active";

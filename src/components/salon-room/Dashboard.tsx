@@ -4,12 +4,13 @@
 
 import React, { useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
-import { Crosshair, Store, FileSignature, Wallet, TrendingUp, AlertTriangle, Filter, Layers, HeartPulse, Users, Table2, ArrowUpDown, Gift } from "lucide-react";
+import { Crosshair, Store, FileSignature, Wallet, TrendingUp, AlertTriangle, Filter, Layers, HeartPulse, Users, Table2, ArrowUpDown, Gift, Megaphone } from "lucide-react";
 import { HEALTH, SESSION_NAME, STAGES, stageLabel, type Health, type Stage } from "@/lib/salon-room";
 import { needsAttention, type RoomData } from "./SalonRoom";
 import { ACTIVE_STAGES, CONTRACT_STAGES, goalsProgress, isActive, isLead, lastActivity, planProgress, ratio, weekProgress } from "./metrics";
-import { Avatar, Badge, EmptyState, GOLD, SectionTitle, card, dateLabel, fmt, timeAgo, todayKey } from "./ui";
+import { Avatar, Badge, EmptyState, GOLD, LOCALE, SectionTitle, card, dateLabel, fmt, timeAgo, todayKey } from "./ui";
 import { SessionSettingsButton, sessionMetrics } from "./FreeSession";
+import { DEFAULT_MARKETING, READINESS, READINESS_COUNT, marketingTotals } from "@/lib/salon-campaigns";
 import type { Targets } from "@/lib/salon-room";
 
 type SortKey = "salon" | "stage" | "health" | "plan" | "goals" | "review" | "activity";
@@ -32,6 +33,14 @@ export default function Dashboard({ data, onOpen, onSaveTargets }: { data: RoomD
   const conversion = all.length ? everConverted / all.length : 0;
   const w = weekProgress(all, data.logs, now);
   const sm = sessionMetrics(all, data.targets, now);
+  // الحملات: كل صالون عنده حملات أو بدأ الجاهزية
+  const mkRows = all.filter((c) => !isLead(c)).map((c) => {
+    const m = { ...DEFAULT_MARKETING, ...c.marketing };
+    const ready = READINESS.reduce((s, p) => s + p.items.filter((i) => m.readiness[i.id]).length, 0);
+    return { c, t: marketingTotals(m.campaigns), ready, count: m.campaigns.length };
+  }).filter((r) => r.count || r.ready);
+  const mkAll = marketingTotals(all.flatMap((c) => ({ ...DEFAULT_MARKETING, ...c.marketing }).campaigns));
+  const x1 = (n: number | null) => (n === null ? "—" : `${n.toLocaleString(LOCALE, { maximumFractionDigits: 1 })}×`);
 
   // قمع التحويل: كل مرحلة = اللي وصلوها أو تعدّوها
   const contactedIds = new Set(data.logs.filter((l) => l.kind === "contact").map((l) => l.client_id));
@@ -147,6 +156,48 @@ export default function Dashboard({ data, onOpen, onSaveTargets }: { data: RoomD
             {sm.avgContract !== null && <> — متوسط العقد {fmt(sm.avgContract)} ر.س</>}
           </p>
         </div>
+      </div>
+
+      {/* ─── الحملات الإعلانية لكل الصالونات ─── */}
+      <div className={`${card} p-5`}>
+        <SectionTitle icon={Megaphone} title="التسويق الرقمي والحملات" />
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+          {[
+            { label: "حملات شغّالة", value: fmt(mkAll.live) },
+            { label: "الصرف", value: `${fmt(mkAll.spend)} ر.س` },
+            { label: "الحجوزات", value: fmt(mkAll.bookings) },
+            { label: "تكلفة الحجز", value: mkAll.cpb === null ? "—" : `${fmt(mkAll.cpb)} ر.س` },
+            { label: "العائد على الإعلان", value: x1(mkAll.roas), tone: mkAll.roas === null ? undefined : mkAll.roas >= 1 ? "#16A34A" : "#DC2626" },
+          ].map((k) => (
+            <div key={k.label} className="rounded-2xl bg-[var(--surface-2)] px-3 py-2.5">
+              <div className="text-[11px] font-bold text-[var(--muted)]">{k.label}</div>
+              <div className="mt-0.5 text-lg font-black" style={{ color: k.tone ?? "var(--ink)" }}>{k.value}</div>
+            </div>
+          ))}
+        </div>
+        {mkRows.length ? (
+          <div className="-mx-1 mt-4 overflow-x-auto px-1">
+            <table className="w-full min-w-[560px] text-sm">
+              <thead><tr className="text-right text-[11px] text-[var(--faint)]">
+                <th className="px-2 py-1.5 font-bold">الصالون</th><th className="px-2 py-1.5 font-bold">الجاهزية</th><th className="px-2 py-1.5 font-bold">حملات</th>
+                <th className="px-2 py-1.5 font-bold">الصرف</th><th className="px-2 py-1.5 font-bold">حجوزات</th><th className="px-2 py-1.5 font-bold">تكلفة الحجز</th><th className="px-2 py-1.5 font-bold">العائد</th>
+              </tr></thead>
+              <tbody>
+                {mkRows.map(({ c, t, ready, count }) => (
+                  <tr key={c.id} onClick={() => onOpen(c.id)} className="cursor-pointer border-t border-[var(--line)] hover:bg-[var(--hover)]">
+                    <td className="px-2 py-2 font-bold text-[var(--ink)]">{c.salon_name}</td>
+                    <td className="px-2 py-2 text-[var(--muted)]">{fmt((ready / READINESS_COUNT) * 100)}٪</td>
+                    <td className="px-2 py-2">{fmt(count)}{t.live ? <span className="text-[11px] text-emerald-600"> ({fmt(t.live)} شغّالة)</span> : null}</td>
+                    <td className="px-2 py-2">{fmt(t.spend)} ر.س</td>
+                    <td className="px-2 py-2">{fmt(t.bookings)}</td>
+                    <td className="px-2 py-2">{t.cpb === null ? "—" : `${fmt(t.cpb)} ر.س`}</td>
+                    <td className="px-2 py-2 font-black" style={{ color: t.roas === null ? "var(--faint)" : t.roas >= 1 ? "#16A34A" : "#DC2626" }}>{x1(t.roas)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : <p className="mt-3 text-xs text-[var(--faint)]">ما فيه حملات مسجّلة — تنضاف من بطاقة كل صالون ← «التسويق الرقمي والحملات».</p>}
       </div>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">

@@ -1,6 +1,8 @@
 // «الخطة التسويقية للصالونات»: الأنواع والثوابت والحسابات المشتركة بين الواجهة ومسارات الـ API.
 // لا يعتمد على أي شي خاص بالسيرفر أو المتصفح — يُستورد من الطرفين.
 
+import { DEFAULT_MARKETING, type Marketing } from "@/lib/salon-campaigns";
+
 /* ──────────────────────────── الأنواع (بنفس أعمدة الجداول) ──────────────────────────── */
 
 export type Addon = { name: string; price: number };
@@ -34,6 +36,7 @@ export type Settings = {
   auto_on: Record<TplKey, boolean>;
   reception: { date: string; checks: Record<string, boolean> };
   diagnosis: Diagnosis;
+  marketing: Marketing;
 };
 
 /* ──────────────────────────── التشخيص الأولي (قبل التعاقد) ──────────────────────────── */
@@ -41,7 +44,9 @@ export type Settings = {
 export type KpiKey =
   | "revenue" | "aov" | "invoices" | "active_clients" | "sleeping_count" | "sleeping_pct"
   | "return60" | "return90" | "upsell_rate" | "rebook_rate" | "noshow_rate" | "utilization"
-  | "revenue_per_staff" | "members" | "google_rating" | "google_reviews" | "reception_score";
+  | "revenue_per_staff" | "members" | "reception_score"
+  // التواجد الرقمي
+  | "google_rating" | "google_reviews" | "ig_followers" | "ig_engagement" | "posts_week" | "dm_response" | "new_clients";
 
 export type Diagnosis = {
   meeting_date: string;
@@ -64,7 +69,7 @@ export const DEFAULT_DIAGNOSIS: Diagnosis = {
   quick_win: "", next_review: "",
 };
 
-export type KpiDef = { key: KpiKey; label: string; unit: string; how: string; lowerIsBetter?: boolean; auto: boolean };
+export type KpiDef = { key: KpiKey; label: string; unit: string; how: string; lowerIsBetter?: boolean; auto: boolean; group?: "digital" };
 
 /** بطاقة خط الأساس — auto: يُحسب «الحالي» تلقائياً من بيانات اللوحة. */
 export const KPIS: KpiDef[] = [
@@ -82,9 +87,15 @@ export const KPIS: KpiDef[] = [
   { key: "utilization", label: "إشغال الموظفات", unit: "٪", how: "الساعات المحجوزة ÷ الساعات المتاحة", auto: false },
   { key: "revenue_per_staff", label: "الدخل لكل موظفة", unit: "ر.س", how: "الدخل الشهري ÷ عدد الموظفات", auto: true },
   { key: "members", label: "عضوات الباقات والرصيد المسبق", unit: "عضوة", how: "مجموع المشتركات في الباقات المفعّلة", auto: true },
-  { key: "google_rating", label: "تقييم قوقل", unit: "من ٥", how: "من حساب قوقل ماب", auto: false },
-  { key: "google_reviews", label: "عدد مراجعات قوقل", unit: "مراجعة", how: "من حساب قوقل ماب", auto: false },
   { key: "reception_score", label: "درجة الاستقبال", unit: "من ٥", how: "بنود بروتوكول الاستقبال (الحالي: قائمة اليوم)", auto: true },
+  // ─── التواجد الرقمي ───
+  { key: "google_rating", label: "تقييم قوقل", unit: "من ٥", how: "من حساب قوقل ماب", auto: false, group: "digital" },
+  { key: "google_reviews", label: "عدد مراجعات قوقل", unit: "مراجعة", how: "من حساب قوقل ماب", auto: false, group: "digital" },
+  { key: "ig_followers", label: "متابعين إنستقرام", unit: "متابع", how: "من الحساب", auto: false, group: "digital" },
+  { key: "ig_engagement", label: "نسبة التفاعل", unit: "٪", how: "متوسط (إعجابات + تعليقات) لآخر ٩ منشورات ÷ المتابعين", auto: false, group: "digital" },
+  { key: "posts_week", label: "منشورات بالأسبوع", unit: "منشور", how: "متوسط آخر ٤ أسابيع (كل المنصات)", auto: false, group: "digital" },
+  { key: "dm_response", label: "وقت الرد على الرسائل", unit: "دقيقة", how: "جرّب: أرسل رسالة وقت الدوام وقِس", lowerIsBetter: true, auto: false, group: "digital" },
+  { key: "new_clients", label: "عميلات جدد شهرياً", unit: "عميلة", how: "أول زيارة خلال آخر ٣٠ يوم", auto: true, group: "digital" },
 ];
 
 const KPI_LOCALE = "ar-SA-u-ca-gregory";
@@ -120,6 +131,20 @@ export function goalProgress(k: KpiDef, base: number | null | undefined, cur: nu
 }
 
 /** القيم الحالية المحسوبة من بيانات اللوحة (آخر ٣٠ يوم للمؤشرات الشهرية). */
+/** عميلات أول زيارة (منجزة) لهن خلال آخر ٣٠ يوم. */
+function newClients(appts: ApptRow[], now: number) {
+  const first = new Map<string, number>();
+  for (const a of appts) {
+    if (a.status !== "done") continue;
+    const key = a.client_id ?? a.phone;
+    const t = Date.parse(a.starts_at);
+    if (key && (!first.has(key) || t < first.get(key)!)) first.set(key, t);
+  }
+  let n = 0;
+  first.forEach((t) => { if (t > now - 30 * DAY && t <= now) n++; });
+  return n;
+}
+
 export function computeCurrentKpis(
   clients: ClientRow[], appts: ApptRow[], memberships: MembershipRow[], receptionToday: number, now: number,
 ): Partial<Record<KpiKey, number | null>> {
@@ -140,10 +165,11 @@ export function computeCurrentKpis(
     revenue_per_staff: staffCount ? revenue / staffCount : null,
     members: memberships.filter((p) => p.active).reduce((s, p) => s + p.members, 0),
     reception_score: receptionToday,
+    new_clients: newClients(appts, now),
   };
 }
 
-export const SETTING_KEYS = ["salon_name", "booking_link", "discount", "templates", "auto_on", "reception", "diagnosis"] as const;
+export const SETTING_KEYS = ["salon_name", "booking_link", "discount", "templates", "auto_on", "reception", "diagnosis", "marketing"] as const;
 export type SettingKey = (typeof SETTING_KEYS)[number];
 
 export const CLIENT_COLS = "id, name, phone, favorite_service, last_visit_at, total_spent, visits, winback_sent_at";
@@ -196,6 +222,7 @@ export const DEFAULT_SETTINGS: Settings = {
   auto_on: { reminder: true, followup: true, winback: false },
   reception: { date: "", checks: {} },
   diagnosis: DEFAULT_DIAGNOSIS,
+  marketing: DEFAULT_MARKETING,
 };
 
 export const DEFAULT_PLANS: Omit<MembershipRow, "id">[] = [

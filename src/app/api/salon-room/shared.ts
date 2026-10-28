@@ -71,6 +71,11 @@ export function parseClient(b: Record<string, unknown>, partial: boolean): Parse
     if (!d || typeof d !== "object" || Array.isArray(d) || JSON.stringify(d).length > 60000) return { ok: false, error: "تشخيص غير صالح" };
     f.diagnosis = d;
   }
+  if (has("marketing")) {
+    const mk = b.marketing;
+    if (!mk || typeof mk !== "object" || Array.isArray(mk) || JSON.stringify(mk).length > 60000) return { ok: false, error: "بيانات الحملات غير صالحة" };
+    f.marketing = mk;
+  }
   if (has("archived")) f.archived = !!b.archived;
   return { ok: true, fields: f };
 }

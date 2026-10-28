@@ -5,10 +5,12 @@
 import React, { useState } from "react";
 import {
   X, Archive, MessageCircle, CheckCircle2, Circle, Plus, Trash2, Target, Package, Lightbulb, ListChecks,
-  History, Send, StickyNote, Crosshair, ArrowLeftCircle, CalendarRange, Wand2, Stethoscope, ChevronDown, Lock,
+  History, Send, StickyNote, Crosshair, ArrowLeftCircle, CalendarRange, Wand2, Stethoscope, ChevronDown, Lock, Megaphone,
 } from "lucide-react";
 import { DEFAULT_DIAGNOSIS, KPIS, intlPhone, type Diagnosis } from "@/lib/salon-growth";
 import { DiagnosisView, type DiagnosisSource } from "@/components/offer/SalonDiagnosis";
+import CampaignsView from "@/components/offer/SalonCampaigns";
+import { DEFAULT_MARKETING, marketingTotals } from "@/lib/salon-campaigns";
 import { goalsProgress } from "./metrics";
 import { SessionCard } from "./FreeSession";
 import {
@@ -16,7 +18,7 @@ import {
   type Health, type LogKind, type Priority, type RoomClient, type RoomTask, type Stage,
 } from "@/lib/salon-room";
 import type { RoomData, RoomOps } from "./SalonRoom";
-import { Avatar, Badge, Field, GOLD, SectionTitle, accGrad, btnGhost, btnPrimary, card, dateLabel, fmt, input, timeAgo, todayKey } from "./ui";
+import { Avatar, Badge, Field, GOLD, LOCALE, SectionTitle, accGrad, btnGhost, btnPrimary, card, dateLabel, fmt, input, timeAgo, todayKey } from "./ui";
 
 const numOrNull = (v: string) => (v.trim() === "" ? null : Number.isFinite(Number(v)) ? Number(v) : null);
 
@@ -42,6 +44,9 @@ export default function ClientPanel({ client: c, data, me, ops, onClose, copy }:
   const team = data.team.filter((m) => m.active || m.name === c.consultant);
 
   // التشخيص: الملاحظات والاعتماد في c.diagnosis، والأرقام في baseline/current/goals (نفس مصدر الداشبورد)
+  const [mkOpen, setMkOpen] = useState(false);
+  const mk = { ...DEFAULT_MARKETING, ...c.marketing };
+  const mkTotals = marketingTotals(mk.campaigns);
   const [diagOpen, setDiagOpen] = useState(c.stage === "discovery" || c.stage === "diagnosis" || c.stage === "proposal");
   const diag: Diagnosis = { ...DEFAULT_DIAGNOSIS, ...c.diagnosis };
   const goals3 = [0, 1, 2].map((i) => c.goals[i] ?? { kpi: "" as const, target: null });
@@ -283,6 +288,30 @@ export default function ClientPanel({ client: c, data, me, ops, onClose, copy }:
                 <div className="mt-4">
                   <DiagnosisView src={diagSrc} copy={copy} salonName={c.salon_name} compact
                     currentHint="سجّلي أرقام الصالون اليوم واعتمديها مع المالكة. «الحالي» تحدّثينه عند كل مراجعة شهرية — ومنه يتحسب تقدّم الأهداف في الداشبورد." />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ─── التسويق الرقمي والحملات ─── */}
+          {!lead && (
+            <div className={`${card} p-4`}>
+              <button onClick={() => setMkOpen((o) => !o)} className="flex w-full items-center gap-2 text-right" aria-expanded={mkOpen}>
+                <span className="grid h-8 w-8 place-items-center rounded-xl" style={{ color: "var(--acc)", background: "color-mix(in srgb, var(--acc) 12%, transparent)" }}><Megaphone size={15} /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-base font-black text-[var(--ink)]">التسويق الرقمي والحملات</span>
+                  <span className="block text-[11px] text-[var(--faint)]">
+                    {mk.campaigns.length
+                      ? `${fmt(mk.campaigns.length)} حملة، ${fmt(mkTotals.live)} شغّالة، صرف ${fmt(mkTotals.spend)} ر.س، ${fmt(mkTotals.bookings)} حجز`
+                      : "الجاهزية (قوقل ← الحسابات ← الإعلان) وسجل الحملات ودليل المحتوى"}
+                  </span>
+                </span>
+                {mkTotals.roas !== null && <Badge color={mkTotals.roas >= 1 ? "#16A34A" : "#DC2626"}>عائد {mkTotals.roas.toLocaleString(LOCALE, { maximumFractionDigits: 1 })}×</Badge>}
+                <ChevronDown size={16} className={`shrink-0 text-[var(--muted)] transition-transform ${mkOpen ? "rotate-180" : ""}`} />
+              </button>
+              {mkOpen && (
+                <div className="mt-4">
+                  <CampaignsView m={mk} set={(v) => patch({ marketing: v }, true)} salonName={c.salon_name} copy={copy} compact />
                 </div>
               )}
             </div>

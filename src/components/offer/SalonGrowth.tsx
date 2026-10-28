@@ -9,7 +9,7 @@ import {
   Sun, Moon, Maximize2, Minimize2, Printer, Link2, Check, Sparkles, Coffee, UserCheck, Flower2,
   Calculator, Crown, Gem, Plus, Trash2, X, Send, Copy, RotateCcw, Users, Footprints, Clock,
   PlayCircle, CheckCircle2, Hourglass, Wand2, Scissors, Palette, Brush, Hand, Star, BellRing,
-  Store, Trophy, Repeat, Zap, Gift, UserPlus, Cloud, CloudOff, Loader2, Database, LogIn, ShieldX, Stethoscope,
+  Store, Trophy, Repeat, Zap, Gift, UserPlus, Cloud, CloudOff, Loader2, Database, LogIn, ShieldX, Stethoscope, Megaphone,
 } from "lucide-react";
 import {
   ADDONS, DEFAULT_SETTINGS, RETENTION_TARGET, SERVICES, SLEEP_DAYS, STAFF, TEMPLATE_DEFAULTS,
@@ -19,6 +19,8 @@ import {
   type SettingKey, type Settings, type TplKey,
 } from "@/lib/salon-growth";
 import DiagnosisTab from "@/components/offer/SalonDiagnosis";
+import CampaignsView from "@/components/offer/SalonCampaigns";
+import { DEFAULT_MARKETING } from "@/lib/salon-campaigns";
 import BackToPlatform from "@/components/offer/BackToPlatform";
 
 /* ──────────────────────────── أدوات عامة ──────────────────────────── */
@@ -91,6 +93,7 @@ const TABS = [
   { id: "growth", label: "مفاتيح التغيير والنمو", short: "مفاتيح النمو", icon: Rocket },
   { id: "booking", label: "جدول المواعيد والحجز الذكي", short: "المواعيد", icon: CalendarClock },
   { id: "automation", label: "رسائل التواصل الآلي والولاء", short: "الرسائل", icon: MessageCircle },
+  { id: "campaigns", label: "التسويق الرقمي والحملات", short: "الحملات", icon: Megaphone },
   { id: "analytics", label: "تقارير الأداء والزيادة", short: "التقارير", icon: BarChart3 },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
@@ -516,6 +519,7 @@ function SalonGrowthInner() {
             {tab === "growth" && <GrowthTab data={data} now={now} ops={ops} setSetting={setSetting} vars={vars} canDelete={isManager} />}
             {tab === "booking" && <BookingTab appts={data.appts} now={now} ops={ops} reminderTpl={S.templates.reminder} vars={vars} />}
             {tab === "automation" && <AutomationTab settings={S} setSetting={setSetting} vars={vars} copy={copy} notify={notify} />}
+            {tab === "campaigns" && <CampaignsView m={{ ...DEFAULT_MARKETING, ...S.marketing }} set={(v) => setSetting("marketing", v)} salonName={salonName} copy={copy} />}
             {tab === "analytics" && <AnalyticsTab metrics={metrics} />}
           </main>
         </>

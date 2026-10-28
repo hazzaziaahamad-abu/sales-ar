@@ -10,7 +10,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Stethoscope, ClipboardList, ClipboardCheck, Target, TriangleAlert, Lock, LockOpen, ChevronDown, FileText,
   CalendarDays, Flag, Check, Users, Receipt, Sparkles, CalendarClock, Crown, Star,
-  Scissors, MessageCircle, Zap, Flower2, Coffee, UserCheck,
+  Scissors, MessageCircle, Zap, Flower2, Coffee, UserCheck, Megaphone,
 } from "lucide-react";
 import {
   DEFAULT_DIAGNOSIS, KPIS, computeCurrentKpis, formatKpi, goalProgress, kpiDelta, localDateKey,
@@ -41,7 +41,7 @@ const PREREQS: { id: string; icon: LucideIcon; title: string; why: string }[] = 
   { id: "staff", icon: UserCheck, title: "الموظفات: التخصص والدوام وطريقة الراتب/العمولة", why: "الحافز على البيع وإنتاجية كل وحدة" },
   { id: "booking", icon: CalendarClock, title: "طريقة الحجز الحالية (اتصال/واتساب/إنستقرام/نظام)", why: "حجم الضياع والغياب" },
   { id: "offers", icon: Crown, title: "العروض والباقات والعضويات الحالية", why: "وش جُرّب ووش نجح" },
-  { id: "accounts", icon: Star, title: "حسابات قوقل ماب وإنستقرام", why: "التقييم وعدد المراجعات والتفاعل" },
+  { id: "accounts", icon: Star, title: "حسابات قوقل ماب والسوشال (إنستقرام، سناب، تيك توك) + أي إعلانات سابقة ونتائجها", why: "التقييم والتفاعل ومعدل النشر وتكلفة العميلة" },
 ];
 
 type Axis = { id: string; icon: LucideIcon; title: string; key?: string; questions: { id: string; q: string }[]; observe?: boolean };
@@ -73,9 +73,12 @@ const AXES: Axis[] = [
   { id: "memberships", icon: Crown, title: "العضويات والدفع المقدّم", key: "مفتاح العضويات المغلقة", questions: [
     { id: "mem_current", q: "هل فيه رصيد مسبق أو باقة شهرية أو باقة عروس؟ كم مشتركة؟" },
   ] },
-  { id: "reputation", icon: Star, title: "السمعة والتسويق", questions: [
-    { id: "rep_google", q: "كم تقييم قوقل وعدد المراجعات؟" },
-    { id: "rep_spend", q: "كم الصرف على الإعلان، ومن وين تجي العميلات الجدد؟" },
+  { id: "reputation", icon: Megaphone, title: "التواجد الرقمي والإعلان", key: "التسويق الرقمي والحملات", questions: [
+    { id: "rep_google", q: "كم تقييم قوقل وعدد المراجعات؟ هل تطلبون تقييم بعد كل زيارة وتردّون على المراجعات؟" },
+    { id: "dig_accounts", q: "على أي منصات الصالون موجود (إنستقرام، سناب، تيك توك)؟ ومين يدير الحسابات؟" },
+    { id: "dig_content", q: "كم مرة تنشرون بالأسبوع؟ وش نوع المحتوى (قبل وبعد، عروض، فيديو، الخبيرات)؟" },
+    { id: "dig_dm", q: "كم ياخذ الرد على رسائل الواتساب والإنستقرام؟ وهل فيه رابط حجز في البايو وقوقل؟" },
+    { id: "rep_spend", q: "كم الصرف على الإعلان، على أي منصة، ومن وين تجي العميلات الجدد؟ هل تعرفون تكلفة العميلة؟" },
   ] },
 ];
 const QUESTION_COUNT = AXES.reduce((s, a) => s + a.questions.length, 0);
@@ -351,12 +354,17 @@ export function DiagnosisView({ src, copy, salonName, currentHint, compact = fal
               </tr>
             </thead>
             <tbody>
-              {KPIS.map((k) => {
+              {KPIS.map((k, i) => {
                 const b = src.baseline(k.key);
                 const cur = src.current(k);
                 const dl = kpiDelta(k, b?.value, cur);
+                const groupStart = k.group === "digital" && KPIS[i - 1]?.group !== "digital";
                 return (
-                  <tr key={k.key} className="bg-[var(--surface-2)]/60">
+                  <React.Fragment key={k.key}>
+                  {groupStart && (
+                    <tr><td colSpan={5} className="px-3 pb-1 pt-4 text-xs font-black text-[var(--acc)]"><Megaphone size={13} className="me-1.5 inline" />التواجد الرقمي</td></tr>
+                  )}
+                  <tr className="bg-[var(--surface-2)]/60">
                     <td className="rounded-r-2xl px-3 py-2.5">
                       <div className="font-bold text-[var(--ink)]">{k.label}</div>
                       <div className="text-[11px] text-[var(--faint)]">{k.how}</div>
@@ -385,6 +393,7 @@ export function DiagnosisView({ src, copy, salonName, currentHint, compact = fal
                     </td>
                     <td className="rounded-l-2xl px-3 py-2.5 font-black" style={{ color: dl?.color ?? "var(--faint)" }}>{dl?.text ?? "—"}</td>
                   </tr>
+                  </React.Fragment>
                 );
               })}
             </tbody>
