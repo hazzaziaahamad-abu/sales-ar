@@ -3401,34 +3401,28 @@ export function SalesSection({ salesType }: SalesPageProps) {
 
             {/* Rep + Date row */}
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {/* من يضيف الرقم يوكل المبيعة لمختص المبيعات؛ تغييرها لاحقاً للمدير فقط */}
-              {isAdmin || !editingId ? (
-                <div className="grid gap-1.5">
-                  <Label htmlFor="assigned_rep_name">الموظف الموكل له المبيعة</Label>
-                  <Select
-                    value={form.assigned_rep_name}
-                    onValueChange={(val) => val && setForm({ ...form, assigned_rep_name: val })}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="اختر الموظف الموكل له" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {employees.filter((e) => e.status === "نشط" || e.status === "مشغول" || e.status === "متاح").map((e) => (
-                        <SelectItem key={e.id} value={e.name}>
-                          {e.name}{e.role ? ` — ${e.role}` : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : (
-                <div className="grid gap-1.5">
-                  <Label>الموظف الموكل له المبيعة</Label>
-                  <div className="px-3 py-2 rounded-lg border border-border bg-muted/30 text-sm text-foreground">
-                    {form.assigned_rep_name || "—"}
-                  </div>
-                </div>
-              )}
+              {/* من يضيف الرقم يوكل المبيعة لمختص المبيعات، ويمكن تعديل الموكل له لاحقاً */}
+              <div className="grid gap-1.5">
+                <Label htmlFor="assigned_rep_name">الموظف الموكل له المبيعة</Label>
+                <Select
+                  value={form.assigned_rep_name}
+                  onValueChange={(val) => val && setForm({ ...form, assigned_rep_name: val })}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="اختر الموظف الموكل له" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {form.assigned_rep_name && !employees.some((e) => e.name === form.assigned_rep_name) && (
+                      <SelectItem value={form.assigned_rep_name}>{form.assigned_rep_name}</SelectItem>
+                    )}
+                    {employees.map((e) => (
+                      <SelectItem key={e.id} value={e.name}>
+                        {e.name}{e.role ? ` — ${e.role}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid gap-1.5">
                 <Label htmlFor="deal_date">التاريخ</Label>
                 <Input
