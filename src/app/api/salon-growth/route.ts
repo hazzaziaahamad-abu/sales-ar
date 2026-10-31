@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
-  APPT_COLS, CLIENT_COLS, MEMBERSHIP_COLS, DEFAULT_SETTINGS, buildDemoData,
+  APPT_COLS, CLIENT_COLS, MEMBERSHIP_COLS, DEFAULT_SETTINGS, SETTING_KEYS, buildDemoData,
   type ApptRow, type ClientRow, type MembershipRow, type Settings,
 } from "@/lib/salon-growth";
+import { isSuperAdmin } from "@/lib/permissions";
 import { fetchAll, getSalonAccess, toNum } from "./shared";
 
 export const runtime = "nodejs";
@@ -25,7 +26,8 @@ async function loadAll(orgId: string) {
   if (memberships.error) throw new Error(memberships.error.message);
   if (settingsRes.error) throw new Error(settingsRes.error.message);
   const settings: Settings = { ...DEFAULT_SETTINGS };
-  for (const r of settingsRes.data ?? []) (settings as Record<string, unknown>)[r.key] = r.value;
+  // مفاتيح اللوحة فقط — «الخطة المبسطة» (simple) للسوبر أدمن عبر /api/salon-simple وما تطلع هنا
+  for (const r of settingsRes.data ?? []) if ((SETTING_KEYS as readonly string[]).includes(r.key)) (settings as Record<string, unknown>)[r.key] = r.value;
   return {
     clients: clients.map((c) => toNum(c, ["total_spent", "visits"])),
     appts: appts.map((a) => toNum(a, ["price", "duration_minutes"])),
@@ -35,7 +37,6 @@ async function loadAll(orgId: string) {
       templates: { ...DEFAULT_SETTINGS.templates, ...settings.templates },
       diagnosis: { ...DEFAULT_SETTINGS.diagnosis, ...settings.diagnosis },
       marketing: { ...DEFAULT_SETTINGS.marketing, ...settings.marketing },
-      simple: { ...DEFAULT_SETTINGS.simple, ...settings.simple, costs: { ...DEFAULT_SETTINGS.simple.costs, ...settings.simple?.costs } },
     },
   };
 }
@@ -46,7 +47,7 @@ export async function GET() {
   if (access instanceof NextResponse) return access;
   try {
     const data = await loadAll(access.orgId);
-    return NextResponse.json({ ...data, me: { isManager: access.isManager } }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ ...data, me: { isManager: access.isManager, isSuper: await isSuperAdmin(access.userId) } }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }

@@ -1,6 +1,7 @@
 // «الخطة المبسطة» للصالونات والخدمات المنزلية: نموذج العمل، تشخيص خفيف بخمس محاور،
 // حاسبة التسعير من التكلفة الحقيقية، قائمة الخدمات، خطة ٩٠ يوم تنبني من الفجوات، و٦ مؤشرات.
-// تُحفظ كإعداد «simple» في «الخطة التسويقية للصالونات» — مستقلة عن الخطة الشاملة.
+// صفحة مستقلة للسوبر أدمن فقط (/offer/salon-simple) — تُحفظ في salon_growth_settings بالمفتاح «simple»
+// عبر /api/salon-simple، ومستبعدة من بيانات «الخطة التسويقية» الشاملة.
 
 export type BizModel = "salon" | "home_visit" | "home_studio";
 export type ServiceKind = "core" | "entry" | "addon" | "package";
@@ -21,6 +22,7 @@ export type Costs = {
 export type SimpleKpiKey = "revenue" | "clients" | "return_pct" | "avg_ticket" | "margin_pct" | "cpa";
 
 export type Simple = {
+  name: string;
   model: BizModel | null;
   checks: Record<string, boolean>;
   nums: Record<string, number | null>;
@@ -37,7 +39,7 @@ export const DEFAULT_COSTS: Costs = {
   travel_cost: null, travel_minutes: null, commission_pct: 0, margin_pct: 40, vat: false,
 };
 export const DEFAULT_SIMPLE: Simple = {
-  model: null, checks: {}, nums: {}, costs: DEFAULT_COSTS, services: [], done: {}, start: "", baseline: {}, current: {},
+  name: "", model: null, checks: {}, nums: {}, costs: DEFAULT_COSTS, services: [], done: {}, start: "", baseline: {}, current: {},
 };
 
 export const MODELS: { id: BizModel; label: string; desc: string; risk: string }[] = [

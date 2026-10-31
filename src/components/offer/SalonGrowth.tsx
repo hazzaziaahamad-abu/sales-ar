@@ -20,8 +20,6 @@ import {
 } from "@/lib/salon-growth";
 import DiagnosisTab from "@/components/offer/SalonDiagnosis";
 import CampaignsView from "@/components/offer/SalonCampaigns";
-import SimplePlan from "@/components/offer/SimplePlan";
-import { DEFAULT_SIMPLE } from "@/lib/salon-simple";
 import { DEFAULT_MARKETING } from "@/lib/salon-campaigns";
 import BackToPlatform from "@/components/offer/BackToPlatform";
 
@@ -198,15 +196,22 @@ function SalonGrowthInner() {
     return TABS.some((t) => t.id === q) ? (q as TabId) : "growth";
   });
   // مبسطة أو شاملة — يختار المستخدم كل ما يدخل (روابط التبويبات القديمة ?tab= تفتح الشاملة مباشرة)
+  // الاختيار للسوبر أدمن فقط — «المبسطة» صفحة مستقلة له (/offer/salon-simple)، والباقي يدخل الشاملة مباشرة
   const [plan, setPlan] = useState<PlanMode | null>(() => {
     const q = params.get("plan");
     if (q === "simple" || q === "full") return q;
     return params.get("tab") ? "full" : null;
   });
+  const [isSuper, setIsSuper] = useState(false);
   const [lastPlan] = useState<PlanMode | null>(() => {
     try { const v = localStorage.getItem("sg-plan"); return v === "simple" || v === "full" ? v : null; } catch { return null; }
   });
   const choosePlan = (p: PlanMode | null) => {
+    if (p === "simple") {
+      try { localStorage.setItem("sg-plan", p); } catch { /* ignore */ }
+      window.location.href = "/offer/salon-simple";
+      return;
+    }
     setPlan(p);
     if (p) try { localStorage.setItem("sg-plan", p); } catch { /* ignore */ }
     const url = new URL(window.location.href);
@@ -226,10 +231,11 @@ function SalonGrowthInner() {
   const live = mode === "live";
 
   const load = useCallback(() =>
-    api<Data & { me: { isManager: boolean } }>("", "GET").then(
+    api<Data & { me: { isManager: boolean; isSuper?: boolean } }>("", "GET").then(
       (res) => {
         setData({ clients: res.clients, appts: res.appts, memberships: res.memberships, settings: res.settings });
         setIsManager(res.me.isManager);
+        setIsSuper(!!res.me.isSuper);
         setMode("live");
       },
       (e) => {
@@ -377,6 +383,9 @@ function SalonGrowthInner() {
 
   const S = data.settings;
   const salonName = S.salon_name.trim() || "صالونك";
+  const showChooser = live && isSuper && plan !== "full";
+  // رابط قديم ?plan=simple → الصفحة المستقلة
+  useEffect(() => { if (live && isSuper && plan === "simple") window.location.replace("/offer/salon-simple"); }, [live, isSuper, plan]);
   const bookingLink = S.booking_link.trim() || `${window.location.origin}/offer/nahjez`;
   const vars = (v: Vars): Vars => ({ salon: salonName, discount: `${fmt(S.discount)}٪`, link: bookingLink, ...v });
   const empty = live && !data.clients.length && !data.appts.length && !data.memberships.length;
@@ -422,9 +431,9 @@ function SalonGrowthInner() {
             </div>
           </div>
           <div className="ms-auto flex items-center gap-1.5">
-            {live && plan && (
+            {live && isSuper && plan === "full" && (
               <button onClick={() => choosePlan(null)} title="تغيير نوع الخطة" className="flex items-center gap-1 rounded-full border border-[var(--line)] px-3 py-1.5 text-xs font-black hover:bg-[var(--hover)]" style={{ color: "var(--acc)" }}>
-                {plan === "simple" ? "مبسطة" : "شاملة"} <RotateCcw size={12} />
+                شاملة <RotateCcw size={12} />
               </button>
             )}
             <ConnChip mode={mode} />
@@ -437,7 +446,7 @@ function SalonGrowthInner() {
             <span className="hidden sm:contents"><IconBtn onClick={toggleFs} title="وضع العرض">{fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</IconBtn></span>
           </div>
         </div>
-        {live && plan === "full" && <nav className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 pb-2.5 sm:px-6 [scrollbar-width:none]" role="tablist">
+        {live && !showChooser && <nav className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 pb-2.5 sm:px-6 [scrollbar-width:none]" role="tablist">
           {TABS.map((t) => {
             const on = t.id === tab;
             return (
@@ -464,13 +473,8 @@ function SalonGrowthInner() {
         </div>
       ) : !live ? (
         <AccessGate mode={mode} onRetry={() => { setMode("loading"); load(); }} />
-      ) : plan === null ? (
+      ) : showChooser ? (
         <PlanChooser last={lastPlan} onPick={choosePlan} />
-      ) : plan === "simple" ? (
-        <main className="sg-in mx-auto max-w-7xl px-4 pb-24 pt-6 sm:px-6">
-          <SimplePlan s={{ ...DEFAULT_SIMPLE, ...S.simple }} set={(v) => setSetting("simple", v)} salonName={S.salon_name}
-            setSalonName={(v) => setSetting("salon_name", v)} copy={copy} />
-        </main>
       ) : (
         <>
           {/* ─── المؤشرات السريعة ─── */}
@@ -586,7 +590,7 @@ function PlanChooser({ last, onPick }: { last: PlanMode | null; onPick: (p: Plan
       <h1 className="text-center text-2xl font-black text-[var(--ink)] sm:text-4xl">
         الخطة التسويقية <span className="bg-clip-text text-transparent" style={{ backgroundImage: `linear-gradient(90deg, var(--acc), ${GOLD})` }}>للصالونات</span>
       </h1>
-      <p className="mt-2 text-center text-sm text-[var(--muted)]">اختر نوع الخطة — تقدر تبدّل بينهم أي وقت من أعلى الصفحة.</p>
+      <p className="mt-2 text-center text-sm text-[var(--muted)]">اختر نوع الخطة. «المبسطة» صفحة مستقلة لك أنت فقط.</p>
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
         {options.map((o) => (
           <button key={o.id} onClick={() => onPick(o.id)} className={`${card} relative flex flex-col justify-start p-5 text-right transition-all hover:-translate-y-1 hover:border-[var(--acc)] sm:p-6`}>
