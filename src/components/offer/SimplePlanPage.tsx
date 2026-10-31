@@ -1,6 +1,6 @@
 "use client";
 
-// صفحة «الخطة المبسطة للصالونات» المستقلة — للسوبر أدمن فقط (يتحقق منها /api/salon-simple).
+// صفحة «الخطة المبسطة للصالونات» المستقلة — للسوبر أدمن ومن صفحتها مفعّلة في دوره (يتحقق منها /api/salon-simple).
 
 import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Check, Cloud, Loader2, Moon, ShieldX, Sun, X, Zap } from "lucide-react";
