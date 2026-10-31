@@ -196,13 +196,13 @@ function SalonGrowthInner() {
     return TABS.some((t) => t.id === q) ? (q as TabId) : "growth";
   });
   // مبسطة أو شاملة — يختار المستخدم كل ما يدخل (روابط التبويبات القديمة ?tab= تفتح الشاملة مباشرة)
-  // الاختيار للسوبر أدمن فقط — «المبسطة» صفحة مستقلة له (/offer/salon-simple)، والباقي يدخل الشاملة مباشرة
+  // الاختيار لمن يقدر يفتح «المبسطة» (سوبر أدمن أو صفحتها مفعّلة في دوره) — صفحة مستقلة (/offer/salon-simple)، والباقي يدخل الشاملة مباشرة
   const [plan, setPlan] = useState<PlanMode | null>(() => {
     const q = params.get("plan");
     if (q === "simple" || q === "full") return q;
     return params.get("tab") ? "full" : null;
   });
-  const [isSuper, setIsSuper] = useState(false);
+  const [canSimple, setCanSimple] = useState(false);
   const [lastPlan] = useState<PlanMode | null>(() => {
     try { const v = localStorage.getItem("sg-plan"); return v === "simple" || v === "full" ? v : null; } catch { return null; }
   });
@@ -231,11 +231,11 @@ function SalonGrowthInner() {
   const live = mode === "live";
 
   const load = useCallback(() =>
-    api<Data & { me: { isManager: boolean; isSuper?: boolean } }>("", "GET").then(
+    api<Data & { me: { isManager: boolean; canSimple?: boolean } }>("", "GET").then(
       (res) => {
         setData({ clients: res.clients, appts: res.appts, memberships: res.memberships, settings: res.settings });
         setIsManager(res.me.isManager);
-        setIsSuper(!!res.me.isSuper);
+        setCanSimple(!!res.me.canSimple);
         setMode("live");
       },
       (e) => {
@@ -383,9 +383,9 @@ function SalonGrowthInner() {
 
   const S = data.settings;
   const salonName = S.salon_name.trim() || "صالونك";
-  const showChooser = live && isSuper && plan !== "full";
+  const showChooser = live && canSimple && plan !== "full";
   // رابط قديم ?plan=simple → الصفحة المستقلة
-  useEffect(() => { if (live && isSuper && plan === "simple") window.location.replace("/offer/salon-simple"); }, [live, isSuper, plan]);
+  useEffect(() => { if (live && canSimple && plan === "simple") window.location.replace("/offer/salon-simple"); }, [live, canSimple, plan]);
   const bookingLink = S.booking_link.trim() || `${window.location.origin}/offer/nahjez`;
   const vars = (v: Vars): Vars => ({ salon: salonName, discount: `${fmt(S.discount)}٪`, link: bookingLink, ...v });
   const empty = live && !data.clients.length && !data.appts.length && !data.memberships.length;
@@ -431,7 +431,7 @@ function SalonGrowthInner() {
             </div>
           </div>
           <div className="ms-auto flex items-center gap-1.5">
-            {live && isSuper && plan === "full" && (
+            {live && canSimple && plan === "full" && (
               <button onClick={() => choosePlan(null)} title="تغيير نوع الخطة" className="flex items-center gap-1 rounded-full border border-[var(--line)] px-3 py-1.5 text-xs font-black hover:bg-[var(--hover)]" style={{ color: "var(--acc)" }}>
                 شاملة <RotateCcw size={12} />
               </button>
@@ -590,7 +590,7 @@ function PlanChooser({ last, onPick }: { last: PlanMode | null; onPick: (p: Plan
       <h1 className="text-center text-2xl font-black text-[var(--ink)] sm:text-4xl">
         الخطة التسويقية <span className="bg-clip-text text-transparent" style={{ backgroundImage: `linear-gradient(90deg, var(--acc), ${GOLD})` }}>للصالونات</span>
       </h1>
-      <p className="mt-2 text-center text-sm text-[var(--muted)]">اختر نوع الخطة. «المبسطة» صفحة مستقلة لك أنت فقط.</p>
+      <p className="mt-2 text-center text-sm text-[var(--muted)]">اختر نوع الخطة. «المبسطة» تنفتح في صفحة مستقلة.</p>
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
         {options.map((o) => (
           <button key={o.id} onClick={() => onPick(o.id)} className={`${card} relative flex flex-col justify-start p-5 text-right transition-all hover:-translate-y-1 hover:border-[var(--acc)] sm:p-6`}>

@@ -4,7 +4,7 @@ import {
   APPT_COLS, CLIENT_COLS, MEMBERSHIP_COLS, DEFAULT_SETTINGS, SETTING_KEYS, buildDemoData,
   type ApptRow, type ClientRow, type MembershipRow, type Settings,
 } from "@/lib/salon-growth";
-import { isSuperAdmin } from "@/lib/permissions";
+import { canOpenPage } from "@/lib/permissions";
 import { fetchAll, getSalonAccess, toNum } from "./shared";
 
 export const runtime = "nodejs";
@@ -47,7 +47,7 @@ export async function GET() {
   if (access instanceof NextResponse) return access;
   try {
     const data = await loadAll(access.orgId);
-    return NextResponse.json({ ...data, me: { isManager: access.isManager, isSuper: await isSuperAdmin(access.userId) } }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ ...data, me: { isManager: access.isManager, canSimple: await canOpenPage(access.userId, "offer-salon-simple") } }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
