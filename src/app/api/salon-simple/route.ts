@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getTicketAccess } from "@/lib/api/work-ticket-access";
-import { isSuperAdmin } from "@/lib/permissions";
+import { canOpenPage } from "@/lib/permissions";
 import { DEFAULT_SIMPLE, type Simple } from "@/lib/salon-simple";
 
 export const runtime = "nodejs";
 
 const KEY = "simple";
 
-/** «الخطة المبسطة للصالونات»: السوبر أدمن فقط. */
+/** «الخطة المبسطة للصالونات»: السوبر أدمن، أو من صفحة offer-salon-simple مفعّلة في دوره. */
 async function access() {
   const a = await getTicketAccess();
   if (!a) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!(await isSuperAdmin(a.userId))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!(await canOpenPage(a.userId, "offer-salon-simple"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   return a;
 }
 
