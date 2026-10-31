@@ -6,7 +6,7 @@ import { Loader2, Moon, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import { saudiMinutesNow } from "@/lib/team-reminders";
-import { DAY_LIMIT, SLICE_KINDS, type FocusSlice } from "@/lib/focus-slices";
+import { SLICE_KINDS, dayLimit, type FocusSlice } from "@/lib/focus-slices";
 import { SLICES_CHANGED_EVENT } from "@/lib/focus-session";
 
 /**
@@ -16,6 +16,7 @@ import { SLICES_CHANGED_EVENT } from "@/lib/focus-session";
 
 export const EVENING_START_MIN = 20 * 60;
 const SNOOZE_MS = 60 * 60_000;
+const LIMIT = dayLimit("ideas");
 const num = (n: number) => n.toLocaleString("ar-SA");
 
 function ls(key: string, val?: string) {
@@ -74,15 +75,15 @@ export function EveningPlanPrompt() {
 
   const planned = slices.filter((s) => s.planned_for === tomorrow);
   const free = {
-    deep: DAY_LIMIT.deep - planned.filter((s) => s.kind === "deep").length,
-    shallow: DAY_LIMIT.shallow - planned.filter((s) => s.kind === "shallow").length,
+    deep: LIMIT.deep - planned.filter((s) => s.kind === "deep").length,
+    shallow: LIMIT.shallow - planned.filter((s) => s.kind === "shallow").length,
   };
   const candidates = slices.filter((s) => !s.done_at).sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "deep" ? -1 : 1));
 
   const toggle = async (s: FocusSlice) => {
     const on = s.planned_for === tomorrow;
     if (!on && free[s.kind] <= 0) {
-      setNotice(s.kind === "deep" ? "🔥 شريحة عميقة وحدة تكفي لبكرة" : `⚡ ${num(DAY_LIMIT.shallow)} سطحية كحد أقصى`);
+      setNotice(s.kind === "deep" ? "🔥 شريحة عميقة وحدة تكفي لبكرة" : `⚡ ${num(LIMIT.shallow)} سطحية كحد أقصى`);
       return;
     }
     setBusy(s.id);
@@ -114,17 +115,17 @@ export function EveningPlanPrompt() {
           <span className="w-10 h-10 rounded-2xl bg-violet-500/15 text-violet-300 flex items-center justify-center shrink-0"><Moon className="w-5 h-5" /></span>
           <div className="flex-1">
             <p className="text-base font-extrabold text-foreground">🌙 اختر شرائح بكرة</p>
-            <p className="text-xs text-muted-foreground mt-0.5">عميقة وحدة + {num(DAY_LIMIT.shallow)} سطحية — تصحى وخطتك جاهزة</p>
+            <p className="text-xs text-muted-foreground mt-0.5">عميقة وحدة + {num(LIMIT.shallow)} سطحية — تصحى وخطتك جاهزة</p>
           </div>
           <button onClick={() => close("snooze")} className="p-1.5 rounded-full text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
         </div>
 
         <div className="px-5 flex gap-2 text-[11px] font-bold">
           <span className={cn("px-2.5 py-1 rounded-full border", free.deep <= 0 ? "bg-orange-500/20 text-orange-200 border-orange-400/40" : "border-border text-muted-foreground")}>
-            🔥 {num(DAY_LIMIT.deep - free.deep)}/{num(DAY_LIMIT.deep)}
+            🔥 {num(LIMIT.deep - free.deep)}/{num(LIMIT.deep)}
           </span>
           <span className={cn("px-2.5 py-1 rounded-full border", free.shallow <= 0 ? "bg-sky-500/20 text-sky-200 border-sky-400/40" : "border-border text-muted-foreground")}>
-            ⚡ {num(DAY_LIMIT.shallow - free.shallow)}/{num(DAY_LIMIT.shallow)}
+            ⚡ {num(LIMIT.shallow - free.shallow)}/{num(LIMIT.shallow)}
           </span>
         </div>
         {notice && <p className="mx-5 mt-2 text-xs font-semibold text-amber-300">{notice}</p>}

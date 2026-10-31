@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Heart, Search, Trash2, X, Loader2, Dices, Sparkles, GripVertical, Check, CalendarClock, Plus, Rocket, Trophy, BellRing, Undo2, FileText, Scissors, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PushCard } from "@/components/push/push-card";
-import { IdeaSlicesPanel, QuickCapture, SliceChip, TodaySlices, useSlices } from "@/components/ideas/slices";
+import { IdeaSlicesPanel, QuickCapture, SliceChip, TodaySlices, useSlices, type ConvertKind } from "@/components/ideas/slices";
 import { STICKER_KINDS, devProgress, isDevSheet, isReminder, stickerKind, timelineOf, type IdeaSticker, type StickerKind, type TimelineStep } from "@/lib/idea-stickers";
 import type { FocusSlice } from "@/lib/focus-slices";
 import { NoteEditor, NoteView } from "@/components/salon-room/NoteEditor";
@@ -279,6 +279,25 @@ export function IdeasBoard() {
     }
   };
 
+  /** تحويل شريحة عميقة لاستكر على اللوحة (تطوير / فكرة خاطفة / مقترح) — الشريحة تنشال بعد التحويل. */
+  const convertSlice = async (slice: FocusSlice, kind: ConvertKind) => {
+    const label = stickerKind(kind).label;
+    if (!confirm(`تحويل «${slice.title}» إلى ${label}؟ الشريحة تنشال من شرائحك وتصير استكر على اللوحة.`)) return;
+    const res = await fetch("/api/idea-stickers", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind, tag: stickerKind(kind).tag, title: slice.title, body: "" }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.error || "تعذّر التحويل");
+    setStickers((p) => [...p, json.sticker]);
+    setFreshId(json.sticker.id);
+    setFilter("all");
+    setQuery("");
+    setView("board");
+    await slices.remove(slice.id);
+    setOpen(json.sticker); // نفتحها مباشرة عشان تكمل تفاصيلها
+  };
+
   const save = async (id: string, patch: Draft) => {
     const res = await fetch(`/api/idea-stickers/${id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch),
@@ -434,6 +453,7 @@ export function IdeasBoard() {
         api={slices}
         parentTitle={(id) => { const s = stickers.find((x) => x.id === id); return s ? s.title || s.body.slice(0, 60) || "فكرة" : "فكرة محذوفة"; }}
         onOpenParent={(id) => { const s = stickers.find((x) => x.id === id); if (s) setOpen(s); }}
+        onConvert={convertSlice}
       />
 
       {/* ─── الصق فكرة: الكتابة على الاستكر نفسه ─── */}

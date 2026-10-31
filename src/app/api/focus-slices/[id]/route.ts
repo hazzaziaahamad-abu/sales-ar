@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getSliceAccess } from "@/lib/api/focus-slices-access";
 import {
-  DAY_LIMIT, SLICE_COLS, SLICE_KINDS, cleanSliceTitle, isSliceKind, nextDayFor, todayRiyadh, type SliceKind, type SliceSpace,
+  SLICE_COLS, dayLimit, SLICE_KINDS, cleanSliceTitle, isSliceKind, nextDayFor, todayRiyadh, type SliceKind, type SliceSpace,
 } from "@/lib/focus-slices";
 
 export const runtime = "nodejs";
@@ -27,7 +27,7 @@ async function ownSlice(id: string) {
  * PATCH /api/focus-slices/[id]
  * { title?, kind?, plan?: "today" | "tomorrow" | null, done?: boolean, add_minutes?: number, session_at?: "HH:MM" | null }
  * «tomorrow» في العمل الوظيفي = يوم الدوام التالي.
- * الحد اليومي يُفرض هنا: عميقة واحدة + ٣ سطحية لكل يوم.
+ * الحد اليومي يُفرض هنا: عميقة واحدة + ٣ سطحية لكل يوم (٥ في الأفكار).
  */
 export async function PATCH(req: NextRequest, { params }: Ctx) {
   const { id } = await params;
@@ -61,13 +61,14 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       .from("focus_slices").select("id", { count: "exact", head: true })
       .eq("org_id", access.orgId).eq("user_id", access.userId).eq("space", row.space)
       .eq("planned_for", day).eq("kind", kind).neq("id", id);
-    if ((count ?? 0) >= DAY_LIMIT[kind]) {
+    const limit = dayLimit(row.space as SliceSpace);
+    if ((count ?? 0) >= limit[kind]) {
       const k = SLICE_KINDS[kind];
       const when = day === todayRiyadh() ? "اليوم" : "بكرة";
       return NextResponse.json(
         { error: kind === "deep"
           ? `${k.icon} عندك شريحة عميقة ${when} — وحدة تكفي. أنجزها أو رجّعها أولاً`
-          : `${k.icon} اكتملت الشرائح السطحية ${when} (${DAY_LIMIT.shallow}) — رجّع وحدة أولاً` },
+          : `${k.icon} اكتملت الشرائح السطحية ${when} (${limit.shallow}) — رجّع وحدة أولاً` },
         { status: 409 }
       );
     }

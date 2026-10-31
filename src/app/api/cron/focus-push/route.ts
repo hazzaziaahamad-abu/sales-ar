@@ -72,7 +72,7 @@ async function handle(req: NextRequest) {
     const work = mine.filter((s) => s.space === "work");
 
     if (inEvening && ideas.some((s) => !s.done_at) && !ideas.some((s) => s.planned_for === tomorrow) && await claimDaily(uid, "evening", today)) {
-      sent += await sendPushToUser(uid, { title: "🌙 اختر شرائح بكرة", body: "دقيقة تخطيط الليلة: عميقة وحدة + ٣ سطحية — تصحى وخطتك جاهزة", url: "/ideas", tag: "evening" });
+      sent += await sendPushToUser(uid, { title: "🌙 اختر شرائح بكرة", body: "دقيقة تخطيط الليلة: عميقة وحدة + ٥ سطحية — تصحى وخطتك جاهزة", url: "/ideas", tag: "evening" });
     }
 
     if (!superSet.has(uid)) continue;

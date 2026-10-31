@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getSliceAccess } from "@/lib/api/focus-slices-access";
 import {
-  DAY_LIMIT, SLICE_COLS, SLICE_KINDS, SLICE_MAX, SLICES_PER_IDEA_MAX, cleanSliceTitle, isSliceKind, isSliceSpace, nextDayFor, todayRiyadh,
+  SLICE_COLS, dayLimit, SLICE_KINDS, SLICE_MAX, SLICES_PER_IDEA_MAX, cleanSliceTitle, isSliceKind, isSliceSpace, nextDayFor, todayRiyadh,
 } from "@/lib/focus-slices";
 
 export const runtime = "nodejs";
@@ -88,10 +88,11 @@ async function quickToday(space: "ideas" | "work", access: { userId: string; org
     .from("focus_slices").select("id", { count: "exact", head: true })
     .eq("org_id", access.orgId).eq("user_id", access.userId).eq("space", space)
     .eq("planned_for", today).eq("kind", kind);
-  if ((count ?? 0) >= DAY_LIMIT[kind]) {
+  const limit = dayLimit(space);
+  if ((count ?? 0) >= limit[kind]) {
     const k = SLICE_KINDS[kind];
     return NextResponse.json(
-      { error: kind === "deep" ? `${k.icon} عندك شريحة عميقة اليوم — وحدة تكفي` : `${k.icon} اكتملت الشرائح السطحية اليوم (${DAY_LIMIT.shallow})` },
+      { error: kind === "deep" ? `${k.icon} عندك شريحة عميقة اليوم — وحدة تكفي` : `${k.icon} اكتملت الشرائح السطحية اليوم (${limit.shallow})` },
       { status: 409 }
     );
   }

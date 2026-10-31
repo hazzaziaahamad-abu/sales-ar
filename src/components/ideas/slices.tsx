@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronDown, Flame, Loader2, Moon, Play, Plus, Scissors, Sun, SunDim, Trash2, X, Zap } from "lucide-react";
+import { Check, ChevronDown, Flame, Loader2, Moon, MoreHorizontal, Play, Plus, Scissors, Sun, SunDim, Trash2, Trophy, Undo2, X, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  DAY_LIMIT, SLICE_KINDS, SLICE_MAX, SLICE_MIN, ideaProgress, parentOf,
+  SLICE_KINDS, SLICE_MAX, dayLimit, SLICE_MIN, ideaProgress, parentOf,
   type FocusSlice, type FocusStats, type SliceKind, type SliceSpace,
 } from "@/lib/focus-slices";
 import { SLICES_CHANGED_EVENT } from "@/lib/focus-session";
@@ -12,7 +12,7 @@ import { FocusStartDialog } from "@/components/focus/focus-overlay";
 
 /**
  * «الشرائح» — تقطيع الفكرة لمهام تنجز كل وحدة في جلسة واحدة، واختيار «شرائح اليوم»:
- * عميقة واحدة + ٣ سطحية كحد أقصى، والباقي مخفي في قائمة منفصلة.
+ * عميقة واحدة + ٥ سطحية في الأفكار (٣ في العمل الوظيفي)، والباقي مخفي في قائمة منفصلة.
  */
 
 const num = (n: number) => n.toLocaleString("ar-SA");
@@ -120,13 +120,23 @@ export function useSlices(space: SliceSpace) {
 export type SlicesApi = ReturnType<typeof useSlices>;
 
 /** الأماكن المتاحة في يوم لكل نوع. */
-function freeToday(slices: FocusSlice[], today: string) {
+function freeToday(slices: FocusSlice[], today: string, limit: Record<SliceKind, number>) {
   const planned = slices.filter((s) => s.planned_for === today);
   return {
-    deep: DAY_LIMIT.deep - planned.filter((s) => s.kind === "deep").length,
-    shallow: DAY_LIMIT.shallow - planned.filter((s) => s.kind === "shallow").length,
+    deep: limit.deep - planned.filter((s) => s.kind === "deep").length,
+    shallow: limit.shallow - planned.filter((s) => s.kind === "shallow").length,
   };
 }
+
+/** وجهات تحويل الشريحة العميقة إلى استكر على لوحة الأفكار. */
+export type ConvertKind = "dev" | "star" | "circle";
+const CONVERT_TO: { kind: ConvertKind; label: string }[] = [
+  { kind: "dev", label: "🛠️ ورقة تطوير" },
+  { kind: "star", label: "⚡ فكرة خاطفة" },
+  { kind: "circle", label: "💡 مقترح" },
+];
+/** «منجزة» خارج شرائح اليوم = في «المنجزات». */
+const isArchived = (s: FocusSlice, today: string) => !!s.done_at && s.planned_for !== today;
 
 /** رسالة مؤقتة صغيرة بدل alert. */
 function useNotice() {
@@ -204,15 +214,19 @@ export function QuickCapture({ onAdd, detailed, onToggleDetailed, placeholder }:
 
 // ─── شرائح اليوم + باقي الشرائح ───────────────────────────────────────────────
 
-export function TodaySlices({ api, parentTitle, onOpenParent, readOnly, icon = "💡", emptyHint, nextLabel = "بكرة" }: {
+export function TodaySlices({ api, parentTitle, onOpenParent, readOnly, icon = "💡", emptyHint, nextLabel = "بكرة", onConvert }: {
   api: SlicesApi; parentTitle: (id: string | null) => string; onOpenParent: (id: string) => void;
   /** عرض فقط (مثل العمل الوظيفي خارج الدوام). */
   readOnly?: boolean; icon?: string; emptyHint?: string; nextLabel?: string;
+  /** تحويل الشريحة العميقة لاستكر (تطوير / فكرة خاطفة / مقترح) — لوحة الأفكار فقط. */
+  onConvert?: (slice: FocusSlice, kind: ConvertKind) => Promise<void>;
 }) {
   const { slices, today, tomorrow, patch, loaded } = api;
   // المهام السريعة ما لها أم
   const titleOf = (id: string | null) => (id ? parentTitle(id) : "");
   const [showRest, setShowRest] = useState(false);
+  const [showDone, setShowDone] = useState(false);
+  const limit = dayLimit(api.space);
   const [focusing, setFocusing] = useState<FocusSlice | null>(null);
   const { notice, show } = useNotice();
 
@@ -221,8 +235,12 @@ export function TodaySlices({ api, parentTitle, onOpenParent, readOnly, icon = "
     [slices, today]
   );
   const rest = useMemo(() => slices.filter((s) => !s.done_at && s.planned_for !== today), [slices, today]);
-  const free = freeToday(slices, today);
-  const freeTomorrow = freeToday(slices, tomorrow);
+  const archived = useMemo(
+    () => slices.filter((s) => isArchived(s, today)).sort((a, b) => b.done_at!.localeCompare(a.done_at!)),
+    [slices, today]
+  );
+  const free = freeToday(slices, today, limit);
+  const freeTomorrow = freeToday(slices, tomorrow, limit);
   const tomorrowCount = slices.filter((s) => s.planned_for === tomorrow).length;
   const deep = todayList.filter((s) => s.kind === "deep");
   const shallow = todayList.filter((s) => s.kind === "shallow");
@@ -235,6 +253,21 @@ export function TodaySlices({ api, parentTitle, onOpenParent, readOnly, icon = "
   }, [rest]);
 
   const run = async (id: string, body: Patch) => { try { await patch(id, body); } catch (e) { show((e as Error).message); } };
+  /** نقل للمنجزات: تنعلّم منجزة وتطلع من شرائح اليوم (تفضى خانتها). */
+  const archive = (s: FocusSlice) => run(s.id, { done: true, plan: null });
+  const del = async (s: FocusSlice) => {
+    if (!confirm(`حذف «${s.title}»؟`)) return;
+    try { await api.remove(s.id); } catch (e) { show((e as Error).message); }
+  };
+  const convert = async (s: FocusSlice, kind: ConvertKind) => {
+    if (!onConvert) return;
+    try { await onConvert(s, kind); } catch (e) { show((e as Error).message); }
+  };
+  const rowActions = (s: FocusSlice) => ({
+    onArchive: () => archive(s),
+    onDelete: () => del(s),
+    onConvert: onConvert && s.kind === "deep" ? (k: ConvertKind) => convert(s, k) : undefined,
+  });
   /** كتابة مهمة في خانة فاضية — ومع «ابدأ» تنفتح جلسة التركيز ويبدأ العدّاد. */
   const quick = async (title: string, kind: SliceKind, start: boolean) => {
     try {
@@ -260,7 +293,7 @@ export function TodaySlices({ api, parentTitle, onOpenParent, readOnly, icon = "
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-base font-extrabold text-foreground">🎯 شرائح اليوم</h2>
-          <p className="text-[11px] text-muted-foreground">عميقة وحدة + {num(DAY_LIMIT.shallow)} سطحية كحد أقصى — ركّز على القليل وأنجزه</p>
+          <p className="text-[11px] text-muted-foreground">عميقة وحدة + {num(limit.shallow)} سطحية كحد أقصى — ركّز على القليل وأنجزه</p>
         </div>
         <FocusCounter signal={slices.filter((s) => s.done_at).length} />
         {todayList.length > 0 && (
@@ -281,7 +314,7 @@ export function TodaySlices({ api, parentTitle, onOpenParent, readOnly, icon = "
               onOpenIdea={() => { const p = parentOf(s); if (p) onOpenParent(p); }}
               onDone={() => run(s.id, { done: !s.done_at })}
               onFocus={() => setFocusing(s)}
-              onUnplan={() => run(s.id, { plan: null })} />
+              onUnplan={() => run(s.id, { plan: null })} {...rowActions(s)} />
           )) : readOnly ? (
             <p className="text-xs text-muted-foreground py-3 text-center">ما فيه شريحة عميقة اليوم</p>
           ) : (
@@ -293,14 +326,14 @@ export function TodaySlices({ api, parentTitle, onOpenParent, readOnly, icon = "
         </div>
         {/* السطحية */}
         <div className="rounded-2xl border border-sky-400/20 bg-gradient-to-bl from-sky-500/[0.07] to-transparent p-3">
-          <p className="text-[11px] font-bold text-sky-300 mb-2">⚡ سطحية (أقل من ١٥ د) · {num(shallow.length)}/{num(DAY_LIMIT.shallow)}</p>
+          <p className="text-[11px] font-bold text-sky-300 mb-2">⚡ سطحية (أقل من ١٥ د) · {num(shallow.length)}/{num(limit.shallow)}</p>
           <div className="space-y-1.5">
             {shallow.map((s) => (
               <TodayRow key={s.id} slice={s} parent={titleOf(parentOf(s))} icon={icon} readOnly={readOnly}
                 onOpenIdea={() => { const p = parentOf(s); if (p) onOpenParent(p); }}
                 onDone={() => run(s.id, { done: !s.done_at })}
                 onFocus={() => setFocusing(s)}
-                onUnplan={() => run(s.id, { plan: null })} />
+                onUnplan={() => run(s.id, { plan: null })} {...rowActions(s)} />
             ))}
             {Array.from({ length: Math.max(0, free.shallow) }).map((_, i) => (
               readOnly || i > 0
@@ -343,7 +376,7 @@ export function TodaySlices({ api, parentTitle, onOpenParent, readOnly, icon = "
                           onClick={() => isTomorrow
                             ? run(s.id, { plan: null })
                             : fullTomorrow
-                              ? show(s.kind === "deep" ? `🌙 اخترت شريحة عميقة ${forDay(nextLabel)} — وحدة تكفي` : `🌙 اكتملت السطحية ${forDay(nextLabel)} (${num(DAY_LIMIT.shallow)})`)
+                              ? show(s.kind === "deep" ? `🌙 اخترت شريحة عميقة ${forDay(nextLabel)} — وحدة تكفي` : `🌙 اكتملت السطحية ${forDay(nextLabel)} (${num(limit.shallow)})`)
                               : run(s.id, { plan: "tomorrow" })}
                           className={cn("shrink-0 p-1 rounded-full", isTomorrow ? "text-violet-300" : "text-muted-foreground/60 hover:text-violet-300")}
                           title={isTomorrow ? `مخططة ${forDay(nextLabel)} — اضغط للإلغاء` : `خططها ${forDay(nextLabel)}`}
@@ -352,7 +385,7 @@ export function TodaySlices({ api, parentTitle, onOpenParent, readOnly, icon = "
                         </button>
                         <button
                           onClick={() => full
-                            ? show(s.kind === "deep" ? "🔥 عندك شريحة عميقة اليوم — وحدة تكفي. أنجزها أو رجّعها أولاً" : `⚡ اكتملت الشرائح السطحية اليوم (${num(DAY_LIMIT.shallow)}) — رجّع وحدة أولاً`)
+                            ? show(s.kind === "deep" ? "🔥 عندك شريحة عميقة اليوم — وحدة تكفي. أنجزها أو رجّعها أولاً" : `⚡ اكتملت الشرائح السطحية اليوم (${num(limit.shallow)}) — رجّع وحدة أولاً`)
                             : run(s.id, { plan: "today" })}
                           className={cn("shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border transition",
                             full ? "border-border text-muted-foreground/50" : "border-emerald-400/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20")}
@@ -370,6 +403,38 @@ export function TodaySlices({ api, parentTitle, onOpenParent, readOnly, icon = "
           </div>
         )}
       </div>
+      {/* المنجزات — الشرائح اللي خلصت وانتقلت من شرائح اليوم */}
+      {archived.length > 0 && (
+        <div>
+          <button onClick={() => setShowDone((v) => !v)}
+            className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-emerald-500/[0.06] border border-emerald-400/20 text-xs font-bold text-emerald-300 hover:text-emerald-200">
+            <span className="flex items-center gap-1.5"><Trophy className="w-3.5 h-3.5" /> المنجزات ({num(archived.length)})</span>
+            <ChevronDown className={cn("w-4 h-4 transition-transform", showDone && "rotate-180")} />
+          </button>
+          {showDone && (
+            <div className="mt-2 space-y-1 max-h-80 overflow-y-auto">
+              {archived.map((s) => (
+                <div key={s.id} className="flex items-center gap-2 rounded-xl px-2 py-1.5 bg-white/[0.02] border border-white/[0.05]">
+                  <span className="shrink-0 w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center"><Check className="w-3 h-3" strokeWidth={3} /></span>
+                  <KindBadge kind={s.kind} small />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-foreground truncate">{s.title}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">
+                      {new Date(s.done_at!).toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "long", day: "numeric", month: "long" })}
+                      {parentOf(s) ? ` · ${icon} ${titleOf(parentOf(s))}` : ""}
+                    </p>
+                  </div>
+                  {!readOnly && (<>
+                    <button onClick={() => run(s.id, { done: false })} title="رجّعها غير منجزة (لباقي الشرائح)"
+                      className="shrink-0 p-1 text-muted-foreground hover:text-foreground"><Undo2 className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => del(s)} title="حذف" className="shrink-0 p-1 text-muted-foreground/60 hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
+                  </>)}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {focusing && <FocusStartDialog slice={focusing} parent={titleOf(parentOf(focusing))} onClose={() => setFocusing(null)} />}
     </section>
   );
@@ -456,9 +521,10 @@ function QuickSlot({ kind, placeholder, onAdd }: {
   );
 }
 
-function TodayRow({ slice, parent, icon, big, readOnly, onDone, onFocus, onUnplan, onOpenIdea }: {
+function TodayRow({ slice, parent, icon, big, readOnly, onDone, onFocus, onUnplan, onOpenIdea, onArchive, onDelete, onConvert }: {
   slice: FocusSlice; parent: string; icon: string; big?: boolean; readOnly?: boolean;
   onDone: () => void; onFocus: () => void; onUnplan: () => void; onOpenIdea: () => void;
+  onArchive: () => void; onDelete: () => void; onConvert?: (k: ConvertKind) => void;
 }) {
   const done = !!slice.done_at;
   return (
@@ -484,6 +550,54 @@ function TodayRow({ slice, parent, icon, big, readOnly, onDone, onFocus, onUnpla
             <SunDim className="w-4 h-4" />
           </button>
         </>
+      )}
+      {done && !readOnly && (
+        <button onClick={onArchive} title="انقلها للمنجزات"
+          className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-400/30 hover:bg-emerald-500/25">
+          <Trophy className="w-3 h-3" /> للمنجزات
+        </button>
+      )}
+      {!readOnly && <RowMenu done={done} onArchive={onArchive} onDelete={onDelete} onConvert={onConvert} />}
+    </div>
+  );
+}
+
+/** قائمة «⋯» للشريحة: نقل للمنجزات، تحويل (العميقة)، حذف. */
+function RowMenu({ done, onArchive, onDelete, onConvert }: {
+  done: boolean; onArchive: () => void; onDelete: () => void; onConvert?: (k: ConvertKind) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: PointerEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("pointerdown", close); document.removeEventListener("keydown", esc); };
+  }, [open]);
+  const pick = (fn: () => void) => () => { setOpen(false); fn(); };
+  const item = "w-full flex items-center gap-2 px-3 py-2 text-right text-xs font-semibold text-foreground hover:bg-white/[0.07]";
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button onClick={() => setOpen((v) => !v)} title="خيارات" aria-label="خيارات الشريحة" aria-expanded={open}
+        className="p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-white/[0.06]">
+        <MoreHorizontal className="w-4 h-4" />
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full mt-1 z-30 w-48 overflow-hidden rounded-xl border border-border bg-popover shadow-xl py-1">
+          {!done && <button onClick={pick(onArchive)} className={item}><Trophy className="w-3.5 h-3.5 text-emerald-300" /> أنجزتها — للمنجزات</button>}
+          {onConvert && (
+            <>
+              <p className="px-3 pt-2 pb-1 text-[10px] font-bold text-muted-foreground">حوّلها إلى</p>
+              {CONVERT_TO.map((c) => (
+                <button key={c.kind} onClick={pick(() => onConvert(c.kind))} className={item}>{c.label}</button>
+              ))}
+              <span className="block my-1 h-px bg-border" />
+            </>
+          )}
+          <button onClick={pick(onDelete)} className={cn(item, "text-red-400 hover:text-red-300")}><Trash2 className="w-3.5 h-3.5" /> حذف</button>
+        </div>
       )}
     </div>
   );
@@ -517,7 +631,8 @@ export function IdeaSlicesPanel({ ideaId, api, suggestUrl, readOnly, className }
   const [busy, setBusy] = useState<string | null>(null);
   const { notice, show } = useNotice();
   const pct = ideaProgress(list);
-  const free = freeToday(api.slices, api.today);
+  const limit = dayLimit(api.space);
+  const free = freeToday(api.slices, api.today, limit);
 
   const suggest = async () => {
     setBusy("ai");
@@ -579,7 +694,7 @@ export function IdeaSlicesPanel({ ideaId, api, suggestUrl, readOnly, className }
                     onClick={() => isToday
                       ? run(`p-${s.id}`, () => api.patch(s.id, { plan: null }))
                       : free[s.kind] <= 0
-                        ? show(s.kind === "deep" ? "🔥 عندك شريحة عميقة اليوم — وحدة تكفي" : `⚡ اكتملت الشرائح السطحية اليوم (${num(DAY_LIMIT.shallow)})`)
+                        ? show(s.kind === "deep" ? "🔥 عندك شريحة عميقة اليوم — وحدة تكفي" : `⚡ اكتملت الشرائح السطحية اليوم (${num(limit.shallow)})`)
                         : run(`p-${s.id}`, () => api.patch(s.id, { plan: "today" }))}
                     title={isToday ? "في شرائح اليوم — اضغط للإرجاع" : "أضفها لشرائح اليوم"}
                     className={cn("shrink-0 p-1 rounded-full", isToday ? "text-amber-300" : "text-muted-foreground hover:text-foreground")}>

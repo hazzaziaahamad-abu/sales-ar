@@ -31,8 +31,12 @@ export const SLICE_KINDS: Record<SliceKind, { icon: string; label: string; hint:
   shallow: { icon: "⚡", label: "سطحية", hint: "أقل من ١٥ دقيقة" },
 };
 
-/** حد «شرائح اليوم»: شريحة عميقة واحدة + ٣ سطحية كحد أقصى. */
+/** حد «شرائح اليوم» الافتراضي (العمل الوظيفي): شريحة عميقة واحدة + ٣ سطحية كحد أقصى. */
 export const DAY_LIMIT: Record<SliceKind, number> = { deep: 1, shallow: 3 };
+
+/** حد اليوم حسب المساحة — الأفكار: عميقة واحدة + ٥ سطحية. */
+export const dayLimit = (space: SliceSpace): Record<SliceKind, number> =>
+  space === "ideas" ? { deep: 1, shallow: 5 } : DAY_LIMIT;
 
 /** عدد الشرائح عند التقطيع وأقصى عدد للفكرة الواحدة. */
 export const SLICE_MIN = 3;

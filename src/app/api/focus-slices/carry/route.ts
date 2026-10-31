@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getSliceAccess } from "@/lib/api/focus-slices-access";
-import { DAY_LIMIT, SLICE_COLS, isSliceSpace, nextDayFor, todayRiyadh, type SliceKind } from "@/lib/focus-slices";
+import { SLICE_COLS, dayLimit, isSliceSpace, nextDayFor, todayRiyadh, type SliceKind } from "@/lib/focus-slices";
 
 export const runtime = "nodejs";
 
@@ -27,9 +27,10 @@ export async function POST(req: NextRequest) {
   ]);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  const limit = dayLimit(space);
   const free: Record<SliceKind, number> = {
-    deep: DAY_LIMIT.deep - (already ?? []).filter((s) => s.kind === "deep").length,
-    shallow: DAY_LIMIT.shallow - (already ?? []).filter((s) => s.kind === "shallow").length,
+    deep: limit.deep - (already ?? []).filter((s) => s.kind === "deep").length,
+    shallow: limit.shallow - (already ?? []).filter((s) => s.kind === "shallow").length,
   };
   const moved: string[] = [], overflow: string[] = [];
   for (const s of pending ?? []) {
