@@ -19,7 +19,7 @@ async function ownStickerAccess(id: string) {
   return { access };
 }
 
-/** PATCH /api/idea-stickers/[id] { kind?, tag?, title?, body? } */
+/** PATCH /api/idea-stickers/[id] { kind?, tag?, title?, body?, notes? } */
 export async function PATCH(req: NextRequest, { params }: Ctx) {
   const { id } = await params;
   const { res } = await ownStickerAccess(id);
@@ -30,6 +30,8 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   if (typeof b.tag === "string") patch.tag = b.tag.trim().slice(0, 60);
   if (typeof b.title === "string") patch.title = b.title.trim().slice(0, 200);
   if (typeof b.body === "string") patch.body = b.body.trim().slice(0, 3000);
+  // ملاحظات الاجتماع (ورقة التطوير) — تتحفظ تلقائياً أثناء الكتابة
+  if (typeof b.notes === "string") patch.notes = b.notes.slice(0, 20000);
   const { data, error } = await supabaseAdmin.from("idea_stickers").update(patch).eq("id", id).select("*").single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ sticker: data });

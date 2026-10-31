@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Heart, Search, Trash2, X, Loader2, Dices, Sparkles, GripVertical, Check, CalendarClock, Plus, Rocket, Trophy, BellRing, Undo2 } from "lucide-react";
+import { Heart, Search, Trash2, X, Loader2, Dices, Sparkles, GripVertical, Check, CalendarClock, Plus, Rocket, Trophy, BellRing, Undo2, FileText, Scissors, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PushCard } from "@/components/push/push-card";
 import { IdeaSlicesPanel, QuickCapture, SliceChip, TodaySlices, useSlices } from "@/components/ideas/slices";
-import { STICKER_KINDS, isReminder, stickerKind, timelineOf, type IdeaSticker, type StickerKind, type TimelineStep } from "@/lib/idea-stickers";
+import { STICKER_KINDS, devProgress, isDevSheet, isReminder, stickerKind, timelineOf, type IdeaSticker, type StickerKind, type TimelineStep } from "@/lib/idea-stickers";
+import type { FocusSlice } from "@/lib/focus-slices";
+import { NoteEditor, NoteView } from "@/components/salon-room/NoteEditor";
 
 // خط يدوي مرح للاستكرات — يعطي إحساس الكتابة بالقلم على ورق لاصق.
 // خط اليد Marhey معرّف في src/app/fonts.css (متغيّر --font-hand)
@@ -68,6 +70,25 @@ const CSS = `
 .ib-circle .ib-paper { border-radius:50%; aspect-ratio:1; padding:34px 30px; align-items:center; justify-content:center; text-align:center;
   background: radial-gradient(circle at 32% 26%, #ecfdf5 0%, #a7f3d0 52%, #6ee7b7 120%); overflow:hidden; }
 .ib-circle .ib-paper::before { content:""; position:absolute; inset:9px; border-radius:50%; border:1.5px dashed rgba(6,78,59,.22); pointer-events:none; }
+
+/* ورقة تطوير: ورق مخطط هندسي (بلوبرنت) بمشبك */
+.ib-dev .ib-paper { border-radius:6px;
+  background:
+    linear-gradient(rgba(37,99,235,.10) 1px, transparent 1px) 0 0 / 14px 14px,
+    linear-gradient(90deg, rgba(37,99,235,.10) 1px, transparent 1px) 0 0 / 14px 14px,
+    linear-gradient(170deg, #eff6ff 0%, #dbeafe 55%, #bfdbfe 140%);
+  box-shadow: inset 0 0 0 1.5px rgba(30,58,138,.12); }
+.ib-dev .ib-paper::after { content:""; position:absolute; inset:auto 0 0 0; height:5px; border-radius:0 0 6px 6px;
+  background: linear-gradient(90deg, #60a5fa, #34d399); opacity:.55; }
+.ib-clip { position:absolute; top:-12px; left:50%; width:58px; height:26px; margin-left:-29px; z-index:3; border-radius:6px 6px 3px 3px;
+  background: linear-gradient(180deg, #475569, #1e293b); box-shadow: 0 3px 5px rgba(15,23,42,.3), inset 0 1px 0 rgba(255,255,255,.25); }
+.ib-clip::before { content:""; position:absolute; top:-9px; left:12px; right:12px; height:14px; border:3px solid #94a3b8; border-bottom:0; border-radius:8px 8px 0 0; }
+.ib-ring-mini { display:inline-flex; align-items:center; gap:4px; padding:1px 6px 1px 2px; border-radius:999px; background:rgba(255,255,255,.6); font-weight:800; white-space:nowrap; }
+.dv-ring circle { transition: stroke-dashoffset .7s cubic-bezier(.2,.8,.2,1); }
+.dv-seg { flex:1; height:6px; border-radius:99px; background:rgba(255,255,255,.08); }
+.dv-seg.on { background: linear-gradient(90deg, #34d399, #059669); }
+.dv-seg.cur { background: rgba(96,165,250,.55); }
+.dv-paper { --surface:#fffdf7; --line:#e7e2d6; --line-strong:#d9d2c1; --ink:#1f2937; --muted:#6b7280; --faint:#9ca3af; --hover:#f1ece0; color:#1f2937; }
 
 /* شريط لاصق على الفكرة الخاطفة */
 .ib-tape { position:absolute; top:-11px; left:50%; width:84px; height:24px; transform:translateX(-50%) rotate(-4deg); z-index:3;
@@ -161,8 +182,8 @@ button.tl-dot:not(:disabled):hover { transform:scale(1.1); }
 .ib-cta:hover { filter: brightness(1.08) saturate(1.1); }
 `;
 
-const PIN: Record<StickerKind, string> = { star: "#f97316", note: "#e11d48", circle: "#0d9488" };
-const TILT: Record<StickerKind, number> = { star: -2, note: 3, circle: -1 };
+const PIN: Record<StickerKind, string> = { star: "#f97316", note: "#e11d48", circle: "#0d9488", dev: "#2563eb" };
+const TILT: Record<StickerKind, number> = { star: -2, note: 3, circle: -1, dev: 1 };
 
 /** قيمة ثابتة لكل استكر (من معرّفه) — للميلان والإزاحة العضوية بدون ما تتغير مع كل تحميل. */
 const seed = (id: string) => {
@@ -285,6 +306,17 @@ export function IdeasBoard() {
     const json = await res.json().catch(() => ({}));
     if (res.ok) replace(json.sticker);
     else replace(s);
+  };
+
+  /** ملاحظات اجتماع ورقة التطوير — حفظ تلقائي بعد توقف الكتابة. */
+  const saveNotes = async (id: string, notes: string) => {
+    const res = await fetch(`/api/idea-stickers/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ notes }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.error || "تعذّر حفظ الملاحظات");
+    replace(json.sticker);
+    setOpen((o) => (o?.id === id ? json.sticker : o));
   };
 
   /** تحديث تايم لاين التنفيذ — يرجع الاستكر المحدّث ويحدّث اللوحة والنافذة. */
@@ -472,7 +504,7 @@ export function IdeasBoard() {
       {/* ─── شريط الأدوات ─── */}
       {stickers.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
-          {([["all", "الكل", "conic-gradient(#fef08a 0 33%, #fbcfe8 0 66%, #a7f3d0 0)"], ...STICKER_KINDS.map((k) => [k.value, k.label, k.swatch])] as [StickerKind | "all", string, string][]).map(([v, label, color]) => (
+          {([["all", "الكل", "conic-gradient(#fef08a 0 25%, #fbcfe8 0 50%, #a7f3d0 0 75%, #bfdbfe 0)"], ...STICKER_KINDS.map((k) => [k.value, k.label, k.swatch])] as [StickerKind | "all", string, string][]).map(([v, label, color]) => (
             <button
               key={v}
               onClick={() => { setFilter(v); setView("board"); }}
@@ -569,8 +601,14 @@ export function IdeasBoard() {
                           </>
                         )}
                         {!s.created_by_name && <span className="ml-auto" />}
-                        <ProgressChip sticker={s} />
-                        <SliceChip slices={slices.byParent.get(s.id)} />
+                        {isDevSheet(s) ? (
+                          <DevRingChip sticker={s} slices={slices.byParent.get(s.id)} />
+                        ) : (
+                          <>
+                            <ProgressChip sticker={s} />
+                            <SliceChip slices={slices.byParent.get(s.id)} />
+                          </>
+                        )}
                         <button
                           onClick={(e) => { e.stopPropagation(); toggleLike(s); }}
                           className={cn("ib-like", liked && "ib-on")}
@@ -602,7 +640,9 @@ export function IdeasBoard() {
           onSave={async (d) => { await save(open.id, d); setOpen(null); }}
           onDelete={() => remove(open.id)}
           onTimeline={(body) => updateTimeline(open.id, body)}
-          slicesPanel={<IdeaSlicesPanel ideaId={open.id} api={slices} />}
+          onNotes={(v) => saveNotes(open.id, v)}
+          mySlices={slices.byParent.get(open.id)}
+          slicesPanel={<IdeaSlicesPanel ideaId={open.id} api={slices} className={isDevSheet(open) ? "w-[min(92vw,520px)]" : undefined} />}
         />
       )}
     </div>
@@ -624,7 +664,7 @@ function StickerShape({ kind, className, style, onClick, children }: {
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? (e) => { if (e.key === "Enter" && e.target === e.currentTarget) onClick(); } : undefined}
     >
-      {kind === "star" ? <span className="ib-tape" /> : <span className="ib-pin" style={{ ["--pin" as string]: PIN[kind] }} />}
+      {kind === "star" ? <span className="ib-tape" /> : kind === "dev" ? <span className="ib-clip" /> : <span className="ib-pin" style={{ ["--pin" as string]: PIN[kind] }} />}
       <div className="ib-paper">{children}</div>
     </div>
   );
@@ -682,10 +722,11 @@ function EmptyDone({ filtering }: { filtering: boolean }) {
 
 // ─── نافذة الاستكر: نفس الشكل بحجم أكبر، والكتابة عليه مباشرة ─────────────────
 
-function StickerDialog({ sticker, canEdit, liked, onLike, onClose, onSave, onDelete, onTimeline, slicesPanel }: {
+function StickerDialog({ sticker, canEdit, liked, onLike, onClose, onSave, onDelete, onTimeline, onNotes, mySlices, slicesPanel }: {
   sticker: IdeaSticker; canEdit: boolean; liked: boolean; onLike: () => void;
   onClose: () => void; onSave: (d: Draft) => Promise<void>; onDelete: () => void;
-  onTimeline: (body: Record<string, unknown>) => Promise<void>; slicesPanel?: React.ReactNode;
+  onTimeline: (body: Record<string, unknown>) => Promise<void>; onNotes: (v: string) => Promise<void>;
+  mySlices?: FocusSlice[]; slicesPanel?: React.ReactNode;
 }) {
   const [form, setForm] = useState<Draft>({ kind: sticker.kind, tag: sticker.tag, title: sticker.title, body: sticker.body });
   const [saving, setSaving] = useState(false);
@@ -778,12 +819,23 @@ function StickerDialog({ sticker, canEdit, liked, onLike, onClose, onSave, onDel
           )}
         </div>
 
+        {isDevSheet(sticker) ? (
+          <>
+            <DevOverview sticker={sticker} slices={mySlices ?? []} />
+            <TimelinePanel sticker={sticker} canEdit={canEdit} onTimeline={onTimeline} dev />
+            {slicesPanel}
+            <MeetingNotes sticker={sticker} canEdit={canEdit} onNotes={onNotes} />
+          </>
+        ) : (
+          <>
         {slicesPanel}
 
         {isReminder(sticker) ? (
           <ReminderPanel sticker={sticker} canEdit={canEdit} onTimeline={onTimeline} />
         ) : (
           <TimelinePanel sticker={sticker} canEdit={canEdit} onTimeline={onTimeline} />
+        )}
+          </>
         )}
       </div>
       </div>
@@ -925,8 +977,10 @@ function ReminderPanel({ sticker, canEdit, onTimeline }: {
   );
 }
 
-function TimelinePanel({ sticker, canEdit, onTimeline }: {
+function TimelinePanel({ sticker, canEdit, onTimeline, dev }: {
   sticker: IdeaSticker; canEdit: boolean; onTimeline: (body: Record<string, unknown>) => Promise<void>;
+  /** ورقة التطوير: «مراحل» بدل «خطوات»، والنسبة تظهر في الدائرة فوق. */
+  dev?: boolean;
 }) {
   const steps = timelineOf(sticker);
   const [busy, setBusy] = useState<string | null>(null);
@@ -948,9 +1002,9 @@ function TimelinePanel({ sticker, canEdit, onTimeline }: {
   };
 
   return (
-    <div className="w-[min(92vw,420px)] rounded-2xl glass-surface border border-border p-4 space-y-4 hover:translate-y-0 text-right">
+    <div className={cn(dev ? "w-[min(92vw,520px)]" : "w-[min(92vw,420px)]", "rounded-2xl glass-surface border border-border p-4 space-y-4 hover:translate-y-0 text-right")}>
       {/* الحالة الحالية */}
-      <div>
+      {!dev && <div>
         <p className="text-xs font-semibold text-muted-foreground mb-2">حالة التنفيذ</p>
         <div className="flex items-center gap-3">
           <span className={cn("w-2.5 h-2.5 rounded-full shrink-0", done === steps.length ? "bg-emerald-400" : "bg-blue-400")} />
@@ -963,11 +1017,11 @@ function TimelinePanel({ sticker, canEdit, onTimeline }: {
         <div className="mt-2.5 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
           <div className="h-full rounded-full bg-gradient-to-l from-emerald-400 to-emerald-600 transition-all duration-500" style={{ width: `${(done / steps.length) * 100}%` }} />
         </div>
-      </div>
+      </div>}
 
       {/* خطوات التنفيذ */}
       <div>
-        <p className="text-xs font-semibold text-muted-foreground mb-3">خطوات التنفيذ</p>
+        <p className="text-xs font-semibold text-muted-foreground mb-3">{dev ? "🧭 مراحل التطوير" : "خطوات التنفيذ"}</p>
         <div className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-3.5">
           {steps.map((s, i) => {
             return (
@@ -984,11 +1038,11 @@ function TimelinePanel({ sticker, canEdit, onTimeline }: {
                 <div className="flex-1 min-w-0 pt-0.5">
                   <p className={cn("text-sm font-bold", s.done_at || i === nextIdx ? "text-foreground" : "text-muted-foreground")}>{s.label}</p>
                   <p className="text-[11px] text-muted-foreground mt-0.5">
-                    {s.done_at ? `${fmtStamp(s.done_at)}${s.done_by ? ` · ${s.done_by}` : ""}` : i === nextIdx ? "الخطوة الحالية" : "بانتظار التنفيذ"}
+                    {s.done_at ? `${fmtStamp(s.done_at)}${s.done_by ? ` · ${s.done_by}` : ""}` : i === nextIdx ? (dev ? "المرحلة الحالية — قطّعها لشرائح تحت ✂️" : "الخطوة الحالية") : "بانتظار التنفيذ"}
                   </p>
                 </div>
                 {canEdit && steps.length > 1 && (
-                  <button onClick={() => { if (confirm(`حذف خطوة «${s.label}»؟`)) run(`del-${s.key}`, { action: "remove", key: s.key }); }}
+                  <button onClick={() => { if (confirm(`حذف ${dev ? "مرحلة" : "خطوة"} «${s.label}»؟`)) run(`del-${s.key}`, { action: "remove", key: s.key }); }}
                     disabled={!!busy} className="tl-del self-start p-1 text-muted-foreground hover:text-red-400" title="حذف الخطوة">
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -999,7 +1053,7 @@ function TimelinePanel({ sticker, canEdit, onTimeline }: {
           {canEdit && (
             <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/[0.06]">
               <input value={newStep} onChange={(e) => setNewStep(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addStep(); }}
-                placeholder="أضف خطوة..." maxLength={80}
+                placeholder={dev ? "أضف مرحلة..." : "أضف خطوة..."} maxLength={80}
                 className="flex-1 min-w-0 rounded-full bg-white/[0.04] border border-border px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-emerald-400/40" />
               <button onClick={addStep} disabled={!newStep.trim() || !!busy}
                 className="p-1.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-400/25 disabled:opacity-40">
@@ -1012,7 +1066,7 @@ function TimelinePanel({ sticker, canEdit, onTimeline }: {
 
       {/* الالتزام بموعد التنفيذ */}
       <div>
-        <p className="text-xs font-semibold text-muted-foreground mb-2">الالتزام بموعد التنفيذ</p>
+        <p className="text-xs font-semibold text-muted-foreground mb-2">{dev ? "موعد اكتمال التطوير" : "الالتزام بموعد التنفيذ"}</p>
         <div className="flex items-center gap-3 rounded-xl bg-white/[0.02] border border-white/[0.06] p-3">
           <span className="w-9 h-9 rounded-full bg-blue-500/15 text-blue-300 flex items-center justify-center shrink-0"><CalendarClock className="w-4 h-4" /></span>
           <div className="flex-1 min-w-0">
@@ -1033,6 +1087,121 @@ function TimelinePanel({ sticker, canEdit, onTimeline }: {
             </span>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── ورقة التطوير: الدائرة الإجمالية + ملاحظات الاجتماع ─────────────────────────
+
+/** دائرة نسبة اكتمال التطوير (SVG) — الأخضر عند الاكتمال. */
+function ProgressRing({ pct, size = 112, stroke = 10, children }: { pct: number; size?: number; stroke?: number; children?: React.ReactNode }) {
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const gid = `dv-g-${size}-${pct >= 100 ? "done" : "wip"}`; // نفس المعرّف = نفس التدرّج دائماً
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg className="dv-ring -rotate-90" width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden>
+        <defs>
+          <linearGradient id={gid} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor={pct >= 100 ? "#34d399" : "#60a5fa"} />
+            <stop offset="100%" stopColor={pct >= 100 ? "#059669" : "#34d399"} />
+          </linearGradient>
+        </defs>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="currentColor" strokeOpacity={0.12} strokeWidth={stroke} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={`url(#${gid})`} strokeWidth={stroke} strokeLinecap="round"
+          strokeDasharray={c} strokeDashoffset={c * (1 - Math.min(100, Math.max(0, pct)) / 100)} />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">{children}</div>
+    </div>
+  );
+}
+
+/** شارة الدائرة على استكر ورقة التطوير في اللوحة. */
+function DevRingChip({ sticker, slices }: { sticker: IdeaSticker; slices?: FocusSlice[] }) {
+  const pct = devProgress(timelineOf(sticker), slices ?? []);
+  return (
+    <span className="ib-ring-mini" title={`اكتمال التطوير ${num(pct)}٪`}>
+      <ProgressRing pct={pct} size={20} stroke={3.5} />
+      {num(pct)}٪
+    </span>
+  );
+}
+
+/** ملخص ورقة التطوير: نسبة الاكتمال الإجمالية (المراحل + الشرائح) والمرحلة الحالية والشريحة التالية. */
+function DevOverview({ sticker, slices }: { sticker: IdeaSticker; slices: FocusSlice[] }) {
+  const steps = timelineOf(sticker);
+  const pct = devProgress(steps, slices);
+  const doneSteps = steps.filter((s) => s.done_at).length;
+  const doneSlices = slices.filter((s) => s.done_at).length;
+  const curIdx = steps.findIndex((s) => !s.done_at);
+  const nextSlice = slices.find((s) => !s.done_at);
+  const status = dueStatus(sticker.due_at, steps);
+  return (
+    <div className="w-[min(92vw,520px)] rounded-2xl glass-surface border border-border p-4 hover:translate-y-0 text-right">
+      <div className="flex items-center gap-4">
+        <ProgressRing pct={pct}>
+          <span className="ib-hand text-3xl font-bold text-foreground leading-none">{num(pct)}٪</span>
+          <span className="text-[10px] text-muted-foreground mt-1">اكتمال التطوير</span>
+        </ProgressRing>
+        <div className="flex-1 min-w-0 space-y-2">
+          <div>
+            <p className="text-[11px] text-muted-foreground">{pct >= 100 ? "الحالة" : "المرحلة الحالية"}</p>
+            <p className="text-sm font-extrabold text-foreground truncate">
+              {curIdx < 0 ? "اكتمل التطوير 🎉" : `${num(curIdx + 1)}. ${steps[curIdx].label}`}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-1.5 text-[11px] font-bold">
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300"><Layers className="w-3 h-3" /> المراحل {num(doneSteps)}/{num(steps.length)}</span>
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300"><Scissors className="w-3 h-3" /> الشرائح {num(doneSlices)}/{num(slices.length)}</span>
+            {status && (
+              <span className={cn("px-2 py-0.5 rounded-full",
+                status.tone === "late" ? "bg-red-500/15 text-red-300" : status.tone === "warn" ? "bg-amber-500/15 text-amber-300" : "bg-emerald-500/15 text-emerald-300")}>
+                {status.text}
+              </span>
+            )}
+          </div>
+          {nextSlice && (
+            <p className="text-[11px] text-muted-foreground truncate">✂️ الشريحة التالية: <b className="text-foreground">{nextSlice.title}</b></p>
+          )}
+        </div>
+      </div>
+      {/* شريط المراحل: كل مرحلة قطعة */}
+      <div className="flex gap-1 mt-3.5">
+        {steps.map((s, i) => (
+          <span key={s.key} title={s.label} className={cn("dv-seg", s.done_at && "on", i === curIdx && "cur")} />
+        ))}
+      </div>
+      <p className="text-[10px] text-muted-foreground mt-2">النسبة = المراحل المنجزة + الشرائح المنجزة — كل شريحة صغيرة تحرّك الدائرة</p>
+    </div>
+  );
+}
+
+/** ملاحظات الاجتماع — نفس دفتر ملاحظات اجتماع إدارة المستشارين (تظليل بالألوان + عريض)، حفظ تلقائي. */
+function MeetingNotes({ sticker, canEdit, onNotes }: { sticker: IdeaSticker; canEdit: boolean; onNotes: (v: string) => Promise<void> }) {
+  const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const save = async (v: string) => {
+    setState("saving");
+    try { await onNotes(v); setState("saved"); } catch { setState("error"); }
+  };
+  const value = sticker.notes ?? "";
+  return (
+    <div className="w-[min(92vw,520px)] rounded-2xl glass-surface border border-border p-4 space-y-2.5 hover:translate-y-0 text-right">
+      <div className="flex items-center justify-between gap-2">
+        <p className="flex items-center gap-1.5 text-sm font-extrabold text-foreground"><FileText className="w-4 h-4 text-blue-300" /> ملاحظات الاجتماع</p>
+        <span className={cn("text-[10px] font-bold", state === "error" ? "text-red-300" : "text-muted-foreground")}>
+          {state === "saving" ? "جارٍ الحفظ…" : state === "saved" ? "محفوظة ✓" : state === "error" ? "تعذّر الحفظ — أعد المحاولة" : ""}
+        </span>
+      </div>
+      <div className="dv-paper">
+        {canEdit ? (
+          <NoteEditor value={value} onChange={save} minLines={6} label="ملاحظات الاجتماع"
+            placeholder="وش انقال في اجتماع التطوير؟ قرارات، ملاحظات، أشياء نتابعها… وظلّل المهم" />
+        ) : value ? (
+          <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-3 text-sm leading-7"><NoteView value={value} /></div>
+        ) : (
+          <p className="text-xs text-muted-foreground">ما فيه ملاحظات اجتماع بعد.</p>
+        )}
       </div>
     </div>
   );
