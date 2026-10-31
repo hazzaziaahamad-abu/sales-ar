@@ -35,6 +35,7 @@ async function loadAll(orgId: string) {
       templates: { ...DEFAULT_SETTINGS.templates, ...settings.templates },
       diagnosis: { ...DEFAULT_SETTINGS.diagnosis, ...settings.diagnosis },
       marketing: { ...DEFAULT_SETTINGS.marketing, ...settings.marketing },
+      simple: { ...DEFAULT_SETTINGS.simple, ...settings.simple, costs: { ...DEFAULT_SETTINGS.simple.costs, ...settings.simple?.costs } },
     },
   };
 }

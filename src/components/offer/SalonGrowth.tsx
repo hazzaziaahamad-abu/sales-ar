@@ -20,6 +20,8 @@ import {
 } from "@/lib/salon-growth";
 import DiagnosisTab from "@/components/offer/SalonDiagnosis";
 import CampaignsView from "@/components/offer/SalonCampaigns";
+import SimplePlan from "@/components/offer/SimplePlan";
+import { DEFAULT_SIMPLE } from "@/lib/salon-simple";
 import { DEFAULT_MARKETING } from "@/lib/salon-campaigns";
 import BackToPlatform from "@/components/offer/BackToPlatform";
 
@@ -166,6 +168,7 @@ type Ops = {
   deletePlan: (m: MembershipRow) => Promise<void>;
 };
 type SetSetting = <K extends SettingKey>(key: K, value: Settings[K]) => void;
+type PlanMode = "simple" | "full";
 
 /* ──────────────────────────── الصفحة ──────────────────────────── */
 
@@ -194,6 +197,23 @@ function SalonGrowthInner() {
     const q = params.get("tab");
     return TABS.some((t) => t.id === q) ? (q as TabId) : "growth";
   });
+  // مبسطة أو شاملة — يختار المستخدم كل ما يدخل (روابط التبويبات القديمة ?tab= تفتح الشاملة مباشرة)
+  const [plan, setPlan] = useState<PlanMode | null>(() => {
+    const q = params.get("plan");
+    if (q === "simple" || q === "full") return q;
+    return params.get("tab") ? "full" : null;
+  });
+  const [lastPlan] = useState<PlanMode | null>(() => {
+    try { const v = localStorage.getItem("sg-plan"); return v === "simple" || v === "full" ? v : null; } catch { return null; }
+  });
+  const choosePlan = (p: PlanMode | null) => {
+    setPlan(p);
+    if (p) try { localStorage.setItem("sg-plan", p); } catch { /* ignore */ }
+    const url = new URL(window.location.href);
+    if (p) url.searchParams.set("plan", p); else url.searchParams.delete("plan");
+    window.history.replaceState(null, "", url.toString());
+    window.scrollTo({ top: 0 });
+  };
   const [fullscreen, setFullscreen] = useState(false);
   const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -402,6 +422,11 @@ function SalonGrowthInner() {
             </div>
           </div>
           <div className="ms-auto flex items-center gap-1.5">
+            {live && plan && (
+              <button onClick={() => choosePlan(null)} title="تغيير نوع الخطة" className="flex items-center gap-1 rounded-full border border-[var(--line)] px-3 py-1.5 text-xs font-black hover:bg-[var(--hover)]" style={{ color: "var(--acc)" }}>
+                {plan === "simple" ? "مبسطة" : "شاملة"} <RotateCcw size={12} />
+              </button>
+            )}
             <ConnChip mode={mode} />
             <span className="hidden items-center gap-1.5 rounded-full border border-[var(--line)] px-3 py-1.5 text-xs text-[var(--muted)] md:flex">
               <Clock size={13} /> {new Date(now).toLocaleTimeString(LOCALE, { hour: "numeric", minute: "2-digit" })}
@@ -412,7 +437,7 @@ function SalonGrowthInner() {
             <span className="hidden sm:contents"><IconBtn onClick={toggleFs} title="وضع العرض">{fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</IconBtn></span>
           </div>
         </div>
-        {live && <nav className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 pb-2.5 sm:px-6 [scrollbar-width:none]" role="tablist">
+        {live && plan === "full" && <nav className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 pb-2.5 sm:px-6 [scrollbar-width:none]" role="tablist">
           {TABS.map((t) => {
             const on = t.id === tab;
             return (
@@ -439,6 +464,13 @@ function SalonGrowthInner() {
         </div>
       ) : !live ? (
         <AccessGate mode={mode} onRetry={() => { setMode("loading"); load(); }} />
+      ) : plan === null ? (
+        <PlanChooser last={lastPlan} onPick={choosePlan} />
+      ) : plan === "simple" ? (
+        <main className="sg-in mx-auto max-w-7xl px-4 pb-24 pt-6 sm:px-6">
+          <SimplePlan s={{ ...DEFAULT_SIMPLE, ...S.simple }} set={(v) => setSetting("simple", v)} salonName={S.salon_name}
+            setSalonName={(v) => setSetting("salon_name", v)} copy={copy} />
+        </main>
       ) : (
         <>
           {/* ─── المؤشرات السريعة ─── */}
@@ -531,6 +563,45 @@ function SalonGrowthInner() {
         </div>
       )}
     </div>
+  );
+}
+
+/* ══════════════════════════ اختيار نوع الخطة ══════════════════════════ */
+
+function PlanChooser({ last, onPick }: { last: PlanMode | null; onPick: (p: PlanMode) => void }) {
+  const options: { id: PlanMode; title: string; icon: LucideIcon; desc: string; points: string[]; fit: string }[] = [
+    {
+      id: "simple", title: "الخطة المبسطة", icon: Zap, desc: "للصالونات الصغيرة والخدمات المنزلية — جاهزة خلال جلسة وحدة",
+      points: ["نموذج العمل: صالون، زيارة منزلية، أو استقبال في البيت", "تشخيص خفيف بخمس محاور", "حاسبة التسعير من التكلفة الحقيقية", "خطة ٩٠ يوم تنبني من الفجوات + ٦ مؤشرات"],
+      fit: "تناسب: مالكة تشتغل بنفسها، أو نشاط ما عنده نظام حجز وبيانات",
+    },
+    {
+      id: "full", title: "الخطة الشاملة", icon: Crown, desc: "للصالونات اللي عندها فريق وبيانات — تشغيل يومي ومتابعة دقيقة",
+      points: ["التشخيص الأولي بخط أساس ١٧+ مؤشر", "مفاتيح النمو وجدول المواعيد", "رسائل التواصل الآلي والولاء", "التسويق الرقمي والحملات والتقارير"],
+      fit: "تناسب: صالون بأكثر من خبيرة ونظام حجز",
+    },
+  ];
+  return (
+    <main className="sg-in mx-auto max-w-4xl px-4 pb-24 pt-10 sm:px-6">
+      <h1 className="text-center text-2xl font-black text-[var(--ink)] sm:text-4xl">
+        الخطة التسويقية <span className="bg-clip-text text-transparent" style={{ backgroundImage: `linear-gradient(90deg, var(--acc), ${GOLD})` }}>للصالونات</span>
+      </h1>
+      <p className="mt-2 text-center text-sm text-[var(--muted)]">اختر نوع الخطة — تقدر تبدّل بينهم أي وقت من أعلى الصفحة.</p>
+      <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {options.map((o) => (
+          <button key={o.id} onClick={() => onPick(o.id)} className={`${card} relative flex flex-col justify-start p-5 text-right transition-all hover:-translate-y-1 hover:border-[var(--acc)] sm:p-6`}>
+            {last === o.id && <span className="absolute left-4 top-4 rounded-full px-2 py-0.5 text-[10px] font-black" style={{ color: GOLD, background: `color-mix(in srgb, ${GOLD} 14%, transparent)` }}>آخر اختيار</span>}
+            <span className="grid h-12 w-12 place-items-center rounded-2xl text-[var(--on-acc)]" style={accGrad}><o.icon size={22} /></span>
+            <div className="mt-4 text-xl font-black text-[var(--ink)]">{o.title}</div>
+            <div className="mt-1 text-sm text-[var(--muted)]">{o.desc}</div>
+            <ul className="mt-4 space-y-1.5">
+              {o.points.map((p) => <li key={p} className="flex items-start gap-2 text-sm text-[var(--body)]"><Check size={14} className="mt-0.5 shrink-0" style={{ color: GOLD }} />{p}</li>)}
+            </ul>
+            <div className="mt-4 rounded-2xl bg-[var(--surface-2)] px-3 py-2 text-xs font-bold text-[var(--muted)]">{o.fit}</div>
+          </button>
+        ))}
+      </div>
+    </main>
   );
 }
 

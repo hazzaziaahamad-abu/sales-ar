@@ -2,6 +2,7 @@
 // لا يعتمد على أي شي خاص بالسيرفر أو المتصفح — يُستورد من الطرفين.
 
 import { DEFAULT_MARKETING, type Marketing } from "@/lib/salon-campaigns";
+import { DEFAULT_SIMPLE, type Simple } from "@/lib/salon-simple";
 
 /* ──────────────────────────── الأنواع (بنفس أعمدة الجداول) ──────────────────────────── */
 
@@ -37,6 +38,8 @@ export type Settings = {
   reception: { date: string; checks: Record<string, boolean> };
   diagnosis: Diagnosis;
   marketing: Marketing;
+  /** الخطة المبسطة (مستقلة عن الشاملة). */
+  simple: Simple;
 };
 
 /* ──────────────────────────── التشخيص الأولي (قبل التعاقد) ──────────────────────────── */
@@ -169,7 +172,7 @@ export function computeCurrentKpis(
   };
 }
 
-export const SETTING_KEYS = ["salon_name", "booking_link", "discount", "templates", "auto_on", "reception", "diagnosis", "marketing"] as const;
+export const SETTING_KEYS = ["salon_name", "booking_link", "discount", "templates", "auto_on", "reception", "diagnosis", "marketing", "simple"] as const;
 export type SettingKey = (typeof SETTING_KEYS)[number];
 
 export const CLIENT_COLS = "id, name, phone, favorite_service, last_visit_at, total_spent, visits, winback_sent_at";
@@ -223,6 +226,7 @@ export const DEFAULT_SETTINGS: Settings = {
   reception: { date: "", checks: {} },
   diagnosis: DEFAULT_DIAGNOSIS,
   marketing: DEFAULT_MARKETING,
+  simple: DEFAULT_SIMPLE,
 };
 
 export const DEFAULT_PLANS: Omit<MembershipRow, "id">[] = [
