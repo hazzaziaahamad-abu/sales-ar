@@ -1,5 +1,5 @@
 // «الخطة المبسطة» للصالونات والخدمات المنزلية: نموذج العمل، تشخيص خفيف بخمس محاور،
-// حاسبة التسعير من التكلفة الحقيقية، قائمة الخدمات، خطة ٩٠ يوم تنبني من الفجوات، و٦ مؤشرات.
+// حاسبة التسعير من التكلفة الحقيقية، قائمة الخدمات، توصيات الجلسة، خطة شهرية تنبني من الفجوات، و٦ مؤشرات.
 // صفحة مستقلة للسوبر أدمن فقط (/offer/salon-simple) — تُحفظ في salon_growth_settings بالمفتاح «simple»
 // عبر /api/salon-simple، ومستبعدة من بيانات «الخطة التسويقية» الشاملة.
 
@@ -21,25 +21,35 @@ export type Costs = {
 
 export type SimpleKpiKey = "revenue" | "clients" | "return_pct" | "avg_ticket" | "margin_pct" | "cpa";
 
+/** شهر في الخطة: إجراءات مختارة بالأولوية + مراجعة نهاية الشهر (الأرقام والملاحظات). */
+export type MonthPlan = {
+  id: string; month: string; focus: string;
+  actions: string[]; done: Record<string, boolean>; carried: string[];
+  numbers: Partial<Record<SimpleKpiKey, number | null>>; notes: string; closed_at: string | null;
+};
+
+export type Session = { date: string; attendees: string; notes: string; done_at: string | null };
+
 export type Simple = {
   name: string;
   model: BizModel | null;
+  session: Session;
   checks: Record<string, boolean>;
   nums: Record<string, number | null>;
   costs: Costs;
   services: SimpleService[];
-  done: Record<string, boolean>;
-  start: string;
+  /** أرقام «قبل» من الجلسة. */
   baseline: Partial<Record<SimpleKpiKey, number | null>>;
-  current: Partial<Record<SimpleKpiKey, number | null>>;
+  months: MonthPlan[];
 };
 
 export const DEFAULT_COSTS: Costs = {
   rent: null, salaries: null, other: null, hours_month: null, utilization: 60,
   travel_cost: null, travel_minutes: null, commission_pct: 0, margin_pct: 40, vat: false,
 };
+export const DEFAULT_SESSION: Session = { date: "", attendees: "", notes: "", done_at: null };
 export const DEFAULT_SIMPLE: Simple = {
-  name: "", model: null, checks: {}, nums: {}, costs: DEFAULT_COSTS, services: [], done: {}, start: "", baseline: {}, current: {},
+  name: "", model: null, session: DEFAULT_SESSION, checks: {}, nums: {}, costs: DEFAULT_COSTS, services: [], baseline: {}, months: [],
 };
 
 export const MODELS: { id: BizModel; label: string; desc: string; risk: string }[] = [
@@ -211,14 +221,15 @@ export function axisScore(results: CheckResult[], axis: AxisId) {
   return { total: rs.length, known: known.length, passed: known.filter((r) => r.pass).length, score: known.length ? known.filter((r) => r.pass).length / known.length : null };
 }
 
-/* ─── خطة ٩٠ يوم: كل فحص ما نجح يضيف إجراء ─── */
+/* ─── الخطة الشهرية: كل فحص ما نجح يضيف إجراء، والشهر ياخذ أعلاها أولوية ─── */
 
 export type Action = { id: string; phase: 1 | 2 | 3; axis: AxisId; check: string; title: string; how: string };
 
-export const PHASES: { id: 1 | 2 | 3; title: string; days: string; goal: string }[] = [
-  { id: 1, title: "الأساس", days: "اليوم ١–٣٠", goal: "نوقف الخسارة: أسعار فوق التكلفة، حجز منظم، وواجهة تثق فيها العميلة" },
-  { id: 2, title: "الفاتورة والعودة", days: "اليوم ٣١–٦٠", goal: "نرفع الفاتورة ونرجّع العميلة: إضافات، باقة، ومتابعة بعد الزيارة" },
-  { id: 3, title: "الاستقطاب", days: "اليوم ٦١–٩٠", goal: "نجيب عميلات جدد بمحتوى منتظم وحملة صغيرة تنقاس" },
+/** المراحل للترتيب والتصنيف فقط (مو مدد زمنية): الأساس قبل الفاتورة، والفاتورة قبل الاستقطاب. */
+export const PHASES: { id: 1 | 2 | 3; title: string; goal: string }[] = [
+  { id: 1, title: "الأساس", goal: "نوقف الخسارة: أسعار فوق التكلفة، حجز منظم، وواجهة تثق فيها العميلة" },
+  { id: 2, title: "الفاتورة والعودة", goal: "نرفع الفاتورة ونرجّع العميلة: إضافات، باقة، ومتابعة بعد الزيارة" },
+  { id: 3, title: "الاستقطاب", goal: "نجيب عميلات جدد بمحتوى منتظم وحملة صغيرة تنقاس" },
 ];
 
 export const ACTIONS: Action[] = [
@@ -252,13 +263,106 @@ export const ACTIONS: Action[] = [
   { id: "a_hygiene", phase: 1, axis: "ops", check: "o_hygiene", title: "خلّي التعقيم ظاهر", how: "أدوات مغلّفة تُفتح قدام العميلة، وستوري يوضح طريقة التعقيم — أكبر سبب ثقة للمنزلي." },
 ];
 
-/** إجراءات الخطة: كل فحص ما نجح أو ما تجاوب عليه بعد. */
-export function planActions(s: Simple, results: CheckResult[]) {
+/** ترتيب الأولوية: الخسارة والنظام أولاً، بعدها الحجز والواجهة، بعدها الفاتورة والعودة، وآخرها الاستقطاب. */
+const RANK = [
+  "a_costs", "a_prices", "a_license", "a_deposit", "a_visit_fee", "a_booking", "a_link", "a_dm", "a_zone", "a_hygiene",
+  "a_clients", "a_list", "a_focus", "a_kit", "a_google", "a_followup", "a_return", "a_addon", "a_package", "a_entry",
+  "a_reviews", "a_discount", "a_offpeak", "a_standard", "a_posts", "a_identity", "a_rating", "a_measure",
+];
+const rankOf = (id: string) => { const i = RANK.indexOf(id); return i < 0 ? RANK.length : i; };
+export const actionById = (id: string) => ACTIONS.find((a) => a.id === id) ?? null;
+
+/** الإجراءات المفتوحة بالأولوية: فحصها ما نجح (أو ما تجاوب عليه) وما انجزت في أي شهر. */
+export function openActions(s: Simple, results: CheckResult[]) {
   const byId = new Map(results.map((r) => [r.id, r]));
+  const doneEver = new Set(s.months.flatMap((m) => Object.keys(m.done).filter((k) => m.done[k])));
   return ACTIONS.filter((a) => {
     const r = byId.get(a.check);
-    return r && r.pass !== true;
-  }).map((a) => ({ ...a, unknown: byId.get(a.check)?.pass === null, done: !!s.done[a.id] }));
+    return r && r.pass !== true && !doneEver.has(a.id);
+  }).sort((a, b) => rankOf(a.id) - rankOf(b.id)).map((a) => ({ ...a, unknown: byId.get(a.check)?.pass === null }));
+}
+
+/* ─── الشهور ─── */
+
+export const MONTH_SIZE = 5;
+export const monthKeyOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+export function nextMonthKey(key: string) {
+  const [y, m] = key.split("-").map(Number);
+  return monthKeyOf(new Date(y, m, 1));
+}
+export function monthLabel(key: string) {
+  const [y, m] = key.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString("ar-SA-u-ca-gregory", { month: "long", year: "numeric" });
+}
+
+/** خطة شهر جديد: الإجراءات اللي ما انجزت في الشهر اللي قبله تترحّل، والباقي من الأعلى أولوية. */
+export function buildMonth(s: Simple, results: CheckResult[], month: string, id: string): MonthPlan {
+  const last = s.months[s.months.length - 1];
+  const open = openActions(s, results).map((a) => a.id);
+  const carried = last ? last.actions.filter((a) => !last.done[a] && open.includes(a)) : [];
+  const fresh = open.filter((a) => !carried.includes(a)).slice(0, Math.max(0, MONTH_SIZE - carried.length));
+  return { id, month, focus: "", actions: [...carried, ...fresh], done: {}, carried, numbers: {}, notes: "", closed_at: null };
+}
+
+/* ─── توصيات الجلسة: أهم ٣ حسب الأثر + فوز سريع ─── */
+
+export type Rec = { id: string; title: string; why: string; impact: string | null; actions: string[] };
+
+const fmtN = (v: number) => Math.round(v).toLocaleString("ar-SA-u-ca-gregory");
+
+export function recommendations(s: Simple, results: CheckResult[]): { top: Rec[]; quickWin: Action | null } {
+  const byId = new Map(results.map((r) => [r.id, r.pass]));
+  const failed = (id: string) => byId.get(id) === false;
+  const open = new Set(openActions(s, results).map((a) => a.id));
+  const b = s.baseline;
+  const out: Rec[] = [];
+
+  const priced = s.services.filter((x) => x.name.trim()).map((x) => ({ x, p: pricing(x, s.costs, s.model) }));
+  const losing = priced.filter(({ p }) => p.status === "loss" || p.status === "low");
+  if (losing.length) {
+    const now = monthEstimate(s.services, s.costs, s.model);
+    const fixedSvcs = s.services.map((x) => { const p = pricing(x, s.costs, s.model); return p.suggested && (x.price ?? 0) < p.suggested ? { ...x, price: p.suggested } : x; });
+    const after = monthEstimate(fixedSvcs, s.costs, s.model);
+    out.push({
+      id: "pricing", title: "صحّحي الأسعار اللي تحت التكلفة",
+      why: `${fmtN(losing.length)} خدمة سعرها أقل من السعر الأدنى${losing.some(({ p }) => p.status === "loss") ? " — وبعضها خسارة على كل عميلة" : ""}.`,
+      impact: now.profit !== null && after.profit !== null ? `صافي الربح الشهري من ${fmtN(now.profit)} إلى ${fmtN(after.profit)} ر.س` : null,
+      actions: ["a_prices"],
+    });
+  } else if (byId.get("d_costs") !== true) {
+    out.push({ id: "costs", title: "احسبي تكلفتك الحقيقية", why: "بدون تكلفة الساعة ما نعرف هل الأسعار تربح — أغلب الصالونات والمنزليات يسعّرون تحت التكلفة بدون ما يدرون.", impact: null, actions: ["a_costs"] });
+  }
+  if (failed("o_license")) {
+    out.push({ id: "license", title: "رتّبي الترخيص والشهادات الصحية", why: "النشاط بدون ترخيص معرّض للإغلاق، وما يقدر يعلن رسمياً أو يفتح بوابة دفع.", impact: null, actions: ["a_license"] });
+  }
+  const rp = s.nums.return_pct ?? b.return_pct ?? null;
+  if (rp !== null && rp < 50) {
+    const clients = b.clients ?? null, ticket = b.avg_ticket ?? (b.revenue && b.clients ? b.revenue / b.clients : null);
+    const extra = clients ? (clients * (0.5 - rp / 100)) / 2 : null;
+    out.push({
+      id: "return", title: "رجّعي العميلات", why: `${fmtN(rp)}٪ بس يرجعن خلال شهرين — الربح الحقيقي في الزيارة الثانية.`,
+      impact: extra && ticket ? `لو وصلت العودة ٥٠٪: تقريباً ${fmtN(extra)} زيارة زيادة بالشهر ≈ ${fmtN(extra * ticket)} ر.س` : null,
+      actions: ["a_clients", "a_followup", "a_return"].filter((a) => open.has(a)),
+    });
+  }
+  if (failed("d_addon") || failed("d_package")) {
+    const clients = b.clients ?? null;
+    out.push({
+      id: "ticket", title: "ارفعي الفاتورة بالإضافات والباقة", why: "ما فيه إضافات ترفع الفاتورة أو باقة تضمن الرجوع.",
+      impact: clients ? `لو ٣٠٪ من العميلات أخذن إضافة بـ٥٠ ر.س: تقريباً ${fmtN(clients * 0.3 * 50)} ر.س زيادة بالشهر` : null,
+      actions: ["a_addon", "a_package"].filter((a) => open.has(a)),
+    });
+  }
+  if (failed("o_deposit") || failed("o_booking")) {
+    out.push({ id: "booking", title: "نظّمي الحجز والعربون", why: "الغياب والإلغاء المتأخر يضيّعون مواعيد ما تتعوض.", impact: null, actions: ["a_deposit", "a_booking"].filter((a) => open.has(a)) });
+  }
+  if (failed("so_link") || failed("so_google") || failed("d_posts") || failed("d_dm")) {
+    out.push({ id: "social", title: "رتّبي واجهتك الرقمية", why: "العميلة تحكم من الحساب وقوقل وسرعة الرد قبل ما تحجز.", impact: null, actions: ["a_link", "a_google", "a_dm", "a_posts"].filter((a) => open.has(a)) });
+  }
+
+  const QUICK = ["a_link", "a_deposit", "a_dm", "a_list", "a_google", "a_reviews", "a_followup"];
+  const quickWin = QUICK.map((id) => (open.has(id) ? actionById(id) : null)).find(Boolean) ?? null;
+  return { top: out.slice(0, 3), quickWin };
 }
 
 /* ─── المؤشرات الستة ─── */

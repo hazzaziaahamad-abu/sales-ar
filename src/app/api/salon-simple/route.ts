@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getTicketAccess } from "@/lib/api/work-ticket-access";
 import { isSuperAdmin } from "@/lib/permissions";
-import { DEFAULT_SIMPLE, type Simple } from "@/lib/salon-simple";
+import { DEFAULT_SESSION, DEFAULT_SIMPLE, type Simple } from "@/lib/salon-simple";
 
 export const runtime = "nodejs";
 
@@ -23,7 +23,12 @@ export async function GET() {
   const { data, error } = await supabaseAdmin.from("salon_growth_settings").select("value").eq("org_id", a.orgId).eq("key", KEY).maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   const v = (data?.value ?? {}) as Partial<Simple>;
-  const simple: Simple = { ...DEFAULT_SIMPLE, ...v, costs: { ...DEFAULT_SIMPLE.costs, ...v.costs } };
+  const simple: Simple = {
+    ...DEFAULT_SIMPLE, ...v,
+    costs: { ...DEFAULT_SIMPLE.costs, ...v.costs },
+    session: { ...DEFAULT_SESSION, ...v.session },
+    months: Array.isArray(v.months) ? v.months : [],
+  };
   return NextResponse.json({ simple }, { headers: { "Cache-Control": "no-store" } });
 }
 
