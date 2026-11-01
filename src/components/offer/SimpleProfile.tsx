@@ -240,7 +240,7 @@ export function profileLines(s: Simple): string[] {
   const loc = LOCATIONS.find((l) => l.id === pf.location)?.label;
   if (where || loc) out.push(`الموقع: ${[where, loc].filter(Boolean).join(" — ")}`);
   if (pf.specialties.length) out.push(`التخصص: ${pf.specialties.join("، ")}`);
-  const team = [pf.staff_experts !== null ? `${fmt(pf.staff_experts)} خبيرة` : "", pf.staff_admin !== null ? `${fmt(pf.staff_admin)} إدارة واستقبال` : ""].filter(Boolean).join(" + ");
+  const team = [pf.staff_experts ? `${fmt(pf.staff_experts)} خبيرة` : "", pf.staff_admin ? `${fmt(pf.staff_admin)} إدارة واستقبال` : ""].filter(Boolean).join(" + ");
   if (team) out.push(`الفريق: ${team}`);
   if (pf.age_years !== null) out.push(`عمر النشاط: ${fmt(pf.age_years)} سنة${pf.trend ? `، الدخل ${{ up: "يزيد", flat: "ثابت", down: "ينزل" }[pf.trend]}` : ""}`);
   const risks = RISKS.filter((r) => pf.risks[r.id]).map((r) => r.label);
