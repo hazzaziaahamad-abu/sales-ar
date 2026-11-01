@@ -9,12 +9,13 @@ import type { LucideIcon } from "lucide-react";
 import {
   Store, Car, Home, Stethoscope, Calculator, BarChart3, Check, Plus, Trash2, Copy, Sparkles,
   Scissors, Receipt, Users, Megaphone, ShieldCheck, Lightbulb, RefreshCw, Wand2, Target, Zap, ChevronLeft, ChevronRight,
-  CalendarCheck, PlayCircle, X, Lock,
+  CalendarCheck, PlayCircle, X, Lock, Building2, Package,
 } from "lucide-react";
+import { ProfileBasics, ProfileFinance, ProfileGoalTeam, ProfileRisks, ProfileTab, ProfileVoice, profileLines } from "./SimpleProfile";
 import {
   AXES, MODELS, NUMS, PHASES, SERVICE_IDEAS, SERVICE_KINDS, SIMPLE_KPIS, CONTENT_BY_MODEL,
   actionById, axisScore, buildMonth, costBase, evaluate, modelOf, monthEstimate, monthKeyOf, monthLabel, nextMonthKey,
-  openActions, pricing, questionsFor, recommendations, serviceKind,
+  openActions, pricing, questionsFor, recommendations, serviceKind, suggestPackage, monthSize, GOALS,
   type AxisId, type BizModel, type Costs, type MonthPlan, type ServiceKind, type Simple, type SimpleService,
 } from "@/lib/salon-simple";
 import { CONTENT_WEEK } from "@/lib/salon-campaigns";
@@ -39,10 +40,11 @@ const scoreColor = (v: number | null) => (v === null ? "var(--faint)" : v >= 0.7
 
 type Patch = (p: Partial<Simple>) => void;
 type Results = ReturnType<typeof evaluate>;
-type Tab = "recs" | "diagnosis" | "pricing" | "month" | "follow";
+type Tab = "recs" | "profile" | "diagnosis" | "pricing" | "month" | "follow";
 const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: "recs", label: "التوصيات", icon: Target },
   { id: "month", label: "خطة الشهر", icon: CalendarCheck },
+  { id: "profile", label: "ملف المنشأة", icon: Building2 },
   { id: "diagnosis", label: "التشخيص", icon: Stethoscope },
   { id: "pricing", label: "التسعير والخدمات", icon: Calculator },
   { id: "follow", label: "المتابعة الشهرية", icon: BarChart3 },
@@ -87,6 +89,7 @@ export default function SimplePlan({ s, set, salonName, setSalonName, copy }: {
               className="w-full rounded-lg border border-dashed border-[var(--line-strong)] bg-transparent px-2 py-0.5 text-lg font-black text-[var(--ink)] outline-none placeholder:text-[var(--faint)] focus:border-[var(--acc)] sm:w-72" />
             <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-[var(--muted)]">
               {model && <span className="rounded-full px-2.5 py-0.5 font-black" style={{ color: "var(--acc)", background: "color-mix(in srgb, var(--acc) 10%, transparent)" }}>{model.label}</span>}
+              {s.profile?.goal && <span className="rounded-full px-2.5 py-0.5 font-black" style={{ color: GOLD, background: `color-mix(in srgb, ${GOLD} 12%, transparent)` }}>الهدف: {GOALS.find((g) => g.id === s.profile.goal)?.label}</span>}
               {s.session.done_at ? <span>جلسة التشخيص: {s.session.date ? new Date(s.session.date).toLocaleDateString(LOCALE, { day: "numeric", month: "long" }) : "—"}</span> : <span className="font-bold" style={{ color: WARN }}>الجلسة ما اكتملت</span>}
               {current && <span>· {monthLabel(current.month)}</span>}
             </div>
@@ -126,6 +129,7 @@ export default function SimplePlan({ s, set, salonName, setSalonName, copy }: {
       </nav>
 
       {tab === "recs" && <Recommendations s={s} results={results} onMonth={() => setTab("month")} />}
+      {tab === "profile" && <ProfileTab s={s} patch={patch} />}
       {tab === "diagnosis" && <Diagnosis s={s} patch={patch} results={results} />}
       {tab === "pricing" && <Pricing s={s} patch={patch} />}
       {tab === "month" && <MonthView s={s} set={set} results={results} />}
@@ -142,6 +146,8 @@ function clientReport(s: Simple, results: Results, name: string) {
   const lines = [`📋 تقرير جلسة التشخيص${name ? ` — ${name}` : ""}`];
   if (s.session.date) lines.push(`📅 ${new Date(s.session.date).toLocaleDateString(LOCALE, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}`);
   if (model) lines.push(`النشاط: ${model.label}`);
+  const prof = profileLines(s);
+  if (prof.length) lines.push("", "🏷️ ملف المنشأة:", ...prof.map((x) => `• ${x}`));
   lines.push("", "🩺 الوضع الحالي:");
   AXES.forEach((a) => { const x = axisScore(results, a.id); lines.push(`• ${a.title}: ${x.score === null ? "—" : `${fmt(x.score * 100)}٪`}`); });
   const nums = SIMPLE_KPIS.filter((k) => s.baseline[k.key] != null).map((k) => `${k.label}: ${fmt(s.baseline[k.key]!)}${k.unit === "٪" ? "٪" : ` ${k.unit}`}`);
@@ -151,6 +157,8 @@ function clientReport(s: Simple, results: Results, name: string) {
     top.forEach((r, i) => { lines.push(`${i + 1}. ${r.title} — ${r.why}`); if (r.impact) lines.push(`   الأثر المتوقع: ${r.impact}`); });
   }
   if (quickWin) lines.push("", `⚡ ابدئي هالأسبوع: ${quickWin.title} — ${quickWin.how}`);
+  const pkg = suggestPackage(s, results);
+  if (pkg) lines.push("", `📦 الباقة المقترحة: ${pkg.title} — ${pkg.why}`);
   const m = s.months[s.months.length - 1];
   if (m) {
     lines.push("", `🗓️ خطة ${monthLabel(m.month)}:`);
@@ -162,12 +170,12 @@ function clientReport(s: Simple, results: Results, name: string) {
 /* ──────────────────────────── البداية ──────────────────────────── */
 
 function Intro({ onStart }: { onStart: () => void }) {
-  const steps = ["النشاط والجلسة", "أرقام اليوم", "الخدمات والأسعار والتكاليف", "العميلات والسوشال", "التشغيل والثقة", "التوصيات وخطة الشهر الأول"];
+  const steps = ["النشاط: المجال والموقع والمساحة", "الهدف والرؤية والفريق والوضع النظامي", "أرقام اليوم والوضع المالي", "الخدمات والأسعار والتكاليف", "العميلات وآراؤهن والسوشال", "التشغيل والمخاطر", "التوصيات والباقة المقترحة وخطة الشهر الأول"];
   return (
     <div className={`${card} mx-auto max-w-2xl p-6 sm:p-8`}>
       <span className="grid h-12 w-12 place-items-center rounded-2xl text-[var(--on-acc)]" style={accGrad}><Users size={22} /></span>
       <h2 className="mt-4 text-2xl font-black text-[var(--ink)]">ابدئي بجلسة مع العميلة</h2>
-      <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">٣٠–٤٥ دقيقة: تاخذين منها المعلومات والأرقام خطوة بخطوة، وفي آخرها تطلع التوصيات بالأولوية وخطة الشهر الأول.</p>
+      <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">٤٥–٦٠ دقيقة: تاخذين منها المعلومات والأرقام خطوة بخطوة، وفي آخرها تطلع التوصيات بالأولوية وخطة الشهر الأول.</p>
       <ol className="mt-5 space-y-2">
         {steps.map((t, i) => (
           <li key={t} className="flex items-center gap-3 text-sm text-[var(--body)]">
@@ -182,7 +190,7 @@ function Intro({ onStart }: { onStart: () => void }) {
 
 /* ──────────────────────────── الجلسة خطوة بخطوة ──────────────────────────── */
 
-const STEPS = ["النشاط", "أرقام اليوم", "الخدمات والأسعار", "العميلات والسوشال", "التشغيل والثقة", "التوصيات"];
+const STEPS = ["النشاط", "الهدف والفريق", "أرقام اليوم", "الخدمات والأسعار", "العميلات والسوشال", "التشغيل والمخاطر", "التوصيات"];
 
 function SessionWizard({ s, patch, results, salonName, setSalonName, onExit, onFinish }: {
   s: Simple; patch: Patch; results: Results; salonName: string; setSalonName: (v: string) => void; onExit: () => void; onFinish: () => void;
@@ -221,14 +229,21 @@ function SessionWizard({ s, patch, results, salonName, setSalonName, onExit, onF
             </div>
           </div>
           <ModelCards value={s.model} onPick={(model) => patch({ model })} />
+          {s.model && <ProfileBasics s={s} patch={patch} />}
           <div className={`${card} p-4 sm:p-5`}>
             <label className="block"><span className="mb-1 block text-xs font-bold text-[var(--muted)]">ملاحظات الجلسة (وش أكثر شي مزعجها؟ وش تبي توصل له؟)</span>
               <textarea rows={3} value={s.session.notes} onChange={(e) => patch({ session: { ...s.session, notes: e.target.value } })} className={`${input} resize-y`} /></label>
           </div>
         </div>
       )}
-      {step === 1 && <BaselineStep s={s} patch={patch} />}
+      {step === 1 && <ProfileGoalTeam s={s} patch={patch} />}
       {step === 2 && (
+        <div className="space-y-4">
+          <BaselineStep s={s} patch={patch} />
+          <ProfileFinance s={s} patch={patch} />
+        </div>
+      )}
+      {step === 3 && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <AxisBlock s={s} patch={patch} results={results} axis="services" />
@@ -237,14 +252,22 @@ function SessionWizard({ s, patch, results, salonName, setSalonName, onExit, onF
           <Pricing s={s} patch={patch} />
         </div>
       )}
-      {step === 3 && (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <AxisBlock s={s} patch={patch} results={results} axis="clients" />
-          <AxisBlock s={s} patch={patch} results={results} axis="social" />
+      {step === 4 && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <AxisBlock s={s} patch={patch} results={results} axis="clients" />
+            <AxisBlock s={s} patch={patch} results={results} axis="social" />
+          </div>
+          <ProfileVoice s={s} patch={patch} />
         </div>
       )}
-      {step === 4 && <AxisBlock s={s} patch={patch} results={results} axis="ops" />}
-      {step === 5 && <Recommendations s={s} results={results} />}
+      {step === 5 && (
+        <div className="space-y-4">
+          <AxisBlock s={s} patch={patch} results={results} axis="ops" />
+          <ProfileRisks s={s} patch={patch} />
+        </div>
+      )}
+      {step === 6 && <Recommendations s={s} results={results} />}
 
       <div className="flex items-center gap-2">
         <button onClick={() => go(step - 1)} disabled={step === 0} className={btnGhost}><ChevronRight size={15} /> السابق</button>
@@ -314,6 +337,7 @@ function BaselineStep({ s, patch }: { s: Simple; patch: Patch }) {
 function Recommendations({ s, results, onMonth }: { s: Simple; results: Results; onMonth?: () => void }) {
   const { top, quickWin } = recommendations(s, results);
   const open = openActions(s, results);
+  const pkg = suggestPackage(s, results);
   return (
     <div className="space-y-4">
       {top.length === 0 ? (
@@ -346,13 +370,23 @@ function Recommendations({ s, results, onMonth }: { s: Simple; results: Results;
           </div>
         </div>
       )}
+      {pkg && (
+        <div className={`${card} flex gap-3 p-4 sm:p-5`}>
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl text-[var(--on-acc)]" style={accGrad}><Package size={18} /></span>
+          <div className="min-w-0">
+            <div className="text-xs font-bold text-[var(--muted)]">الباقة المقترحة</div>
+            <div className="text-sm font-black text-[var(--ink)]">{pkg.title}</div>
+            <div className="mt-0.5 text-xs leading-relaxed text-[var(--muted)]">{pkg.why}</div>
+          </div>
+        </div>
+      )}
       {open.length > 0 && (
         <div className={`${card} p-4 sm:p-5`}>
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="flex-1 text-base font-black text-[var(--ink)]">كل الفجوات المفتوحة ({fmt(open.length)})</h3>
             {onMonth && <button onClick={onMonth} className={`${btnGhost} !px-3 !py-1.5 text-xs`}><CalendarCheck size={13} /> خطة الشهر</button>}
           </div>
-          <p className="mt-0.5 text-xs text-[var(--muted)]">مرتبة بالأولوية — كل شهر ياخذ أعلاها ({fmt(5)} إجراءات تقريباً)، والباقي ينتظر الشهور الجاية.</p>
+          <p className="mt-0.5 text-xs text-[var(--muted)]">مرتبة بالأولوية — كل شهر ياخذ أعلاها ({fmt(monthSize(s))} إجراءات حسب وقت المالكة)، والباقي ينتظر الشهور الجاية.</p>
           <ul className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
             {open.map((a, i) => (
               <li key={a.id} className="flex items-center gap-2 rounded-xl border border-[var(--line)] px-3 py-2 text-xs">
@@ -719,6 +753,16 @@ function MonthView({ s, set, results }: { s: Simple; set: (s: Simple) => void; r
             );
           })}
         </ul>
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-2xl px-3 py-2 text-xs font-bold" style={{ background: `color-mix(in srgb, ${doneN === cur.actions.length ? GOOD : WARN} 9%, transparent)` }}>
+          <span style={{ color: doneN === cur.actions.length ? GOOD : WARN }}>التزام العميلة: {fmt(cur.actions.length ? (doneN / cur.actions.length) * 100 : 0)}٪</span>
+          <span className="text-[var(--muted)]">({fmt(doneN)} من {fmt(cur.actions.length)} إجراء انجز)</span>
+        </div>
+        {doneN < cur.actions.length && (
+          <label className="mt-2 block">
+            <span className="mb-1 block text-[11px] font-bold text-[var(--muted)]">وش منع التنفيذ؟ (وقت، ميزانية، فريق، اقتناع…)</span>
+            <input value={cur.blocker ?? ""} onChange={(e) => setCur({ blocker: e.target.value })} className={input} />
+          </label>
+        )}
         <label className="mt-3 block">
           <span className="mb-1 block text-[11px] font-bold text-[var(--muted)]">ملاحظات الشهر (وش نجح، وش ما مشى، وليش)</span>
           <textarea rows={2} value={cur.notes} onChange={(e) => setCur({ notes: e.target.value })} className={`${input} resize-y`} />
@@ -744,6 +788,7 @@ function MonthView({ s, set, results }: { s: Simple; set: (s: Simple) => void; r
                       {m.focus && <p className="mb-1"><b>الهدف:</b> {m.focus}</p>}
                       <ul className="space-y-0.5">{m.actions.map((id) => <li key={id}>{m.done[id] ? "✅" : "▫️"} {actionById(id)?.title}</li>)}</ul>
                       {m.notes && <p className="mt-1 text-[var(--muted)]">{m.notes}</p>}
+                      {m.blocker && <p className="mt-1" style={{ color: WARN }}>العائق: {m.blocker}</p>}
                     </div>
                   )}
                 </li>
@@ -792,6 +837,16 @@ function FollowUp({ s, patch }: { s: Simple; patch: Patch }) {
                 </tr>
               );
             })}
+            <tr className="border-t-2 border-[var(--line)]">
+              <td className="px-2 py-2 font-bold text-[var(--ink)]">التزام العميلة <span className="text-[10px] font-normal text-[var(--faint)]">(٪ المنجز)</span></td>
+              <td className="px-2 py-2 text-[var(--faint)]">—</td>
+              {months.map((m) => {
+                const d = m.actions.filter((a) => m.done[a]).length;
+                const v = m.actions.length ? (d / m.actions.length) * 100 : 0;
+                return <td key={m.id} className="px-2 py-2 font-black" style={{ color: v >= 80 ? GOOD : v >= 50 ? WARN : BAD }}>{fmt(v)}٪</td>;
+              })}
+              <td className="px-2 py-2" />
+            </tr>
           </tbody>
         </table>
       </div>

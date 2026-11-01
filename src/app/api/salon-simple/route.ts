@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getTicketAccess } from "@/lib/api/work-ticket-access";
 import { canOpenPage } from "@/lib/permissions";
-import { DEFAULT_SESSION, DEFAULT_SIMPLE, type Simple } from "@/lib/salon-simple";
+import { DEFAULT_PROFILE, DEFAULT_SESSION, DEFAULT_SIMPLE, type Simple } from "@/lib/salon-simple";
 
 export const runtime = "nodejs";
 
@@ -27,6 +27,7 @@ export async function GET() {
     ...DEFAULT_SIMPLE, ...v,
     costs: { ...DEFAULT_SIMPLE.costs, ...v.costs },
     session: { ...DEFAULT_SESSION, ...v.session },
+    profile: { ...DEFAULT_PROFILE, ...v.profile },
     months: Array.isArray(v.months) ? v.months : [],
   };
   return NextResponse.json({ simple }, { headers: { "Cache-Control": "no-store" } });
