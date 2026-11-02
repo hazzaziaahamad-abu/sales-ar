@@ -57,6 +57,7 @@ import {
   AtSign,
   Presentation,
   Flower2,
+  PenTool,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
@@ -134,6 +135,7 @@ export const NAV_ITEMS = [
   { label: "Maestro", href: "/maestro", slug: "maestro", icon: Flame, color: "amber", group: "النظام" },
   { label: "المظهر", href: "/appearance", slug: "appearance", icon: Palette, color: "violet", group: "النظام" },
   { label: "الخطط التسويقية", href: "/marketing-plans", slug: "marketing-plans", icon: Megaphone, color: "violet", group: "المبيعات والدعم" },
+  { label: "صفحة المصمم", href: "/designer", slug: "designer", icon: PenTool, color: "violet", group: "المبيعات والدعم" },
   { label: "تحليلات الزيارات", href: "/analytics", slug: "analytics", icon: BarChart2, color: "cyan", group: "النظام" },
   { label: "واتساب", href: "/whatsapp", slug: "whatsapp", icon: MessageCircle, color: "emerald", group: "النظام" },
 ];
