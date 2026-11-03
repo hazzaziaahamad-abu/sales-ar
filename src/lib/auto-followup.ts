@@ -20,7 +20,7 @@ export interface FollowUpRule {
   escalate?: boolean;
 }
 
-const CLOSED_STAGES = new Set(["مكتملة", "مرفوض مع سبب", "كنسل التجربة", "استهداف خاطئ"]);
+const CLOSED_STAGES = new Set(["مكتملة", "مرفوض مع سبب", "كنسل التجربة", "استهداف خاطئ", "غير مهتم", "غير متجاوب"]);
 
 export const FOLLOWUP_RULES: FollowUpRule[] = [
   // ─── Stage-specific rules (checked first) ───

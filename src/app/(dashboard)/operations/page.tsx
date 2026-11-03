@@ -302,7 +302,7 @@ export default function OperationsPage() {
 
     // High-value stale deals (>= 10k, no activity 7+ days)
     for (const d of deals) {
-      if (["مكتملة", "مرفوض مع سبب", "استهداف خاطئ", "كنسل التجربة", "انتظار الدفع"].includes(d.stage)) continue;
+      if (["مكتملة", "مرفوض مع سبب", "استهداف خاطئ", "كنسل التجربة", "غير مهتم", "غير متجاوب", "انتظار الدفع"].includes(d.stage)) continue;
       const lastActivity = lastNoteMap.get(d.id) || d.last_contact || d.updated_at || d.created_at;
       const days = daysAgo(lastActivity);
       if ((d.deal_value || 0) >= 10000 && days >= 7) {
@@ -336,7 +336,7 @@ export default function OperationsPage() {
       if (d.stage === "مكتملة" && (d.close_date || d.updated_at || "").slice(0, 10) >= weekStart) {
         r.closed++;
         r.revenue += d.deal_value || 0;
-      } else if (!["مكتملة", "مرفوض مع سبب", "استهداف خاطئ", "كنسل التجربة"].includes(d.stage)) {
+      } else if (!["مكتملة", "مرفوض مع سبب", "استهداف خاطئ", "كنسل التجربة", "غير مهتم", "غير متجاوب"].includes(d.stage)) {
         r.open++;
       }
     }

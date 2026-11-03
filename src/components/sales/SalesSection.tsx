@@ -93,7 +93,7 @@ import MeetingPlanButton from "@/components/sales/MeetingPlanButton";
 /* ─── Deal health score ─── */
 function getDealHealthScore(deal: { stage: string; updated_at: string; deal_date?: string | null; last_contact?: string | null; created_at: string }): { icon: string; label: string; color: string } {
   if (deal.stage === "مكتملة") return { icon: "✅", label: "مكتمل", color: "text-cc-green" };
-  if (deal.stage === "مرفوض مع سبب" || deal.stage === "كنسل التجربة") return { icon: "⚫", label: "خسارة", color: "text-muted-foreground" };
+  if (deal.stage === "مرفوض مع سبب" || deal.stage === "كنسل التجربة" || deal.stage === "غير مهتم") return { icon: "⚫", label: "خسارة", color: "text-muted-foreground" };
   const ref = deal.last_contact || deal.deal_date;
   const daysSince = ref ? Math.floor((Date.now() - new Date(ref).getTime()) / 86400000) : 99;
   const dateBase = deal.deal_date || deal.created_at;
@@ -121,6 +121,8 @@ const STAGE_BADGE_COLOR: Record<string, "green" | "amber" | "purple" | "cyan" | 
   "مرفوض مع سبب": "red",
   "استهداف خاطئ": "red",
   "تم إرسال العرض": "purple",
+  "غير مهتم": "red",
+  "غير متجاوب": "amber",
 };
 
 /* ─── Stage summary config ─── */
@@ -136,9 +138,9 @@ const STAGE_SUMMARY: { stage: string; color: "green" | "amber" | "cyan" | "purpl
 
 /* ─── «الصفقات الفعلية» بجانب عدد قائمة الصفقات ─── */
 // محاولات اتصال لا تُحتسب صفقة فعلية
-const NON_ACTUAL_STAGES = new Set(["اعادة الاتصال في وقت اخر", "استهداف خاطئ"]);
+const NON_ACTUAL_STAGES = new Set(["اعادة الاتصال في وقت اخر", "استهداف خاطئ", "غير متجاوب"]);
 // صفقات منتهية لا تحتاج متابعة في السجل
-const CLOSED_STAGES = new Set(["مكتملة", "مرفوض مع سبب", "استهداف خاطئ", "كنسل التجربة"]);
+const CLOSED_STAGES = new Set(["مكتملة", "مرفوض مع سبب", "استهداف خاطئ", "كنسل التجربة", "غير مهتم", "غير متجاوب"]);
 const BREAKDOWN_ACTUAL = "__actual";
 const BREAKDOWN_NON_ACTUAL = "__non_actual";
 const STAGE_TEXT_COLOR: Record<string, string> = {
@@ -162,6 +164,8 @@ const OFFICE_STAGE_BOXES: StageBox[] = [
   { key: "انتظار الدفع", icon: "💳", label: "ينتظر الدفع", color: "amber", sublabel: "اجمع الفلوس اليوم!" },
   { key: "تفاوض", icon: "🤝", label: "قيد التفاوض", color: "purple", sublabel: "أقنعهم اليوم!" },
   { key: "تجريبي", icon: "🧪", label: "في التجربة", color: "blue", sublabel: "تابع رضا العميل" },
+  { key: "غير مهتم", icon: "🙅", label: "غير مهتم", color: "red", sublabel: "اعرف السبب" },
+  { key: "غير متجاوب", icon: "📵", label: "غير متجاوب", color: "amber", sublabel: "جرّب قناة ثانية" },
 ];
 
 // مبيعات الدعم: نعرض كل مراحل الصفقة كصناديق قابلة للفلترة.
@@ -179,6 +183,8 @@ const SUPPORT_STAGE_BOXES: StageBox[] = [
   { key: "كنسل التجربة", icon: "❌", label: "كنسل التجربة", color: "red", sublabel: "افهم السبب" },
   { key: "مرفوض مع سبب", icon: "🚫", label: "مرفوض", color: "red", sublabel: "حلّل الخسارة" },
   { key: "استهداف خاطئ", icon: "🎯", label: "استهداف خاطئ", color: "red", sublabel: "" },
+  { key: "غير مهتم", icon: "🙅", label: "غير مهتم", color: "red", sublabel: "اعرف السبب" },
+  { key: "غير متجاوب", icon: "📵", label: "غير متجاوب", color: "amber", sublabel: "جرّب قناة ثانية" },
 ];
 
 /* ─── Empty deal form shape ─── */
@@ -2528,7 +2534,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
                 const goalReached = goal !== null && closedCount >= goal;
 
                 /* active stage buckets */
-                const repActive = deals.filter(d => d.assigned_rep_name === rep && !["مكتملة","مرفوض مع سبب","كنسل التجربة"].includes(d.stage));
+                const repActive = deals.filter(d => d.assigned_rep_name === rep && !["مكتملة","مرفوض مع سبب","كنسل التجربة","غير مهتم","غير متجاوب"].includes(d.stage));
                 const buckets: Record<string,number> = {};
                 repActive.forEach(d => { buckets[d.stage] = (buckets[d.stage] || 0) + 1; });
 

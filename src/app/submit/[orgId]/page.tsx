@@ -12,6 +12,8 @@ const SUBMIT_STAGES = [
   { key: "تجريبي", label: "يوزر تجريبي", color: "blue" },
   { key: "انتظار الدفع", label: "بانتظار الدفع", color: "amber" },
   { key: "كنسل التجربة", label: "كنسل التجربة", color: "red" },
+  { key: "غير مهتم", label: "غير مهتم", color: "red" },
+  { key: "غير متجاوب", label: "غير متجاوب", color: "amber" },
   { key: "مكتملة", label: "مكتملة", color: "green" },
 ] as const;
 

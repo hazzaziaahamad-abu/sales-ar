@@ -100,7 +100,9 @@ export default function ManagerDashboardPage() {
         d.stage !== "مكتملة" &&
         d.stage !== "مرفوض مع سبب" &&
         d.stage !== "استهداف خاطئ" &&
-        d.stage !== "كنسل التجربة"
+        d.stage !== "كنسل التجربة" &&
+        d.stage !== "غير مهتم" &&
+        d.stage !== "غير متجاوب"
     );
     const closedToday = deals.filter(
       (d) => d.stage === "مكتملة" && (d.close_date || d.updated_at).slice(0, 10) === today
@@ -154,7 +156,9 @@ export default function ManagerDashboardPage() {
         d.stage !== "مكتملة" &&
         d.stage !== "مرفوض مع سبب" &&
         d.stage !== "استهداف خاطئ" &&
-        d.stage !== "كنسل التجربة"
+        d.stage !== "كنسل التجربة" &&
+        d.stage !== "غير مهتم" &&
+        d.stage !== "غير متجاوب"
     );
     const scored = officeDeals.map((d) => {
       const days = daysAgo(d.last_contact || d.updated_at || d.created_at);
@@ -240,7 +244,7 @@ export default function ManagerDashboardPage() {
       if (d.stage === "مكتملة" && new Date(d.close_date || d.updated_at) >= startOfWeek) {
         r.closedDeals++;
         r.closedRevenue += d.deal_value || 0;
-      } else if (d.stage !== "مرفوض مع سبب" && d.stage !== "استهداف خاطئ" && d.stage !== "كنسل التجربة" && d.stage !== "مكتملة") {
+      } else if (d.stage !== "مرفوض مع سبب" && d.stage !== "استهداف خاطئ" && d.stage !== "كنسل التجربة" && d.stage !== "غير مهتم" && d.stage !== "غير متجاوب" && d.stage !== "مكتملة") {
         r.openDeals++;
       }
     });
