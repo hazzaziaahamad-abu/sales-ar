@@ -9,7 +9,7 @@ export const PRODUCT_LABEL: Record<string, string> = { menu: "قائمة الط�
 
 /** مراحل الصفقة اللي تعني إن العميل وافق. */
 export const CONVERTED_STAGES = ["مكتملة", "انتظار الدفع", "تجهيز"];
-export const LOST_STAGES = ["مرفوض مع سبب", "استهداف خاطئ", "كنسل التجربة"];
+export const LOST_STAGES = ["مرفوض مع سبب", "استهداف خاطئ", "كنسل التجربة", "غير مهتم", "غير متجاوب"];
 
 export type MeetingOutcome = "converted" | "lost" | "open";
 

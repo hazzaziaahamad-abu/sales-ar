@@ -136,6 +136,8 @@ const STAGE_WEIGHTS: Record<string, number> = {
   "اعادة الاتصال في وقت اخر": 25,
   "تاجيل": 20,
   "كنسل التجربة": 10,
+  "غير متجاوب": 8,
+  "غير مهتم": 5,
   "استهداف خاطئ": 5,
 };
 
@@ -1399,7 +1401,7 @@ export function SecretaryView({ sections, exclude, embedded = false }: {
       }
     }
     return deals
-      .filter(d => d.stage !== "مكتملة" && d.stage !== "مرفوض مع سبب" && d.stage !== "استهداف خاطئ" && d.stage !== "كنسل التجربة")
+      .filter(d => d.stage !== "مكتملة" && d.stage !== "مرفوض مع سبب" && d.stage !== "استهداف خاطئ" && d.stage !== "كنسل التجربة" && d.stage !== "غير مهتم" && d.stage !== "غير متجاوب")
       .map(d => ({ deal: d, intel: computeDealIntel(d, lastNoteByDeal.get(d.id)) }));
   }, [deals, recentNotes]);
 

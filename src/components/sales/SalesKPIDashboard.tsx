@@ -28,6 +28,8 @@ const STAGE_STATUS_MAP: Record<string, { label: string; color: string }> = {
   "مكتملة": { label: "مغلق", color: "bg-emerald-500/20 text-emerald-400" },
   "مرفوض مع سبب": { label: "خسرنا", color: "bg-red-500/20 text-red-400" },
   "كنسل التجربة": { label: "ملغي", color: "bg-red-500/20 text-red-400" },
+  "غير مهتم": { label: "غير مهتم", color: "bg-red-500/20 text-red-400" },
+  "غير متجاوب": { label: "غير متجاوب", color: "bg-amber-500/20 text-amber-400" },
 };
 
 export interface DealWithStages extends Deal {
@@ -130,7 +132,7 @@ export default function SalesKPIDashboard({ deals: externalDeals, merged = false
 
     // Stage filter
     if (filterStage === "active") {
-      result = result.filter((d) => d.stage !== "مكتملة" && d.stage !== "مرفوض مع سبب" && d.stage !== "كنسل التجربة");
+      result = result.filter((d) => d.stage !== "مكتملة" && d.stage !== "مرفوض مع سبب" && d.stage !== "كنسل التجربة" && d.stage !== "غير مهتم" && d.stage !== "غير متجاوب");
     } else if (filterStage === "won") {
       result = result.filter((d) => d.stage === "مكتملة");
     }
@@ -238,7 +240,7 @@ export default function SalesKPIDashboard({ deals: externalDeals, merged = false
           <div className="flex flex-wrap gap-2">
             {[
               { key: "all", label: `الكل (${filteredDeals.length})` },
-              { key: "active", label: `نشطة (${filteredDeals.filter((d) => d.stage !== "مكتملة" && d.stage !== "مرفوض مع سبب" && d.stage !== "كنسل التجربة").length})` },
+              { key: "active", label: `نشطة (${filteredDeals.filter((d) => d.stage !== "مكتملة" && d.stage !== "مرفوض مع سبب" && d.stage !== "كنسل التجربة" && d.stage !== "غير مهتم" && d.stage !== "غير متجاوب").length})` },
               { key: "won", label: `مغلقة (${filteredDeals.filter((d) => d.stage === "مكتملة").length})` },
             ].map((s) => (
               <button

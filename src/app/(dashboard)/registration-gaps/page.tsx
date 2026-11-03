@@ -23,7 +23,7 @@ const SUPPORT_ROLES = ["دعم", "دعم فني", "support"];
 const SUPPORT_SALES_ROLES = ["مبيعات الدعم", "مبيعات دعم", "support sales"];
 const OFFICE_SALES_ROLES = ["مبيعات", "مبيعات المكتب", "sales"];
 const RENEWAL_ROLES = ["تجديدات", "تجديد", "renewals"];
-const INACTIVE_DEAL_STAGES = ["مكتملة", "مرفوض مع سبب", "كنسل التجربة", "استهداف خاطئ"];
+const INACTIVE_DEAL_STAGES = ["مكتملة", "مرفوض مع سبب", "كنسل التجربة", "استهداف خاطئ", "غير مهتم", "غير متجاوب"];
 const ACTIVE_TICKET_STATUSES = ["مفتوح", "قيد الحل"];
 const INACTIVE_RENEWAL_STATUSES = ["مكتمل", "ملغي بسبب"];
 
