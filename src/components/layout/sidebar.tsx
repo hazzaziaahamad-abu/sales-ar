@@ -66,11 +66,14 @@ import { countPendingDeals, countUrgentFollowupDeals, fetchMentionNotifications,
 import { isMentionsManager, MENTIONS_UPDATED_EVENT } from "@/components/mentions/mention-alert-banner";
 import { useWorkClock } from "@/components/work/work-clock";
 import { fmtDuration } from "@/lib/work-hours";
+import { useHuddleManagers } from "@/lib/huddle-managers";
 
 export const NAV_ITEMS = [
   // هام جداً — ظاهرة لكل الموظفين دائماً (بدون صلاحية) عشان ما تضيع متابعة انتظار الدفع / التجريبي / التجهيز
   { label: "هام جداً للمتابعة اليومية", href: "/urgent-followup", slug: "urgent-followup", icon: Siren, color: "red", group: "عام", alwaysVisible: true, urgent: true },
   { label: "المتابعة اليومية", href: "/daily-huddle", slug: "daily-huddle", icon: CalendarCheck, color: "violet", group: "عام" },
+  // للمدير: تقارير «مهام اليوم» + الأهداف والإعدادات
+  { label: "مركز مهام اليوم", href: "/daily-tasks", slug: "daily-tasks", icon: ClipboardList, color: "cyan", group: "عام", dailyManager: true },
   // للمدير فقط — بدل بانر المنشنات أعلى الصفحة
   { label: "منشناتي", href: "/mentions", slug: "mentions", icon: AtSign, color: "amber", group: "عام", managerOnly: true },
   { label: "نظرة عامة", href: "/dashboard", slug: "dashboard", icon: LayoutDashboard, color: "cyan", group: "عام" },
@@ -208,12 +211,14 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   }, [activeOrgId, isManager, userName]);
 
   const isSuperAdmin = user?.isSuperAdmin ?? false;
+  const { isManager: isDailyManager } = useHuddleManagers();
 
   // Filter nav items by user permissions
   const visibleItems = NAV_ITEMS.filter((item) => {
     // نحجز: «مبيعات الدعم» مدموجة مع «المبيعات»
     if (item.slug === "support-sales" && isSupportSalesMerged(activeOrgId)) return false;
     if ((item as { managerOnly?: boolean }).managerOnly) return isManager;
+    if ((item as { dailyManager?: boolean }).dailyManager) return isDailyManager && !isImpersonating;
     if ((item as { superOnly?: boolean }).superOnly) return isSuperAdmin && !isImpersonating;
     if (isSuperAdmin) return true;
     if ((item as { alwaysVisible?: boolean }).alwaysVisible) return !!user;

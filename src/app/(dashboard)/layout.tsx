@@ -46,7 +46,8 @@ import { WorkDayWatcher, WorkHoursBanner } from "@/components/work/work-day";
 import { PushRefresher } from "@/components/push/push-card";
 import { isFocusActive, useFocusActive } from "@/lib/focus-session";
 
-const ALWAYS_ALLOWED_SLUGS = ["urgent-followup", "mentions"];
+// daily-tasks: الصفحة نفسها تتحقق أن المستخدم مدير (السوبر أدمن أو مدراء المتابعة اليومية)
+const ALWAYS_ALLOWED_SLUGS = ["urgent-followup", "mentions", "daily-tasks"];
 // صفحات للسوبر أدمن فقط حتى لو الصلاحية مفعّلة للموظف
 const SUPER_ONLY_SLUGS = ["finance"];
 

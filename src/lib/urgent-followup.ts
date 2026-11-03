@@ -53,7 +53,7 @@ export function isUrgentAdmin(user: { isSuperAdmin?: boolean; roleName?: string 
  * repName = صفقات موظف واحد فقط. salesType = قسم واحد (المكتب / الدعم).
  * sinceDays = صفقات آخر N يوم فقط (حسب تاريخ الصفقة) — للمدير.
  */
-export async function fetchUrgentDeals(opts?: { repName?: string; salesType?: "office" | "support"; sinceDays?: number }): Promise<UrgentDeal[]> {
+export async function fetchUrgentDeals(opts?: { repName?: string; salesType?: "office" | "support"; sinceDays?: number; stages?: readonly string[] }): Promise<UrgentDeal[]> {
   const supabase = createClient();
   const orgId = getOrgId();
 
@@ -61,7 +61,7 @@ export async function fetchUrgentDeals(opts?: { repName?: string; salesType?: "o
     .from("deals")
     .select("*")
     .eq("org_id", orgId)
-    .in("stage", [...URGENT_FOLLOWUP_STAGES]);
+    .in("stage", [...(opts?.stages ?? URGENT_FOLLOWUP_STAGES)]);
   if (opts?.repName) query = query.eq("assigned_rep_name", opts.repName.trim());
   // نحجز: «مبيعات الدعم» مدموجة مع «المبيعات» — بانر المبيعات يشمل كل الصفقات
   const merged = opts?.salesType === "office" && isSupportSalesMerged(orgId);

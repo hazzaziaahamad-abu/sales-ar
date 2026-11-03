@@ -107,6 +107,18 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
   const [saving, setSaving] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // أولويات «مهام اليوم» — لو الموظف بدأ مهام يومه تظهر هنا بدل كتابتها مرة ثانية
+  const [dailyPlans, setDailyPlans] = useState<{ user_name: string; priorities: { key: string; title: string }[] }[]>([]);
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/daily-tasks/team?date=${date}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (alive) setDailyPlans(d && d.orgId === activeOrgId ? d.plans ?? [] : []); })
+      .catch(() => { if (alive) setDailyPlans([]); });
+    return () => { alive = false; };
+  }, [date, activeOrgId]);
+  const dailyPrioritiesOf = (member: string) =>
+    dailyPlans.find((p) => memberOf(p.user_name.trim().split(/\s+/)[0]) === member && p.priorities?.length)?.priorities ?? null;
 
   // منال تُسجَّل بالإنجليزي أحياناً (Manal) — نطابق بالكرت لا بالنص.
   const canEdit = (member: string) => isManager || memberOf(myFirstName) === member;
@@ -481,6 +493,16 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
 
                   <div className="text-xs text-muted-foreground">
                     أهم 3 أشياء اليوم
+                    {dailyPrioritiesOf(member) ? (
+                    <div className="space-y-1.5 mt-1">
+                      {dailyPrioritiesOf(member)!.map((p, i) => (
+                        <div key={p.key} className="block w-full px-3 py-1.5 rounded-lg bg-cyan-dim/40 border border-cyan/20 text-sm text-foreground">
+                          {i + 1}. {p.title}
+                        </div>
+                      ))}
+                      <div className="text-[10px] text-cyan">من «مهام اليوم»</div>
+                    </div>
+                    ) : (
                     <div className="space-y-1.5 mt-1">
                       {commitments.slice(0, 3).map((c, i) => (
                         <input
@@ -493,6 +515,7 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
                         />
                       ))}
                     </div>
+                    )}
                   </div>
 
                   <label className="block text-xs text-muted-foreground">

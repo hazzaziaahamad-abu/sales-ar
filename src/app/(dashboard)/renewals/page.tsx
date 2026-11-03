@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
+import { DailyTasksBar } from "@/components/daily-tasks/daily-tasks-bar";
 import type { Renewal, Employee } from "@/types";
 import { revenueCutoff, visibleAmount } from "@/lib/revenue-visibility";
 import { triggerSaleCelebration } from "@/components/layout/sale-celebration";
@@ -1073,6 +1074,7 @@ export default function RenewalsPage() {
 
   return (
     <div className="space-y-6">
+      <DailyTasksBar department="renewals" />
       {/* ─── Page Header ─── */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">

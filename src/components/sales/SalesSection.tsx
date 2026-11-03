@@ -21,6 +21,7 @@ import { FollowUpLogButton } from "@/components/follow-up-log";
 import { WatchlistPinButton } from "@/components/watchlist-pin-button";
 import { ClientProfilePanel } from "@/components/client-profile-panel";
 import { UrgentFollowupBanner } from "@/components/urgent-followup/urgent-followup-banner";
+import { DailyTasksBar } from "@/components/daily-tasks/daily-tasks-bar";
 import { AchievementSummary } from "@/components/achievement-summary";
 import SalesKPIDashboard from "@/components/sales/SalesKPIDashboard";
 import { isSupportSalesMerged } from "@/lib/sales-merge";
@@ -1444,6 +1445,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
   return (
     <div className="space-y-6">
       {/* ─── هام جداً للمتابعة اليومية — حالات هذا القسم فقط ─── */}
+      <DailyTasksBar department={salesType} />
       <UrgentFollowupBanner salesType={salesType} />
 
       {/* ─── Page Header ─── */}
