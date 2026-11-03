@@ -74,6 +74,9 @@ import {
   Loader2,
   Download,
   RotateCcw,
+  MessageCircle,
+  Copy,
+  Check,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -112,6 +115,49 @@ const SUPPORT_QUOTES = [
   { text: "ابدأ حيث أنت، استخدم ما لديك، افعل ما تستطيع — هذا هو جوهر الدعم المتميز", author: "آرثر آش", book: "أيام النعمة" },
   { text: "العميل الذي تحل مشكلته اليوم هو السفير الذي يسوّق لك غداً", author: "فيليب كوتلر", book: "إدارة التسويق" },
 ];
+
+/* ------------------------------------------------------------------ */
+/*  مشاركة ملخص التذكرة مع العميل على واتساب                          */
+/* ------------------------------------------------------------------ */
+/** يحوّل رقم الجوال لصيغة wa.me الدولية (افتراضياً سعودي) */
+function waPhone(p?: string | null): string {
+  if (!p) return "";
+  let s = p.replace(/[^\d]/g, "");
+  if (s.startsWith("00")) s = s.slice(2);
+  if (s.startsWith("05")) s = "966" + s.slice(1);
+  else if (s.startsWith("5") && s.length === 9) s = "966" + s;
+  return s;
+}
+
+/** الحالة كما تظهر للعميل — «متأخر» داخلية فما نعرضها له بهالاسم */
+const CLIENT_STATUS: Record<string, { label: string; note: string }> = {
+  "مفتوح": { label: "🔴 تم الاستلام", note: "تم استلام طلبك وهو الآن في قائمة المعالجة، وبيتواصل معك فريق الدعم قريباً." },
+  "قيد الحل": { label: "🟡 قيد المعالجة", note: "فريقنا يشتغل حالياً على طلبك، وبنبلغك أول ما ننتهي." },
+  "متأخر": { label: "🟡 قيد المعالجة", note: "نعتذر عن التأخير، طلبك له أولوية عندنا ونعمل على إنهائه بأقرب وقت." },
+  "محلول": { label: "✅ تم الحل", note: "تم حل طلبك بنجاح، وإذا عندك أي ملاحظة لا تتردد تتواصل معنا." },
+};
+
+function buildTicketClientSummary(t: Ticket): string {
+  const st = CLIENT_STATUS[t.status] ?? { label: t.status, note: "" };
+  const isService = (t.request_type || "problem") === "service";
+  const lines = [
+    `السلام عليكم ${t.client_name} 👋`,
+    `هذا ملخص ${isService ? "طلب الخدمة" : "تذكرة الدعم"} الخاصة فيكم${t.ticket_number ? ` رقم *#${t.ticket_number}*` : ""}:`,
+    "",
+    `📌 *نوع الطلب:* ${isService ? "طلب خدمة" : "مشكلة فنية"}`,
+    ...(t.issue_category ? [`🗂 *التصنيف:* ${t.issue_category}${t.issue_subcategory ? ` — ${t.issue_subcategory}` : ""}`] : []),
+    `📝 *التفاصيل:* ${t.issue}`,
+    ...(t.open_date ? [`📅 *تاريخ الفتح:* ${formatDate(t.open_date)}`] : []),
+    `🔖 *الحالة:* ${st.label}`,
+    ...(t.status === "محلول" && t.resolved_date ? [`🏁 *تاريخ الحل:* ${formatDate(t.resolved_date)}`] : []),
+    ...(t.status !== "محلول" && t.due_date ? [`⏰ *الموعد المتوقع للحل:* ${formatDate(t.due_date)}`] : []),
+    ...(t.assigned_agent_name ? [`👤 *المسؤول عن طلبك:* ${t.assigned_agent_name}`] : []),
+    "",
+    ...(st.note ? [st.note] : []),
+    "شاكرين لكم تواصلكم معنا 🌷",
+  ];
+  return lines.join("\n");
+}
 
 function getDailySupportQuote() {
   const start = new Date(2025, 0, 1).getTime();
@@ -179,6 +225,12 @@ export default function SupportPage() {
   const [reopening, setReopening] = useState(false);
   const [reopenMentions, setReopenMentions] = useState<string[]>([]);
   const [mentionPeople, setMentionPeople] = useState<string[]>([]);
+
+  // مشاركة ملخص التذكرة مع العميل على واتساب
+  const [shareTicket, setShareTicket] = useState<Ticket | null>(null);
+  const [shareText, setShareText] = useState("");
+  const [sharePhone, setSharePhone] = useState("");
+  const [shareCopied, setShareCopied] = useState(false);
 
   // Month filter
   const { activeMonthIndex, filterCutoff } = useTopbarControls();
@@ -662,6 +714,38 @@ export default function SupportPage() {
       console.error(err);
     } finally {
       setReopening(false);
+    }
+  }
+
+  function openShareDialog(ticket: Ticket) {
+    setShareTicket(ticket);
+    setShareText(buildTicketClientSummary(ticket));
+    setSharePhone(ticket.client_phone || "");
+    setShareCopied(false);
+  }
+
+  function logShare(ticket: Ticket, how: string) {
+    createFollowUpNote("ticket", ticket.id, `📤 تم ${how} ملخص التذكرة للعميل (الحالة: ${ticket.status})`, authUser?.name || "—")
+      .catch(console.error);
+  }
+
+  function sendShareWhatsApp() {
+    if (!shareTicket || !shareText.trim()) return;
+    const phone = waPhone(sharePhone);
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(shareText)}`, "_blank", "noopener,noreferrer");
+    logShare(shareTicket, "إرسال");
+    setShareTicket(null);
+  }
+
+  async function copyShareText() {
+    if (!shareTicket || !shareText.trim()) return;
+    try {
+      await navigator.clipboard.writeText(shareText);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+      logShare(shareTicket, "نسخ");
+    } catch (err) {
+      console.error(err);
     }
   }
 
@@ -1183,6 +1267,15 @@ export default function SupportPage() {
                         entityId={ticket.id}
                         entityName={ticket.client_name}
                       />
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        onClick={() => openShareDialog(ticket)}
+                        title="مشاركة ملخص التذكرة مع العميل على واتساب"
+                        className="text-green-400 hover:text-green-400"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                      </Button>
                       {ticket.status === "محلول" && (
                         <Button
                           variant="ghost"
@@ -1952,6 +2045,63 @@ export default function SupportPage() {
             </Button>
             <Button onClick={handleReopen} disabled={reopening || !reopenReason.trim()}>
               {reopening ? "جاري الحفظ..." : "إعادة فتح"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* -------- مشاركة ملخص التذكرة مع العميل -------- */}
+      <Dialog open={!!shareTicket} onOpenChange={(o) => { if (!o) setShareTicket(null); }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>مشاركة ملخص التذكرة مع العميل</DialogTitle>
+            <DialogDescription>
+              {shareTicket ? `#${shareTicket.ticket_number ?? ""} — ${shareTicket.client_name}` : ""}
+              {" · "}راجع الرسالة وعدّلها لو تبي، وبعدين أرسلها على واتساب.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label htmlFor="share_phone">رقم واتساب العميل</Label>
+            <Input
+              id="share_phone"
+              dir="ltr"
+              value={sharePhone}
+              onChange={(e) => setSharePhone(e.target.value)}
+              placeholder="05xxxxxxxx"
+            />
+            {!waPhone(sharePhone) && (
+              <p className="text-[12px] text-amber">ما فيه رقم — بيفتح واتساب وتختار المحادثة بنفسك.</p>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="share_text">نص الرسالة</Label>
+            <Textarea
+              id="share_text"
+              value={shareText}
+              onChange={(e) => setShareText(e.target.value)}
+              rows={13}
+              className="text-sm leading-relaxed"
+            />
+            <button
+              type="button"
+              onClick={() => shareTicket && setShareText(buildTicketClientSummary(shareTicket))}
+              className="text-[12px] text-muted-foreground hover:text-foreground underline"
+            >
+              استرجاع النص الأصلي
+            </button>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={copyShareText} disabled={!shareText.trim()}>
+              {shareCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              {shareCopied ? "تم النسخ" : "نسخ"}
+            </Button>
+            <Button
+              onClick={sendShareWhatsApp}
+              disabled={!shareText.trim()}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              <MessageCircle className="w-4 h-4" />
+              إرسال على واتساب
             </Button>
           </DialogFooter>
         </DialogContent>
