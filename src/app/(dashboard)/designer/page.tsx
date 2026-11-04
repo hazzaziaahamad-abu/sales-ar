@@ -1,14 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Clapperboard, ImageIcon, PenTool } from "lucide-react";
+import { Clapperboard, ImageIcon, PenTool, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PackagePostsStudio } from "@/components/designer/PackagePostsStudio";
+import { ReferenceDesignStudio } from "@/components/designer/ai/ReferenceDesignStudio";
 
 /** «صفحة المصمم» — أدوات تصميم داخل المنصة. أول قسم: استوديو بوستات الباقات. */
 export default function DesignerPage() {
-  const [tab, setTab] = useState<"posts" | "videos">("posts");
+  const [tab, setTab] = useState<"reference" | "posts" | "videos">("reference");
   const tabs = [
+    { key: "reference", label: "صمّم من مرجع (ذكاء)", icon: Sparkles },
     { key: "posts", label: "استوديو بوستات الباقات", icon: ImageIcon },
     { key: "videos", label: "الفيديوهات", icon: Clapperboard, soon: true },
   ] as const;
@@ -21,11 +23,11 @@ export default function DesignerPage() {
         </div>
         <div>
           <h1 className="text-xl font-extrabold">صفحة المصمم</h1>
-          <p className="text-xs text-muted-foreground">عدّل بوستات باقات قائمة الطلبات MENU، صدّرها PNG بالمقاس الحقيقي، وشاركها مباشرة.</p>
+          <p className="text-xs text-muted-foreground">ارفع تصميم أعجبك ونطلع لك أفضل منه بهويتنا، أو عدّل بوستات الباقات — وصدّر PNG بالمقاس الحقيقي.</p>
         </div>
       </div>
 
-      <div className="flex w-fit gap-1 rounded-xl border border-border bg-white/[0.04] p-1">
+      <div className="flex w-fit max-w-full flex-wrap gap-1 rounded-xl border border-border bg-white/[0.04] p-1">
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -43,6 +45,7 @@ export default function DesignerPage() {
         ))}
       </div>
 
+      {tab === "reference" && <ReferenceDesignStudio />}
       {tab === "posts" && <PackagePostsStudio />}
     </div>
   );

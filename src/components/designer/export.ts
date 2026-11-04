@@ -28,6 +28,11 @@ const isWebKit = () =>
 /** يلتقط عنصر القالب (المقاس الكامل، بدون تصغير) ويرجّع PNG كـ Blob. */
 export async function renderPng(node: HTMLElement, post: PostData): Promise<Blob> {
   const { w, h } = TEMPLATE_SIZE[post.template];
+  return renderNodePng(node, w, h);
+}
+
+/** نفس التصدير لأي عنصر بمقاس معطى (يستخدمه «صمّم من مرجع»). */
+export async function renderNodePng(node: HTMLElement, w: number, h: number): Promise<Blob> {
   await loadStudioFonts();
   await waitForImages(node);
   await nextFrame();
