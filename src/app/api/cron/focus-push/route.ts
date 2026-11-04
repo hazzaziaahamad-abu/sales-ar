@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { claimDaily, sendPushToUser } from "@/lib/push";
 import { verifyCronSecret } from "@/lib/cron-auth";
+import { DESK_SLUG } from "@/lib/content-desk/server";
 import { topSliceOf, tomorrowRiyadh, type FocusSlice } from "@/lib/focus-slices";
 import { WORK_END_MIN, WORK_START_MIN, riyadhMinutes, workClock } from "@/lib/work-hours";
 
@@ -11,6 +12,28 @@ export const dynamic = "force-dynamic";
 /** وقت التذكير المسائي «اختر شرائح بكرة» (٨ م – ١١ م). */
 const EVENING_FROM = 20 * 60;
 const EVENING_TO = 23 * 60;
+
+/** تذكير حالة الواتساب لأخصائيي المحتوى (١٢:٠٠ – ١٢:٣٠). */
+const WA_REMINDER_MIN = 12 * 60;
+
+async function waStatusReminders(today: string): Promise<number> {
+  const { data: roles } = await supabaseAdmin.from("roles").select("id").contains("allowed_pages", [DESK_SLUG]);
+  const roleIds = (roles ?? []).map((r) => r.id as string);
+  if (!roleIds.length) return 0;
+  const { data: people } = await supabaseAdmin.from("user_profiles").select("id")
+    .eq("is_active", true).eq("is_super_admin", false).in("role_id", roleIds);
+  const ids = (people ?? []).map((p) => p.id as string);
+  if (!ids.length) return 0;
+  const { data: done } = await supabaseAdmin.from("content_desk_days").select("user_id")
+    .eq("day", today).not("wa_status_at", "is", null).in("user_id", ids);
+  const doneSet = new Set((done ?? []).map((d) => d.user_id as string));
+  let sent = 0;
+  for (const uid of ids) {
+    if (doneSet.has(uid) || !(await claimDaily(uid, "wa_status", today))) continue;
+    sent += await sendPushToUser(uid, { title: "💬 حالة الواتساب", body: "ما فعّلت حالة الواتساب اليوم — فعّلها وأشّر عليها في مكتب المحتوى", url: "/content-desk", tag: "wa-status" });
+  }
+  return sent;
+}
 
 const toMin = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
 
@@ -41,6 +64,9 @@ async function handle(req: NextRequest) {
     sent += await sendPushToUser(q.user_id, { title: q.title, body: q.body, url: q.url, tag: q.tag });
   }
   await supabaseAdmin.from("push_queue").delete().lt("send_at", new Date(now.getTime() - 2 * 86_400_000).toISOString());
+
+  // ١.٥) 💬 حالة الواتساب — أخصائي المحتوى ما فعّلها قبل ١٢ الظهر
+  if (m >= WA_REMINDER_MIN && m < WA_REMINDER_MIN + 30) sent += await waStatusReminders(today);
 
   // ٢) التذكيرات اليومية — فقط للي عندهم أجهزة مشتركة
   const inEvening = m >= EVENING_FROM && m < EVENING_TO;

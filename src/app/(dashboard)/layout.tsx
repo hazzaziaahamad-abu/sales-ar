@@ -95,6 +95,7 @@ const PAGE_SLUG_MAP: Record<string, string> = {
   "/analytics": "analytics",
   "/marketing-plans": "marketing-plans",
   "/designer": "designer",
+  "/content-desk": "content-desk",
   "/whatsapp": "whatsapp",
   "/discipline": "discipline",
   "/challenges": "challenges",

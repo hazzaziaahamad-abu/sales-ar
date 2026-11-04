@@ -139,6 +139,7 @@ export const NAV_ITEMS = [
   { label: "المظهر", href: "/appearance", slug: "appearance", icon: Palette, color: "violet", group: "النظام" },
   { label: "الخطط التسويقية", href: "/marketing-plans", slug: "marketing-plans", icon: Megaphone, color: "violet", group: "المبيعات والدعم" },
   { label: "صفحة المصمم", href: "/designer", slug: "designer", icon: PenTool, color: "violet", group: "المبيعات والدعم" },
+  { label: "مكتب المحتوى", href: "/content-desk", slug: "content-desk", icon: CalendarDays, color: "pink", group: "المبيعات والدعم" },
   { label: "تحليلات الزيارات", href: "/analytics", slug: "analytics", icon: BarChart2, color: "cyan", group: "النظام" },
   { label: "واتساب", href: "/whatsapp", slug: "whatsapp", icon: MessageCircle, color: "emerald", group: "النظام" },
 ];
