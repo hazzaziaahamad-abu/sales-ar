@@ -20,6 +20,8 @@ export interface Deal {
   plan?: string;
   marketer_name?: string;
   loss_reason?: string;
+  /** شهر الحملة (YYYY-MM) — إلزامي في النموذج لمصدر «حملة اعلانية» */
+  campaign_month?: string | null;
   category?: string;
   notes?: string;
   last_contact?: string;

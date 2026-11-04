@@ -1,4 +1,24 @@
 export const STAGES = ["قيد التواصل", "عميل جديد", "تفاوض", "تجهيز", "انتظار الدفع", "مكتملة", "تاجيل", "اعادة الاتصال في وقت اخر", "تجريبي", "كنسل التجربة", "مرفوض مع سبب", "استهداف خاطئ", "تم إرسال العرض", "غير مهتم", "غير متجاوب"] as const;
+/** المصادر التي تتطلب «شهر الحملة» في نموذج الصفقة */
+export const CAMPAIGN_SOURCES = ["حملة اعلانية"];
+const AR_MONTHS = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+/** «نوفمبر 2026» من YYYY-MM */
+export function campaignMonthLabel(ym?: string | null): string {
+  if (!ym || !/^\d{4}-\d{2}$/.test(ym)) return "";
+  return `${AR_MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`;
+}
+/** خيارات شهر الحملة: الشهر الحالي و11 شهراً قبله (بتوقيت الرياض) */
+export function campaignMonthOptions(now = new Date()): string[] {
+  const r = new Date(now.getTime() + 3 * 3600000);
+  let y = r.getUTCFullYear(), m = r.getUTCMonth() + 1;
+  const out: string[] = [];
+  for (let i = 0; i < 12; i++) {
+    out.push(`${y}-${String(m).padStart(2, "0")}`);
+    m--; if (m === 0) { m = 12; y--; }
+  }
+  return out;
+}
+
 export const SOURCES = ["حملة اعلانية", "تسويق بالعمولة", "جديد لعميل حالي", "فرع جديد لعميل حالي", "من طرف عميل", "من الدعم", "من ارقام عشوائية", "محول من الدعم", "تسجيل من الويب", "من المبيعات", "استهداف", "تجديد", "ترقية", "عميل من قائمة الطلبات", "اخرى"] as const;
 export const PLANS = ["الاساسية", "VIP", "بلس", "الكاشير", "الذهبية", "بطاقات الولاء", "البيجر", "لعبة المنيو"] as const;
 export const PRIORITIES = ["عاجل", "مرتفع", "عادي"] as const;

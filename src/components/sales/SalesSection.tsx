@@ -12,7 +12,7 @@ import { AssignTaskModal } from "@/components/tasks/AssignTaskModal";
 import { MyCallRequests } from "@/components/tasks/MyCallRequests";
 import { useAuth } from "@/lib/auth-context";
 import { useTopbarControls } from "@/components/layout/topbar-context";
-import { STAGES, SOURCES, SOURCE_COLORS, PLANS } from "@/lib/utils/constants";
+import { STAGES, SOURCES, SOURCE_COLORS, PLANS, CAMPAIGN_SOURCES, campaignMonthLabel, campaignMonthOptions } from "@/lib/utils/constants";
 
 import SalesKPIsView from "@/components/SalesKPIsView";
 import { revenueCutoff, visibleAmount } from "@/lib/revenue-visibility";
@@ -195,6 +195,7 @@ const EMPTY_FORM = {
   deal_value: 0,
   assigned_rep_name: "",
   source: "حملة اعلانية",
+  campaign_month: "",
   stage: "قيد التواصل",
   plan: "",
   deal_date: todayLocal(),
@@ -349,6 +350,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [campaignError, setCampaignError] = useState(false);
 
   /* delete confirmation */
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -1250,6 +1252,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
   function openAddModal() {
     setEditingId(null);
     setForm({ ...EMPTY_FORM, assigned_rep_name: authUser?.name || "" });
+    setCampaignError(false);
     setModalOpen(true);
   }
 
@@ -1261,6 +1264,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
       deal_value: deal.deal_value,
       assigned_rep_name: deal.assigned_rep_name || "",
       source: deal.source || "حملة اعلانية",
+      campaign_month: deal.campaign_month || "",
       stage: deal.stage,
       plan: deal.plan || "",
       deal_date: deal.deal_date || todayLocal(),
@@ -1272,11 +1276,21 @@ export function SalesSection({ salesType }: SalesPageProps) {
       callback_date: deal.callback_date ? deal.callback_date.slice(0, 16) : "",
       close_date: deal.close_date ? deal.close_date.slice(0, 10) : "",
     });
+    setCampaignError(false);
     setModalOpen(true);
   }
 
   async function handleSave() {
     if (!form.client_name.trim()) return;
+    // شهر الحملة إلزامي لمصدر «حملة اعلانية» — للصفقة الجديدة وعند التعديل
+    const needsCampaign = CAMPAIGN_SOURCES.includes(form.source);
+    if (needsCampaign && !form.campaign_month) {
+      setCampaignError(true);
+      document.getElementById("deal-campaign-month")?.focus();
+      return;
+    }
+    setCampaignError(false);
+    const campaignMonth = needsCampaign ? form.campaign_month : null;
     setSaving(true);
     try {
       const dealDate = form.deal_date;
@@ -1294,6 +1308,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
           deal_value: form.deal_value,
           assigned_rep_name: form.assigned_rep_name,
           source: form.source,
+          campaign_month: campaignMonth,
           stage: form.stage,
           plan: form.plan || undefined,
           deal_date: form.deal_date,
@@ -1319,6 +1334,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
           if ((oldDeal.assigned_rep_name || "") !== form.assigned_rep_name) changes.push(`الموكل له: ${oldDeal.assigned_rep_name || "—"} ← ${form.assigned_rep_name || "—"}`);
           if ((oldDeal.plan || "") !== (form.plan || "")) changes.push(`الباقة: ${oldDeal.plan || "—"} ← ${form.plan || "—"}`);
           if ((oldDeal.source || "") !== form.source) changes.push(`المصدر: ${oldDeal.source || "—"} ← ${form.source}`);
+          if ((oldDeal.campaign_month || "") !== (campaignMonth || "")) changes.push(`شهر الحملة: ${campaignMonthLabel(oldDeal.campaign_month) || "—"} ← ${campaignMonthLabel(campaignMonth) || "—"}`);
           if (changes.length > 0) {
             createFollowUpNote("deal", editingId, `📝 تحديث تلقائي:\n${changes.join("\n")}`, author).catch(console.error);
           }
@@ -1348,6 +1364,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
           assigned_rep_name: form.assigned_rep_name,
           added_by_name: authUser?.name || undefined,
           source: form.source,
+          campaign_month: campaignMonth,
           stage: form.stage,
           plan: form.plan || undefined,
           deal_date: form.deal_date,
@@ -2289,6 +2306,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs">
                     {deal.source || "—"}
+                    {deal.campaign_month && <span className="block text-[10px] text-cyan">{campaignMonthLabel(deal.campaign_month)}</span>}
                   </TableCell>
                   <TableCell>
                     {deal.category ? (
@@ -3496,6 +3514,28 @@ export function SalesSection({ salesType }: SalesPageProps) {
                 ))}
               </div>
             </div>
+
+            {/* شهر الحملة — إلزامي لمصدر «حملة اعلانية» */}
+            {CAMPAIGN_SOURCES.includes(form.source) && (
+              <div className="grid gap-1.5">
+                <Label htmlFor="deal-campaign-month">شهر الحملة <span className="text-red-400">*</span></Label>
+                <select
+                  id="deal-campaign-month"
+                  value={form.campaign_month}
+                  onChange={(e) => { setForm({ ...form, campaign_month: e.target.value }); if (e.target.value) setCampaignError(false); }}
+                  className={`h-9 w-full rounded-md border bg-background px-3 text-sm ${campaignError ? "border-red-500" : "border-input"}`}
+                >
+                  <option value="">اختر الشهر الذي جاء منه العميل</option>
+                  {campaignMonthOptions().map((m) => <option key={m} value={m}>{campaignMonthLabel(m)}</option>)}
+                  {form.campaign_month && !campaignMonthOptions().includes(form.campaign_month) && (
+                    <option value={form.campaign_month}>{campaignMonthLabel(form.campaign_month)}</option>
+                  )}
+                </select>
+                <p className={`text-[11px] ${campaignError ? "text-red-400" : "text-muted-foreground"}`}>
+                  {campaignError ? "حدّد شهر الحملة قبل الحفظ" : "شهر الإعلان الذي تواصل منه العميل، وليس شهر الدفع"}
+                </p>
+              </div>
+            )}
 
             {/* Marketer (shown only when source is تسويق بالعمولة) */}
             {form.source === "تسويق بالعمولة" && (
