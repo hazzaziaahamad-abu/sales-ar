@@ -37,3 +37,37 @@ export async function generateJSONWithImages<T>(prompt: string, images: InlineIm
   const jsonStr = jsonMatch ? jsonMatch[1].trim() : text.trim();
   return JSON.parse(jsonStr) as T;
 }
+
+// ─── توليد الصور (نموذج Gemini للصور) ─────────────────────────────────────────
+// نستخدم REST مباشرة لأن مكتبة @google/generative-ai ما تدعم responseModalities/imageConfig.
+
+export type ImageAspect = "1:1" | "4:5" | "9:16" | "3:4" | "16:9";
+
+/** يولّد صورة من وصف (+ صور مساعدة اختيارية: لقطة شاشة تنحط في الجوال، أو مرجع للستايل). يرجّع base64. */
+export async function generateImage(
+  prompt: string,
+  images: InlineImage[] = [],
+  aspectRatio: ImageAspect = "4:5"
+): Promise<InlineImage> {
+  const model = process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image";
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY! },
+    body: JSON.stringify({
+      contents: [{
+        role: "user",
+        parts: [{ text: prompt }, ...images.map((i) => ({ inlineData: { mimeType: i.mimeType, data: i.data } }))],
+      }],
+      generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio } },
+    }),
+  });
+  if (!res.ok) throw new Error(`image model ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  const json = await res.json();
+  const parts: { inlineData?: InlineImage; inline_data?: { mime_type: string; data: string } }[] =
+    json?.candidates?.[0]?.content?.parts ?? [];
+  for (const p of parts) {
+    if (p.inlineData?.data) return { mimeType: p.inlineData.mimeType || "image/png", data: p.inlineData.data };
+    if (p.inline_data?.data) return { mimeType: p.inline_data.mime_type || "image/png", data: p.inline_data.data };
+  }
+  throw new Error("image model returned no image");
+}

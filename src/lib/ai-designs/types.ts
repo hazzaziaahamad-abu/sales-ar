@@ -2,10 +2,14 @@
 // (الخط واللوقو والألوان مضمونة 100٪ — الذكاء ما يرسم بكسلات، يختار التخطيط ويكتب الكلام فقط).
 
 export type DesignSize = "square" | "portrait" | "story";
-export type DesignLayout = "centered" | "editorial" | "split" | "card" | "bold";
+export type DesignLayout = "photo" | "photoBottom" | "photoSplit" | "centered" | "editorial" | "split" | "card" | "bold";
+export const PHOTO_LAYOUTS: DesignLayout[] = ["photo", "photoBottom", "photoSplit"];
+export const isPhotoLayout = (l: DesignLayout) => PHOTO_LAYOUTS.includes(l);
+/** marker = شريط بنفسجي خلف السطور (ستايل بوستاتنا) · boxes = كل سطر داخل كبسولة · plain = عادي. */
+export type HeadlineStyle = "marker" | "boxes" | "plain";
 export type DesignTheme = "light" | "dark" | "purple" | "gold";
 export type DesignBackground = "dots" | "glow" | "solid" | "grid" | "rays" | "waves";
-export type BulletStyle = "checks" | "chips" | "numbers";
+export type BulletStyle = "checks" | "chips" | "numbers" | "tags";
 export type DesignDecor = "circles" | "sparkles" | "stripe" | "corners" | "ring";
 export type ImageFrame = "none" | "phone" | "photo" | "floating";
 
@@ -27,6 +31,15 @@ export interface AiDesign {
   subheadline?: string;
   bullets: string[];
   bulletStyle: BulletStyle;
+  headlineStyle: HeadlineStyle;
+  /** وصف الصورة بالإنجليزي اللي يولّدها نموذج الصور (يكتبه الذكاء ويقدر المستخدم يعدّله). */
+  photoPrompt?: string;
+  /** صورة الخلفية (data URL) — مولّدة بالذكاء أو مرفوعة. */
+  photo?: string;
+  /** موضع الصورة (object-position) وتعتيمها 0→1. */
+  photoX: number;
+  photoY: number;
+  shade: number;
   stat?: { value: string; label: string };
   cta?: string;
   showContact: boolean;
@@ -43,6 +56,9 @@ export const DESIGN_SIZE: Record<DesignSize, { w: number; h: number; label: stri
 };
 
 export const LAYOUT_LABEL: Record<DesignLayout, string> = {
+  photo: "صورة كاملة — نص فوق",
+  photoBottom: "صورة كاملة — نص تحت",
+  photoSplit: "صورة فوق + لوح تحت",
   centered: "متمركز",
   editorial: "مجلة (يمين)",
   split: "مقسوم نصين",
@@ -62,7 +78,10 @@ export const FRAME_LABEL: Record<ImageFrame, string> = {
   none: "بدون صورة", phone: "داخل جوال", photo: "صورة بإطار", floating: "عائمة",
 };
 export const BULLET_LABEL: Record<BulletStyle, string> = {
-  checks: "علامات ✓", chips: "كبسولات", numbers: "أرقام",
+  checks: "علامات ✓", chips: "كبسولات", numbers: "أرقام", tags: "مربعات بنفسجية",
+};
+export const HEADLINE_LABEL: Record<HeadlineStyle, string> = {
+  marker: "شريط خلف الكلام", boxes: "كبسولة لكل سطر", plain: "عادي",
 };
 
 const pick = <T extends string>(v: unknown, allowed: readonly T[], fallback: T): T =>
@@ -82,7 +101,7 @@ export function normalizeDesign(raw: unknown, size: DesignSize): AiDesign {
     name: str(r.name, 40) || "اقتراح",
     note: str(r.note, 300) || undefined,
     size,
-    layout: pick(r.layout, ["centered", "editorial", "split", "card", "bold"] as const, "centered"),
+    layout: pick(r.layout, ["photo", "photoBottom", "photoSplit", "centered", "editorial", "split", "card", "bold"] as const, "photo"),
     theme: pick(r.theme, ["light", "dark", "purple", "gold"] as const, "light"),
     background: pick(r.background, ["dots", "glow", "solid", "grid", "rays", "waves"] as const, "dots"),
     align: pick(r.align, ["center", "start"] as const, "center"),
@@ -93,7 +112,12 @@ export function normalizeDesign(raw: unknown, size: DesignSize): AiDesign {
     headline: str(r.headline, 120) || "منيو إلكتروني يرفع طلباتك",
     subheadline: str(r.subheadline, 200) || undefined,
     bullets: Array.isArray(r.bullets) ? r.bullets.map((b) => str(b, 80)).filter(Boolean).slice(0, 6) : [],
-    bulletStyle: pick(r.bulletStyle, ["checks", "chips", "numbers"] as const, "checks"),
+    bulletStyle: pick(r.bulletStyle, ["checks", "chips", "numbers", "tags"] as const, "checks"),
+    headlineStyle: pick(r.headlineStyle, ["marker", "boxes", "plain"] as const, "marker"),
+    photoPrompt: str(r.photoPrompt, 1200) || undefined,
+    photoX: 50,
+    photoY: 50,
+    shade: typeof r.shade === "number" ? Math.min(1, Math.max(0, r.shade)) : 0.55,
     stat: statValue ? { value: statValue, label: str(stat!.label, 40) } : undefined,
     cta: str(r.cta, 50) || undefined,
     showContact: r.showContact !== false,

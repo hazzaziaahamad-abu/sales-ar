@@ -2,10 +2,10 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import type { AiDesign, DesignTheme } from "@/lib/ai-designs/types";
-import { DESIGN_SIZE } from "@/lib/ai-designs/types";
+import { DESIGN_SIZE, isPhotoLayout } from "@/lib/ai-designs/types";
 import { FONT_LEXEND, FONT_TAJAWAL } from "../fonts";
 import {
-  Highlighted, IconCheck, IconInstagram, IconPhone, IconWhatsapp, INK, INK_2, LIGHT_BG, Logo, Ring,
+  Highlighted, IconCheck, IconInstagram, IconTiktok, IconWhatsapp, IconX, INK, INK_2, LIGHT_BG, Logo, Ring,
 } from "../templates/parts";
 
 // مرسام «صمّم من مرجع»: يحوّل المواصفة (AiDesign) لبوست بهوية قائمة الطلبات بالمقاس الحقيقي.
@@ -13,7 +13,7 @@ import {
 
 const PURPLE = "#4A2C9F";
 const GOLD = "#F5C518";
-const CONTACT = { phone: "920031843", whatsapp: "+966 59 116 6861", handle: "menuspages" };
+const CONTACT = { whatsapp: "+966 591166861", handle: "MENUSPAGES" };
 
 interface Palette {
   bg: string; fg: string; sub: string; accent: string; accent2: string;
@@ -40,7 +40,13 @@ const PALETTES: Record<DesignTheme, Palette> = {
   },
 };
 
+/** فوق الصور: نص أبيض، تمييز ذهبي، شريط بنفسجي. */
+const PHOTO_PALETTE: Palette = {
+  ...PALETTES.dark, bg: "#140D24", sub: "rgba(255,255,255,0.88)", card: "rgba(255,255,255,0.12)", cardBorder: "rgba(255,255,255,0.25)",
+};
+
 const plainLen = (t: string) => t.replace(/\[\[|\]\]/g, "").length;
+const linesOf = (t: string) => t.replace(/\\n/g, "\n").split("\n").map((l) => l.trim()).filter(Boolean);
 
 // ─── الخلفيات والزخارف ────────────────────────────────────────────────────────
 
@@ -164,6 +170,23 @@ function Eyebrow({ text, p }: { text: string; p: Palette }) {
 function Bullets({ d, p, center }: { d: AiDesign; p: Palette; center: boolean }) {
   if (!d.bullets.length) return null;
   const fs = d.size === "square" ? 34 : 38;
+  if (d.bulletStyle === "tags") {
+    return (
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 14, justifyContent: center ? "center" : "flex-start", maxWidth: 900 }}>
+        {d.bullets.map((b, i) => (
+          <span
+            key={i}
+            style={{
+              background: PURPLE, color: "#FFFFFF", borderRadius: 4, padding: "8px 24px 12px",
+              fontWeight: 500, fontSize: fs * 1.05, lineHeight: 1.25, whiteSpace: "nowrap",
+            }}
+          >
+            {b}
+          </span>
+        ))}
+      </div>
+    );
+  }
   if (d.bulletStyle === "chips") {
     return (
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16, justifyContent: center ? "center" : "flex-start" }}>
@@ -215,7 +238,28 @@ function Stat({ stat, p, big }: { stat: NonNullable<AiDesign["stat"]>; p: Palett
   );
 }
 
-function Cta({ text, p }: { text: string; p: Palette }) {
+/** الدعوة: سطر واحد = كبسولة بسهم · سطرين (\n) = كبسولتين فوق بعض (ذهبي ثم أبيض) مثل بوستاتنا. */
+function Cta({ text, p, onPhoto }: { text: string; p: Palette; onPhoto?: boolean }) {
+  const lines = linesOf(text);
+  if (lines.length > 1) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+        {lines.slice(0, 2).map((l, i) => (
+          <div
+            key={i}
+            style={{
+              background: i === 0 ? GOLD : "#FFFFFF", color: i === 0 ? "#FFFFFF" : GOLD, borderRadius: 999,
+              padding: "6px 48px 16px", fontWeight: 900, fontSize: 76, lineHeight: 1.15, whiteSpace: "nowrap",
+              border: `5px solid ${i === 0 ? GOLD : "#FFFFFF"}`, boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
+              textShadow: i === 0 ? "0 2px 0 rgba(0,0,0,0.12)" : undefined,
+            }}
+          >
+            {l}
+          </div>
+        ))}
+      </div>
+    );
+  }
   return (
     <div
       data-fit="cta"
@@ -223,27 +267,37 @@ function Cta({ text, p }: { text: string; p: Palette }) {
       style={{
         display: "inline-flex", alignItems: "center", gap: 14, background: p.ctaBg, color: p.ctaFg, borderRadius: 999,
         padding: "20px 52px 24px", fontWeight: 900, fontSize: 42, lineHeight: 1.15, whiteSpace: "nowrap",
-        boxShadow: "0 12px 30px rgba(30,20,51,0.18)",
+        boxShadow: onPhoto ? "0 12px 30px rgba(0,0,0,0.35)" : "0 12px 30px rgba(30,20,51,0.18)",
       }}
     >
-      {text}
+      {lines[0] ?? text}
       <span style={{ fontSize: 40, lineHeight: 1 }}>←</span>
     </div>
   );
 }
 
+/** التذييل بستايل بوستاتنا: واتساب يمين · أيقونات X/انستقرام/تيك توك + MENUSPAGES يسار. */
 function Contact({ p }: { p: Palette }) {
-  const item = (icon: ReactNode, text: string) => (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 10, direction: "ltr" }}>
+  const circle = (icon: ReactNode) => (
+    <span style={{ width: 46, height: 46, borderRadius: "50%", background: p.fg, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
       {icon}
-      <span style={{ fontFamily: FONT_LEXEND, fontWeight: 600, fontSize: 28 }}>{text}</span>
     </span>
   );
+  const glyph = p.fg === "#FFFFFF" ? "#111111" : "#FFFFFF";
   return (
-    <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: "14px 40px", color: p.fg }}>
-      {item(<IconPhone size={30} color={p.accent} />, CONTACT.phone)}
-      {item(<IconWhatsapp size={30} color={p.accent} />, CONTACT.whatsapp)}
-      {item(<IconInstagram size={30} color={p.accent} />, CONTACT.handle)}
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", width: "100%", color: p.fg, gap: 20 }}>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 12, direction: "ltr" }}>
+        {circle(<IconWhatsapp size={30} color={glyph} />)}
+        <span style={{ fontFamily: FONT_LEXEND, fontWeight: 700, fontSize: 40, letterSpacing: 0.5 }}>{CONTACT.whatsapp}</span>
+      </span>
+      <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-start", gap: 8, direction: "ltr" }}>
+        <span style={{ display: "inline-flex", gap: 10 }}>
+          {circle(<IconX size={24} color={glyph} />)}
+          {circle(<IconInstagram size={26} color={glyph} />)}
+          {circle(<IconTiktok size={26} color={glyph} />)}
+        </span>
+        <span style={{ fontFamily: FONT_LEXEND, fontWeight: 700, fontSize: 40, lineHeight: 1 }}>{CONTACT.handle}</span>
+      </span>
     </div>
   );
 }
@@ -287,16 +341,43 @@ function ImageBlock({ d, p }: { d: AiDesign; p: Palette }) {
   );
 }
 
-function Headline({ d, p, scale = 1 }: { d: AiDesign; p: Palette; scale?: number }) {
-  const base = d.size === "story" ? 104 : d.size === "portrait" ? 92 : 82;
-  const len = plainLen(d.headline);
-  const fit = len > 18 ? Math.max(0.58, Math.sqrt(18 / len)) : 1;
+function Headline({ d, p, scale = 1, onPhoto, center = true }: { d: AiDesign; p: Palette; scale?: number; onPhoto?: boolean; center?: boolean }) {
+  const { w } = DESIGN_SIZE[d.size];
+  const base = (d.size === "story" ? 104 : d.size === "portrait" ? 92 : 82) * scale;
+  const lines = linesOf(d.headline);
+  const longest = Math.max(1, ...lines.map(plainLen));
+  // سطور صريحة (\n): المقاس حسب أطول سطر عشان كل سطر يجي بسطر واحد · غير كذا: تصغير حسب الطول
+  const size = lines.length > 1
+    ? Math.min(base * 1.25, ((w - 170) / (longest * 0.56)))
+    : base * (plainLen(d.headline) > 18 ? Math.max(0.58, Math.sqrt(18 / plainLen(d.headline))) : 1);
+  const style = d.headlineStyle ?? "plain";
+  const bar = PURPLE;
+  const fg = style === "marker" ? "#FFFFFF" : p.fg;
+  const lineSpan = (l: string, i: number) => {
+    const deco: CSSProperties =
+      style === "marker"
+        ? { background: `linear-gradient(transparent 46%, ${bar} 46%, ${bar} 90%, transparent 90%)`, padding: "0 0.14em" }
+        : style === "boxes"
+          ? { background: onPhoto || p.fg === "#FFFFFF" ? "#FFFFFF" : PURPLE, color: onPhoto || p.fg === "#FFFFFF" ? INK : "#FFFFFF", padding: "0.02em 0.32em 0.14em", borderRadius: "0.22em" }
+          : {};
+    return (
+      <div key={i} style={{ marginTop: i && style === "boxes" ? "0.14em" : 0 }}>
+        <span style={{ ...deco, WebkitBoxDecorationBreak: "clone", boxDecorationBreak: "clone" } as CSSProperties}>
+          <Highlighted text={l} color={style === "boxes" ? PURPLE : p.accent} />
+        </span>
+      </div>
+    );
+  };
   return (
     <div
       data-fit="headline"
-      style={{ fontWeight: 900, fontSize: Math.round(base * scale * fit), lineHeight: 1.22, color: p.fg, letterSpacing: -0.5, textWrap: "balance" } as CSSProperties}
+      style={{
+        fontWeight: 900, fontSize: Math.round(size), lineHeight: style === "boxes" ? 1.3 : 1.28, color: fg, letterSpacing: -0.5,
+        textAlign: center ? "center" : "right", textShadow: onPhoto && style === "plain" ? "0 4px 24px rgba(0,0,0,0.45)" : undefined,
+        ...(lines.length > 1 ? {} : { textWrap: "balance" }),
+      } as CSSProperties}
     >
-      <Highlighted text={d.headline} color={p.accent} />
+      {lines.map(lineSpan)}
     </div>
   );
 }
@@ -337,7 +418,7 @@ function Stack({ d, p, center, pad, headScale = 1, withLogo = true }: {
         }}
       >
         {d.eyebrow && <Eyebrow text={d.eyebrow} p={p} />}
-        <Headline d={d} p={p} scale={headScale} />
+        <Headline d={d} p={p} scale={headScale} center={center} />
         <Sub d={d} p={p} />
         {d.stat && <Stat stat={d.stat} p={p} big={d.layout === "bold"} />}
         <Bullets d={d} p={p} center={center} />
@@ -369,7 +450,7 @@ function SplitLayout({ d, p, w, h }: { d: AiDesign; p: Palette; w: number; h: nu
         <div style={{ position: "relative" }}><LogoBlock p={pp} height={96} /></div>
         <div data-flow style={{ position: "relative", flex: "1 1 0", minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column", gap, justifyContent: "center", alignItems: center ? "center" : "flex-start", width: "100%" }}>
           {d.eyebrow && <Eyebrow text={d.eyebrow} p={pp} />}
-          <Headline d={d} p={pp} scale={0.92} />
+          <Headline d={d} p={pp} scale={0.92} center={center} />
           <Sub d={d} p={pp} />
         </div>
       </div>
@@ -391,13 +472,117 @@ function SplitLayout({ d, p, w, h }: { d: AiDesign; p: Palette; w: number; h: nu
   );
 }
 
+// ─── تخطيطات الصور ───────────────────────────────────────────────────────────
+
+/** صورة الخلفية + تدرّج غامق فوق/تحت حسب مكان الكلام. بدون صورة: خلفية بنفسجية داكنة مؤقتة. */
+function PhotoLayer({ d, area = "full", focus }: { d: AiDesign; area?: "full" | "top"; focus: "top" | "bottom" }) {
+  const shade = d.shade ?? 0.55;
+  const box: CSSProperties = { position: "absolute", left: 0, right: 0, top: 0, bottom: area === "top" ? undefined : 0, height: area === "top" ? "100%" : undefined };
+  return (
+    <div style={box}>
+      {d.photo ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={d.photo} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: `${d.photoX ?? 50}% ${d.photoY ?? 50}%`, display: "block" }} />
+      ) : (
+        <div style={{ position: "absolute", inset: 0, background: `radial-gradient(circle at 70% 40%, #5B3FB8 0, #2A1A55 45%, #120A22 100%)` }} />
+      )}
+      {area === "full" && (
+        <div
+          style={{
+            position: "absolute", inset: 0,
+            background: focus === "top"
+              ? `linear-gradient(180deg, rgba(14,8,28,${shade}) 0%, rgba(14,8,28,${shade * 0.55}) 34%, rgba(14,8,28,0) 55%, rgba(14,8,28,0) 72%, rgba(14,8,28,${Math.min(0.85, shade * 1.1)}) 100%)`
+              : `linear-gradient(180deg, rgba(14,8,28,${shade * 0.6}) 0%, rgba(14,8,28,0) 22%, rgba(14,8,28,0) 40%, rgba(14,8,28,${Math.min(0.92, shade * 1.25)}) 72%, rgba(14,8,28,${Math.min(0.95, shade * 1.4)}) 100%)`,
+          }}
+        />
+      )}
+      {area === "top" && (
+        <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, rgba(255,255,255,${shade * 0.5}) 0%, rgba(255,255,255,0) 30%)` }} />
+      )}
+    </div>
+  );
+}
+
+function PhotoLayout({ d, w, h }: { d: AiDesign; w: number; h: number }) {
+  const p = PHOTO_PALETTE;
+  const bottom = d.layout === "photoBottom";
+  const center = d.align === "center";
+  const pad = d.size === "square" ? 64 : 80;
+  const gap = d.size === "square" ? 22 : 30;
+  const hasFrame = !!d.image && d.imageFrame !== "none";
+  const textBlock = (
+    <div style={{ display: "flex", flexDirection: "column", gap, alignItems: center ? "center" : "flex-start", width: "100%" }}>
+      {d.eyebrow && <Eyebrow text={d.eyebrow} p={p} />}
+      <Headline d={d} p={p} onPhoto center={center} />
+      {d.subheadline && <div style={{ textShadow: "0 2px 14px rgba(0,0,0,0.5)", textAlign: center ? "center" : "right" }}><Sub d={d} p={p} /></div>}
+      {d.stat && <Stat stat={d.stat} p={p} />}
+    </div>
+  );
+  return (
+    <div style={{ position: "relative", width: w, height: h }}>
+      <PhotoLayer d={d} focus={bottom ? "bottom" : "top"} />
+      <div style={{ position: "relative", height: "100%", boxSizing: "border-box", padding: `${pad - 10}px ${pad}px ${pad - 16}px`, display: "flex", flexDirection: "column", gap }}>
+        <div style={{ alignSelf: "flex-start" }}><LogoBlock p={p} height={d.size === "square" ? 86 : 100} /></div>
+        {!bottom && textBlock}
+        <div data-flow style={{ flex: "1 1 0", minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center", gap }}>
+          {hasFrame && <ImageBlock d={d} p={p} />}
+          {bottom && textBlock}
+          <Bullets d={d} p={p} center={center} />
+        </div>
+        {d.cta && <div style={{ alignSelf: "center" }}><Cta text={d.cta} p={p} onPhoto /></div>}
+        {d.showContact && <Contact p={p} />}
+      </div>
+    </div>
+  );
+}
+
+/** صورة فوق + لوح فاتح تحت (مثل بوست «لا تشيل همـ»). */
+function PhotoSplitLayout({ d, w, h }: { d: AiDesign; w: number; h: number }) {
+  const p: Palette = { ...PALETTES.light, bg: "#ECEBF1" };
+  const photoH = Math.round(h * (d.size === "story" ? 0.6 : d.size === "portrait" ? 0.52 : 0.48));
+  const gap = d.size === "square" ? 18 : 26;
+  return (
+    <div style={{ position: "relative", width: w, height: h, background: p.bg }}>
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: photoH, overflow: "hidden" }}>
+        <PhotoLayer d={d} area="top" focus="top" />
+        <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 160, background: `linear-gradient(180deg, rgba(236,235,241,0) 0%, ${p.bg} 100%)` }} />
+      </div>
+      <div style={{ position: "absolute", top: 56, left: 0, right: 0, display: "flex", justifyContent: "center" }}>
+        <LogoBlock p={p} height={d.size === "square" ? 86 : 104} />
+      </div>
+      <div
+        style={{
+          position: "absolute", top: photoH - 40, left: 0, right: 0, bottom: 0, padding: "0 80px 56px", boxSizing: "border-box",
+          display: "flex", flexDirection: "column", alignItems: "center", gap, textAlign: "center",
+        }}
+      >
+        <div data-flow style={{ flex: "1 1 0", minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap, width: "100%" }}>
+          {d.eyebrow && <Eyebrow text={d.eyebrow} p={p} />}
+          <Headline d={d} p={p} scale={0.9} />
+          <Bullets d={d} p={p} center />
+          {d.subheadline && <Sub d={d} p={p} />}
+          {d.stat && <Stat stat={d.stat} p={p} />}
+        </div>
+        {d.cta && (
+          <div style={{ background: GOLD, color: PURPLE, padding: "14px 40px 20px", fontWeight: 900, fontSize: 46, lineHeight: 1.2, borderRadius: 4, maxWidth: "100%" }}>
+            {linesOf(d.cta).join(" ")}
+          </div>
+        )}
+        {d.showContact && <Contact p={p} />}
+      </div>
+    </div>
+  );
+}
+
 export function AiPoster({ design: d }: { design: AiDesign }) {
   const { w, h } = DESIGN_SIZE[d.size];
   const p = PALETTES[d.theme];
   const center = d.align === "center";
 
   let body: ReactNode;
-  if (d.layout === "split") {
+  if (isPhotoLayout(d.layout)) {
+    body = d.layout === "photoSplit" ? <PhotoSplitLayout d={d} w={w} h={h} /> : <PhotoLayout d={d} w={w} h={h} />;
+  } else if (d.layout === "split") {
     body = <SplitLayout d={d} p={p} w={w} h={h} />;
   } else if (d.layout === "card") {
     const cp = d.theme === "light" ? { ...PALETTES.light, bg: "#FFFFFF" } : PALETTES.light;
@@ -435,8 +620,8 @@ export function AiPoster({ design: d }: { design: AiDesign }) {
         fontFamily: FONT_TAJAWAL, lineHeight: 1.35, WebkitFontSmoothing: "antialiased", boxSizing: "border-box",
       }}
     >
-      <Background d={d} p={p} w={w} h={h} />
-      <Decor d={d} p={p} w={w} h={h} />
+      {!isPhotoLayout(d.layout) && <Background d={d} p={p} w={w} h={h} />}
+      {!isPhotoLayout(d.layout) && <Decor d={d} p={p} w={w} h={h} />}
       {body}
     </div>
   );

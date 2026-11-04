@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  BG_LABEL, BULLET_LABEL, DECOR_LABEL, DESIGN_SIZE, FRAME_LABEL, LAYOUT_LABEL, THEME_LABEL,
+  BG_LABEL, BULLET_LABEL, DECOR_LABEL, DESIGN_SIZE, FRAME_LABEL, HEADLINE_LABEL, LAYOUT_LABEL, THEME_LABEL, isPhotoLayout,
   type AiDesign, type DesignDecor, type DesignSize,
 } from "@/lib/ai-designs/types";
 import { StudioFonts } from "../preview";
@@ -31,7 +31,10 @@ const toInline = (dataUrl: string): RefImage => {
 function loadSaved(): AiDesign[] {
   try {
     const raw = localStorage.getItem(STORE_KEY);
-    return raw ? (JSON.parse(raw) as AiDesign[]) : [];
+    // تصاميم محفوظة من نسخة أقدم: نكمّل الحقول الجديدة
+    return raw
+      ? (JSON.parse(raw) as Partial<AiDesign>[]).map((d) => ({ headlineStyle: "plain", photoX: 50, photoY: 50, shade: 0.55, ...d }) as AiDesign)
+      : [];
   } catch {
     return [];
   }
@@ -159,6 +162,9 @@ export function ReferenceDesignStudio() {
   const [warnings, setWarnings] = useState<FitWarnings>({});
   const [fontsReady, setFontsReady] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [autoPhotos, setAutoPhotos] = useState(true);
+  /** معرّفات التصاميم اللي صورتها قيد التوليد. */
+  const [photoBusy, setPhotoBusy] = useState<Record<string, boolean>>({});
   const stageRef = useRef<HTMLDivElement>(null);
 
   const onFontsReady = useCallback(() => setFontsReady(true), []);
@@ -210,6 +216,64 @@ export function ReferenceDesignStudio() {
     }
   };
 
+  /** يطلب صورة خلفية من نموذج الصور ويصغّرها (WebP) عشان الحفظ والتصدير يكونون خفاف. */
+  const requestPhoto = useCallback(async (d: AiDesign): Promise<string> => {
+    const res = await fetch("/api/ai/design-photo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt: d.photoPrompt,
+        size: d.size,
+        textSide: d.layout === "photoBottom" ? "bottom" : d.layout === "photoSplit" ? "none" : "top",
+        screen: productImage ? toInline(productImage) : undefined,
+        styleRef: refs[0] ? { mimeType: refs[0].mimeType, data: refs[0].data } : undefined,
+      }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || "تعذّر توليد الصورة");
+    const blob = await (await fetch(json.image)).blob();
+    return fileToDataUrl(new File([blob], "photo", { type: blob.type }), 1600);
+  }, [productImage, refs]);
+
+  const fillPhotos = useCallback(async (designs: AiDesign[]) => {
+    const targets = designs.filter((d) => isPhotoLayout(d.layout) && d.photoPrompt && !d.photo);
+    setPhotoBusy((b) => ({ ...b, ...Object.fromEntries(targets.map((d) => [d.id, true])) }));
+    await Promise.all(targets.map(async (d) => {
+      try {
+        const photo = await requestPhoto(d);
+        setResults((all) => all.map((x) => (x.id === d.id ? { ...x, photo } : x)));
+        setDraft((cur) => (cur && cur.id === d.id && !cur.photo ? { ...cur, photo } : cur));
+      } catch (e) {
+        notify(e instanceof Error ? e.message : "تعذّر توليد الصورة", "err");
+      } finally {
+        setPhotoBusy((b) => ({ ...b, [d.id]: false }));
+      }
+    }));
+  }, [requestPhoto, notify]);
+
+  const regenPhoto = async () => {
+    if (!draft?.photoPrompt) return notify("اكتب وصف الصورة أول", "err");
+    setPhotoBusy((b) => ({ ...b, [draft.id]: true }));
+    try {
+      const photo = await requestPhoto(draft);
+      setDraft((cur) => (cur ? { ...cur, photo } : cur));
+    } catch (e) {
+      notify(e instanceof Error ? e.message : "تعذّر توليد الصورة", "err");
+    } finally {
+      setPhotoBusy((b) => ({ ...b, [draft.id]: false }));
+    }
+  };
+
+  const uploadPhoto = async (files: File[]) => {
+    if (!files[0] || !draft) return;
+    try {
+      const url = await fileToDataUrl(files[0], 1600);
+      setDraft({ ...draft, photo: url, layout: isPhotoLayout(draft.layout) ? draft.layout : "photo" });
+    } catch {
+      notify("تعذّر قراءة الصورة", "err");
+    }
+  };
+
   const generate = async () => {
     setGenerating(true);
     setError(null);
@@ -225,7 +289,9 @@ export function ReferenceDesignStudio() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "فشل التوليد");
       setAnalysis(json.analysis || "");
-      setResults((json.designs as AiDesign[]).map((d) => ({ ...d, image: productImage })));
+      const designs = (json.designs as AiDesign[]).map((d) => ({ ...d, image: productImage }));
+      setResults(designs);
+      if (autoPhotos) fillPhotos(designs);
     } catch (e) {
       setError(e instanceof Error ? e.message : "فشل التوليد");
     } finally {
@@ -248,9 +314,15 @@ export function ReferenceDesignStudio() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "فشل التعديل");
       const next = json.design as AiDesign;
-      setDraft({ ...next, id: draft.id, image: draft.image, name: next.name || draft.name });
+      const keepPhoto = next.photoPrompt === draft.photoPrompt || !next.photoPrompt;
+      setDraft({
+        ...next, id: draft.id, image: draft.image, name: next.name || draft.name,
+        photo: keepPhoto ? draft.photo : undefined, photoPrompt: next.photoPrompt || draft.photoPrompt,
+        photoX: draft.photoX, photoY: draft.photoY,
+      });
+      if (!keepPhoto) notify("الذكاء غيّر وصف الصورة — اضغط «ولّد صورة» لو تبي صورة جديدة");
+      else notify("تم التعديل", "ok");
       setInstruction("");
-      notify("تم التعديل", "ok");
     } catch (e) {
       notify(e instanceof Error ? e.message : "فشل التعديل", "err");
     } finally {
@@ -373,7 +445,7 @@ export function ReferenceDesignStudio() {
             <div className="space-y-3 rounded-xl border border-border bg-card/60 p-4">
               <h3 className="text-sm font-bold">الكلام</h3>
               <TextField label="عبارة فوق العنوان" value={draft.eyebrow ?? ""} onChange={(v) => set("eyebrow", v || undefined)} warn={warnings.eyebrow} />
-              <TextField label="العنوان" value={draft.headline} onChange={(v) => set("headline", v)} multiline hint="ميّز كلمة باللون بكتابتها بين [[ ]]" />
+              <TextField label="العنوان" value={draft.headline} onChange={(v) => set("headline", v)} multiline hint="كل سطر بسطر (Enter) · ميّز كلمة باللون بكتابتها بين [[ ]] · الكشيدة «ـــ» تمد الكلمة" />
               <TextField label="السطر الداعم" value={draft.subheadline ?? ""} onChange={(v) => set("subheadline", v || undefined)} multiline />
               <Row label="النقاط (كل سطر نقطة)">
                 <textarea
@@ -388,17 +460,54 @@ export function ReferenceDesignStudio() {
                 <TextField label="رقم بارز" value={draft.stat?.value ?? ""} onChange={(v) => set("stat", v ? { value: v, label: draft.stat?.label ?? "" } : undefined)} />
                 <TextField label="وصف الرقم" value={draft.stat?.label ?? ""} onChange={(v) => draft.stat && set("stat", { ...draft.stat, label: v })} />
               </div>
-              <TextField label="زر الدعوة (CTA)" value={draft.cta ?? ""} onChange={(v) => set("cta", v || undefined)} warn={warnings.cta} />
+              <TextField label="زر الدعوة (CTA)" value={draft.cta ?? ""} onChange={(v) => set("cta", v || undefined)} warn={warnings.cta} multiline hint="سطرين = كبسولتين كبار (ذهبي + أبيض)" />
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={draft.showContact} onChange={(e) => set("showContact", e.target.checked)} className="accent-violet-500" />
                 إظهار أرقام التواصل
               </label>
             </div>
 
+            {isPhotoLayout(draft.layout) && (
+              <div className="space-y-3 rounded-xl border border-border bg-card/60 p-4">
+                <h3 className="text-sm font-bold">صورة الخلفية</h3>
+                <TextField
+                  label="وصف الصورة (يفضّل بالإنجليزي)"
+                  value={draft.photoPrompt ?? ""}
+                  onChange={(v) => set("photoPrompt", v)}
+                  multiline
+                  hint="مثلاً: Saudi man in white thobe holding a phone showing a menu, warm restaurant, blurred background"
+                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <button onClick={regenPhoto} disabled={!!photoBusy[draft.id]} className={cn(btn, "bg-violet-600 text-white hover:bg-violet-500")}>
+                    {photoBusy[draft.id] ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    {draft.photo ? "ولّد صورة ثانية" : "ولّد الصورة"}
+                  </button>
+                  <ImagePicker onPick={uploadPhoto} label={<><ImagePlus className="h-4 w-4" /> ارفع صورتك</>} className={cn(btn, "bg-white/[0.06] hover:bg-white/[0.1]")} />
+                  {draft.photo && <button onClick={() => set("photo", undefined)} className={cn(btn, "text-rose-400 hover:bg-rose-500/10")}><Trash2 className="h-4 w-4" /></button>}
+                </div>
+                <p className="text-[11px] text-muted-foreground">لو رفعت لقطة شاشة المنيو، الذكاء يحطها على شاشة الجوال داخل الصورة.</p>
+                {draft.photo && (
+                  <div className="grid gap-2">
+                    {([["photoX", "يمين/يسار"], ["photoY", "فوق/تحت"]] as const).map(([k, l]) => (
+                      <label key={k} className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span className="w-16 shrink-0">{l}</span>
+                        <input type="range" min={0} max={100} value={draft[k]} onChange={(e) => set(k, Number(e.target.value))} className="w-full accent-violet-500" />
+                      </label>
+                    ))}
+                  </div>
+                )}
+                <label className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <span className="w-16 shrink-0">التعتيم</span>
+                  <input type="range" min={0} max={100} value={Math.round(draft.shade * 100)} onChange={(e) => set("shade", Number(e.target.value) / 100)} className="w-full accent-violet-500" />
+                </label>
+              </div>
+            )}
+
             <div className="space-y-3 rounded-xl border border-border bg-card/60 p-4">
               <h3 className="text-sm font-bold">الشكل</h3>
               <Row label="المقاس"><Chips value={draft.size} options={{ square: DESIGN_SIZE.square.label, portrait: DESIGN_SIZE.portrait.label, story: DESIGN_SIZE.story.label }} onChange={(v) => set("size", v)} /></Row>
               <Row label="التخطيط"><Chips value={draft.layout} options={LAYOUT_LABEL} onChange={(v) => set("layout", v)} /></Row>
+              <Row label="شكل العنوان"><Chips value={draft.headlineStyle} options={HEADLINE_LABEL} onChange={(v) => set("headlineStyle", v)} /></Row>
               <Row label="الثيم"><Chips value={draft.theme} options={THEME_LABEL} onChange={(v) => set("theme", v)} /></Row>
               <Row label="الخلفية"><Chips value={draft.background} options={BG_LABEL} onChange={(v) => set("background", v)} /></Row>
               <Row label="المحاذاة"><Chips value={draft.align} options={{ center: "منتصف", start: "يمين" }} onChange={(v) => set("align", v)} /></Row>
@@ -518,7 +627,7 @@ export function ReferenceDesignStudio() {
             <Chips value={size} options={{ square: DESIGN_SIZE.square.label, portrait: DESIGN_SIZE.portrait.label, story: DESIGN_SIZE.story.label }} onChange={setSize} />
           </Row>
 
-          <Row label="صورة منتج / شاشة المنيو (اختياري)">
+          <Row label="لقطة شاشة المنيو / المنتج (اختياري — تنحط على الجوال في الصورة)">
             <div className="flex items-center gap-2">
               {productImage && (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -533,6 +642,10 @@ export function ReferenceDesignStudio() {
             <Chips value={String(count) as "2" | "3" | "4"} options={{ "2": "2", "3": "3", "4": "4" }} onChange={(v) => setCount(Number(v))} />
           </Row>
 
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={autoPhotos} onChange={(e) => setAutoPhotos(e.target.checked)} className="accent-violet-500" />
+            ولّد صور فوتوغرافية بالذكاء (شخص/مطعم/جوال) للتصاميم اللي فيها صورة
+          </label>
           <button
             onClick={generate}
             disabled={generating || (!refs.length && !brief.trim())}
@@ -557,7 +670,16 @@ export function ReferenceDesignStudio() {
                   onClick={() => { setDraft(structuredClone(d)); window.scrollTo({ top: 0 }); }}
                   className="group space-y-2 rounded-2xl border border-border bg-card/60 p-3 text-right transition-colors hover:border-violet-400/60"
                 >
-                  <DesignPreview design={d} maxHeight={420} />
+                  <div className="relative">
+                    <DesignPreview design={d} maxHeight={420} />
+                    {photoBusy[d.id] && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1.5 text-xs font-semibold text-white">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" /> نصوّر المشهد…
+                        </span>
+                      </div>
+                    )}
+                  </div>
                   <div className="text-sm font-bold group-hover:text-violet-300">{d.name}</div>
                   {d.note && <div className="text-xs leading-relaxed text-muted-foreground">{d.note}</div>}
                 </button>
@@ -597,9 +719,11 @@ export function ReferenceDesignStudio() {
 
       <button
         onClick={() => setDraft({
-          id: crypto.randomUUID(), name: "تصميم يدوي", size, layout: "centered", theme: "light", background: "dots", align: "center",
-          decor: [], headline: "منيو [[إلكتروني]] يرفع طلباتك", bullets: [], bulletStyle: "checks", showContact: true,
-          imageFrame: productImage ? "phone" : "none", image: productImage, cta: "اشترك الحين", updatedAt: new Date().toISOString(),
+          id: crypto.randomUUID(), name: "تصميم يدوي", size, layout: "photo", theme: "dark", background: "solid", align: "center",
+          decor: [], headline: "منيو واضح\nعميل مرتاح\nمبيـــعات أعلى", headlineStyle: "marker", bullets: [], bulletStyle: "tags",
+          showContact: true, imageFrame: "none", image: productImage, cta: "", photoX: 50, photoY: 50, shade: 0.55,
+          photoPrompt: "Close-up of a hand holding a smartphone showing a restaurant digital menu, a QR code table stand on a wooden table, cozy modern Saudi restaurant with warm bokeh lights",
+          updatedAt: new Date().toISOString(),
         })}
         className={cn(btn, "bg-white/[0.06] hover:bg-white/[0.1]")}
       >

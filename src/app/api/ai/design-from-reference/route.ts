@@ -17,33 +17,45 @@ const SPEC = `كل تصميم كائن JSON بهذه الحقول فقط:
 {
   "name": "اسم قصير للاقتراح (2-3 كلمات)",
   "note": "سطر واحد: ايش أخذت من المرجع وايش حسّنت",
-  "layout": "centered | editorial | split | card | bold",
+  "layout": "photo | photoBottom | photoSplit | centered | editorial | split | card | bold",
   "theme": "light | dark | purple | gold",
   "background": "dots | glow | solid | grid | rays | waves",
   "align": "center | start",
-  "decor": ["circles" | "sparkles" | "stripe" | "corners" | "ring"]  (0 إلى 2 عناصر),
-  "eyebrow": "كلمة/عبارة قصيرة فوق العنوان (≤ 4 كلمات) أو فاضي",
-  "headline": "العنوان الرئيسي ≤ 9 كلمات، ميّز أهم كلمة أو كلمتين بـ [[ ]]",
-  "subheadline": "سطر داعم ≤ 18 كلمة أو فاضي",
-  "bullets": ["نقاط قصيرة ≤ 6 كلمات لكل نقطة، 0 إلى 5 نقاط"],
-  "bulletStyle": "checks | chips | numbers",
-  "stat": {"value": "رقم قصير مثل 349 أو +40% أو 24/7", "label": "وصفه بكلمتين-ثلاث"} أو null,
-  "cta": "دعوة لإجراء ≤ 4 كلمات مثل «اشترك الحين» أو فاضي",
-  "showContact": true | false,
-  "imageFrame": "none | phone | photo | floating"
+  "decor": ["circles" | "sparkles" | "stripe" | "corners" | "ring"]  (0 إلى 2 — وغالباً فاضي مع تخطيطات الصور),
+  "eyebrow": "عبارة قصيرة فوق العنوان (≤ 4 كلمات) أو فاضي",
+  "headline": "العنوان ≤ 9 كلمات. افصل السطور بـ \\n (2-3 سطور قصيرة متوازنة). ميّز كلمة بـ [[ ]] لو تبي لون مختلف",
+  "headlineStyle": "marker | boxes | plain",
+  "subheadline": "سطر داعم ≤ 16 كلمة أو فاضي",
+  "bullets": ["نقاط قصيرة ≤ 4 كلمات، 0 إلى 6"],
+  "bulletStyle": "checks | chips | numbers | tags",
+  "stat": {"value": "رقم قصير مثل 349 أو 24 أو +40%", "label": "وصفه بكلمتين"} أو null,
+  "cta": "دعوة لإجراء ≤ 5 كلمات، ولو تبيها سطرين افصل بـ \\n",
+  "showContact": true,
+  "imageFrame": "none | phone | photo | floating",
+  "shade": 0.0 إلى 1.0 (تعتيم الصورة عشان يبان الكلام الأبيض — عادة 0.45-0.7),
+  "photoPrompt": "وصف بالإنجليزي لصورة الخلفية (مشهد تصوير احترافي بدون أي كتابة) — إلزامي مع تخطيطات photo*"
 }
-معاني التخطيطات: centered = كل شي بالمنتصف · editorial = نص محاذى يمين بأسلوب مجلات · split = لوح ملوّن فوق فيه العنوان وتحته التفاصيل · card = كرت أبيض كبير فوق خلفية ملونة · bold = عنوان ضخم جداً ومختصر.
-imageFrame: phone = صورة شاشة/منيو داخل جوال · photo = صورة بإطار أبيض · floating = صورة مائلة بظل · none = بدون.`;
+التخطيطات:
+- photo = صورة فوتوغرافية تغطي البوست كامل، اللوقو فوق يمين، العنوان الأبيض الكبير فوق، والدعوة والتواصل تحت (هذا ستايلنا الأساسي).
+- photoBottom = صورة كاملة والعنوان والدعوة تحت فوق تدرّج غامق.
+- photoSplit = صورة بالجزء العلوي ولوح فاتح تحت فيه العنوان والمربعات البنفسجية والدعوة.
+- centered/editorial/split/card/bold = تصاميم جرافيك بدون صورة فوتوغرافية.
+headlineStyle: marker = شريط بنفسجي خلف نص أبيض (ستايلنا المميز) · boxes = كل سطر داخل كبسولة (ذهبي/أبيض) · plain = نص عادي.
+bulletStyle tags = مربعات بنفسجية بنص أبيض جنب بعض (مثل: تعديل المنتجات · إضافة العروض · السعرات).
+photoPrompt: اكتب مشهد واقعي محدد يخدم الرسالة، مثل: "A smiling young Saudi man in a white thobe and red shemagh holding a smartphone toward the camera, the phone screen facing the viewer, inside a warm modern Saudi restaurant, blurred background" أو "Close-up of a hand holding a phone above a wooden restaurant table, a QR code table stand beside it, cozy cafe bokeh". لو فيه لقطة شاشة منيو مرفوعة اذكر إن الجوال يعرض الشاشة.`;
 
 const GENERATE_PROMPT = `أنت مدير فني (Art Director) وكاتب إعلانات سعودي محترف لبراند سوشال ميديا.
 ${BRAND}
 
-المطلوب: المستخدم أرفق تصميماً مرجعياً أعجبه (من أي براند). حلّله: التخطيط، ترتيب الأهمية، الإحساس (جريء/هادئ/فاخر/مرح)، استخدام الألوان، الزخارف، وكمية النص.
+ستايل بوستاتنا الحالية (التزم فيه إلا لو المرجع يطلب غيره): صورة فوتوغرافية واقعية كاملة (شخص سعودي بالثوب والشماغ يمسك جوال فيه منيو، أو جوال بيد على طاولة مطعم مع باركود)، اللوقو فوق يمين، عنوان أبيض عريض جداً 2-3 سطور بشريط بنفسجي خلف الكلام، وأحياناً كبسولات ذهبية للدعوة، وتحت: أيقونات X/انستقرام/تيك توك + MENUSPAGES يسار ورقم الواتساب يمين. نستخدم الكشيدة (ـــ) أحياناً عشان تتوازن السطور مثل «علـــشان» و«مبيـــعات» — استخدمها بخفة.
+
+المطلوب: المستخدم أرفق تصميماً مرجعياً أعجبه (من أي براند أو من بوستاتنا). حلّله: التخطيط، ترتيب الأهمية، الإحساس (جريء/هادئ/فاخر/مرح)، استخدام الألوان، الزخارف، وكمية النص.
 ثم صمّم {count} اقتراحات **مستوحاة منه لكن أفضل** وبهويتنا نحن:
 - خذ روح المرجع وتركيبته، لا تنسخ كلامه ولا اسم براندهم.
 - أفضل = تسلسل بصري أوضح، عنوان أقصر وأقوى، نص أقل، ودعوة واضحة للإجراء.
 - الاقتراح الأول الأقرب للمرجع، والباقي تنويعات مختلفة فعلاً (تخطيط/ثيم/خلفية مختلفة).
 - اكتب الكلام عن موضوع المستخدم. لو ما حدد موضوع، كيّف رسالة المرجع لمنتجنا.
+- لو المرجع فيه صورة فوتوغرافية (أشخاص/مطعم/جهاز) استخدم تخطيطات photo* واكتب photoPrompt دقيق يشبه مشهد المرجع لكن بسياقنا (مطاعم وكوفيهات سعودية + منيو إلكتروني).
 - المقاس: {size}. في المربع خفّف النقاط (≤ 3) والنص.
 - {image_rule}
 
@@ -89,16 +101,16 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const size: DesignSize = ["square", "portrait", "story"].includes(body.size) ? body.size : "portrait";
     const imageRule = body.hasProductImage
-      ? "المستخدم رفع صورة منتج/شاشة — استخدم imageFrame غير none في أغلب الاقتراحات."
-      : "ما فيه صورة منتج — خلّ imageFrame = none.";
+      ? "المستخدم رفع لقطة شاشة منيو/منتج — مع تخطيطات photo* اجعل الجوال في المشهد يعرضها (اذكر ذلك في photoPrompt) و imageFrame = none، ومع تخطيطات الجرافيك استخدم imageFrame = phone."
+        : "ما فيه لقطة شاشة — خلّ imageFrame = none.";
     const brief = String(body.brief || "").slice(0, 1500) || "(ما حدد — استوحِ الرسالة من المرجع وكيّفها لقائمة الطلبات)";
 
     // ─── تعديل تصميم حالي ───
     if (body.mode === "refine") {
       const instruction = String(body.instruction || "").trim().slice(0, 800);
       if (!instruction || !body.current) return NextResponse.json({ error: "اكتب التعديل المطلوب" }, { status: 400 });
-      const { image: _img, id: _id, updatedAt: _u, ...current } = body.current as Record<string, unknown>;
-      void _img; void _id; void _u;
+      const { image: _img, photo: _ph, id: _id, updatedAt: _u, ...current } = body.current as Record<string, unknown>;
+      void _img; void _ph; void _id; void _u;
       const prompt = REFINE_PROMPT
         .replace("{current}", JSON.stringify(current, null, 2).slice(0, 6000))
         .replace("{instruction}", instruction)
