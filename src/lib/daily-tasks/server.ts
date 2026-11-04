@@ -17,7 +17,7 @@ export interface DailyAccess {
   viewingAs: boolean;
 }
 
-/** المستخدم + المنشأة. ?as= مسموح للسوبر أدمن فقط وللقراءة. */
+/** المستخدم + المنشأة. ?as= للقراءة فقط: السوبر أدمن ومدراء المتابعة اليومية، لموظف من نفس المنشأة. */
 export async function getDailyAccess(asUserId?: string | null): Promise<DailyAccess | null> {
   const user = await getAuthUser();
   if (!user) return null;
@@ -25,14 +25,18 @@ export async function getDailyAccess(asUserId?: string | null): Promise<DailyAcc
   if (!profile?.org_id) return null;
   const isSuper = await isSuperAdmin(user.id);
   const isManager = isSuper || (await isHuddleManager(user.id, profile.org_id));
-  if (asUserId && isSuper && asUserId !== user.id) {
+  if (asUserId && isManager && asUserId !== user.id) {
     const other = await getChallengeProfile(asUserId);
-    if (other?.org_id) {
+    if (other?.org_id && (isSuper || other.org_id === profile.org_id)) {
       return { userId: other.id, name: other.name ?? "", orgId: other.org_id, isManager: false, isSuper: false, viewingAs: true };
     }
   }
   return { userId: user.id, name: profile.name ?? "", orgId: profile.org_id, isManager, isSuper, viewingAs: false };
 }
+
+/** ملاحظة المدير على يوم موظف — في sales_guide_settings (نفس نمط المتابعة اليومية). */
+export const reviewKey = (date: string, userId: string) => `daily_review:${date}:${userId}`;
+export interface DailyReview { note: string; by_name: string; at: string }
 
 export async function loadSettings(orgId: string): Promise<DailySettings> {
   const { data } = await supabaseAdmin

@@ -23,6 +23,7 @@ export interface DailyState {
   mtd: Partial<Record<Department, { dept: number; mine: number }>>;
   prospectToday: number;
   meetingsToday: PlanActivity[];
+  review: { note: string; by_name: string; at: string } | null;
 }
 
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
@@ -58,8 +59,10 @@ async function latestNotes(entityType: "deal" | "renewal", ids: string[]) {
   return out;
 }
 
-/** يبني طابور المراجعة للموظف من الصفقات والتجديدات المسندة له. */
-export async function loadQueue(state: DailyState): Promise<QueueItem[]> {
+/** يبني طابور المراجعة للموظف من الصفقات والتجديدات المسندة له.
+ *  all = كل المفتوح المسند له (للمدير)، وليس المستحق اليوم فقط. */
+export async function loadQueue(state: DailyState, opts?: { all?: boolean }): Promise<QueueItem[]> {
+  const all = !!opts?.all;
   const name = state.me.name.trim();
   const speed = state.settings.speed;
   const items: QueueItem[] = [];
@@ -74,7 +77,7 @@ export async function loadQueue(state: DailyState): Promise<QueueItem[]> {
       const cbFuture = cb !== null && cb > eod;
       const stale = u.staleDays >= STALE_DAYS;
       // موعد محدد في المستقبل = ليست مستحقة اليوم حتى لو قديمة
-      if (!(cbDue || (stale && !cbFuture))) continue;
+      if (!all && !(cbDue || (stale && !cbFuture))) continue;
       const lateDays = cbDue ? Math.max(0, Math.floor((Date.now() - cb!) / DAY)) : u.staleDays;
       const ageDays = daysSince(d.created_at);
       items.push({
@@ -89,14 +92,14 @@ export async function loadQueue(state: DailyState): Promise<QueueItem[]> {
 
   if (state.departments.includes("renewals")) {
     const member = (state.settings.members.renewals ?? []).find((m: DeptMember) => m.user_id === state.me.id);
-    const all = await fetchRenewals();
+    const renewals = await fetchRenewals();
     const today = riyadhDate();
     const windowEnd = new Date(Date.now() + RENEWAL_WINDOW_DAYS * DAY).toISOString().slice(0, 10);
-    const mine = all.filter((r) =>
+    const mine = renewals.filter((r) =>
       (r.assigned_rep || "").trim() === name &&
       OPEN_RENEWAL_STATUSES.includes(r.status) &&
       (!member?.sales_type || (r.sales_type ?? "support") === member.sales_type) &&
-      ((r.renewal_date && r.renewal_date <= windowEnd) || r.status === "انتظار الدفع" || r.status === "جاري المتابعة"),
+      (all || (r.renewal_date && r.renewal_date <= windowEnd) || r.status === "انتظار الدفع" || r.status === "جاري المتابعة"),
     );
     const notes = await latestNotes("renewal", mine.map((r) => r.id));
     for (const r of mine) {
@@ -104,7 +107,7 @@ export async function loadQueue(state: DailyState): Promise<QueueItem[]> {
       const lastTouch = [n?.created_at, r.updated_at].filter(Boolean).sort().pop();
       const overdue = r.renewal_date && r.renewal_date < today ? daysSince(`${r.renewal_date}T00:00:00+03:00`) : 0;
       // متابعة سجّلها الموظف اليوم ولها موعد قادم = ليست مستحقة
-      if (r.status !== "انتظار الدفع" && daysSince(lastTouch) === 0 && r.renewal_date > today) continue;
+      if (!all && r.status !== "انتظار الدفع" && daysSince(lastTouch) === 0 && r.renewal_date > today) continue;
       const ageDays = daysSince(r.created_at);
       items.push({
         key: `renewal:${r.id}`, entityType: "renewal", id: r.id, department: "renewals",

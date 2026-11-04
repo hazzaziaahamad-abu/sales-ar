@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendPushToUser } from "@/lib/push";
-import { getDailyAccess, loadSettings, loadBaselines, managerIds, prospectCountToday } from "@/lib/daily-tasks/server";
+import { getDailyAccess, loadSettings, loadBaselines, managerIds, prospectCountToday, reviewKey, saveSetting, type DailyReview } from "@/lib/daily-tasks/server";
 import {
   OUTCOMES, countOutcomes, departmentsOf, minutesBetween, monthWorkdays, riyadhDate, riyadhPeriod,
   type DailyPlan, type DailyReport, type Department, type ExtraTask, type PlanActivity, type PlanPriority,
@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
 
   const dayStart = new Date(`${date}T00:00:00+03:00`).toISOString();
   const dayEnd = new Date(`${date}T23:59:59+03:00`).toISOString();
-  const [plan, activities, targetsRes, baselines, prospectToday, meetingsRes] = await Promise.all([
+  const [plan, activities, targetsRes, baselines, prospectToday, meetingsRes, reviewRes] = await Promise.all([
     todayPlan(access.orgId, access.userId, date),
     todayActivities(access.orgId, access.userId, date),
     supabaseAdmin.from("dept_targets").select("department, user_id, metric, min_value, target_value, stretch_value, share_pct, method, approved_at")
@@ -48,6 +48,8 @@ export async function GET(req: NextRequest) {
     supabaseAdmin.from("sales_activities").select(ACT_COLS)
       .eq("org_id", access.orgId).eq("user_id", access.userId).eq("outcome", "meeting_booked")
       .gte("next_action_at", dayStart).lte("next_action_at", dayEnd).order("next_action_at").limit(50),
+    supabaseAdmin.from("sales_guide_settings").select("setting_value")
+      .eq("org_id", access.orgId).eq("setting_key", reviewKey(date, access.userId)).maybeSingle(),
   ]);
 
   const targets = (targetsRes.data ?? []).filter((t) => departments.includes(t.department as Department) && (t.user_id === null || t.user_id === access.userId));
@@ -62,6 +64,7 @@ export async function GET(req: NextRequest) {
     settings: { queueCap: settings.queueCap, speed: settings.speed, activity: settings.activity, members: settings.members },
     departments, plan, activities, targets, mtd, prospectToday,
     meetingsToday: meetingsRes.data ?? [],
+    review: (reviewRes.data?.setting_value as DailyReview | null) ?? null,
   });
 }
 
@@ -72,6 +75,20 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const date = riyadhDate();
   const now = new Date().toISOString();
+
+  // ملاحظة المدير على يوم موظف (للمدير فقط) — تظهر للموظف في شريطه
+  if (body.action === "review") {
+    if (!access.isManager) return NextResponse.json({ error: "للمدير فقط" }, { status: 403 });
+    const target = await getDailyAccess(typeof body.user_id === "string" ? body.user_id : null);
+    if (!target?.viewingAs) return NextResponse.json({ error: "الموظف غير موجود" }, { status: 400 });
+    const note = typeof body.note === "string" ? body.note.trim().slice(0, 1000) : "";
+    const value: DailyReview | null = note ? { note, by_name: access.name, at: now } : null;
+    await saveSetting(access.orgId, reviewKey(date, target.userId), value);
+    if (note) {
+      await sendPushToUser(target.userId, { title: "ملاحظة من المدير على مهام اليوم", body: note.slice(0, 140), url: "/sales", tag: `daily-review-${target.userId}-${date}` }).catch(() => 0);
+    }
+    return NextResponse.json({ review: value });
+  }
 
   if (body.action === "start") {
     const settings = await loadSettings(access.orgId);

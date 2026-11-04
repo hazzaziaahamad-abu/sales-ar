@@ -27,7 +27,8 @@ const toLocalInput = (iso: string) => {
 const fromLocalInput = (v: string) => new Date(`${v}:00+03:00`).toISOString();
 const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("ar-SA", { timeZone: "Asia/Riyadh", hour: "numeric", minute: "2-digit" });
 
-export function DailyTasksBar({ department }: { department: Department }) {
+/** viewAsUserId = المدير يراجع شاشة موظف (للعرض فقط، داخل مركز مهام اليوم). */
+export function DailyTasksBar({ department, viewAsUserId }: { department?: Department; viewAsUserId?: string }) {
   const { user, activeOrgId, isImpersonating } = useAuth();
   const [state, setState] = useState<DailyState | null>(null);
   const [queue, setQueue] = useState<QueueItem[] | null>(null);
@@ -46,8 +47,13 @@ export function DailyTasksBar({ department }: { department: Department }) {
   const [finishing, setFinishing] = useState(false);
   const [reason, setReason] = useState("");
   const [blocker, setBlocker] = useState("");
+  const viewing = !!viewAsUserId;
+  /** المدير: «كل المسند له» بدل المستحق اليوم فقط */
+  const [showAll, setShowAll] = useState(false);
+  const [reviewDraft, setReviewDraft] = useState("");
+  const [reviewMsg, setReviewMsg] = useState<string | null>(null);
 
-  const collapseKey = user ? `daily_tasks_collapsed_${user.id}` : null;
+  const collapseKey = user && !viewing ? `daily_tasks_collapsed_${user.id}` : null;
   useEffect(() => {
     if (!collapseKey) return;
     try { setCollapsed(localStorage.getItem(collapseKey) === "1"); } catch { /* تخزين المتصفح غير متاح */ }
@@ -57,18 +63,19 @@ export function DailyTasksBar({ department }: { department: Department }) {
     try { if (collapseKey) localStorage.setItem(collapseKey, v ? "1" : "0"); } catch { /* تجاهل */ }
   };
 
-  const readOnly = isImpersonating;
+  const readOnly = isImpersonating || viewing;
   const load = useCallback(async () => {
     if (!user) return;
     try {
-      const s = await fetchDailyState(isImpersonating ? user.id : null);
+      const s = await fetchDailyState(viewAsUserId ?? (isImpersonating ? user.id : null));
       setState(s);
+      setReviewDraft(s.review?.note ?? "");
       setError(null);
-      if (s.departments.length && s.orgId === activeOrgId) setQueue(await loadQueue(s));
+      if (s.departments.length && s.orgId === activeOrgId) setQueue(await loadQueue(s, { all: showAll }));
     } catch (e) {
       setError(e instanceof Error ? e.message : "تعذّر التحميل");
     }
-  }, [user, isImpersonating, activeOrgId]);
+  }, [user, isImpersonating, activeOrgId, viewAsUserId, showAll]);
   useEffect(() => { load(); }, [load]);
 
   const plan = state?.plan ?? null;
@@ -86,16 +93,18 @@ export function DailyTasksBar({ department }: { department: Department }) {
     if (!queue) return [];
     // القسم الحالي أولاً لمن يعمل في قسمين
     const q = sortQueue(queue, priorityKeys);
+    if (!department) return q;
     return [...q.filter((i) => i.department === department), ...q.filter((i) => i.department !== department)];
   }, [queue, priorityKeys, department]);
   const pending = ordered.filter((i) => !doneMap.has(i.key));
   const done = ordered.filter((i) => doneMap.has(i.key));
-  const cap = state?.settings.queueCap ?? 40;
+  const cap = showAll ? 500 : state?.settings.queueCap ?? 40;
   const shown = pending.slice(0, cap);
   const waiting = Math.max(0, pending.length - cap);
 
-  if (!user || !state || state.orgId !== activeOrgId) return null;
-  if (!state.departments.length) return null;
+  if (viewing && error && !state) return <p className="text-sm text-red-400">{error}</p>;
+  if (!user || !state || state.orgId !== activeOrgId) return viewing ? <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> تحميل…</div> : null;
+  if (!state.departments.length) return viewing ? <p className="text-sm text-muted-foreground">هذا الموظف ليس ضمن توزيع الأقسام.</p> : null;
 
   const me = state.me;
   const depts = state.departments;
@@ -236,7 +245,7 @@ export function DailyTasksBar({ department }: { department: Department }) {
   const profileHref = (item: QueueItem) => `${DEPT_PAGE[item.department]}?profile=${encodeURIComponent(item.phone || item.name)}`;
 
   // ─── الشريط المطوي ───
-  if (collapsed) {
+  if (collapsed && !viewing) {
     return (
       <button type="button" onClick={() => toggleCollapse(false)}
         className="flex w-full items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-2.5 text-right hover:border-cyan/40">
@@ -255,50 +264,46 @@ export function DailyTasksBar({ department }: { department: Department }) {
 
   const header = (
     <div className="flex items-center justify-between gap-2">
-      <span className="flex items-center gap-2 font-extrabold"><ClipboardList className="h-4 w-4 text-cyan" /> مهام اليوم
+      <span className="flex items-center gap-2 font-extrabold"><ClipboardList className="h-4 w-4 text-cyan" /> مهام اليوم{viewing ? ` · ${me.name}` : ""}
         {readOnly && <span className="rounded bg-amber-500/15 px-1.5 text-[11px] text-amber-400">عرض فقط</span>}</span>
       <span className="flex items-center gap-1">
+        {viewing && (
+          <span className="flex rounded-lg bg-muted p-0.5 text-[11px] font-bold">
+            <button type="button" onClick={() => { if (showAll) { setShowAll(false); setQueue(null); } }} className={`rounded-md px-2 py-0.5 ${!showAll ? "bg-card" : "text-muted-foreground"}`}>المستحق اليوم</button>
+            <button type="button" onClick={() => { if (!showAll) { setShowAll(true); setQueue(null); } }} className={`rounded-md px-2 py-0.5 ${showAll ? "bg-card" : "text-muted-foreground"}`}>كل المسند له</button>
+          </span>
+        )}
         <button type="button" onClick={() => { setQueue(null); load(); }} className="rounded-md p-1.5 text-muted-foreground hover:text-foreground" title="تحديث"><RefreshCw className="h-3.5 w-3.5" /></button>
-        <button type="button" onClick={() => toggleCollapse(true)} className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:text-foreground">طيّ <ChevronUp className="h-3.5 w-3.5" /></button>
+        {!viewing && <button type="button" onClick={() => toggleCollapse(true)} className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:text-foreground">طيّ <ChevronUp className="h-3.5 w-3.5" /></button>}
       </span>
     </div>
   );
-
-  // ─── قبل البدء ───
-  if (!plan) {
-    return (
-      <section className="rounded-2xl border border-border bg-card/40 p-3 sm:p-4 space-y-3">
-        {header}
-        <div className="flex flex-col items-center gap-2 rounded-xl border border-border bg-card px-4 py-4 text-center">
-          <div className="text-base font-extrabold">أهلاً {me.name}</div>
-          <div className="flex flex-wrap justify-center gap-x-4 text-sm text-muted-foreground">
-            <span><b className="text-foreground">{queue ? n(pending.length) : "…"}</b> مستحقة</span>
-            <span><b className="text-foreground">{n(booked)}</b> اجتماع اليوم</span>
-            {prospectTarget > 0 && <span><b className="text-foreground">{n(prospectTarget)}</b> استهداف</span>}
-          </div>
-          <button type="button" onClick={start} disabled={busy || readOnly || !queue}
-            className="mt-1 w-full max-w-sm rounded-xl bg-cyan py-2.5 text-sm font-extrabold text-[#07090F] disabled:opacity-50">
-            {busy ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : "ابدأ مهام اليوم"}
-          </button>
-        </div>
-        {goalBlock}
-        {error && <p className="text-xs text-red-400">{error}</p>}
-      </section>
-    );
-  }
-
-  // ─── بعد الإنهاء ───
-  if (plan.finished_at && plan.report) {
-    return (
-      <section className="rounded-2xl border border-border bg-card/40 p-3 sm:p-4 space-y-3">
-        {header}
-        <DailyReportView plan={plan} />
-      </section>
-    );
-  }
-
-  const tabs: [typeof tab, string][] = [["queue", "الطابور"], ...(prospectTarget > 0 ? [["prospect", "الاستهداف"] as [typeof tab, string]] : []), ["meetings", "الاجتماعات"]];
-  const extras = plan.extra_tasks ?? [];
+  const saveReview = async () => {
+    setReviewMsg(null);
+    try {
+      const r = await postDaily<{ review: DailyState["review"] }>({ action: "review", user_id: viewAsUserId, note: reviewDraft });
+      setState((s) => (s ? { ...s, review: r.review } : s));
+      setReviewMsg(r.review ? "حُفظت الملاحظة ووصل إشعار للموظف" : "حُذفت الملاحظة");
+    } catch (e) { setReviewMsg(e instanceof Error ? e.message : "تعذّر الحفظ"); }
+  };
+  const reviewEditor = viewing && (
+    <div className="space-y-1.5 rounded-xl border border-violet-500/30 bg-violet-500/5 p-3">
+      <label htmlFor="daily-review" className="text-xs font-bold text-violet-300">ملاحظتك على يوم {me.name} (تظهر له أعلى مهام اليوم)</label>
+      <textarea id="daily-review" value={reviewDraft} onChange={(e) => setReviewDraft(e.target.value)} rows={2}
+        placeholder="مثال: ابدأ بعملاء انتظار الدفع قبل الاستهداف، ورقم ورق عنب يحتاج اتصال اليوم"
+        className="w-full rounded-lg border border-border bg-card px-2.5 py-1.5 text-sm" />
+      <div className="flex items-center gap-2">
+        <button type="button" onClick={saveReview} className="rounded-lg bg-violet-500 px-3 py-1 text-xs font-bold text-white">حفظ الملاحظة</button>
+        {reviewMsg && <span className="text-xs text-muted-foreground">{reviewMsg}</span>}
+      </div>
+    </div>
+  );
+  const reviewNote = viewing ? reviewEditor : state.review && (
+    <div className="rounded-xl border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-sm">
+      <div className="text-[11px] font-bold text-violet-300">ملاحظة {state.review.by_name} على يومك</div>
+      <div className="whitespace-pre-wrap">{state.review.note}</div>
+    </div>
+  );
 
   const itemRow = (item: QueueItem) => {
     const isDone = doneMap.has(item.key);
@@ -371,10 +376,61 @@ export function DailyTasksBar({ department }: { department: Department }) {
       </div>
     );
   };
+  /** للمدير: القائمة كاملة حتى لو الموظف ما بدأ أو أنهى */
+  const viewList = viewing && (
+    <div className="space-y-2">
+      <div className="text-xs font-bold">{showAll ? `كل المسند له (${n(ordered.length)})` : `المستحق اليوم (${n(pending.length)})`} · أُنجز اليوم {n(done.length)}</div>
+      {!queue && <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" /> تحميل…</div>}
+      <div className="grid gap-2 md:grid-cols-2">{[...done, ...pending].slice(0, cap).map(itemRow)}</div>
+    </div>
+  );
+
+  // ─── قبل البدء ───
+  if (!plan) {
+    return (
+      <section className="rounded-2xl border border-border bg-card/40 p-3 sm:p-4 space-y-3">
+        {header}
+        <div className="flex flex-col items-center gap-2 rounded-xl border border-border bg-card px-4 py-4 text-center">
+          <div className="text-base font-extrabold">{viewing ? `${me.name} لم يبدأ مهام اليوم بعد` : `أهلاً ${me.name}`}</div>
+          <div className="flex flex-wrap justify-center gap-x-4 text-sm text-muted-foreground">
+            <span><b className="text-foreground">{queue ? n(pending.length) : "…"}</b> مستحقة</span>
+            <span><b className="text-foreground">{n(booked)}</b> اجتماع اليوم</span>
+            {prospectTarget > 0 && <span><b className="text-foreground">{n(prospectTarget)}</b> استهداف</span>}
+          </div>
+          {!viewing && <button type="button" onClick={start} disabled={busy || readOnly || !queue}
+            className="mt-1 w-full max-w-sm rounded-xl bg-cyan py-2.5 text-sm font-extrabold text-[#07090F] disabled:opacity-50">
+            {busy ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : "ابدأ مهام اليوم"}
+          </button>}
+        </div>
+        {reviewNote}
+        {goalBlock}
+        {viewList}
+        {error && <p className="text-xs text-red-400">{error}</p>}
+      </section>
+    );
+  }
+
+  // ─── بعد الإنهاء ───
+  if (plan.finished_at && plan.report) {
+    return (
+      <section className="rounded-2xl border border-border bg-card/40 p-3 sm:p-4 space-y-3">
+        {header}
+        {reviewNote}
+        <DailyReportView plan={plan} />
+        {viewList}
+      </section>
+    );
+  }
+
+  const tabs: [typeof tab, string][] = [["queue", "الطابور"], ...(prospectTarget > 0 ? [["prospect", "الاستهداف"] as [typeof tab, string]] : []), ["meetings", "الاجتماعات"]];
+  const extras = plan.extra_tasks ?? [];
+
+
 
   return (
     <section className="rounded-2xl border border-border bg-card/40 p-3 sm:p-4 space-y-3">
       {header}
+      {reviewNote}
       {goalBlock}
 
       <div className="grid grid-cols-3 gap-2">

@@ -8,6 +8,7 @@ import {
   type DailyPlan, type DailySettings, type Department, type DeptBaseline, type DeptMember, type DeptTargetRow, type TargetMethod,
 } from "@/lib/daily-tasks/shared";
 import { DailyReportView } from "./daily-report";
+import { DailyTasksBar } from "./daily-tasks-bar";
 
 interface SettingsData {
   period: string;
@@ -104,8 +105,11 @@ function Reports({ data, date, onDate }: { data: SettingsData; date: string; onD
     return [...m.entries()];
   }, [data.settings.members]);
   const byUser = new Map(data.plans.map((p) => [p.user_id, p]));
+  const [open, setOpen] = useState<string | null>(null);
+  const today = date === data.date;
   return (
     <div className="space-y-3">
+      <p className="text-xs text-muted-foreground">اضغط على اسم الموظف لترى شاشته كما يراها هو: المستحق عليه اليوم وكل ما هو مسند له، وتكتب له ملاحظة.</p>
       <label className="flex items-center gap-2 text-sm text-muted-foreground">اليوم
         <input type="date" value={date} onChange={(e) => e.target.value && onDate(e.target.value)} className="rounded-lg border border-border bg-muted px-2 py-1 text-sm text-foreground" />
       </label>
@@ -119,8 +123,10 @@ function Reports({ data, date, onDate }: { data: SettingsData; date: string; onD
               const p = byUser.get(id);
               const r = p?.report;
               return (
-                <tr key={id} className="border-t border-border text-center">
-                  <td className="px-3 py-2 text-right font-bold">{name}</td>
+                <tr key={id} className={`border-t border-border text-center ${open === id ? "bg-cyan-dim/30" : ""}`}>
+                  <td className="px-3 py-2 text-right font-bold">
+                    <button type="button" onClick={() => setOpen(open === id ? null : id)} className="text-cyan underline-offset-2 hover:underline">{name} ‹</button>
+                  </td>
                   <td className={`px-3 py-2 ${!p ? "text-red-400" : p.finished_at ? "text-emerald-400" : "text-cyan"}`}>{!p ? "لم يبدأ" : p.finished_at ? "أنهى" : "يعمل"}</td>
                   <td className="px-3 py-2 font-mono text-xs">{p ? new Date(p.started_at).toLocaleTimeString("ar-SA", { timeZone: "Asia/Riyadh", hour: "numeric", minute: "2-digit" }) : "—"}</td>
                   <td className="px-3 py-2 font-mono text-xs">{r ? `${n(r.queue_done)}/${n(r.queue_total)}` : "—"}</td>
@@ -132,6 +138,11 @@ function Reports({ data, date, onDate }: { data: SettingsData; date: string; onD
           </tbody>
         </table>
       </div>
+      {open && (
+        today
+          ? <DailyTasksBar key={open} viewAsUserId={open} />
+          : <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">عرض شاشة الموظف متاح لليوم الحالي فقط. تقرير اليوم المختار تحت.</p>
+      )}
       <div className="grid gap-3 md:grid-cols-2">
         {data.plans.filter((p) => p.report).map((p) => <DailyReportView key={p.id} plan={p} showName />)}
       </div>
