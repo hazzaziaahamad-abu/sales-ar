@@ -148,16 +148,19 @@ function Goals({ data, dept, onSave }: { data: SettingsData; dept: Department; o
   const [method, setMethod] = useState<TargetMethod>(existing?.method ?? "history");
   const [growth, setGrowth] = useState(10);
   const [rates, setRates] = useState<number[]>(b.pipeline.map((r) => r[2]));
-  const [manual, setManual] = useState({ min: existing?.min_value ?? 0, target: existing?.target_value ?? 0, stretch: existing?.stretch_value ?? 0 });
+  // اليدوي يبدأ من المعتمد، وإلا من مقترح الأداء السابق — لا يبدأ من صفر
+  const [manual, setManual] = useState(() => {
+    if (existing) return { min: existing.min_value ?? 0, target: existing.target_value, stretch: existing.stretch_value ?? existing.target_value };
+    const h = suggestFromHistory(b, 10);
+    return { min: h.min, target: h.target, stretch: h.stretch };
+  });
   const [shares, setShares] = useState<Record<string, number>>(() => {
     const out: Record<string, number> = {};
     const saved = data.targets.filter((t) => t.department === dept && t.user_id);
     if (saved.length) for (const t of saved) out[t.user_id!] = Number(t.share_pct) || 0;
     else {
-      // مقترح: حسب مساهمة كل موظف في آخر شهر، وإلا بالتساوي
-      const base = members.map((m) => b.mtdByRep[m.name] ?? 0);
-      const sum = base.reduce((a, c) => a + c, 0);
-      members.forEach((m, i) => { out[m.user_id] = sum ? Math.round((base[i] / sum) * 100) : Math.floor(100 / Math.max(1, members.length)); });
+      // افتراضياً بالتساوي — المدير يعدّل النسب
+      members.forEach((m) => { out[m.user_id] = Math.floor(100 / Math.max(1, members.length)); });
       const diff = 100 - Object.values(out).reduce((a, c) => a + c, 0);
       if (members[0]) out[members[0].user_id] += diff;
     }
@@ -168,6 +171,11 @@ function Goals({ data, dept, onSave }: { data: SettingsData; dept: Department; o
   const pipe = suggestFromPipeline(b, rates);
   const s = method === "history" ? hist : method === "pipeline" ? pipe : manual;
   const ratio = hist.avg ? pipe.target / hist.avg : 0;
+  /** ينتقل لليدوي ويبدأ من الأرقام الظاهرة الآن */
+  const editManually = () => {
+    if (method !== "manual") setManual({ min: s.min, target: s.target, stretch: s.stretch });
+    setMethod("manual");
+  };
   const totalShare = Object.values(shares).reduce((a, c) => a + (Number(c) || 0), 0);
 
   const approve = () => onSave({
@@ -189,7 +197,7 @@ function Goals({ data, dept, onSave }: { data: SettingsData; dept: Department; o
         </div>
         <div className="grid grid-cols-3 gap-1.5">
           {([["history", "من الأداء السابق"], ["pipeline", "من أرقام القائمة"], ["manual", "يدوي"]] as [TargetMethod, string][]).map(([k, l]) => (
-            <button key={k} type="button" onClick={() => setMethod(k)} className={`rounded-lg border py-2 text-xs font-bold ${method === k ? "border-cyan bg-cyan-dim text-cyan" : "border-border text-muted-foreground"}`}>{l}</button>
+            <button key={k} type="button" onClick={() => (k === "manual" ? editManually() : setMethod(k))} className={`rounded-lg border py-2 text-xs font-bold ${method === k ? "border-cyan bg-cyan-dim text-cyan" : "border-border text-muted-foreground"}`}>{l}</button>
           ))}
         </div>
 
@@ -224,23 +232,23 @@ function Goals({ data, dept, onSave }: { data: SettingsData; dept: Department; o
             )}
           </div>
         )}
-        {method === "manual" && (
-          <div className="space-y-2 text-sm">
-            {([["min", "الحد الأدنى"], ["target", "الهدف"], ["stretch", "الطموح"]] as const).map(([k, l]) => (
-              <label key={k} className="flex items-center justify-between gap-2 text-muted-foreground">{l}
-                <input type="number" min={0} value={manual[k]} onChange={(e) => setManual((m) => ({ ...m, [k]: Number(e.target.value) || 0 }))} className={`${inputCls} w-32`} />
-              </label>
-            ))}
-          </div>
-        )}
-
         <div className="grid grid-cols-3 gap-2 text-center">
-          {([["الحد الأدنى", s.min], ["الهدف", s.target], ["الطموح", s.stretch]] as const).map(([l, v], i) => (
-            <div key={l} className={`rounded-lg border bg-muted px-1 py-2 ${i === 1 ? "border-cyan" : "border-border"}`}>
-              <div className="text-[11px] text-muted-foreground">{l}</div><b className="font-mono text-sm">{formatMoneyFull(v)}</b>
-            </div>
+          {([["min", "الحد الأدنى"], ["target", "الهدف"], ["stretch", "الطموح"]] as const).map(([k, l], i) => (
+            <label key={k} className={`rounded-lg border bg-muted px-1 py-2 ${i === 1 ? "border-cyan" : "border-border"}`}>
+              <div className="text-[11px] text-muted-foreground">{l}</div>
+              {method === "manual" ? (
+                <input type="number" min={0} step={100} inputMode="numeric" value={manual[k]}
+                  onChange={(e) => setManual((m) => ({ ...m, [k]: Number(e.target.value) || 0 }))}
+                  className="w-full bg-transparent text-center font-mono text-sm font-bold outline-none" aria-label={l} />
+              ) : (
+                <b className="font-mono text-sm">{formatMoneyFull(s[k])}</b>
+              )}
+            </label>
           ))}
         </div>
+        {method !== "manual"
+          ? <button type="button" onClick={editManually} className="w-full rounded-lg border border-border py-1.5 text-xs font-bold text-cyan">✎ تعديل الأرقام يدوياً</button>
+          : <p className="text-[11px] text-muted-foreground">اكتب الأرقام مباشرة في المربعات أعلاه (بالريال). الحد الأدنى ≤ الهدف ≤ الطموح.</p>}
         <p className="text-xs text-muted-foreground">المحقق حتى الآن: <b className="text-foreground">{formatMoneyFull(b.mtd)}</b></p>
         <button type="button" onClick={approve} disabled={!s.target || Math.round(totalShare) !== 100 && members.length > 0}
           className="w-full rounded-xl bg-cyan py-2.5 text-sm font-extrabold text-[#07090F] disabled:opacity-40">اعتماد هدف {DEPT_LABEL[dept]}</button>
@@ -248,6 +256,7 @@ function Goals({ data, dept, onSave }: { data: SettingsData; dept: Department; o
 
       <div className="space-y-2 rounded-xl border border-border bg-card p-4 text-sm">
         <b>التوزيع على الموظفين</b>
+        <p className="text-xs text-muted-foreground">اكتب نسبة كل موظف من هدف القسم في المربع (٪). المبلغ بجانب الاسم يُحسب تلقائياً.</p>
         {members.length === 0 && <p className="text-xs text-muted-foreground">لا موظفين في هذا القسم. أضفهم من تبويب «الفريق وأيام العمل».</p>}
         {members.map((m) => (
           <label key={m.user_id} className="flex items-center justify-between gap-2 text-muted-foreground">
