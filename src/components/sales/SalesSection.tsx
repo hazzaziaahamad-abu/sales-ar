@@ -3518,21 +3518,23 @@ export function SalesSection({ salesType }: SalesPageProps) {
             {/* شهر الحملة — إلزامي لمصدر «حملة اعلانية» */}
             {CAMPAIGN_SOURCES.includes(form.source) && (
               <div className="grid gap-1.5">
-                <Label htmlFor="deal-campaign-month">شهر الحملة <span className="text-red-400">*</span></Label>
+                <Label htmlFor="deal-campaign-month">{form.source === "من ارقام عشوائية" ? "شهر الاستهداف" : "شهر الحملة"} <span className="text-red-400">*</span></Label>
                 <select
                   id="deal-campaign-month"
                   value={form.campaign_month}
                   onChange={(e) => { setForm({ ...form, campaign_month: e.target.value }); if (e.target.value) setCampaignError(false); }}
                   className={`h-9 w-full rounded-md border bg-background px-3 text-sm ${campaignError ? "border-red-500" : "border-input"}`}
                 >
-                  <option value="">اختر الشهر الذي جاء منه العميل</option>
+                  <option value="">{form.source === "من ارقام عشوائية" ? "اختر الشهر الذي استُهدف فيه الرقم" : "اختر الشهر الذي جاء منه العميل"}</option>
                   {campaignMonthOptions().map((m) => <option key={m} value={m}>{campaignMonthLabel(m)}</option>)}
                   {form.campaign_month && !campaignMonthOptions().includes(form.campaign_month) && (
                     <option value={form.campaign_month}>{campaignMonthLabel(form.campaign_month)}</option>
                   )}
                 </select>
                 <p className={`text-[11px] ${campaignError ? "text-red-400" : "text-muted-foreground"}`}>
-                  {campaignError ? "حدّد شهر الحملة قبل الحفظ" : "شهر الإعلان الذي تواصل منه العميل، وليس شهر الدفع"}
+                  {campaignError
+                    ? `حدّد ${form.source === "من ارقام عشوائية" ? "شهر الاستهداف" : "شهر الحملة"} قبل الحفظ`
+                    : form.source === "من ارقام عشوائية" ? "الشهر الذي استُهدف فيه الرقم أول مرة، وليس شهر الدفع" : "شهر الإعلان الذي تواصل منه العميل، وليس شهر الدفع"}
                 </p>
               </div>
             )}
