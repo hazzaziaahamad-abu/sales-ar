@@ -2,7 +2,7 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import type { AiDesign, DesignTheme } from "@/lib/ai-designs/types";
-import { DESIGN_SIZE, isPhotoLayout } from "@/lib/ai-designs/types";
+import { DESIGN_SIZE, SHADE_COLOR_HEX, isPhotoLayout } from "@/lib/ai-designs/types";
 import { FONT_LEXEND, FONT_TAJAWAL } from "../fonts";
 import {
   Highlighted, IconCheck, IconInstagram, IconTiktok, IconWhatsapp, IconX, INK, INK_2, LIGHT_BG, Logo, Ring,
@@ -474,28 +474,36 @@ function SplitLayout({ d, p, w, h }: { d: AiDesign; p: Palette; w: number; h: nu
 
 // ─── تخطيطات الصور ───────────────────────────────────────────────────────────
 
-const SHADE_RGB: Record<NonNullable<AiDesign["shadeColor"]>, string> = { dark: "14,8,28", purple: "52,26,130", light: "255,255,255" };
+const hexRgb = (hex: string) => {
+  const m = hex.replace("#", "").match(/^([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+  return m ? `${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)}` : "14,8,28";
+};
 
-/** طبقة التضليل: تغطي جزء من الصورة بتدرّج ناعم (أو كل شي إلا دائرة). */
+/** طبقة التضليل: تغطي جزء من الصورة بتدرّج (لون واحد أو لونين) بحافة ناعمة/حادة حسب الإعداد. */
 function ShadeOverlay({ d, focus }: { d: AiDesign; focus: "top" | "bottom" }) {
   const a = d.shade ?? 0.55;
-  const c = SHADE_RGB[d.shadeColor ?? "dark"];
+  const c1 = hexRgb(d.shadeHex || SHADE_COLOR_HEX[d.shadeColor ?? "dark"]);
+  const c2 = d.shadeHex2 ? hexRgb(d.shadeHex2) : c1;
   const size = d.shadeSize ?? 55;
   const area = d.shadeArea ?? "auto";
-  const col = (k: number) => `rgba(${c},${Math.min(0.96, a * k).toFixed(3)})`;
+  // النعومة: 0 = الظل صلب لين آخر المساحة (حافة حادة) · 100 = يبدأ يخفّ من أول المساحة
+  const solidEnd = size * (1 - ((d.shadeSoft ?? 60) / 100) * 0.92);
+  const midEnd = (solidEnd + size) / 2;
+  const rgba = (c: string, k: number) => `rgba(${c},${Math.min(1, a * k).toFixed(3)})`;
+  const ramp = `${rgba(c1, 1)} 0%, ${rgba(c2, 1)} ${solidEnd.toFixed(1)}%, ${rgba(c2, 0.45)} ${midEnd.toFixed(1)}%, ${rgba(c2, 0)} ${size}%`;
   let bg: string | null = null;
   if (area === "none") return null;
   if (area === "auto") {
     bg = focus === "top"
-      ? `linear-gradient(180deg, ${col(1)} 0%, ${col(0.55)} 34%, ${col(0)} 55%, ${col(0)} 72%, ${col(1.1)} 100%)`
-      : `linear-gradient(180deg, ${col(0.6)} 0%, ${col(0)} 22%, ${col(0)} 40%, ${col(1.25)} 72%, ${col(1.4)} 100%)`;
+      ? `linear-gradient(180deg, ${rgba(c1, 1)} 0%, ${rgba(c2, 0.55)} 34%, ${rgba(c2, 0)} 55%, rgba(0,0,0,0) 72%, ${rgba(c1, 1.1)} 100%)`
+      : `linear-gradient(180deg, ${rgba(c1, 0.6)} 0%, ${rgba(c1, 0)} 22%, rgba(0,0,0,0) 40%, ${rgba(c2, 1.25)} 72%, ${rgba(c1, 1.4)} 100%)`;
   } else if (area === "full") {
-    bg = col(1);
+    bg = d.shadeHex2 ? `linear-gradient(${d.shadeAngle ?? 180}deg, ${rgba(c1, 1)} 0%, ${rgba(c2, 1)} 100%)` : rgba(c1, 1);
   } else if (area === "spot") {
-    bg = `radial-gradient(circle at ${d.spotX ?? 50}% ${d.spotY ?? 60}%, ${col(0)} 0, ${col(0)} ${size * 0.45}%, ${col(1)} ${size}%)`;
+    bg = `radial-gradient(circle at ${d.spotX ?? 50}% ${d.spotY ?? 60}%, ${rgba(c2, 0)} 0, ${rgba(c2, 0)} ${solidEnd.toFixed(1)}%, ${rgba(c2, 0.55)} ${midEnd.toFixed(1)}%, ${rgba(c1, 1)} ${size}%)`;
   } else {
-    const dir = { top: "180deg", bottom: "0deg", right: "270deg", left: "90deg" }[area];
-    bg = `linear-gradient(${dir}, ${col(1)} 0%, ${col(1)} ${size * 0.45}%, ${col(0)} ${size}%)`;
+    const dir = area === "angle" ? `${d.shadeAngle ?? 180}deg` : { top: "180deg", bottom: "0deg", right: "270deg", left: "90deg" }[area];
+    bg = `linear-gradient(${dir}, ${ramp})`;
     // التذييل (التواصل) تحت دايماً يحتاج أرضية غامقة خفيفة عشان يبان
     if (area !== "bottom" && d.showContact && d.layout !== "photoSplit") {
       bg = `linear-gradient(0deg, rgba(14,8,28,0.7) 0%, rgba(14,8,28,0) 17%), ${bg}`;

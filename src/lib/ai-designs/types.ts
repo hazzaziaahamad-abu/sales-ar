@@ -10,12 +10,15 @@ export type HeadlineStyle = "marker" | "boxes" | "plain";
 export type DesignTheme = "light" | "dark" | "purple" | "gold";
 export type DesignBackground = "dots" | "glow" | "solid" | "grid" | "rays" | "waves";
 /** أي جزء من الصورة نضلّله: auto = حسب مكان الكلام · spot = كل الصورة إلا دائرة (إبراز) · none = بدون. */
-export type ShadeArea = "auto" | "top" | "bottom" | "right" | "left" | "full" | "spot" | "none";
+export type ShadeArea = "auto" | "top" | "bottom" | "right" | "left" | "angle" | "full" | "spot" | "none";
 export type ShadeColor = "dark" | "purple" | "light";
 export const SHADE_AREA_LABEL: Record<ShadeArea, string> = {
-  auto: "تلقائي", top: "فوق", bottom: "تحت", right: "يمين", left: "يسار", full: "كامل", spot: "كل شي إلا دائرة", none: "بدون",
+  auto: "تلقائي", top: "فوق", bottom: "تحت", right: "يمين", left: "يسار", angle: "زاوية مخصصة", full: "كامل", spot: "كل شي إلا دائرة", none: "بدون",
 };
 export const SHADE_COLOR_LABEL: Record<ShadeColor, string> = { dark: "غامق", purple: "بنفسجي", light: "فاتح" };
+export const SHADE_COLOR_HEX: Record<ShadeColor, string> = { dark: "#0E081C", purple: "#341A82", light: "#FFFFFF" };
+/** ألوان جاهزة للظل (هوية + محايدة). */
+export const SHADE_SWATCHES = ["#0E081C", "#000000", "#1E1433", "#341A82", "#4A2C9F", "#F5C518", "#3B2414", "#0B3B3C", "#FFFFFF"];
 
 export type BulletStyle = "checks" | "chips" | "numbers" | "tags";
 export type DesignDecor = "circles" | "sparkles" | "stripe" | "corners" | "ring";
@@ -52,6 +55,13 @@ export interface AiDesign {
   shadeArea: ShadeArea;
   shadeSize: number;
   shadeColor: ShadeColor;
+  /** لون مخصص للظل (يغلب shadeColor) + لون ثاني اختياري لتدرّج لونين. */
+  shadeHex?: string;
+  shadeHex2?: string;
+  /** نعومة حافة الظل 0 (حادة) → 100 (ناعمة جداً). */
+  shadeSoft: number;
+  /** زاوية التدرّج للوضع «زاوية مخصصة» (درجات 0-359، 180 = من فوق). */
+  shadeAngle: number;
   spotX: number;
   spotY: number;
   /** تكبير الصورة 1 → 2.5 */
@@ -134,7 +144,9 @@ export function normalizeDesign(raw: unknown, size: DesignSize): AiDesign {
     photoX: 50,
     photoY: 50,
     shade: typeof r.shade === "number" ? Math.min(1, Math.max(0, r.shade)) : 0.55,
-    shadeArea: pick(r.shadeArea, ["auto", "top", "bottom", "right", "left", "full", "spot", "none"] as const, "auto"),
+    shadeArea: pick(r.shadeArea, ["auto", "top", "bottom", "right", "left", "angle", "full", "spot", "none"] as const, "auto"),
+    shadeSoft: 60,
+    shadeAngle: 180,
     shadeSize: typeof r.shadeSize === "number" ? Math.min(100, Math.max(15, r.shadeSize)) : 55,
     shadeColor: pick(r.shadeColor, ["dark", "purple", "light"] as const, "dark"),
     spotX: 50,
@@ -151,7 +163,7 @@ export function normalizeDesign(raw: unknown, size: DesignSize): AiDesign {
 /** يكمّل الحقول الناقصة لتصاميم محفوظة من نسخة أقدم. */
 export function withDesignDefaults(d: Partial<AiDesign>): AiDesign {
   return {
-    headlineStyle: "plain", photoX: 50, photoY: 50, shade: 0.55, shadeArea: "auto", shadeSize: 55, shadeColor: "dark",
+    headlineStyle: "plain", photoX: 50, photoY: 50, shade: 0.55, shadeArea: "auto", shadeSize: 55, shadeColor: "dark", shadeSoft: 60, shadeAngle: 180,
     spotX: 50, spotY: 60, photoZoom: 1, ...d,
   } as AiDesign;
 }

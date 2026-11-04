@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  BG_LABEL, BULLET_LABEL, DECOR_LABEL, DESIGN_SIZE, FRAME_LABEL, HEADLINE_LABEL, LAYOUT_LABEL, SHADE_AREA_LABEL, SHADE_COLOR_LABEL,
+  BG_LABEL, BULLET_LABEL, DECOR_LABEL, DESIGN_SIZE, FRAME_LABEL, HEADLINE_LABEL, LAYOUT_LABEL, SHADE_AREA_LABEL, SHADE_COLOR_HEX, SHADE_SWATCHES,
   THEME_LABEL, isPhotoLayout, withDesignDefaults,
   type AiDesign, type DesignDecor, type DesignSize,
 } from "@/lib/ai-designs/types";
@@ -86,6 +86,38 @@ function Slider({ label, value, onChange, min = 0, max = 100 }: { label: string;
       <span className="w-20 shrink-0">{label}</span>
       <input type="range" min={min} max={max} value={value} onChange={(e) => onChange(Number(e.target.value))} className="w-full accent-violet-500" />
     </label>
+  );
+}
+
+/** لون الظل: مربعات جاهزة + منتقي ألوان حر + كود HEX. */
+function ShadeColorPicker({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <div>
+      <span className="mb-1.5 block text-xs font-semibold text-muted-foreground">{label}</span>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {SHADE_SWATCHES.map((c) => (
+          <button
+            key={c}
+            type="button"
+            onClick={() => onChange(c)}
+            title={c}
+            className={cn("h-7 w-7 rounded-full border-2", value.toLowerCase() === c.toLowerCase() ? "border-violet-400 ring-2 ring-violet-500/40" : "border-white/20")}
+            style={{ background: c }}
+          />
+        ))}
+        <label className="relative h-7 w-7 cursor-pointer overflow-hidden rounded-full border-2 border-dashed border-white/40" title="لون مخصص"
+          style={{ background: "conic-gradient(red, yellow, lime, cyan, blue, magenta, red)" }}>
+          <input type="color" value={value} onChange={(e) => onChange(e.target.value)} className="absolute inset-0 cursor-pointer opacity-0" />
+        </label>
+        <input
+          dir="ltr"
+          onChange={(e) => { const v = e.target.value.trim(); if (/^#?[0-9a-f]{6}$/i.test(v)) onChange(v.startsWith("#") ? v : `#${v}`); }}
+          className="w-24 rounded-md border border-border bg-white/[0.04] px-2 py-1 text-left font-mono text-xs"
+          key={value}
+          defaultValue={value}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -336,6 +368,7 @@ export function ReferenceDesignStudio() {
         ...next, id: draft.id, image: draft.image, name: next.name || draft.name,
         photo: keepPhoto ? draft.photo : undefined, photoPrompt: next.photoPrompt || draft.photoPrompt,
         photoX: draft.photoX, photoY: draft.photoY, photoZoom: draft.photoZoom, spotX: draft.spotX, spotY: draft.spotY,
+        shadeHex: draft.shadeHex, shadeHex2: draft.shadeHex2, shadeSoft: draft.shadeSoft, shadeAngle: draft.shadeAngle,
       });
       if (!keepPhoto) notify("الذكاء غيّر وصف الصورة — اضغط «ولّد صورة» لو تبي صورة جديدة");
       else notify("تم التعديل", "ok");
@@ -531,10 +564,32 @@ export function ReferenceDesignStudio() {
                     <Chips value={draft.shadeArea ?? "auto"} options={SHADE_AREA_LABEL} onChange={(v) => set("shadeArea", v)} />
                     {draft.shadeArea !== "none" && (
                       <>
-                        <Chips value={draft.shadeColor ?? "dark"} options={SHADE_COLOR_LABEL} onChange={(v) => set("shadeColor", v)} />
-                        <Slider label="القوة" value={Math.round(draft.shade * 100)} onChange={(v) => set("shade", v / 100)} />
+                        <ShadeColorPicker
+                          label="لون الظل"
+                          value={draft.shadeHex || SHADE_COLOR_HEX[draft.shadeColor ?? "dark"]}
+                          onChange={(v) => set("shadeHex", v)}
+                        />
+                        <label className="flex items-center gap-2 text-xs">
+                          <input
+                            type="checkbox"
+                            checked={!!draft.shadeHex2}
+                            onChange={(e) => set("shadeHex2", e.target.checked ? "#4A2C9F" : undefined)}
+                            className="accent-violet-500"
+                          />
+                          تدرّج لونين
+                        </label>
+                        {draft.shadeHex2 && (
+                          <ShadeColorPicker label="اللون الثاني" value={draft.shadeHex2} onChange={(v) => set("shadeHex2", v)} />
+                        )}
+                        <Slider label={`قوة الظل ${Math.round(draft.shade * 100)}%`} value={Math.round(draft.shade * 100)} onChange={(v) => set("shade", v / 100)} />
                         {draft.shadeArea !== "auto" && draft.shadeArea !== "full" && (
-                          <Slider label={draft.shadeArea === "spot" ? "حجم الدائرة" : "المساحة"} min={15} value={draft.shadeSize ?? 55} onChange={(v) => set("shadeSize", v)} />
+                          <>
+                            <Slider label={draft.shadeArea === "spot" ? "حجم الدائرة" : `المساحة ${draft.shadeSize ?? 55}%`} min={15} value={draft.shadeSize ?? 55} onChange={(v) => set("shadeSize", v)} />
+                            <Slider label={`النعومة ${draft.shadeSoft ?? 60}%`} value={draft.shadeSoft ?? 60} onChange={(v) => set("shadeSoft", v)} />
+                          </>
+                        )}
+                        {(draft.shadeArea === "angle" || (draft.shadeArea === "full" && draft.shadeHex2)) && (
+                          <Slider label={`الزاوية ${draft.shadeAngle ?? 180}°`} max={359} value={draft.shadeAngle ?? 180} onChange={(v) => set("shadeAngle", v)} />
                         )}
                         {draft.shadeArea === "spot" && (
                           <>
@@ -789,7 +844,7 @@ export function ReferenceDesignStudio() {
           id: crypto.randomUUID(), name: "تصميم يدوي", size, layout: "photo", theme: "dark", background: "solid", align: "center",
           decor: [], headline: "منيو واضح\nعميل مرتاح\nمبيـــعات أعلى", headlineStyle: "marker", bullets: [], bulletStyle: "tags",
           showContact: true, imageFrame: "none", image: productImage, cta: "", photoX: 50, photoY: 50, shade: 0.55,
-          shadeArea: "auto", shadeSize: 55, shadeColor: "dark", spotX: 50, spotY: 60, photoZoom: 1, photo: bgPhoto,
+          shadeArea: "auto", shadeSize: 55, shadeColor: "dark", shadeSoft: 60, shadeAngle: 180, spotX: 50, spotY: 60, photoZoom: 1, photo: bgPhoto,
           photoPrompt: "Close-up of a hand holding a smartphone showing a restaurant digital menu, a QR code table stand on a wooden table, cozy modern Saudi restaurant with warm bokeh lights",
           updatedAt: new Date().toISOString(),
         })}
