@@ -32,7 +32,10 @@ const SPEC = `كل تصميم كائن JSON بهذه الحقول فقط:
   "cta": "دعوة لإجراء ≤ 5 كلمات، ولو تبيها سطرين افصل بـ \\n",
   "showContact": true,
   "imageFrame": "none | phone | photo | floating",
-  "shade": 0.0 إلى 1.0 (تعتيم الصورة عشان يبان الكلام الأبيض — عادة 0.45-0.7),
+  "shade": 0.0 إلى 1.0 (قوة تضليل الصورة عشان يبان الكلام الأبيض — عادة 0.45-0.7),
+  "shadeArea": "auto | top | bottom | right | left | full | spot | none" (أي جزء من الصورة يتضلّل: auto حسب مكان الكلام، spot = يضلّل كل شي ويبرز دائرة حول الموضوع),
+  "shadeSize": 15 إلى 100 (كم % من البوست يغطي التضليل),
+  "shadeColor": "dark | purple | light",
   "photoPrompt": "وصف بالإنجليزي لصورة الخلفية (مشهد تصوير احترافي بدون أي كتابة) — إلزامي مع تخطيطات photo*"
 }
 التخطيطات:
@@ -103,6 +106,9 @@ export async function POST(req: NextRequest) {
     const imageRule = body.hasProductImage
       ? "المستخدم رفع لقطة شاشة منيو/منتج — مع تخطيطات photo* اجعل الجوال في المشهد يعرضها (اذكر ذلك في photoPrompt) و imageFrame = none، ومع تخطيطات الجرافيك استخدم imageFrame = phone."
         : "ما فيه لقطة شاشة — خلّ imageFrame = none.";
+    const bgRule = body.hasBackgroundPhoto
+      ? "\n- المستخدم رفع صورة خلفية حقيقية (آخر صورة مرفقة) — استخدم تخطيطات photo* فقط، واختر مكان الكلام وshadeArea/shadeSize حسب الجزء الهادي من الصورة عشان ما يغطي الكلام على الموضوع الأساسي. photoPrompt مو لازم."
+      : "";
     const brief = String(body.brief || "").slice(0, 1500) || "(ما حدد — استوحِ الرسالة من المرجع وكيّفها لقائمة الطلبات)";
 
     // ─── تعديل تصميم حالي ───
@@ -125,6 +131,8 @@ export async function POST(req: NextRequest) {
 
     // ─── توليد من مرجع ───
     const imgs = cleanImages(body.images);
+    const bg = cleanImages(body.backgroundPhoto ? [body.backgroundPhoto] : []);
+    if (bg.length) imgs.push(bg[0]);
     if (!imgs.length && !String(body.brief || "").trim()) {
       return NextResponse.json({ error: "ارفع تصميم مرجعي أو اكتب فكرة البوست" }, { status: 400 });
     }
@@ -132,7 +140,7 @@ export async function POST(req: NextRequest) {
     const prompt = GENERATE_PROMPT
       .replaceAll("{count}", String(count))
       .replace("{size}", SIZE_TEXT[size])
-      .replace("{image_rule}", imageRule)
+      .replace("{image_rule}", imageRule + bgRule)
       .replace("{brief}", brief);
 
     const out = imgs.length

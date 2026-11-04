@@ -474,30 +474,60 @@ function SplitLayout({ d, p, w, h }: { d: AiDesign; p: Palette; w: number; h: nu
 
 // ─── تخطيطات الصور ───────────────────────────────────────────────────────────
 
-/** صورة الخلفية + تدرّج غامق فوق/تحت حسب مكان الكلام. بدون صورة: خلفية بنفسجية داكنة مؤقتة. */
+const SHADE_RGB: Record<NonNullable<AiDesign["shadeColor"]>, string> = { dark: "14,8,28", purple: "52,26,130", light: "255,255,255" };
+
+/** طبقة التضليل: تغطي جزء من الصورة بتدرّج ناعم (أو كل شي إلا دائرة). */
+function ShadeOverlay({ d, focus }: { d: AiDesign; focus: "top" | "bottom" }) {
+  const a = d.shade ?? 0.55;
+  const c = SHADE_RGB[d.shadeColor ?? "dark"];
+  const size = d.shadeSize ?? 55;
+  const area = d.shadeArea ?? "auto";
+  const col = (k: number) => `rgba(${c},${Math.min(0.96, a * k).toFixed(3)})`;
+  let bg: string | null = null;
+  if (area === "none") return null;
+  if (area === "auto") {
+    bg = focus === "top"
+      ? `linear-gradient(180deg, ${col(1)} 0%, ${col(0.55)} 34%, ${col(0)} 55%, ${col(0)} 72%, ${col(1.1)} 100%)`
+      : `linear-gradient(180deg, ${col(0.6)} 0%, ${col(0)} 22%, ${col(0)} 40%, ${col(1.25)} 72%, ${col(1.4)} 100%)`;
+  } else if (area === "full") {
+    bg = col(1);
+  } else if (area === "spot") {
+    bg = `radial-gradient(circle at ${d.spotX ?? 50}% ${d.spotY ?? 60}%, ${col(0)} 0, ${col(0)} ${size * 0.45}%, ${col(1)} ${size}%)`;
+  } else {
+    const dir = { top: "180deg", bottom: "0deg", right: "270deg", left: "90deg" }[area];
+    bg = `linear-gradient(${dir}, ${col(1)} 0%, ${col(1)} ${size * 0.45}%, ${col(0)} ${size}%)`;
+    // التذييل (التواصل) تحت دايماً يحتاج أرضية غامقة خفيفة عشان يبان
+    if (area !== "bottom" && d.showContact && d.layout !== "photoSplit") {
+      bg = `linear-gradient(0deg, rgba(14,8,28,0.7) 0%, rgba(14,8,28,0) 17%), ${bg}`;
+    }
+  }
+  return <div style={{ position: "absolute", inset: 0, background: bg }} />;
+}
+
+/** صورة الخلفية (حقيقية مرفوعة أو مولّدة) + التضليل. بدون صورة: خلفية بنفسجية داكنة مؤقتة. */
 function PhotoLayer({ d, area = "full", focus }: { d: AiDesign; area?: "full" | "top"; focus: "top" | "bottom" }) {
-  const shade = d.shade ?? 0.55;
-  const box: CSSProperties = { position: "absolute", left: 0, right: 0, top: 0, bottom: area === "top" ? undefined : 0, height: area === "top" ? "100%" : undefined };
+  const box: CSSProperties = { position: "absolute", left: 0, right: 0, top: 0, bottom: area === "top" ? undefined : 0, height: area === "top" ? "100%" : undefined, overflow: "hidden" };
+  const zoom = d.photoZoom ?? 1;
   return (
     <div style={box}>
       {d.photo ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={d.photo} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: `${d.photoX ?? 50}% ${d.photoY ?? 50}%`, display: "block" }} />
+        <img
+          src={d.photo}
+          alt=""
+          style={{
+            position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover",
+            objectPosition: `${d.photoX ?? 50}% ${d.photoY ?? 50}%`, display: "block",
+            transform: zoom !== 1 ? `scale(${zoom})` : undefined, transformOrigin: `${d.photoX ?? 50}% ${d.photoY ?? 50}%`,
+          }}
+        />
       ) : (
         <div style={{ position: "absolute", inset: 0, background: `radial-gradient(circle at 70% 40%, #5B3FB8 0, #2A1A55 45%, #120A22 100%)` }} />
       )}
-      {area === "full" && (
-        <div
-          style={{
-            position: "absolute", inset: 0,
-            background: focus === "top"
-              ? `linear-gradient(180deg, rgba(14,8,28,${shade}) 0%, rgba(14,8,28,${shade * 0.55}) 34%, rgba(14,8,28,0) 55%, rgba(14,8,28,0) 72%, rgba(14,8,28,${Math.min(0.85, shade * 1.1)}) 100%)`
-              : `linear-gradient(180deg, rgba(14,8,28,${shade * 0.6}) 0%, rgba(14,8,28,0) 22%, rgba(14,8,28,0) 40%, rgba(14,8,28,${Math.min(0.92, shade * 1.25)}) 72%, rgba(14,8,28,${Math.min(0.95, shade * 1.4)}) 100%)`,
-          }}
-        />
-      )}
-      {area === "top" && (
-        <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, rgba(255,255,255,${shade * 0.5}) 0%, rgba(255,255,255,0) 30%)` }} />
+      {area === "full" || (d.shadeArea && d.shadeArea !== "auto") ? (
+        <ShadeOverlay d={d} focus={focus} />
+      ) : (
+        <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, rgba(255,255,255,${(d.shade ?? 0.55) * 0.5}) 0%, rgba(255,255,255,0) 30%)` }} />
       )}
     </div>
   );
