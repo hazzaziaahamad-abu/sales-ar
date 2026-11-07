@@ -85,7 +85,8 @@ const TEMPLATES: Tpl[] = [
 
 export function draftBody(source: FollowupSource, assignee: string, title: string, lastActivity: string, avoid = new Set<number>()): string {
   const days = Math.max(2, Math.floor((Date.now() - new Date(lastActivity).getTime()) / 86_400_000));
-  const short = title.length > 40 ? "" : title;
+  const clean = title.replace(/\s+/g, " ").trim();
+  const short = clean.length > 40 ? "" : clean;
   const all = TEMPLATES.map((_, i) => i);
   const choices = all.filter((i) => !avoid.has(i));
   const i = pick(choices.length ? choices : all);
