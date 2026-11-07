@@ -83,7 +83,7 @@ export interface CompetitorSnapshot {
   avg_likes: number | null;
   avg_comments: number | null;
   engagement_rate: number | null;
-  source: "apify" | "manual";
+  source: "auto" | "manual";
 }
 
 export interface CompetitorPost {
@@ -104,8 +104,6 @@ export interface CompetitorPost {
 export interface CompetitorsPayload {
   me: { id: string; isManager: boolean };
   today: string;
-  /** هل أداة السحب (Apify) مربوطة */
-  connected: boolean;
   competitors: Competitor[];
   snapshots: CompetitorSnapshot[];
   posts: CompetitorPost[];
