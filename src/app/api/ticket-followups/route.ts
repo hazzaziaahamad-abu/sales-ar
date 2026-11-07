@@ -25,7 +25,20 @@ export async function GET() {
       .gte("created_at", since).order("created_at", { ascending: false }).limit(100),
   ]);
   if (open.error) return NextResponse.json({ error: open.error.message }, { status: 500 });
-  return NextResponse.json({ open: open.data ?? [], done: done.data ?? [] });
+
+  // آخر تعليق على كل عنصر مفتوح — عشان يقرر السوبر أدمن يوافق ولا لا
+  const rows = open.data ?? [];
+  const lastById = new Map<string, { author: string | null; body: string; created_at: string }>();
+  const ids = [...new Set(rows.map((r) => r.ticket_id as string))];
+  for (let i = 0; i < ids.length; i += 300) {
+    const { data } = await supabaseAdmin.rpc("followup_last_notes", { p_ids: ids.slice(i, i + 300) });
+    for (const n of (data ?? []) as { item_id: string; author: string | null; body: string; created_at: string }[]) {
+      const prev = lastById.get(n.item_id);
+      if (!prev || n.created_at > prev.created_at) lastById.set(n.item_id, { author: n.author, body: n.body, created_at: n.created_at });
+    }
+  }
+  const withNotes = rows.map((r) => ({ ...r, last_note: lastById.get(r.ticket_id as string) ?? null }));
+  return NextResponse.json({ open: withNotes, done: done.data ?? [] });
 }
 
 /**

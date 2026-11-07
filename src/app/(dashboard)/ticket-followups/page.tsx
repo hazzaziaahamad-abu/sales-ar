@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { BellRing, Check, X, Loader2, Clock, RefreshCw, Undo2, Send, CheckCheck } from "lucide-react";
+import { BellRing, Check, X, Loader2, Clock, RefreshCw, Undo2, Send, CheckCheck, MessageSquare } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 interface Followup {
@@ -18,6 +18,7 @@ interface Followup {
   sent_at: string | null;
   skip_reason: string | null;
   created_at: string;
+  last_note?: { author: string | null; body: string; created_at: string } | null;
 }
 
 type Category = "ticket" | "work" | "office_sales" | "support_sales" | "renewal";
@@ -32,6 +33,28 @@ const STATUS_LABEL: Record<Followup["status"], string> = {
 };
 
 const daysSince = (s: string) => Math.max(0, Math.floor((Date.now() - new Date(s).getTime()) / 86_400_000));
+function ago(s: string): string {
+  const m = Math.max(0, Math.floor((Date.now() - new Date(s).getTime()) / 60_000));
+  if (m < 60) return `قبل ${m} د`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `قبل ${h} س`;
+  return `قبل ${Math.floor(h / 24)} يوم`;
+}
+
+/** آخر تعليق على الصفقة/التذكرة. */
+function LastNote({ f, compact = false }: { f: Followup; compact?: boolean }) {
+  const n = f.last_note;
+  if (!n) return <p className="text-[11px] text-muted-foreground/70">ما فيه تعليقات سابقة</p>;
+  return (
+    <div className={`rounded-[10px] bg-white/[0.03] border border-white/[0.05] px-2.5 py-1.5 ${compact ? "" : "space-y-0.5"}`}>
+      <p className="flex items-center gap-1 text-[10px] text-muted-foreground">
+        <MessageSquare className="w-3 h-3" /> آخر تعليق · {n.author || "—"} · {ago(n.created_at)}
+      </p>
+      <p className={`text-[12px] text-foreground/80 whitespace-pre-line ${compact ? "line-clamp-1" : "line-clamp-4"}`}>{n.body}</p>
+    </div>
+  );
+}
+
 function fmt(s: string | null): string {
   if (!s) return "—";
   try {
@@ -173,6 +196,7 @@ export default function TicketFollowupsPage() {
                     {f.assignee_name} · <Clock className="inline w-3 h-3" /> بدون تحديث من {daysSince(f.last_activity_at)} يوم
                   </span>
                 </div>
+                <LastNote f={f} />
                 <textarea
                   value={texts[f.id] ?? f.body}
                   onChange={(e) => setTexts((p) => ({ ...p, [f.id]: e.target.value }))}
@@ -208,6 +232,7 @@ export default function TicketFollowupsPage() {
                   <div className="min-w-0">
                     <p className="text-[12px] text-muted-foreground">{label(f)} · {f.assignee_name} · {CATEGORY_LABEL[catOf(f)]}</p>
                     <p className="text-sm text-foreground truncate">{f.body}</p>
+                    <div className="mt-1"><LastNote f={f} compact /></div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="flex items-center gap-1 text-[11px] text-orange-300"><Send className="w-3 h-3" /> {fmt(f.send_at)}</span>
