@@ -111,6 +111,8 @@ export const NAV_ITEMS = [
   { label: "رضا العملاء", href: "/satisfaction", slug: "satisfaction", icon: Heart, color: "rose", group: "العملاء" },
   { label: "قائمة الاستهداف", href: "/targeting", slug: "targeting", icon: Target, color: "fuchsia", group: "العملاء" },
   { label: "بوكس الهدايا", href: "/gifts", slug: "gifts", icon: Gift, color: "amber", group: "العملاء" },
+  // للسوبر أدمن: مراجعة واعتماد متابعات التذاكر الساكتة (٤٨ ساعة بدون تحديث)
+  { label: "متابعة التذاكر", href: "/ticket-followups", slug: "ticket-followups", icon: BellRing, color: "orange", group: "المهام", superOnly: true },
   { label: "الطلبات والتطويرات", href: "/work-tickets", slug: "work-tickets", icon: Ticket, color: "amber", group: "المهام" },
   { label: "الاجتماعات", href: "/meetings", slug: "meetings", icon: CalendarDays, color: "indigo", group: "المهام" },
   { label: "أفكار", href: "/ideas", slug: "ideas-board", icon: Lightbulb, color: "amber", group: "المهام" },
