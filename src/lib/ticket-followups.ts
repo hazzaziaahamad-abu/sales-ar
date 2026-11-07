@@ -7,6 +7,8 @@ import { saudiDateStr } from "@/lib/utils/format";
 export const STALE_HOURS = 48;
 /** الأقدم من كذا ما ينجاب (متروك من زمان — مو متابعة يومية). */
 export const MAX_STALE_DAYS = 10;
+/** المنظمات المفعّلة للمتابعة — حالياً «قائمة الطلبات» فقط («حجوزات/نحجز» لاحقاً: أضف ...0002). */
+export const ENABLED_ORG_IDS = new Set(["00000000-0000-0000-0000-000000000001"]);
 const STALE_MS = STALE_HOURS * 3_600_000;
 
 export type FollowupSource = "support" | "work" | "deal" | "renewal";
@@ -175,7 +177,7 @@ export async function getSuperAdmin(): Promise<{ id: string; name: string } | nu
 /** يجهّز مسودات جديدة للعناصر الساكتة، ويلغي المعلّقة اللي ما عادت ساكتة. يرجع عدد الجديد. */
 export async function prepareDrafts(): Promise<number> {
   const admin = await getSuperAdmin();
-  const stale = (await staleItems()).filter((s) => s.assignee !== admin?.name);
+  const stale = (await staleItems()).filter((s) => ENABLED_ORG_IDS.has(s.org_id) && s.assignee !== admin?.name);
   const staleIds = new Set(stale.map((s) => s.id));
 
   const { data: open } = await supabaseAdmin
@@ -264,7 +266,7 @@ export async function sendFollowup(f: TicketFollowup): Promise<"sent" | "skipped
 /** يرسل المتابعات المعتمدة اللي حان وقتها (كل وحدة تنحجز قبل الإرسال عشان ما تتكرر). */
 export async function sendDue(): Promise<{ sent: number; skipped: number; errors: string[] }> {
   const { data: due } = await supabaseAdmin
-    .from("ticket_followups").select("*").eq("status", "approved").lte("send_at", new Date().toISOString())
+    .from("ticket_followups").select("*").eq("status", "approved").in("org_id", [...ENABLED_ORG_IDS]).lte("send_at", new Date().toISOString())
     .order("send_at", { ascending: true }).limit(20);
   let sent = 0, skipped = 0;
   const errors: string[] = [];
