@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { isSupportSalesMerged } from "@/lib/sales-merge";
 import { useAuth } from "@/lib/auth-context";
 import { getEditableContent, saveEditableContent, getEditableContentRange } from "@/lib/supabase/db";
 import {
@@ -69,12 +71,29 @@ const rateColor = (v: number) => (v >= 80 ? "text-emerald-400" : v >= 50 ? "text
 
 const fmtKpi = (key: KpiKey, v: number) => (KPI_DEFS[key].money ? formatMoneyFull(v) : String(v));
 
-function KpiRow({ k, value, target, kpis }: { k: KpiKey; value: number; target: number; kpis: HuddleKpis }) {
+/** الصفحة اللي يفتحها الضغط على المؤشر — صفقات علي ومريم في «مبيعات الدعم» (إلا لو مدموجة مع المبيعات). */
+function kpiHref(k: KpiKey, member: string, salesMerged: boolean): string {
+  const dealsHref = !salesMerged && (member === "علي" || member === "مريم") ? "/support-sales" : "/sales";
+  switch (k) {
+    case "openTickets":
+      return "/support";
+    case "renewalsPaid":
+    case "renewalsValue":
+    case "overdueRenewals":
+      return "/renewals";
+    case "followups":
+      return member === "تغريد" ? "/renewals" : dealsHref;
+    default:
+      return dealsHref;
+  }
+}
+
+function KpiRow({ k, value, target, kpis, href }: { k: KpiKey; value: number; target: number; kpis: HuddleKpis; href: string }) {
   const def = KPI_DEFS[k];
   const s = kpiStatus(def, value, target, kpis);
   const color = s.ok ? "text-emerald-400" : def.period === "now" ? "text-red-400" : "text-amber-400";
   return (
-    <div title={def.hint}>
+    <Link href={href} title={def.hint} className="block rounded-lg -mx-1.5 px-1.5 py-0.5 hover:bg-white/[0.04] transition-colors cursor-pointer">
       <div className="flex items-baseline justify-between gap-2 text-xs">
         <span className="text-muted-foreground">
           {def.label}
@@ -88,12 +107,13 @@ function KpiRow({ k, value, target, kpis }: { k: KpiKey; value: number; target: 
       <div className="h-1.5 rounded-full bg-white/[0.06] mt-1 overflow-hidden">
         <div className={`h-full ${s.ok ? "bg-emerald-500" : def.period === "now" ? "bg-red-500" : "bg-amber-500"}`} style={{ width: `${s.pct}%` }} />
       </div>
-    </div>
+    </Link>
   );
 }
 
 function TeamTodayTab({ isManager }: { isManager: boolean }) {
   const { user, activeOrgId } = useAuth();
+  const salesMerged = isSupportSalesMerged(activeOrgId);
   const myFirstName = user?.name?.trim().split(/\s+/)[0] ?? "";
 
   const [date, setDate] = useState(todayLocal());
@@ -434,7 +454,7 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
                 {/* المؤشرات التلقائية */}
                 <div className="space-y-2.5 mt-3">
                   {role.kpis.map((key) => (
-                    <KpiRow key={key} k={key} value={k.values[key]} target={tgt(member, key)} kpis={kpis} />
+                    <KpiRow key={key} k={key} value={k.values[key]} target={tgt(member, key)} kpis={kpis} href={kpiHref(key, member, salesMerged)} />
                   ))}
                   <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                     {k.closesToday > 0 && <span className="text-emerald-400">إغلاقات اليوم: {k.closesToday}</span>}
