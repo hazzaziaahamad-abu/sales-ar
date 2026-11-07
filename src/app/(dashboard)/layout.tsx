@@ -868,7 +868,7 @@ export default function DashboardLayout({
             onBellClick={() => setNotifOpen((prev) => !prev)}
             onMenuClick={() => setSidebarOpen(true)}
           />
-          <main className="px-4 sm:px-6 pb-8 pt-5">
+          <main className="px-4 sm:px-6 pb-24 lg:pb-8 pt-5">
             <AuthGate>
               {/* المنشن غير المقروء يطلع في كل الصفحات — مو بس صفحات المتابعة */}
               {!showFollowupBanners && <MentionBannerSlot mentions={recentMentions} unreadOnly />}

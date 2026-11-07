@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getTicketAccess } from "@/lib/api/work-ticket-access";
-import { parseMeetingFields } from "./shared";
+import { parseMeetingFields, linkDeal, attachPlans } from "./shared";
 
 export const runtime = "nodejs";
 
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ meetings: data ?? [], me: { id: access.userId, isManager: access.isManager } });
+  return NextResponse.json({ meetings: await attachPlans(data ?? []), me: { id: access.userId, isManager: access.isManager } });
 }
 
 /** POST /api/meetings → جدولة اجتماع. */
@@ -35,6 +35,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const parsed = parseMeetingFields(body, false);
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+  const linked = await linkDeal(parsed.fields, access);
+  if (!linked.ok) return NextResponse.json({ error: linked.error }, { status: linked.status });
 
   const { data, error } = await supabaseAdmin
     .from("meetings")
@@ -42,5 +44,6 @@ export async function POST(req: NextRequest) {
     .select("*")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ meeting: data });
+  const [meeting] = await attachPlans([data]);
+  return NextResponse.json({ meeting });
 }

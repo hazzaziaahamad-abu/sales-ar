@@ -41,3 +41,43 @@ export type ClientMeetingRow = {
   current_stage?: string | null;
   outcome?: MeetingOutcome;
 };
+
+/* ─── تقرير اجتماعات العملاء (التقويم + روابط الخطة) ─── */
+
+/** النتيجة حسب هدف الاجتماع: تحوّل (عميل جديد)، ترقّى (عميل حالي)، رفض، قيد المتابعة، أو بلا صفقة مربوطة. */
+export type ReportOutcome = "converted" | "upgraded" | "lost" | "open" | "unlinked";
+
+export type ReportRow = {
+  key: string;
+  /** calendar = موعد في التقويم · plan = رابط خطة اجتماع بدون موعد. */
+  kind: "calendar" | "plan";
+  org_id: string;
+  product: string;
+  client_name: string;
+  client_phone: string | null;
+  rep_id: string | null;
+  rep_name: string | null;
+  date: string;
+  time: string | null;
+  status: "scheduled" | "done" | null;
+  purpose: "new" | "upgrade";
+  script_done: number;
+  deal_id: string | null;
+  deal_stage: string | null;
+  token: string | null;
+  open_count: number;
+  tier_name: string | null;
+  outcome: ReportOutcome;
+};
+
+/** صفقة ترقية = مصدرها «ترقية» أو باقتها «ترقية». */
+export function isUpgradeDeal(d: { source?: string | null; plan?: string | null }): boolean {
+  const norm = (s?: string | null) => (s ?? "").trim().replace(/ه$/, "ة");
+  return norm(d.source) === "ترقية" || norm(d.plan).replace(/^ال/, "") === "ترقية";
+}
+
+/** مفتاح مقارنة الجوال: آخر ٩ أرقام. */
+export function phoneKey(phone?: string | null): string {
+  const digits = (phone ?? "").replace(/\D/g, "");
+  return digits.length >= 9 ? digits.slice(-9) : "";
+}

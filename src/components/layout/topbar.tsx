@@ -37,6 +37,9 @@ const PAGE_SUBTITLES: Record<string, string> = {
 
 const TIME_FILTERS: TimeFilter[] = ["اليوم", "الأسبوع", "الشهر", "الكل"];
 
+/** صفحات لها فلتر فترة خاص فيها — نخفي فلتر الفترة والشهور العام عشان ما يتكرر. */
+const PAGES_WITH_OWN_PERIOD = new Set(["/meetings", "/meeting-plans"]);
+
 interface TopbarProps {
   unreadCount?: number;
   onBellClick?: () => void;
@@ -56,6 +59,7 @@ export function Topbar({ unreadCount = 0, onBellClick, onMenuClick }: TopbarProp
     setActiveFilter: onFilterChange,
   } = useTopbarControls();
   const showRefresh = pathname === "/dashboard" && !!onRefresh;
+  const showPeriod = !PAGES_WITH_OWN_PERIOD.has(pathname);
   const formattedLastUpdated = lastUpdatedAt
     ? new Intl.DateTimeFormat("ar-EG", {
         hour: "numeric",
@@ -135,7 +139,7 @@ export function Topbar({ unreadCount = 0, onBellClick, onMenuClick }: TopbarProp
           )}
 
           {/* Time filters — hidden on mobile, visible on sm+ */}
-          <div className="hidden sm:flex items-center gap-1 rounded-2xl border border-border bg-white/[0.05] p-1 sm:p-1.5">
+          {showPeriod && <div className="hidden sm:flex items-center gap-1 rounded-2xl border border-border bg-white/[0.05] p-1 sm:p-1.5">
             {TIME_FILTERS.map((filter) => (
               <button
                 key={filter}
@@ -152,7 +156,7 @@ export function Topbar({ unreadCount = 0, onBellClick, onMenuClick }: TopbarProp
                 {filter}
               </button>
             ))}
-          </div>
+          </div>}
 
           {/* Clock + Calendar */}
           <div className="hidden sm:flex items-center gap-2">
@@ -189,7 +193,7 @@ export function Topbar({ unreadCount = 0, onBellClick, onMenuClick }: TopbarProp
       </div>
 
       {/* Mobile time filters — visible only on mobile */}
-      <div className="sm:hidden flex items-center gap-1 rounded-2xl glass-surface p-1.5 overflow-x-auto scrollbar-hide">
+      {showPeriod && <div className="sm:hidden flex items-center gap-1 rounded-2xl glass-surface p-1.5 overflow-x-auto scrollbar-hide">
         {TIME_FILTERS.map((filter) => (
           <button
             key={filter}
@@ -206,10 +210,10 @@ export function Topbar({ unreadCount = 0, onBellClick, onMenuClick }: TopbarProp
             {filter}
           </button>
         ))}
-      </div>
+      </div>}
 
       {/* Month bar */}
-      <div
+      {showPeriod && <div
         ref={monthsRef}
         className="glass-surface rounded-2xl px-2 sm:px-4 py-2 sm:py-2.5 flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-hide"
       >
@@ -242,7 +246,7 @@ export function Topbar({ unreadCount = 0, onBellClick, onMenuClick }: TopbarProp
             </button>
           );
         })}
-      </div>
+      </div>}
     </div>
   );
 }

@@ -1,14 +1,11 @@
-import { randomBytes } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getTicketAccess } from "@/lib/api/work-ticket-access";
 import { isSuperAdmin } from "@/lib/permissions";
-import { ORG_PRODUCT, meetingOutcome, type ClientMeetingRow } from "@/lib/client-meetings";
+import { meetingOutcome, type ClientMeetingRow } from "@/lib/client-meetings";
+import { ensureClientMeetingLink, CLIENT_MEETING_COLS as COLS } from "@/lib/api/client-meeting-link";
 
 export const runtime = "nodejs";
-
-const COLS =
-  "id, org_id, deal_id, token, product, client_name, client_phone, rep_id, rep_name, stage_at_start, tier_name, open_count, first_opened_at, last_opened_at, created_at";
 
 /**
  * POST /api/client-meetings { deal_id } → رابط خطة اجتماع لصفقة.
@@ -21,36 +18,9 @@ export async function POST(req: NextRequest) {
   const dealId = String(body.deal_id ?? "");
   if (!dealId) return NextResponse.json({ error: "deal_id مطلوب" }, { status: 400 });
 
-  const { data: deal } = await supabaseAdmin
-    .from("deals").select("id, org_id, client_name, client_phone, stage").eq("id", dealId).maybeSingle();
-  if (!deal) return NextResponse.json({ error: "الصفقة غير موجودة" }, { status: 404 });
-  if (deal.org_id !== access.orgId && !(await isSuperAdmin(access.userId))) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-  const product = ORG_PRODUCT[deal.org_id];
-  if (!product) return NextResponse.json({ error: "منتج غير معروف" }, { status: 400 });
-
-  const { data: existing } = await supabaseAdmin
-    .from("client_meetings").select(COLS).eq("deal_id", dealId)
-    .order("created_at", { ascending: false }).limit(1).maybeSingle();
-  if (existing) return NextResponse.json({ meeting: existing, url: `/offer/meeting?m=${existing.token}` });
-
-  const { data, error } = await supabaseAdmin
-    .from("client_meetings")
-    .insert({
-      org_id: deal.org_id,
-      deal_id: deal.id,
-      token: randomBytes(9).toString("base64url"),
-      product,
-      client_name: deal.client_name ?? "",
-      client_phone: deal.client_phone ?? null,
-      rep_id: access.userId,
-      rep_name: access.name,
-      stage_at_start: deal.stage ?? null,
-    })
-    .select(COLS).single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ meeting: data, url: `/offer/meeting?m=${data.token}` });
+  const res = await ensureClientMeetingLink(dealId, access);
+  if (!res.ok) return NextResponse.json({ error: res.error }, { status: res.status });
+  return NextResponse.json({ meeting: res.meeting, url: `/offer/meeting?m=${res.meeting.token}` });
 }
 
 /**

@@ -41,6 +41,10 @@ export interface Meeting {
   minutes: string | null;
   status: MeetingStatus;
   client_brief: ClientBrief | null;
+  /** صفقة العميل المربوطة، ورابط «خطة الاجتماع» حقها. */
+  deal_id?: string | null;
+  client_meeting_id?: string | null;
+  plan?: { token: string; open_count: number } | null;
   created_by: string | null;
   created_by_name: string | null;
   updated_by_name: string | null;

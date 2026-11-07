@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CalendarDays, Plus, ChevronRight, ChevronLeft, Clock, MapPin, Users, Loader2, Send,
   CheckCircle2, XCircle, Pencil, Trash2, RotateCcw, FileText, ChevronDown, ChevronUp, Link2,
-  Video, CalendarPlus, Phone, Target, Circle, UserRound,
+  Video, CalendarPlus, Phone, Target, Circle, UserRound, Presentation, Copy, Check, Search, X, Briefcase,
 } from "lucide-react";
 import { fetchUserProfiles } from "@/lib/supabase/db";
 import { todayLocal } from "@/lib/utils/format";
@@ -76,18 +76,23 @@ type FormState = {
   title: string; meeting_type: MeetingType; meeting_date: string; start_time: string;
   duration_minutes: number; location: string; attendees: string[]; agenda: string;
   client_brief: ClientBrief;
+  /** صفقة العميل المربوطة (اختياري) — تنشئ رابط «خطة الاجتماع» وتربط النتيجة بالتقرير. */
+  deal: DealOption | null;
 };
+type DealOption = { id: string; client_name: string | null; client_phone?: string | null; stage?: string | null; source?: string | null };
 const emptyForm = (date: string): FormState => ({
   title: "", meeting_type: "client", meeting_date: date, start_time: "10:00",
-  duration_minutes: 30, location: "", attendees: [], agenda: "", client_brief: emptyClientBrief(),
+  duration_minutes: 30, location: "", attendees: [], agenda: "", client_brief: emptyClientBrief(), deal: null,
 });
 
 /** جسم الطلب: تفاصيل العميل فقط لاجتماعات العملاء، والعنوان الافتراضي باسم العميل. */
 function toPayload(f: FormState) {
   const isClient = f.meeting_type === "client";
   const name = f.client_brief.client_name.trim();
+  const { deal, ...rest } = f;
   return {
-    ...f,
+    ...rest,
+    deal_id: isClient ? deal?.id ?? null : null,
     title: f.title.trim() || (isClient && name ? `اجتماع مع ${name}` : ""),
     client_brief: isClient ? f.client_brief : null,
   };
@@ -415,6 +420,7 @@ export function MeetingsBoard({ embedded = false }: { embedded?: boolean }) {
                         title: m.title, meeting_type: m.meeting_type, meeting_date: m.meeting_date, start_time: m.start_time,
                         duration_minutes: m.duration_minutes, location: m.location ?? "", attendees: m.attendees ?? [], agenda: m.agenda ?? "",
                         client_brief: { ...emptyClientBrief(), ...(m.client_brief ?? {}) },
+                        deal: m.deal_id ? { id: m.deal_id, client_name: m.client_brief?.client_name || m.title } : null,
                       },
                     });
                     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
@@ -581,6 +587,24 @@ function MeetingForm({ value, isNew, users, onChange, onCancel, onSave }: {
         </div>
       )}
 
+      {isClient && (
+        <DealPicker
+          value={value.deal}
+          onChange={(deal) => {
+            const b = value.client_brief;
+            onChange({
+              ...value,
+              deal,
+              client_brief: deal ? {
+                ...b,
+                client_name: b.client_name || deal.client_name || "",
+                client_phone: b.client_phone || deal.client_phone || "",
+              } : b,
+            });
+          }}
+        />
+      )}
+
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div>
           <label className="block text-xs font-bold text-muted-foreground mb-1.5">التاريخ</label>
@@ -697,6 +721,7 @@ function MeetingCard({ m, open, editable, onToggle, onEdit, onPatch, onDelete }:
   const [minutes, setMinutes] = useState(m.minutes ?? "");
   const [brief, setBrief] = useState<ClientBrief>({ ...emptyClientBrief(), ...(m.client_brief ?? {}) });
   const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
   const cancelled = m.status === "cancelled";
   const done = m.status === "done";
   const isClient = m.meeting_type === "client";
@@ -781,6 +806,27 @@ function MeetingCard({ m, open, editable, onToggle, onEdit, onPatch, onDelete }:
             <a href={calUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[12px] font-bold px-3 py-1.5 rounded-lg border bg-white/[0.04] text-muted-foreground border-white/[0.08] hover:text-foreground">
               <CalendarPlus className="w-3.5 h-3.5" /> إضافة لـ Google Calendar
             </a>
+            {m.plan && (
+              <>
+                <a href={`/offer/meeting?m=${m.plan.token}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[12px] font-bold px-3 py-1.5 rounded-lg border bg-violet-500/15 text-violet-300 border-violet-500/20">
+                  <Presentation className="w-3.5 h-3.5" /> خطة الاجتماع
+                  <span className="font-normal opacity-75">{m.plan.open_count > 0 ? `· فُتحت ${m.plan.open_count}` : "· لم تُفتح"}</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(`${window.location.origin}/offer/meeting?m=${m.plan!.token}`);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 1500);
+                    } catch { /* ignore */ }
+                  }}
+                  className="flex items-center gap-1.5 text-[12px] font-bold px-3 py-1.5 rounded-lg border bg-white/[0.04] text-muted-foreground border-white/[0.08] hover:text-foreground"
+                >
+                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />} نسخ رابط الخطة
+                </button>
+              </>
+            )}
             {saved.client_phone && (
               <a href={`tel:${saved.client_phone}`} className="flex items-center gap-1.5 text-[12px] font-bold px-3 py-1.5 rounded-lg border bg-white/[0.04] text-muted-foreground border-white/[0.08] hover:text-foreground" dir="ltr">
                 <Phone className="w-3.5 h-3.5" /> {saved.client_phone}
@@ -788,6 +834,11 @@ function MeetingCard({ m, open, editable, onToggle, onEdit, onPatch, onDelete }:
             )}
           </div>
 
+          {isClient && !m.deal_id && editable && !cancelled && (
+            <p className="text-[11px] text-amber-300/80 rounded-lg bg-amber-500/[0.06] border border-amber-500/15 px-2.5 py-1.5">
+              الموعد غير مربوط بصفقة — اربطه من «تعديل» عشان تنشأ خطة الاجتماع وتنحسب النتيجة (تحويل أو ترقية) في تقرير اجتماعات العملاء.
+            </p>
+          )}
           {m.attendees?.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {m.attendees.map((a) => <span key={a} className="text-[11px] px-2 py-0.5 rounded-md bg-white/[0.05] text-foreground">{a}</span>)}
@@ -871,5 +922,76 @@ function Btn({ icon: Icon, label, cls, disabled, onClick }: {
     <button onClick={onClick} disabled={disabled} className={`flex items-center gap-1.5 text-[12px] font-bold px-3 py-1.5 rounded-lg border disabled:opacity-40 ${cls}`}>
       <Icon className="w-3.5 h-3.5" /> {label}
     </button>
+  );
+}
+
+/* ─── ربط الموعد بصفقة العميل ─── */
+function DealPicker({ value, onChange }: { value: DealOption | null; onChange: (d: DealOption | null) => void }) {
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState<DealOption[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    const term = q.trim();
+    if (term.length < 2) return;
+    let alive = true;
+    const t = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res = await fetch(`/api/meetings/deals?q=${encodeURIComponent(term)}`);
+        const data = await res.json().catch(() => ({}));
+        if (alive) setResults(res.ok ? data.deals ?? [] : []);
+      } finally {
+        if (alive) setSearching(false);
+      }
+    }, 300);
+    return () => { alive = false; clearTimeout(t); };
+  }, [q]);
+
+  const shown = q.trim().length >= 2 ? results : [];
+
+  return (
+    <div>
+      <label className="block text-xs font-bold text-muted-foreground mb-1.5">
+        صفقة العميل <span className="font-normal">(اربطها عشان تنشأ «خطة الاجتماع» وينحسب التحويل أو الترقية)</span>
+      </label>
+      {value ? (
+        <div className="flex items-center justify-between gap-2 rounded-[10px] border border-violet-500/25 bg-violet-500/[0.08] px-3 py-2">
+          <span className="flex items-center gap-2 text-[13px] text-foreground min-w-0">
+            <Briefcase className="w-3.5 h-3.5 text-violet-300 shrink-0" />
+            <b className="truncate">{value.client_name || "صفقة"}</b>
+            {value.stage && <span className="text-[11px] text-muted-foreground shrink-0">· {value.stage}</span>}
+          </span>
+          <button type="button" onClick={() => onChange(null)} title="فك الربط" className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+        </div>
+      ) : (
+        <div className="relative">
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ابحث باسم العميل أو جواله..." className={`${inputCls} pr-9`} />
+          {searching && <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+          {shown.length > 0 && (
+            <div className="mt-1 rounded-[10px] border border-border bg-card divide-y divide-white/[0.04] max-h-56 overflow-y-auto">
+              {shown.map((d) => (
+                <button
+                  key={d.id}
+                  type="button"
+                  onClick={() => { onChange(d); setQ(""); setResults([]); }}
+                  className="w-full text-right px-3 py-2 hover:bg-white/[0.04] flex items-center justify-between gap-2"
+                >
+                  <span className="min-w-0">
+                    <span className="block text-[13px] font-bold text-foreground truncate">{d.client_name || "—"}</span>
+                    {d.client_phone && <span className="block text-[11px] text-muted-foreground" dir="ltr">{d.client_phone}</span>}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground shrink-0">{d.stage}{d.source === "ترقية" ? " · ترقية" : ""}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {!searching && q.trim().length >= 2 && shown.length === 0 && (
+            <p className="mt-1 text-[11px] text-muted-foreground">ما لقينا صفقة بهذا الاسم أو الجوال.</p>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getTicketAccess } from "@/lib/api/work-ticket-access";
 import { MEETING_STATUSES } from "@/lib/meetings";
-import { parseMeetingFields } from "../shared";
+import { parseMeetingFields, linkDeal, attachPlans } from "../shared";
 
 export const runtime = "nodejs";
 
@@ -32,12 +32,15 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const body = await req.json().catch(() => ({}));
   const parsed = parseMeetingFields(body, true);
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+  const linked = await linkDeal(parsed.fields, res.access);
+  if (!linked.ok) return NextResponse.json({ error: linked.error }, { status: linked.status });
   const patch: Record<string, unknown> = { ...parsed.fields, updated_at: new Date().toISOString(), updated_by_name: res.access.name };
   if (MEETING_STATUSES.includes(body.status)) patch.status = body.status;
 
   const { data, error } = await supabaseAdmin.from("meetings").update(patch).eq("id", id).select("*").single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ meeting: data });
+  const [meeting] = await attachPlans([data]);
+  return NextResponse.json({ meeting });
 }
 
 /** DELETE /api/meetings/[id] */
