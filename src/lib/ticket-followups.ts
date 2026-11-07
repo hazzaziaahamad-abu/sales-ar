@@ -1,19 +1,23 @@
-// متابعة التذاكر الساكتة (٤٨ ساعة بدون تحديث) — تجهيز مسودات، وبعد موافقة السوبر أدمن
-// تنرسل كتعليق عادي باسمه فيه منشن للموظف، في أوقات متفرقة طبيعية داخل الدوام.
+// متابعة العناصر الساكتة (تذاكر الدعم، الطلبات والتطويرات، صفقات مبيعات المكتب والدعم، التجديدات):
+// اللي آخر نشاط عليها بين ٤٨ ساعة و١٠ أيام تنجهز لها مسودة، وبعد موافقة السوبر أدمن تنرسل كتعليق
+// عادي باسمه فيه منشن للموظف المسؤول، في أوقات متفرقة طبيعية داخل دوام الفريق.
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { saudiDateStr } from "@/lib/utils/format";
 
 export const STALE_HOURS = 48;
+/** الأقدم من كذا ما ينجاب (متروك من زمان — مو متابعة يومية). */
+export const MAX_STALE_DAYS = 10;
 const STALE_MS = STALE_HOURS * 3_600_000;
-const SUPPORT_CLOSED = ["محلول", "مغلق"];
 
-export type FollowupSource = "support" | "work";
+export type FollowupSource = "support" | "work" | "deal" | "renewal";
+export type FollowupCategory = "ticket" | "work" | "office_sales" | "support_sales" | "renewal";
 export type FollowupStatus = "pending" | "approved" | "sending" | "sent" | "rejected" | "skipped";
 
 export interface TicketFollowup {
   id: string;
   org_id: string;
   source: FollowupSource;
+  category: FollowupCategory | null;
   ticket_id: string;
   ticket_number: number | null;
   title: string;
@@ -30,103 +34,63 @@ export interface TicketFollowup {
   created_at: string;
 }
 
-interface StaleTicket {
+interface Item {
   source: FollowupSource;
+  category: FollowupCategory;
   id: string;
   org_id: string;
-  number: number;
+  item_number: number | null;
   title: string;
   assignee: string;
-  assigneeId: string | null;
-  lastActivity: string;
+  assignee_id: string | null;
+  last_activity: string;
 }
-
-const maxIso = (...xs: (string | null | undefined)[]) =>
-  xs.filter((x): x is string => !!x).reduce((a, b) => (new Date(b) > new Date(a) ? b : a), "1970-01-01T00:00:00Z");
 
 const rand = (a: number, b: number) => a + Math.floor(Math.random() * (b - a + 1));
 const pick = <T,>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)];
 
-// ─── آخر نشاط ────────────────────────────────────────────────────────────────
+// ─── العناصر (محسوبة في قاعدة البيانات: followup_items / followup_stale_items) ──
 
-async function latestActivity(source: FollowupSource, ids: string[]): Promise<Map<string, string>> {
-  const out = new Map<string, string>();
-  for (let i = 0; i < ids.length; i += 200) {
-    const chunk = ids.slice(i, i + 200);
-    const rows: { key: string; at: string }[] = [];
-    if (source === "support") {
-      const { data } = await supabaseAdmin.from("follow_up_notes").select("entity_id, created_at")
-        .eq("entity_type", "ticket").in("entity_id", chunk);
-      for (const r of data ?? []) rows.push({ key: r.entity_id as string, at: r.created_at as string });
-    } else {
-      const { data } = await supabaseAdmin.from("work_ticket_events").select("ticket_id, created_at").in("ticket_id", chunk);
-      for (const r of data ?? []) rows.push({ key: r.ticket_id as string, at: r.created_at as string });
-    }
-    for (const r of rows) if (!out.has(r.key) || new Date(r.at) > new Date(out.get(r.key)!)) out.set(r.key, r.at);
-  }
-  return out;
+async function staleItems(): Promise<Item[]> {
+  const { data, error } = await supabaseAdmin.rpc("followup_stale_items", { p_min_hours: STALE_HOURS, p_max_days: MAX_STALE_DAYS });
+  if (error) throw error;
+  return (data ?? []) as Item[];
 }
 
-/** التذاكر المفتوحة في كل الأقسام اللي ما تحدّثت من ٤٨ ساعة (مع آخر نشاط لكل وحدة). */
-export async function findStaleTickets(skipAssignee?: string): Promise<StaleTicket[]> {
-  const cutoff = Date.now() - STALE_MS;
-  const items: StaleTicket[] = [];
-
-  const { data: tickets } = await supabaseAdmin
-    .from("tickets")
-    .select("id, org_id, ticket_number, client_name, issue, status, assigned_agent_name, created_at, updated_at, reopened_at")
-    .not("status", "in", `(${SUPPORT_CLOSED.map((s) => `"${s}"`).join(",")})`)
-    .limit(5000);
-  const tNotes = await latestActivity("support", (tickets ?? []).map((t) => t.id as string));
-  for (const t of tickets ?? []) {
-    const assignee = ((t.assigned_agent_name as string | null) ?? "").trim();
-    if (!assignee || assignee === skipAssignee) continue;
-    const last = maxIso(t.created_at, t.updated_at, t.reopened_at, tNotes.get(t.id));
-    if (new Date(last).getTime() > cutoff) continue;
-    items.push({
-      source: "support", id: t.id, org_id: t.org_id, number: t.ticket_number,
-      title: (t.client_name || t.issue || "") as string, assignee, assigneeId: null, lastActivity: last,
-    });
-  }
-
-  const { data: work } = await supabaseAdmin
-    .from("work_tickets")
-    .select("id, org_id, ticket_number, title, assigned_to, assigned_to_name, created_at, updated_at")
-    .in("status", ["open", "in_progress"])
-    .limit(5000);
-  const wEvents = await latestActivity("work", (work ?? []).map((w) => w.id as string));
-  for (const w of work ?? []) {
-    const assignee = ((w.assigned_to_name as string | null) ?? "").trim();
-    if (!assignee || assignee === skipAssignee) continue;
-    const last = maxIso(w.created_at, w.updated_at, wEvents.get(w.id));
-    if (new Date(last).getTime() > cutoff) continue;
-    items.push({
-      source: "work", id: w.id, org_id: w.org_id, number: w.ticket_number,
-      title: (w.title || "") as string, assignee, assigneeId: (w.assigned_to as string | null) ?? null, lastActivity: last,
-    });
-  }
-  return items;
+/** حالة عنصر وحده الحين: null = انقفل/ما عاد مفتوح. */
+async function itemNow(source: FollowupSource, id: string): Promise<Item | null> {
+  const { data, error } = await supabaseAdmin.rpc("followup_items", { p_source: source, p_id: id });
+  if (error) throw error;
+  return ((data ?? []) as Item[])[0] ?? null;
 }
 
 // ─── نص المتابعة (صيغ متنوعة بأسلوب طبيعي) ────────────────────────────────────
 
-const TEMPLATES: ((n: string, t: string, d: number) => string)[] = [
-  (n, t) => `@${n} وش آخر المستجدات${t ? ` على ${t}` : " على هالتذكرة"}؟`,
-  (n) => `@${n} هلا، طمني وين وصلت في هالتذكرة؟ لو فيه شي معطلها قول لي`,
-  (n, _t, d) => `@${n} التذكرة واقفة من ${d} أيام تقريباً، وش وضعها؟`,
-  (n, t) => `@${n} الله يعطيك العافية، ممكن تحدّث التذكرة${t ? ` (${t})` : ""} بآخر شي صار؟`,
-  (n) => `@${n} محتاج تحديث على هالتذكرة لو سمحت، وين وصلنا؟`,
+const NOUN: Record<FollowupSource, string> = {
+  support: "هالتذكرة", work: "هالتذكرة", deal: "هالعميل", renewal: "تجديد هالعميل",
+};
+
+type Tpl = (n: string, t: string, d: number, noun: string, src: FollowupSource) => string;
+const TEMPLATES: Tpl[] = [
+  (n, t, _d, noun) => `@${n} وش آخر المستجدات ${t ? `مع ${t}` : `على ${noun}`}؟`,
+  (n, _t, _d, noun) => `@${n} هلا، طمني وين وصلت في ${noun}؟ لو فيه شي معطّل قول لي`,
+  (n, _t, d) => `@${n} صار ${d} أيام تقريباً بدون جديد هنا، وش الوضع؟`,
+  (n, t, _d, noun) => `@${n} الله يعطيك العافية، ممكن تحدّثني ${t ? `عن ${t}` : `عن ${noun}`} بآخر شي صار؟`,
+  (n, _t, _d, noun) => `@${n} محتاج تحديث على ${noun} لو سمحت، وين وصلنا؟`,
   (n, t) => `@${n} وش صار${t ? ` مع ${t}` : " في هالموضوع"}؟ حدّثني لو تكرمت`,
-  (n) => `@${n} أبي أعرف وضع هالتذكرة، خلصت ولا لسا شغال عليها؟`,
+  (n, t, _d, noun, src) => src === "support" || src === "work"
+    ? `@${n} أبي أعرف وضع ${noun}، خلصت ولا لسا شغال عليها؟`
+    : `@${n} تواصلت مع ${t || "العميل"} ولا لسا؟ وش آخر شي؟`,
 ];
 
-export function draftBody(assignee: string, title: string, lastActivity: string, avoid = new Set<number>()): string {
+export function draftBody(source: FollowupSource, assignee: string, title: string, lastActivity: string, avoid = new Set<number>()): string {
   const days = Math.max(2, Math.floor((Date.now() - new Date(lastActivity).getTime()) / 86_400_000));
   const short = title.length > 40 ? "" : title;
-  const choices = TEMPLATES.map((_, i) => i).filter((i) => !avoid.has(i));
-  const i = pick(choices.length ? choices : TEMPLATES.map((_, k) => k));
+  const all = TEMPLATES.map((_, i) => i);
+  const choices = all.filter((i) => !avoid.has(i));
+  const i = pick(choices.length ? choices : all);
   avoid.add(i);
-  return TEMPLATES[i](assignee, short, days);
+  return TEMPLATES[i](assignee, short, days, NOUN[source], source);
 }
 
 // ─── أوقات إرسال طبيعية داخل الدوام ───────────────────────────────────────────
@@ -138,6 +102,7 @@ const WINDOW_END = 15 * 60 + 5;
 /** وقت الظهر/الغداء — ما نرسل فيه. */
 const BREAK_FROM = 11 * 60 + 55;
 const BREAK_TO = 12 * 60 + 40;
+const WINDOW_MINUTES = WINDOW_END - WINDOW_START - (BREAK_TO - BREAK_FROM);
 
 /** أيام دوام الفريق: كل الأيام ما عدا الجمعة (getUTCDay على تاريخ الرياض: الجمعة = 5). */
 const TEAM_OFF_DAYS = [5];
@@ -156,9 +121,9 @@ function normalize(d: Date): Date {
   for (let guard = 0; guard < 20; guard++) {
     const day = saudiDateStr(d);
     const m = riyadhMin(d);
-    if (!isTeamDay(day) || m >= WINDOW_END) { d = atRiyadh(nextTeamDay(day), WINDOW_START + rand(0, 80)); continue; }
-    if (m < WINDOW_START) { d = atRiyadh(day, WINDOW_START + rand(0, 60)); continue; }
-    if (m >= BREAK_FROM && m < BREAK_TO) { d = atRiyadh(day, BREAK_TO + rand(0, 25)); continue; }
+    if (!isTeamDay(day) || m >= WINDOW_END) { d = atRiyadh(nextTeamDay(day), WINDOW_START + rand(0, 40)); continue; }
+    if (m < WINDOW_START) { d = atRiyadh(day, WINDOW_START + rand(0, 40)); continue; }
+    if (m >= BREAK_FROM && m < BREAK_TO) { d = atRiyadh(day, BREAK_TO + rand(0, 15)); continue; }
     break;
   }
   const mm = new Date(d.getTime() + RIYADH_MS).getUTCMinutes();
@@ -172,14 +137,19 @@ export function inTeamHours(now = new Date()): boolean {
   return isTeamDay(saudiDateStr(now)) && m >= 7 * 60 && m < 15 * 60 + 30;
 }
 
-/** يوزّع n إرسالات بعد آخر موعد مجدول: أول وحدة بعد ٨–٢٥ د، وبينها ١٢–٥٠ د. */
+/**
+ * يوزّع n إرسالات بعد آخر موعد مجدول بفواصل عشوائية. الفاصل يتناسب مع العدد: القليل يتباعد
+ * (حتى ~٤٠ د)، والكثير يتقارب (أقل شي ~٢ د) عشان يخلص خلال يوم دوام تقريباً.
+ */
 export function spreadSchedule(n: number, after: Date): Date[] {
   const out: Date[] = [];
-  let cursor = new Date(Math.max(Date.now(), after.getTime()) + rand(8, 25) * 60_000);
+  const avg = Math.min(40, Math.max(2.5, WINDOW_MINUTES / Math.max(1, n)));
+  let cursor = new Date(Math.max(Date.now(), after.getTime()) + rand(5, 15) * 60_000);
   for (let i = 0; i < n; i++) {
     cursor = normalize(cursor);
     out.push(cursor);
-    cursor = new Date(cursor.getTime() + rand(12, 50) * 60_000);
+    const gap = avg * (0.5 + Math.random());
+    cursor = new Date(cursor.getTime() + Math.round(gap * 60_000));
   }
   return out;
 }
@@ -195,57 +165,61 @@ export async function getSuperAdmin(): Promise<{ id: string; name: string } | nu
 
 // ─── تجهيز المسودات ──────────────────────────────────────────────────────────
 
-/** يجهّز مسودات جديدة للتذاكر الساكتة، ويلغي المسودات المعلّقة اللي تحدّثت تذاكرها. يرجع عدد الجديد. */
+/** يجهّز مسودات جديدة للعناصر الساكتة، ويلغي المعلّقة اللي ما عادت ساكتة. يرجع عدد الجديد. */
 export async function prepareDrafts(): Promise<number> {
   const admin = await getSuperAdmin();
-  const stale = await findStaleTickets(admin?.name);
+  const stale = (await staleItems()).filter((s) => s.assignee !== admin?.name);
   const staleIds = new Set(stale.map((s) => s.id));
 
   const { data: open } = await supabaseAdmin
-    .from("ticket_followups").select("id, ticket_id, status, last_activity_at")
-    .in("status", ["pending", "approved"]);
-  const openByTicket = new Map((open ?? []).map((o) => [o.ticket_id as string, o]));
+    .from("ticket_followups").select("id, ticket_id").in("status", ["pending", "approved"]);
+  const openIds = new Set((open ?? []).map((o) => o.ticket_id as string));
 
-  // مسودة معلّقة/مجدولة لتذكرة صار عليها تحديث أو انقفلت ← تتلغى
+  // مسودة لعنصر تحدّث أو انقفل أو تجاوز ١٠ أيام ← تتلغى
   const nowIso = new Date().toISOString();
   const obsolete = (open ?? []).filter((o) => !staleIds.has(o.ticket_id as string)).map((o) => o.id as string);
-  if (obsolete.length) {
+  for (let i = 0; i < obsolete.length; i += 200) {
     await supabaseAdmin.from("ticket_followups")
-      .update({ status: "skipped", skip_reason: "تحدّثت التذكرة أو انقفلت", decided_at: nowIso })
-      .in("id", obsolete).in("status", ["pending", "approved"]);
+      .update({ status: "skipped", skip_reason: "ما عادت ضمن المتابعة (تحدّثت أو انقفلت أو تجاوزت ١٠ أيام)", decided_at: nowIso })
+      .in("id", obsolete.slice(i, i + 200)).in("status", ["pending", "approved"]);
   }
 
-  // ما نعيد اقتراح تذكرة رفضتها خلال آخر ٤٨ ساعة
+  // ما نعيد اقتراح عنصر رفضته خلال آخر ٤٨ ساعة
   const since = new Date(Date.now() - STALE_MS).toISOString();
   const { data: rejected } = await supabaseAdmin
-    .from("ticket_followups").select("ticket_id").eq("status", "rejected").gte("decided_at", since);
+    .from("ticket_followups").select("ticket_id").eq("status", "rejected").gte("decided_at", since).limit(5000);
   const recentlyRejected = new Set((rejected ?? []).map((r) => r.ticket_id as string));
 
-  const usedByAssignee = new Map<string, Set<number>>();
-  const fresh = stale.filter((s) => !openByTicket.has(s.id) && !recentlyRejected.has(s.id));
+  const fresh = stale.filter((s) => !openIds.has(s.id) && !recentlyRejected.has(s.id));
   if (!fresh.length) return 0;
 
+  const usedByAssignee = new Map<string, Set<number>>();
   const rows = fresh.map((s) => {
     const avoid = usedByAssignee.get(s.assignee) ?? new Set<number>();
     usedByAssignee.set(s.assignee, avoid);
     return {
-      org_id: s.org_id, source: s.source, ticket_id: s.id, ticket_number: s.number, title: s.title,
-      assignee_name: s.assignee, assignee_id: s.assigneeId, last_activity_at: s.lastActivity,
-      body: draftBody(s.assignee, s.title, s.lastActivity, avoid), status: "pending",
+      org_id: s.org_id, source: s.source, category: s.category, ticket_id: s.id, ticket_number: s.item_number,
+      title: s.title, assignee_name: s.assignee, assignee_id: s.assignee_id, last_activity_at: s.last_activity,
+      body: draftBody(s.source, s.assignee, s.title, s.last_activity, avoid), status: "pending",
     };
   });
-  // إدخال واحد واحد: الفهرس الفريد (مسودة مفتوحة وحدة لكل تذكرة) يمنع التكرار لو تزامن تشغيلين
+  // دفعات؛ ولو تعارضت دفعة مع الفهرس الفريد (تشغيلين متزامنين) نكمل واحد واحد
   let created = 0;
-  for (const row of rows) {
-    const { error } = await supabaseAdmin.from("ticket_followups").insert(row);
-    if (!error) created++;
+  for (let i = 0; i < rows.length; i += 100) {
+    const chunk = rows.slice(i, i + 100);
+    const { data, error } = await supabaseAdmin.from("ticket_followups").insert(chunk).select("id");
+    if (!error) { created += data?.length ?? 0; continue; }
+    for (const row of chunk) {
+      const { error: e } = await supabaseAdmin.from("ticket_followups").insert(row);
+      if (!e) created++;
+    }
   }
   return created;
 }
 
 // ─── الإرسال ─────────────────────────────────────────────────────────────────
 
-/** يرسل متابعة معتمدة كتعليق عادي باسم صاحبها. يتأكد قبلها إن التذكرة ما زالت ساكتة. */
+/** يرسل متابعة معتمدة كتعليق عادي باسم صاحبها. يتأكد قبلها إن العنصر ما زال مفتوح وساكت. */
 export async function sendFollowup(f: TicketFollowup): Promise<"sent" | "skipped"> {
   const author = f.author_name ?? (await getSuperAdmin())?.name;
   const skip = async (reason: string) => {
@@ -254,33 +228,26 @@ export async function sendFollowup(f: TicketFollowup): Promise<"sent" | "skipped
   };
   if (!author) return skip("ما فيه اسم مرسل");
 
-  if (f.source === "support") {
-    const { data: t } = await supabaseAdmin.from("tickets").select("status, updated_at, reopened_at").eq("id", f.ticket_id).maybeSingle();
-    if (!t || SUPPORT_CLOSED.includes(t.status as string)) return skip("انقفلت التذكرة");
-    const notes = await latestActivity("support", [f.ticket_id]);
-    const last = maxIso(t.updated_at, t.reopened_at, notes.get(f.ticket_id));
-    if (new Date(last) > new Date(f.last_activity_at)) return skip("تحدّثت التذكرة قبل الإرسال");
+  const now = await itemNow(f.source, f.ticket_id);
+  if (!now) return skip("ما عادت مفتوحة وقت الإرسال");
+  if (new Date(now.last_activity) > new Date(f.last_activity_at)) return skip("تحدّثت قبل الإرسال");
 
-    const { data: note, error } = await supabaseAdmin.from("follow_up_notes")
-      .insert({ org_id: f.org_id, entity_type: "ticket", entity_id: f.ticket_id, note: f.body, author_name: author })
-      .select("id").single();
-    if (error) throw error;
-    await supabaseAdmin.from("mention_notifications").insert({
-      org_id: f.org_id, note_id: note.id, entity_type: "ticket", entity_id: f.ticket_id,
-      entity_name: f.title, mentioned_name: f.assignee_name, author_name: author, note_text: f.body,
-    });
-  } else {
-    const { data: w } = await supabaseAdmin.from("work_tickets").select("status, updated_at").eq("id", f.ticket_id).maybeSingle();
-    if (!w || !["open", "in_progress"].includes(w.status as string)) return skip("انقفلت التذكرة");
-    const events = await latestActivity("work", [f.ticket_id]);
-    const last = maxIso(w.updated_at, events.get(f.ticket_id));
-    if (new Date(last) > new Date(f.last_activity_at)) return skip("تحدّثت التذكرة قبل الإرسال");
-
+  if (f.source === "work") {
     const { error } = await supabaseAdmin.from("work_ticket_events").insert({
       ticket_id: f.ticket_id, org_id: f.org_id, event_type: "comment", body: f.body, actor_name: author,
     });
     if (error) throw error;
     await supabaseAdmin.from("work_tickets").update({ updated_at: new Date().toISOString() }).eq("id", f.ticket_id);
+  } else {
+    const entityType = f.source === "support" ? "ticket" : f.source; // ticket / deal / renewal
+    const { data: note, error } = await supabaseAdmin.from("follow_up_notes")
+      .insert({ org_id: f.org_id, entity_type: entityType, entity_id: f.ticket_id, note: f.body, author_name: author })
+      .select("id").single();
+    if (error) throw error;
+    await supabaseAdmin.from("mention_notifications").insert({
+      org_id: f.org_id, note_id: note.id, entity_type: entityType, entity_id: f.ticket_id,
+      entity_name: f.title, mentioned_name: f.assignee_name, author_name: author, note_text: f.body,
+    });
   }
 
   await supabaseAdmin.from("ticket_followups").update({ status: "sent", sent_at: new Date().toISOString() }).eq("id", f.id);
@@ -302,7 +269,7 @@ export async function sendDue(): Promise<{ sent: number; skipped: number; errors
       if ((await sendFollowup(f)) === "sent") sent++;
       else skipped++;
     } catch (e) {
-      errors.push(`#${f.ticket_number}: ${(e as Error).message}`);
+      errors.push(`${f.title}: ${(e as Error).message}`);
       await supabaseAdmin.from("ticket_followups").update({ status: "approved" }).eq("id", f.id);
     }
   }

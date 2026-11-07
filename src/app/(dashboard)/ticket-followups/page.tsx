@@ -6,7 +6,8 @@ import { useAuth } from "@/lib/auth-context";
 
 interface Followup {
   id: string;
-  source: "support" | "work";
+  source: "support" | "work" | "deal" | "renewal";
+  category: Category | null;
   ticket_number: number | null;
   title: string;
   assignee_name: string;
@@ -19,7 +20,13 @@ interface Followup {
   created_at: string;
 }
 
-const SOURCE_LABEL = { support: "الدعم", work: "الطلبات والتطويرات" } as const;
+type Category = "ticket" | "work" | "office_sales" | "support_sales" | "renewal";
+const CATEGORY_LABEL: Record<Category, string> = {
+  ticket: "تذاكر الدعم", work: "الطلبات والتطويرات", office_sales: "مبيعات المكتب", support_sales: "مبيعات الدعم", renewal: "التجديدات",
+};
+const CATEGORIES = Object.keys(CATEGORY_LABEL) as Category[];
+const catOf = (f: Followup): Category => f.category ?? (f.source === "support" ? "ticket" : f.source === "deal" ? "office_sales" : f.source);
+const label = (f: Followup) => `${f.ticket_number ? `#${f.ticket_number} ` : ""}${f.title || "—"}`;
 const STATUS_LABEL: Record<Followup["status"], string> = {
   pending: "بانتظار موافقتك", approved: "مجدولة", sending: "تنرسل", sent: "انرسلت", rejected: "مرفوضة", skipped: "انلغت",
 };
@@ -41,6 +48,7 @@ export default function TicketFollowupsPage() {
   const [texts, setTexts] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [cat, setCat] = useState<Category | "all">("all");
   const [toast, setToast] = useState<{ ok: boolean; msg: string } | null>(null);
 
   const load = useCallback(() =>
@@ -73,7 +81,9 @@ export default function TicketFollowupsPage() {
     setBusy(false);
   };
 
-  const pending = open.filter((f) => f.status === "pending");
+  const allPending = open.filter((f) => f.status === "pending");
+  const pending = cat === "all" ? allPending : allPending.filter((f) => catOf(f) === cat);
+  const counts = CATEGORIES.map((c) => [c, allPending.filter((f) => catOf(f) === c).length] as const);
   const scheduled = open.filter((f) => f.status !== "pending").sort((a, b) => (a.send_at ?? "").localeCompare(b.send_at ?? ""));
   const approveItems = (list: Followup[]) => list.map((f) => ({ id: f.id, body: texts[f.id] ?? f.body }));
 
@@ -87,9 +97,9 @@ export default function TicketFollowupsPage() {
             <BellRing className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-xl font-extrabold text-foreground">متابعة التذاكر</h1>
+            <h1 className="text-xl font-extrabold text-foreground">متابعة التذاكر والصفقات</h1>
             <p className="text-[12px] text-muted-foreground mt-0.5">
-              تذاكر لها ٤٨ ساعة بدون تحديث في كل الأقسام. راجع النص ووافق، وتنرسل باسمك كتعليق عادي فيه منشن في أوقات متفرقة خلال الدوام (السبت–الخميس).
+              تذاكر وصفقات وتجديدات لها من ٤٨ ساعة إلى ١٠ أيام بدون تحديث. راجع النص ووافق، وتنرسل باسمك كتعليق عادي فيه منشن في أوقات متفرقة خلال الدوام (السبت–الخميس).
             </p>
           </div>
         </div>
@@ -112,11 +122,32 @@ export default function TicketFollowupsPage() {
         <div className="flex items-center justify-center py-12 text-muted-foreground"><Loader2 className="w-6 h-6 animate-spin" /></div>
       ) : (
         <>
+          {/* فلتر الأقسام */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {([["all", allPending.length] as const, ...counts]).map(([k, n]) => (
+              <button
+                key={k}
+                onClick={() => setCat(k)}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold border transition-colors ${cat === k ? "bg-orange-500/20 text-orange-300 border-orange-500/30" : "border-white/[0.06] text-muted-foreground hover:text-foreground"}`}
+              >
+                {k === "all" ? "الكل" : CATEGORY_LABEL[k]} ({n})
+              </button>
+            ))}
+          </div>
+
           {/* بانتظار الموافقة */}
           <section className="space-y-2">
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-sm font-extrabold text-foreground">بانتظار موافقتك ({pending.length})</h2>
               {pending.length > 1 && (
+                <div className="flex items-center gap-1.5">
+                <button
+                  disabled={busy}
+                  onClick={() => { if (confirm(`رفض ${pending.length} متابعة؟`)) act({ action: "reject", ids: pending.map((f) => f.id) }, `تم رفض ${pending.length}`); }}
+                  className="flex items-center gap-1 rounded-[10px] px-3 py-1.5 text-xs font-bold text-red-300 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                >
+                  <X className="w-3.5 h-3.5" /> ارفض الكل
+                </button>
                 <button
                   disabled={busy}
                   onClick={() => act({ action: "approve", items: approveItems(pending) }, `تمت جدولة ${pending.length} متابعة`)}
@@ -124,18 +155,19 @@ export default function TicketFollowupsPage() {
                 >
                   <CheckCheck className="w-3.5 h-3.5" /> وافق على الكل
                 </button>
+                </div>
               )}
             </div>
             {pending.length === 0 ? (
               <div className="rounded-[14px] border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
-                ما فيه تذاكر ساكتة تحتاج متابعة 👌
+                ما فيه شي ساكت يحتاج متابعة 👌
               </div>
             ) : pending.map((f) => (
               <div key={f.id} className="rounded-[14px] border border-white/[0.08] bg-white/[0.02] p-3 space-y-2">
                 <div className="flex items-center justify-between gap-2 flex-wrap text-[12px]">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold text-foreground">#{f.ticket_number} {f.title}</span>
-                    <span className="rounded-md bg-white/[0.05] px-1.5 py-0.5 text-[10px] text-muted-foreground">{SOURCE_LABEL[f.source]}</span>
+                    <span className="font-bold text-foreground">{label(f)}</span>
+                    <span className="rounded-md bg-white/[0.05] px-1.5 py-0.5 text-[10px] text-muted-foreground">{CATEGORY_LABEL[catOf(f)]}</span>
                   </div>
                   <span className="text-muted-foreground">
                     {f.assignee_name} · <Clock className="inline w-3 h-3" /> بدون تحديث من {daysSince(f.last_activity_at)} يوم
@@ -174,7 +206,7 @@ export default function TicketFollowupsPage() {
               {scheduled.map((f) => (
                 <div key={f.id} className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] px-3 py-2 flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-[12px] text-muted-foreground">#{f.ticket_number} · {f.assignee_name}</p>
+                    <p className="text-[12px] text-muted-foreground">{label(f)} · {f.assignee_name} · {CATEGORY_LABEL[catOf(f)]}</p>
                     <p className="text-sm text-foreground truncate">{f.body}</p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
@@ -201,7 +233,7 @@ export default function TicketFollowupsPage() {
               <h2 className="text-sm font-extrabold text-muted-foreground">آخر ٧ أيام</h2>
               {done.map((f) => (
                 <div key={f.id} className="rounded-[12px] border border-white/[0.04] px-3 py-2 flex items-center justify-between gap-3 text-[12px]">
-                  <span className="text-muted-foreground truncate">#{f.ticket_number} · {f.assignee_name} — {f.body}</span>
+                  <span className="text-muted-foreground truncate">{label(f)} · {f.assignee_name} — {f.body}</span>
                   <span className={`shrink-0 ${f.status === "sent" ? "text-emerald-400" : "text-muted-foreground"}`}>
                     {STATUS_LABEL[f.status]}{f.status === "sent" ? ` · ${fmt(f.sent_at)}` : f.skip_reason ? ` · ${f.skip_reason}` : ""}
                   </span>
