@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyCronSecret } from "@/lib/cron-auth";
 import { sendPushToUser } from "@/lib/push";
-import { workClock, riyadhMinutes } from "@/lib/work-hours";
-import { getSuperAdmin, prepareDrafts, sendDue } from "@/lib/ticket-followups";
+import { riyadhMinutes } from "@/lib/work-hours";
+import { getSuperAdmin, inTeamHours, prepareDrafts, sendDue } from "@/lib/ticket-followups";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 /**
  * متابعة التذاكر الساكتة — يستدعيها pg_cron كل دقيقة:
  *  - يرسل المتابعات اللي وافق عليها السوبر أدمن وحان موعدها (كتعليق عادي باسمه فيه منشن).
- *  - كل ربع ساعة وقت الدوام: يجهّز مسودات للتذاكر اللي لها ٤٨ ساعة بدون تحديث (كل الأقسام)
+ *  - كل ربع ساعة وقت دوام الفريق (السبت–الخميس): يجهّز مسودات للتذاكر اللي لها ٤٨ ساعة بدون تحديث (كل الأقسام)
  *    ويشعر السوبر أدمن يراجعها في /ticket-followups. ما ينرسل شي بدون موافقته.
  */
 async function handle(req: NextRequest) {
@@ -24,7 +24,7 @@ async function handle(req: NextRequest) {
   let drafted = 0;
   const now = new Date();
   const force = req.nextUrl.searchParams.get("prepare") === "1";
-  if (force || (workClock(now).phase === "on" && riyadhMinutes(now) % 15 === 3)) {
+  if (force || (inTeamHours(now) && riyadhMinutes(now) % 15 === 3)) {
     drafted = await prepareDrafts();
     if (drafted > 0) {
       const admin = await getSuperAdmin();
