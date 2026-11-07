@@ -49,7 +49,7 @@ import { isFocusActive, useFocusActive } from "@/lib/focus-session";
 // daily-tasks: الصفحة نفسها تتحقق أن المستخدم مدير (السوبر أدمن أو مدراء المتابعة اليومية)
 const ALWAYS_ALLOWED_SLUGS = ["urgent-followup", "mentions", "daily-tasks"];
 // صفحات للسوبر أدمن فقط حتى لو الصلاحية مفعّلة للموظف
-const SUPER_ONLY_SLUGS = ["finance"];
+const SUPER_ONLY_SLUGS = ["finance", "ticket-followups"];
 
 /**
  * أول صفحة داخل المنصة يقدر الموظف يفتحها فعلاً — بمسارها الحقيقي من القائمة (الـslug مو دايماً
