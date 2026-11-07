@@ -89,7 +89,7 @@ export default function TicketFollowupsPage() {
           <div>
             <h1 className="text-xl font-extrabold text-foreground">متابعة التذاكر</h1>
             <p className="text-[12px] text-muted-foreground mt-0.5">
-              تذاكر لها ٤٨ ساعة بدون تحديث في كل الأقسام. راجع النص ووافق، وتنرسل باسمك كتعليق عادي فيه منشن في أوقات متفرقة خلال الدوام.
+              تذاكر لها ٤٨ ساعة بدون تحديث في كل الأقسام. راجع النص ووافق، وتنرسل باسمك كتعليق عادي فيه منشن في أوقات متفرقة خلال الدوام (السبت–الخميس).
             </p>
           </div>
         </div>

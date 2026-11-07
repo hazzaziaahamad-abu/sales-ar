@@ -1,7 +1,6 @@
 // متابعة التذاكر الساكتة (٤٨ ساعة بدون تحديث) — تجهيز مسودات، وبعد موافقة السوبر أدمن
 // تنرسل كتعليق عادي باسمه فيه منشن للموظف، في أوقات متفرقة طبيعية داخل الدوام.
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { isWorkday, nextWorkday } from "@/lib/work-hours";
 import { saudiDateStr } from "@/lib/utils/format";
 
 export const STALE_HOURS = 48;
@@ -140,6 +139,15 @@ const WINDOW_END = 15 * 60 + 5;
 const BREAK_FROM = 11 * 60 + 55;
 const BREAK_TO = 12 * 60 + 40;
 
+/** أيام دوام الفريق: كل الأيام ما عدا الجمعة (getUTCDay على تاريخ الرياض: الجمعة = 5). */
+const TEAM_OFF_DAYS = [5];
+const isTeamDay = (ymd: string) => !TEAM_OFF_DAYS.includes(new Date(`${ymd}T00:00:00Z`).getUTCDay());
+function nextTeamDay(ymd: string): string {
+  const d = new Date(`${ymd}T00:00:00Z`);
+  do d.setUTCDate(d.getUTCDate() + 1); while (!isTeamDay(d.toISOString().slice(0, 10)));
+  return d.toISOString().slice(0, 10);
+}
+
 const riyadhMin = (d: Date) => { const s = new Date(d.getTime() + RIYADH_MS); return s.getUTCHours() * 60 + s.getUTCMinutes(); };
 const atRiyadh = (ymd: string, min: number) => new Date(new Date(`${ymd}T00:00:00Z`).getTime() + min * 60_000 - RIYADH_MS);
 
@@ -148,7 +156,7 @@ function normalize(d: Date): Date {
   for (let guard = 0; guard < 20; guard++) {
     const day = saudiDateStr(d);
     const m = riyadhMin(d);
-    if (!isWorkday(day) || m >= WINDOW_END) { d = atRiyadh(nextWorkday(day), WINDOW_START + rand(0, 80)); continue; }
+    if (!isTeamDay(day) || m >= WINDOW_END) { d = atRiyadh(nextTeamDay(day), WINDOW_START + rand(0, 80)); continue; }
     if (m < WINDOW_START) { d = atRiyadh(day, WINDOW_START + rand(0, 60)); continue; }
     if (m >= BREAK_FROM && m < BREAK_TO) { d = atRiyadh(day, BREAK_TO + rand(0, 25)); continue; }
     break;
@@ -156,6 +164,12 @@ function normalize(d: Date): Date {
   const mm = new Date(d.getTime() + RIYADH_MS).getUTCMinutes();
   if (mm === 0 || mm === 30) d = new Date(d.getTime() + rand(2, 6) * 60_000);
   return new Date(d.getTime() + rand(0, 59) * 1000);
+}
+
+/** وقت دوام الفريق الحين؟ (لتجهيز المسودات) */
+export function inTeamHours(now = new Date()): boolean {
+  const m = riyadhMin(now);
+  return isTeamDay(saudiDateStr(now)) && m >= 7 * 60 && m < 15 * 60 + 30;
 }
 
 /** يوزّع n إرسالات بعد آخر موعد مجدول: أول وحدة بعد ٨–٢٥ د، وبينها ١٢–٥٠ د. */
