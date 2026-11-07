@@ -66,24 +66,28 @@ async function itemNow(source: FollowupSource, id: string): Promise<Item | null>
 
 // ─── نص المتابعة: قصير وبدون اسم العميل (الاسم أحياناً رقم جوال أو نقطة) ─────────
 
-/** صيغ عامة تصلح لكل شي. */
-const GENERAL = [
-  "احتاج تحديث",
-  "عطني آخر تحديث",
-  "وش آخر تحديث؟",
-  "طمني وش صار؟",
-  "وين وصلنا؟",
-  "ممكن تحديث لو سمحت؟",
+/** الموظفين الذكور — الباقي يُخاطَبون بصيغة الأنثى. */
+const MALE_ASSIGNEES = new Set(["علي"]);
+
+/** [مذكر، مؤنث] — صيغ عامة تصلح لكل شي. */
+const GENERAL: [string, string][] = [
+  ["احتاج تحديث", "احتاج تحديث"],
+  ["عطني آخر تحديث", "عطيني آخر تحديث"],
+  ["وش آخر تحديث؟", "وش آخر تحديث؟"],
+  ["طمني وش صار؟", "طمنيني وش صار؟"],
+  ["وين وصلنا؟", "وين وصلنا؟"],
+  ["ممكن تحديث لو سمحت؟", "ممكن تحديث لو سمحتي؟"],
 ];
 /** صيغ فيها «العميل» — للتذاكر والصفقات والتجديدات (مو الطلبات الداخلية). */
-const CLIENT = [
-  "ايش صار مع العميل؟",
-  "وش آخر شي مع العميل؟",
-  "تواصلت مع العميل؟ وش صار؟",
+const CLIENT: [string, string][] = [
+  ["ايش صار مع العميل؟", "ايش صار مع العميل؟"],
+  ["وش آخر شي مع العميل؟", "وش آخر شي مع العميل؟"],
+  ["تواصلت مع العميل؟ وش صار؟", "تواصلتي مع العميل؟ وش صار؟"],
 ];
 
 export function draftBody(source: FollowupSource, assignee: string, avoid = new Set<string>()): string {
-  const pool = source === "work" ? GENERAL : [...GENERAL, ...CLIENT];
+  const g = MALE_ASSIGNEES.has(assignee.trim()) ? 0 : 1;
+  const pool = (source === "work" ? GENERAL : [...GENERAL, ...CLIENT]).map((t) => t[g]);
   const choices = pool.filter((t) => !avoid.has(t));
   const t = pick(choices.length ? choices : pool);
   avoid.add(t);
