@@ -37,7 +37,17 @@ export async function GET() {
       if (!prev || n.created_at > prev.created_at) lastById.set(n.item_id, { author: n.author, body: n.body, created_at: n.created_at });
     }
   }
-  const withNotes = rows.map((r) => ({ ...r, last_note: lastById.get(r.ticket_id as string) ?? null }));
+  // مرحلة العميل الحالية (مرحلة الصفقة / حالة التجديد أو التذكرة)
+  const stageById = new Map<string, string>();
+  for (let i = 0; i < ids.length; i += 300) {
+    const { data } = await supabaseAdmin.rpc("followup_item_stages", { p_ids: ids.slice(i, i + 300) });
+    for (const r of (data ?? []) as { item_id: string; stage: string | null }[]) if (r.stage) stageById.set(r.item_id, r.stage);
+  }
+  const withNotes = rows.map((r) => ({
+    ...r,
+    last_note: lastById.get(r.ticket_id as string) ?? null,
+    stage: stageById.get(r.ticket_id as string) ?? null,
+  }));
   return NextResponse.json({ open: withNotes, done: done.data ?? [] });
 }
 

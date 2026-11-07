@@ -19,6 +19,7 @@ interface Followup {
   skip_reason: string | null;
   created_at: string;
   last_note?: { author: string | null; body: string; created_at: string } | null;
+  stage?: string | null;
 }
 
 type Category = "ticket" | "work" | "office_sales" | "support_sales" | "renewal";
@@ -53,6 +54,12 @@ function LastNote({ f, compact = false }: { f: Followup; compact?: boolean }) {
       <p className={`text-[12px] text-foreground/80 whitespace-pre-line ${compact ? "line-clamp-1" : "line-clamp-4"}`}>{n.body}</p>
     </div>
   );
+}
+
+/** شارة مرحلة العميل. */
+function Stage({ f }: { f: Followup }) {
+  if (!f.stage) return null;
+  return <span className="rounded-md bg-sky-500/10 border border-sky-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-sky-300">{f.stage}</span>;
 }
 
 function fmt(s: string | null): string {
@@ -191,6 +198,7 @@ export default function TicketFollowupsPage() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-bold text-foreground">{label(f)}</span>
                     <span className="rounded-md bg-white/[0.05] px-1.5 py-0.5 text-[10px] text-muted-foreground">{CATEGORY_LABEL[catOf(f)]}</span>
+                    <Stage f={f} />
                   </div>
                   <span className="text-muted-foreground">
                     {f.assignee_name} · <Clock className="inline w-3 h-3" /> بدون تحديث من {daysSince(f.last_activity_at)} يوم
@@ -230,7 +238,7 @@ export default function TicketFollowupsPage() {
               {scheduled.map((f) => (
                 <div key={f.id} className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] px-3 py-2 flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-[12px] text-muted-foreground">{label(f)} · {f.assignee_name} · {CATEGORY_LABEL[catOf(f)]}</p>
+                    <p className="flex items-center gap-1.5 flex-wrap text-[12px] text-muted-foreground">{label(f)} · {f.assignee_name} · {CATEGORY_LABEL[catOf(f)]} <Stage f={f} /></p>
                     <p className="text-sm text-foreground truncate">{f.body}</p>
                     <div className="mt-1"><LastNote f={f} compact /></div>
                   </div>
