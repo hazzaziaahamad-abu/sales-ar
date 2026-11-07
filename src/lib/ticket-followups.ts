@@ -64,46 +64,47 @@ async function itemNow(source: FollowupSource, id: string): Promise<Item | null>
   return ((data ?? []) as Item[])[0] ?? null;
 }
 
-// ─── نص المتابعة (صيغ متنوعة بأسلوب طبيعي) ────────────────────────────────────
+// ─── نص المتابعة: قصير وبدون اسم العميل (الاسم أحياناً رقم جوال أو نقطة) ─────────
 
-const NOUN: Record<FollowupSource, string> = {
-  support: "هالتذكرة", work: "هالتذكرة", deal: "هالعميل", renewal: "تجديد هالعميل",
-};
-
-type Tpl = (n: string, t: string, d: number, noun: string, src: FollowupSource) => string;
-const TEMPLATES: Tpl[] = [
-  (n, t, _d, noun) => `@${n} وش آخر المستجدات ${t ? `مع ${t}` : `على ${noun}`}؟`,
-  (n, _t, _d, noun) => `@${n} هلا، طمني وين وصلت في ${noun}؟ لو فيه شي معطّل قول لي`,
-  (n, _t, d) => `@${n} صار ${d} أيام تقريباً بدون جديد هنا، وش الوضع؟`,
-  (n, t, _d, noun) => `@${n} الله يعطيك العافية، ممكن تحدّثني ${t ? `عن ${t}` : `عن ${noun}`} بآخر شي صار؟`,
-  (n, _t, _d, noun) => `@${n} محتاج تحديث على ${noun} لو سمحت، وين وصلنا؟`,
-  (n, t) => `@${n} وش صار${t ? ` مع ${t}` : " في هالموضوع"}؟ حدّثني لو تكرمت`,
-  (n, t, _d, noun, src) => src === "support" || src === "work"
-    ? `@${n} أبي أعرف وضع ${noun}، خلصت ولا لسا شغال عليها؟`
-    : `@${n} تواصلت مع ${t || "العميل"} ولا لسا؟ وش آخر شي؟`,
+/** صيغ عامة تصلح لكل شي. */
+const GENERAL = [
+  "احتاج تحديث",
+  "عطني آخر تحديث",
+  "وش آخر تحديث؟",
+  "طمني وش صار؟",
+  "وين وصلنا؟",
+  "ممكن تحديث لو سمحت؟",
+];
+/** صيغ فيها «العميل» — للتذاكر والصفقات والتجديدات (مو الطلبات الداخلية). */
+const CLIENT = [
+  "ايش صار مع العميل؟",
+  "وش آخر شي مع العميل؟",
+  "تواصلت مع العميل؟ وش صار؟",
 ];
 
-export function draftBody(source: FollowupSource, assignee: string, title: string, lastActivity: string, avoid = new Set<number>()): string {
-  const days = Math.max(2, Math.floor((Date.now() - new Date(lastActivity).getTime()) / 86_400_000));
-  const clean = title.replace(/\s+/g, " ").trim();
-  const short = clean.length > 40 ? "" : clean;
-  const all = TEMPLATES.map((_, i) => i);
-  const choices = all.filter((i) => !avoid.has(i));
-  const i = pick(choices.length ? choices : all);
-  avoid.add(i);
-  return TEMPLATES[i](assignee, short, days, NOUN[source], source);
+export function draftBody(source: FollowupSource, assignee: string, avoid = new Set<string>()): string {
+  const pool = source === "work" ? GENERAL : [...GENERAL, ...CLIENT];
+  const choices = pool.filter((t) => !avoid.has(t));
+  const t = pick(choices.length ? choices : pool);
+  avoid.add(t);
+  return `@${assignee} ${t}`;
 }
 
-// ─── أوقات إرسال طبيعية داخل الدوام ───────────────────────────────────────────
+// ─── أوقات إرسال طبيعية حسب القسم ─────────────────────────────────────────────
 
 const RIYADH_MS = 3 * 3_600_000;
-/** بداية/نهاية نافذة الإرسال (دقائق بتوقيت الرياض) — بعد بداية الدوام بشوي وقبل نهايته. */
-const WINDOW_START = 7 * 60 + 40;
-const WINDOW_END = 15 * 60 + 5;
-/** وقت الظهر/الغداء — ما نرسل فيه. */
-const BREAK_FROM = 11 * 60 + 55;
-const BREAK_TO = 12 * 60 + 40;
-const WINDOW_MINUTES = WINDOW_END - WINDOW_START - (BREAK_TO - BREAK_FROM);
+const H = (h: number, m = 0) => h * 60 + m;
+
+interface SendWindow { start: number; end: number; breaks: [number, number][] }
+/** نافذة الإرسال لكل قسم (دقائق بتوقيت الرياض). */
+const WINDOWS: Record<FollowupCategory, SendWindow> = {
+  ticket:        { start: H(7, 40), end: H(15, 5), breaks: [[H(11, 55), H(12, 40)]] },
+  work:          { start: H(7, 40), end: H(15, 5), breaks: [[H(11, 55), H(12, 40)]] },
+  office_sales:  { start: H(9),     end: H(16, 55), breaks: [[H(11, 55), H(12, 40)]] }, // ٩ ص – ٥ م
+  support_sales: { start: H(13),    end: H(21, 55), breaks: [] },                      // ١ ظ – ١٠ م
+  renewal:       { start: H(13),    end: H(21, 55), breaks: [] },                      // ١ ظ – ١٠ م
+};
+const windowMinutes = (w: SendWindow) => w.end - w.start - w.breaks.reduce((s, [a, b]) => s + (b - a), 0);
 
 /** أيام دوام الفريق: كل الأيام ما عدا الجمعة (getUTCDay على تاريخ الرياض: الجمعة = 5). */
 const TEAM_OFF_DAYS = [5];
@@ -117,14 +118,15 @@ function nextTeamDay(ymd: string): string {
 const riyadhMin = (d: Date) => { const s = new Date(d.getTime() + RIYADH_MS); return s.getUTCHours() * 60 + s.getUTCMinutes(); };
 const atRiyadh = (ymd: string, min: number) => new Date(new Date(`${ymd}T00:00:00Z`).getTime() + min * 60_000 - RIYADH_MS);
 
-/** ينقل الوقت لأقرب لحظة صالحة: يوم دوام، داخل النافذة، خارج وقت الظهر، ومو على رأس الساعة/نصها. */
-function normalize(d: Date): Date {
+/** ينقل الوقت لأقرب لحظة صالحة: يوم دوام، داخل نافذة القسم، خارج الاستراحة، ومو على رأس الساعة/نصها. */
+function normalize(d: Date, w: SendWindow): Date {
   for (let guard = 0; guard < 20; guard++) {
     const day = saudiDateStr(d);
     const m = riyadhMin(d);
-    if (!isTeamDay(day) || m >= WINDOW_END) { d = atRiyadh(nextTeamDay(day), WINDOW_START + rand(0, 40)); continue; }
-    if (m < WINDOW_START) { d = atRiyadh(day, WINDOW_START + rand(0, 40)); continue; }
-    if (m >= BREAK_FROM && m < BREAK_TO) { d = atRiyadh(day, BREAK_TO + rand(0, 15)); continue; }
+    if (!isTeamDay(day) || m >= w.end) { d = atRiyadh(nextTeamDay(day), w.start + rand(3, 40)); continue; }
+    if (m < w.start) { d = atRiyadh(day, w.start + rand(3, 40)); continue; }
+    const br = w.breaks.find(([a, b]) => m >= a && m < b);
+    if (br) { d = atRiyadh(day, br[1] + rand(0, 15)); continue; }
     break;
   }
   const mm = new Date(d.getTime() + RIYADH_MS).getUTCMinutes();
@@ -132,25 +134,25 @@ function normalize(d: Date): Date {
   return new Date(d.getTime() + rand(0, 59) * 1000);
 }
 
-/** وقت دوام الفريق الحين؟ (لتجهيز المسودات) */
+/** وقت تجهيز المسودات (أيام الدوام، ٧ ص – ١٠ م). */
 export function inTeamHours(now = new Date()): boolean {
   const m = riyadhMin(now);
-  return isTeamDay(saudiDateStr(now)) && m >= 7 * 60 && m < 15 * 60 + 30;
+  return isTeamDay(saudiDateStr(now)) && m >= H(7) && m < H(22);
 }
 
 /**
- * يوزّع n إرسالات بعد آخر موعد مجدول بفواصل عشوائية. الفاصل يتناسب مع العدد: القليل يتباعد
- * (حتى ~٤٠ د)، والكثير يتقارب (أقل شي ~٢ د) عشان يخلص خلال يوم دوام تقريباً.
+ * يوزّع n إرسالات لقسم واحد داخل نافذته، بعد آخر موعد مجدول له، بفواصل عشوائية تتناسب مع العدد:
+ * القليل يتباعد (حتى ~٤٠ د) والكثير يتقارب (أقل شي ~٢ د) عشان يخلص خلال يوم تقريباً.
  */
-export function spreadSchedule(n: number, after: Date): Date[] {
+export function spreadSchedule(n: number, after: Date, category: FollowupCategory): Date[] {
+  const w = WINDOWS[category];
   const out: Date[] = [];
-  const avg = Math.min(40, Math.max(2.5, WINDOW_MINUTES / Math.max(1, n)));
+  const avg = Math.min(40, Math.max(2.5, windowMinutes(w) / Math.max(1, n)));
   let cursor = new Date(Math.max(Date.now(), after.getTime()) + rand(5, 15) * 60_000);
   for (let i = 0; i < n; i++) {
-    cursor = normalize(cursor);
+    cursor = normalize(cursor, w);
     out.push(cursor);
-    const gap = avg * (0.5 + Math.random());
-    cursor = new Date(cursor.getTime() + Math.round(gap * 60_000));
+    cursor = new Date(cursor.getTime() + Math.round(avg * (0.5 + Math.random()) * 60_000));
   }
   return out;
 }
@@ -194,14 +196,14 @@ export async function prepareDrafts(): Promise<number> {
   const fresh = stale.filter((s) => !openIds.has(s.id) && !recentlyRejected.has(s.id));
   if (!fresh.length) return 0;
 
-  const usedByAssignee = new Map<string, Set<number>>();
+  const usedByAssignee = new Map<string, Set<string>>();
   const rows = fresh.map((s) => {
-    const avoid = usedByAssignee.get(s.assignee) ?? new Set<number>();
+    const avoid = usedByAssignee.get(s.assignee) ?? new Set<string>();
     usedByAssignee.set(s.assignee, avoid);
     return {
       org_id: s.org_id, source: s.source, category: s.category, ticket_id: s.id, ticket_number: s.item_number,
       title: s.title, assignee_name: s.assignee, assignee_id: s.assignee_id, last_activity_at: s.last_activity,
-      body: draftBody(s.source, s.assignee, s.title, s.last_activity, avoid), status: "pending",
+      body: draftBody(s.source, s.assignee, avoid), status: "pending",
     };
   });
   // دفعات؛ ولو تعارضت دفعة مع الفهرس الفريد (تشغيلين متزامنين) نكمل واحد واحد
