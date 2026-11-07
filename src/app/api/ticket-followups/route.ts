@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getAuthUser, isSuperAdmin } from "@/lib/permissions";
-import { prepareDrafts, spreadSchedule } from "@/lib/ticket-followups";
+import { prepareDrafts, spreadSchedule, type FollowupCategory } from "@/lib/ticket-followups";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,18 +52,37 @@ export async function POST(req: NextRequest) {
     if (!items.length) return NextResponse.json({ error: "ما فيه شي للاعتماد" }, { status: 400 });
     if (!me.name) return NextResponse.json({ error: "اسمك غير مضبوط في الملف الشخصي" }, { status: 400 });
 
-    // نكمل بعد آخر موعد مجدول، وبترتيب عشوائي عشان ما تطلع بنفس ترتيب القائمة
-    const { data: last } = await supabaseAdmin.from("ticket_followups").select("send_at")
-      .eq("status", "approved").order("send_at", { ascending: false }).limit(1).maybeSingle();
-    const after = last?.send_at ? new Date(last.send_at as string) : new Date();
-    const shuffled = [...items].sort(() => Math.random() - 0.5);
-    const slots = spreadSchedule(shuffled.length, after);
+    // كل قسم له نافذة إرسال: نجدول كل قسم لحاله بعد آخر موعد مجدول له، وبترتيب عشوائي
+    const ids = items.map((i: { id: string }) => i.id);
+    const catById = new Map<string, FollowupCategory>();
+    for (let i = 0; i < ids.length; i += 200) {
+      const { data } = await supabaseAdmin.from("ticket_followups").select("id, category, source").in("id", ids.slice(i, i + 200));
+      for (const r of data ?? []) {
+        catById.set(r.id as string, (r.category as FollowupCategory | null) ?? (r.source === "support" ? "ticket" : (r.source as FollowupCategory)));
+      }
+    }
+    const groups = new Map<FollowupCategory, { id: string; body: string }[]>();
+    for (const it of items as { id: string; body: string }[]) {
+      const c = catById.get(it.id);
+      if (!c) continue;
+      groups.set(c, [...(groups.get(c) ?? []), it]);
+    }
+
+    const plan: { id: string; body: string; at: Date }[] = [];
+    for (const [cat, list] of groups) {
+      const { data: last } = await supabaseAdmin.from("ticket_followups").select("send_at")
+        .eq("status", "approved").eq("category", cat).order("send_at", { ascending: false }).limit(1).maybeSingle();
+      const after = last?.send_at ? new Date(last.send_at as string) : new Date();
+      const shuffled = [...list].sort(() => Math.random() - 0.5);
+      const slots = spreadSchedule(shuffled.length, after, cat);
+      shuffled.forEach((it, k) => plan.push({ ...it, at: slots[k] }));
+    }
 
     let approved = 0;
-    for (let i = 0; i < shuffled.length; i += 25) {
-      const res = await Promise.all(shuffled.slice(i, i + 25).map((it: { id: string; body: string }, k: number) =>
+    for (let i = 0; i < plan.length; i += 25) {
+      const res = await Promise.all(plan.slice(i, i + 25).map((it) =>
         supabaseAdmin.from("ticket_followups")
-          .update({ status: "approved", body: it.body, author_name: me.name, send_at: slots[i + k].toISOString(), decided_at: nowIso })
+          .update({ status: "approved", body: it.body, author_name: me.name, send_at: it.at.toISOString(), decided_at: nowIso })
           .eq("id", it.id).eq("status", "pending").select("id")));
       for (const r of res) approved += r.data?.length ?? 0;
     }
