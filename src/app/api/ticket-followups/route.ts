@@ -5,6 +5,7 @@ import { prepareDrafts, spreadSchedule } from "@/lib/ticket-followups";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 async function superAdmin() {
   const user = await getAuthUser();
@@ -30,9 +31,9 @@ export async function GET() {
 /**
  * POST
  *  { action: "approve", items: [{ id, body }] } → اعتماد + جدولة بأوقات متفرقة طبيعية
- *  { action: "reject", ids }                    → رفض (ما تنقترح التذكرة مرة ثانية ٤٨ ساعة)
+ *  { action: "reject", ids }                    → رفض (ما ينقترح العنصر مرة ثانية ٤٨ ساعة)
  *  { action: "unschedule", ids }                → إرجاع المجدولة لمسودات
- *  { action: "prepare" }                        → فحص التذاكر الساكتة الحين
+ *  { action: "prepare" }                        → فحص العناصر الساكتة الحين
  */
 export async function POST(req: NextRequest) {
   const me = await superAdmin();
@@ -59,11 +60,12 @@ export async function POST(req: NextRequest) {
     const slots = spreadSchedule(shuffled.length, after);
 
     let approved = 0;
-    for (let i = 0; i < shuffled.length; i++) {
-      const { data } = await supabaseAdmin.from("ticket_followups")
-        .update({ status: "approved", body: shuffled[i].body, author_name: me.name, send_at: slots[i].toISOString(), decided_at: nowIso })
-        .eq("id", shuffled[i].id).eq("status", "pending").select("id");
-      approved += data?.length ?? 0;
+    for (let i = 0; i < shuffled.length; i += 25) {
+      const res = await Promise.all(shuffled.slice(i, i + 25).map((it: { id: string; body: string }, k: number) =>
+        supabaseAdmin.from("ticket_followups")
+          .update({ status: "approved", body: it.body, author_name: me.name, send_at: slots[i + k].toISOString(), decided_at: nowIso })
+          .eq("id", it.id).eq("status", "pending").select("id")));
+      for (const r of res) approved += r.data?.length ?? 0;
     }
     return NextResponse.json({ ok: true, approved });
   }
@@ -72,8 +74,10 @@ export async function POST(req: NextRequest) {
   if (!ids.length) return NextResponse.json({ error: "ما فيه شي" }, { status: 400 });
 
   if (payload.action === "reject") {
-    await supabaseAdmin.from("ticket_followups").update({ status: "rejected", decided_at: nowIso })
-      .in("id", ids).in("status", ["pending", "approved"]);
+    for (let i = 0; i < ids.length; i += 200) {
+      await supabaseAdmin.from("ticket_followups").update({ status: "rejected", decided_at: nowIso })
+        .in("id", ids.slice(i, i + 200)).in("status", ["pending", "approved"]);
+    }
     return NextResponse.json({ ok: true });
   }
   if (payload.action === "unschedule") {

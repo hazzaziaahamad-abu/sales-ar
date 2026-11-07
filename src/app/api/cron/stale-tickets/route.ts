@@ -6,11 +6,12 @@ import { getSuperAdmin, inTeamHours, prepareDrafts, sendDue } from "@/lib/ticket
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 /**
  * متابعة التذاكر الساكتة — يستدعيها pg_cron كل دقيقة:
  *  - يرسل المتابعات اللي وافق عليها السوبر أدمن وحان موعدها (كتعليق عادي باسمه فيه منشن).
- *  - كل ربع ساعة وقت دوام الفريق (السبت–الخميس): يجهّز مسودات للتذاكر اللي لها ٤٨ ساعة بدون تحديث (كل الأقسام)
+ *  - كل ربع ساعة وقت دوام الفريق (السبت–الخميس): يجهّز مسودات للتذاكر والصفقات والتجديدات اللي لها ٤٨ ساعة إلى ١٠ أيام بدون تحديث
  *    ويشعر السوبر أدمن يراجعها في /ticket-followups. ما ينرسل شي بدون موافقته.
  */
 async function handle(req: NextRequest) {
@@ -30,8 +31,8 @@ async function handle(req: NextRequest) {
       const admin = await getSuperAdmin();
       if (admin) {
         await sendPushToUser(admin.id, {
-          title: "📋 تذاكر تحتاج متابعة",
-          body: `${drafted} تذكرة لها ٤٨ ساعة بدون تحديث — راجع المتابعات ووافق عليها`,
+          title: "📋 متابعات تنتظر موافقتك",
+          body: `${drafted} متابعة جديدة (تذاكر وصفقات وتجديدات) — راجعها ووافق عليها`,
           url: "/ticket-followups",
           tag: "ticket-followups",
         });
