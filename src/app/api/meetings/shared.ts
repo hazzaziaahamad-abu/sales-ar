@@ -1,4 +1,4 @@
-import { MEETING_TYPES, CLIENT_SCRIPT_KEYS } from "@/lib/meetings";
+import { MEETING_TYPES, CLIENT_SCRIPT_KEYS, CLIENT_PURPOSES } from "@/lib/meetings";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -58,6 +58,7 @@ function parseClientBrief(raw: unknown) {
   return {
     client_name: String(b.client_name ?? "").trim().slice(0, 200),
     client_phone: String(b.client_phone ?? "").trim().slice(0, 50),
+    purpose: CLIENT_PURPOSES.includes(b.purpose as never) ? b.purpose : "new",
     notes,
     done,
   };

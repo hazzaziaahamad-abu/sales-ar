@@ -89,20 +89,36 @@ export type ClientScriptKey = (typeof CLIENT_SCRIPT)[number]["key"];
 export const CLIENT_SCRIPT_KEYS = CLIENT_SCRIPT.map((s) => s.key) as ClientScriptKey[];
 
 /** أهداف اجتماع العميل. */
-export const CLIENT_MEETING_GOALS = ["بناء علاقة أفضل مع العميل", "استعراض جميع المميزات"];
+export const CLIENT_MEETING_GOALS = [
+  "استقطاب عملاء جدد",
+  "ترقية العملاء الحاليين",
+  "إلمام العميل بجميع مزايا المنصة",
+  "بناء علاقة أفضل مع العميل",
+];
+
+/** هدف اجتماع العميل: عميل جديد نستقطبه، أو عميل حالي نرقّيه. */
+export type ClientPurpose = "new" | "upgrade";
+export const CLIENT_PURPOSE_LABELS: Record<ClientPurpose, string> = {
+  new: "استقطاب عميل جديد",
+  upgrade: "ترقية عميل حالي",
+};
+export const CLIENT_PURPOSES = Object.keys(CLIENT_PURPOSE_LABELS) as ClientPurpose[];
 
 export interface ClientBrief {
   client_name: string;
   client_phone: string;
+  purpose: ClientPurpose;
   notes: Partial<Record<ClientScriptKey, string>>;
   done: ClientScriptKey[];
 }
 
-export const emptyClientBrief = (): ClientBrief => ({ client_name: "", client_phone: "", notes: {}, done: [] });
+export const emptyClientBrief = (): ClientBrief => ({ client_name: "", client_phone: "", purpose: "new", notes: {}, done: [] });
 
 /** يحوّل محاور الاجتماع لنص يصلح لوصف موعد Google Calendar. */
 export function clientScriptText(brief?: ClientBrief | null): string {
-  const lines: string[] = ["أهداف الاجتماع:", ...CLIENT_MEETING_GOALS.map((g) => `• ${g}`), "", "محاور الاجتماع:"];
+  const lines: string[] = [
+    ...(brief?.purpose ? [`هدف الاجتماع: ${CLIENT_PURPOSE_LABELS[brief.purpose]}`, ""] : []),
+    "أهداف الاجتماع:", ...CLIENT_MEETING_GOALS.map((g) => `• ${g}`), "", "محاور الاجتماع:"];
   CLIENT_SCRIPT.forEach((s, i) => {
     lines.push(`${i + 1}. ${s.title}`);
     s.questions.forEach((q) => lines.push(`   - ${q}`));

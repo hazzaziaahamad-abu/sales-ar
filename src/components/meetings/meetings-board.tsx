@@ -10,8 +10,8 @@ import { fetchUserProfiles } from "@/lib/supabase/db";
 import { todayLocal } from "@/lib/utils/format";
 import {
   MEETING_TYPE_LABELS, MEETING_TYPE_COLORS, MEETING_TYPES,
-  CLIENT_SCRIPT, CLIENT_MEETING_GOALS, emptyClientBrief, clientScriptText, googleCalendarUrl,
-  type Meeting, type MeetingType, type ClientBrief, type ClientScriptKey,
+  CLIENT_SCRIPT, CLIENT_MEETING_GOALS, CLIENT_PURPOSES, CLIENT_PURPOSE_LABELS, emptyClientBrief, clientScriptText, googleCalendarUrl,
+  type Meeting, type MeetingType, type ClientBrief, type ClientScriptKey, type ClientPurpose,
 } from "@/lib/meetings";
 
 const DAY_NAMES = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
@@ -65,6 +65,10 @@ function endTime(t: string, minutes: number): string {
   const total = (h * 60 + m + minutes) % (24 * 60);
   return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
+const PURPOSE_COLORS: Record<ClientPurpose, string> = {
+  new: "bg-emerald-500/15 text-emerald-300 border-emerald-500/25",
+  upgrade: "bg-sky-500/15 text-sky-300 border-sky-500/25",
+};
 const isLink = (s: string) => /^https?:\/\//i.test(s);
 const isMeetLink = (s: string) => /^https?:\/\/meet\.google\.com\//i.test(s);
 
@@ -218,6 +222,8 @@ export function MeetingsBoard({ embedded = false }: { embedded?: boolean }) {
     total: monthMeetings.length,
     client: monthMeetings.filter((m) => m.meeting_type === "client").length,
     clientDone: monthMeetings.filter((m) => m.meeting_type === "client" && m.status === "done").length,
+    clientNew: monthMeetings.filter((m) => m.meeting_type === "client" && (m.client_brief?.purpose ?? "new") === "new").length,
+    clientUpgrade: monthMeetings.filter((m) => m.meeting_type === "client" && m.client_brief?.purpose === "upgrade").length,
     noMinutes: monthMeetings.filter((m) => m.status === "done" && !m.minutes).length,
   }), [monthMeetings]);
 
@@ -297,6 +303,8 @@ export function MeetingsBoard({ embedded = false }: { embedded?: boolean }) {
         <div className="flex items-center gap-3 text-[12px] text-muted-foreground flex-wrap">
           <span>الشهر: <b className="text-foreground">{stats.total}</b></span>
           <span>مع عملاء: <b className="text-amber-300">{stats.client}</b> <span className="text-[11px]">(تم {stats.clientDone})</span></span>
+          <span>جدد: <b className="text-emerald-300">{stats.clientNew}</b></span>
+          <span>ترقية: <b className="text-sky-300">{stats.clientUpgrade}</b></span>
           {stats.noMinutes > 0 && <span className="text-amber-400">بدون محضر: <b>{stats.noMinutes}</b></span>}
         </div>
       </div>
@@ -546,7 +554,22 @@ function MeetingForm({ value, isNew, users, onChange, onCancel, onSave }: {
       </div>
 
       {isClient && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label className="block text-xs font-bold text-muted-foreground mb-1.5">هدف الاجتماع</label>
+            <div className="flex gap-1.5">
+              {CLIENT_PURPOSES.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setBrief({ purpose: p })}
+                  className={`flex-1 text-[12px] font-bold px-2 py-2.5 rounded-[10px] border transition-colors ${value.client_brief.purpose === p ? PURPOSE_COLORS[p] : "bg-white/[0.03] text-muted-foreground border-white/[0.06] hover:text-foreground"}`}
+                >
+                  {CLIENT_PURPOSE_LABELS[p]}
+                </button>
+              ))}
+            </div>
+          </div>
           <div>
             <label className="block text-xs font-bold text-muted-foreground mb-1.5">اسم العميل</label>
             <input value={value.client_brief.client_name} onChange={(e) => setBrief({ client_name: e.target.value })} placeholder="اسم العميل أو المنشأة" className={inputCls} />
@@ -718,6 +741,7 @@ function MeetingCard({ m, open, editable, onToggle, onEdit, onPatch, onDelete }:
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className={`text-[13px] font-bold ${cancelled ? "line-through text-muted-foreground" : "text-foreground"}`}>{m.title}</span>
             <span className={`cc-badge ${MEETING_TYPE_COLORS[m.meeting_type]}`}>{MEETING_TYPE_LABELS[m.meeting_type]}</span>
+            {isClient && <span className={`cc-badge border ${PURPOSE_COLORS[saved.purpose]}`}>{CLIENT_PURPOSE_LABELS[saved.purpose]}</span>}
             {isClient && !cancelled && <span className="cc-badge bg-white/[0.06] text-muted-foreground">المحاور {progress}/{CLIENT_SCRIPT.length}</span>}
             {done && <span className="cc-badge bg-emerald-500/15 text-emerald-400">تم</span>}
             {cancelled && <span className="cc-badge bg-slate-500/15 text-slate-400">ملغي</span>}
