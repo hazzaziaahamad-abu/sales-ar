@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { riyadhDate } from "@/lib/daily-tasks/shared";
 import { getDeskAccess } from "@/lib/content-desk/server";
-import { apifyConnected, syncCompetitors } from "@/lib/content-desk/competitors-sync";
+import { syncCompetitors } from "@/lib/content-desk/competitors-sync";
 import {
   COMPETITOR_COLS, POST_COLS, SNAPSHOT_COLS, cleanUsername,
   type Competitor, type CompetitorPost, type CompetitorSnapshot, type CompetitorsPayload,
@@ -42,7 +42,7 @@ export async function GET() {
     : [{ data: [] }, { data: [] }];
 
   const payload: CompetitorsPayload = {
-    me: { id: me.id, isManager: me.isManager }, today, connected: apifyConnected(),
+    me: { id: me.id, isManager: me.isManager }, today,
     competitors: (comps ?? []) as Competitor[],
     snapshots: ((snaps.data ?? []) as CompetitorSnapshot[]).map((s) => ({ ...s, engagement_rate: s.engagement_rate != null ? Number(s.engagement_rate) : null })),
     posts: (posts.data ?? []) as CompetitorPost[],
@@ -78,13 +78,12 @@ export async function POST(req: NextRequest) {
     if ((count ?? 0) >= 30) return err("الحد ٣٠ منافس");
     const { data, error } = await supabaseAdmin.from("content_competitors").insert({ ...row, org_id: orgId, created_by: me.id }).select(COMPETITOR_COLS).single();
     if (error) return err(error.message, 500);
-    // أول سحب مباشرة لو الأداة مربوطة
-    if (apifyConnected()) await syncCompetitors([data as Competitor]).catch(() => null);
+    // أول سحب مباشرة
+    await syncCompetitors([data as Competitor], 60_000).catch(() => null);
     return NextResponse.json({ competitor: data });
   }
 
   if (body.action === "sync") {
-    if (!apifyConnected()) return err("أداة السحب غير مربوطة — أضف APIFY_TOKEN في إعدادات الاستضافة");
     let q = supabaseAdmin.from("content_competitors").select(COMPETITOR_COLS).eq("org_id", orgId).eq("active", true);
     if (body.id) { if (!UUID.test(body.id)) return err("معرّف غير صالح"); q = q.eq("id", body.id); }
     const { data } = await q;
