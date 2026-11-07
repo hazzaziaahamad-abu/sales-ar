@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import {
   Sheet,
   SheetContent,
@@ -580,6 +581,9 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
   const [mentionStart, setMentionStart] = useState(-1);
   /* one-time scroll guard for the highlighted (mentioned) note */
   const scrolledHighlightRef = useRef<string | null>(null);
+  const scrollBoxRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const pathname = usePathname();
   /* reminder */
   const [showReminderPicker, setShowReminderPicker] = useState(false);
   const [reminderDate, setReminderDate] = useState("");
@@ -615,9 +619,13 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
     if (!data.notes.some((n) => n.id === highlightNoteId)) return;
     const raf = requestAnimationFrame(() => {
       const el = document.getElementById(`note-${highlightNoteId}`);
-      if (el) {
+      const box = scrollBoxRef.current;
+      if (el && box) {
         scrolledHighlightRef.current = highlightNoteId;
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        // نمرّر صندوق اللوحة فقط — scrollIntoView كان يحرّك الصفحة كاملة (أفقياً
+        // كمان) فتطلع اللوحة مزاحة لما تتسكر.
+        const top = el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
+        box.scrollTo({ top: Math.max(0, top - box.clientHeight / 2 + el.clientHeight / 2), behavior: "smooth" });
       }
     });
     return () => cancelAnimationFrame(raf);
@@ -818,6 +826,18 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
 
   const handleClose = () => {
     onClose();
+    // نشيل باراميترات المنشن من الرابط عشان تحديث الصفحة ما يعيد فتح الملخص
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("profile") || params.has("noteId")) {
+      params.delete("profile");
+      params.delete("noteId");
+      params.delete("t");
+      const qs = params.toString();
+      router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
+    }
+    // احتياط: لو الصفحة انزاحت أفقياً نرجعها لمكانها
+    const se = document.scrollingElement;
+    if (se && se.scrollLeft !== 0) se.scrollLeft = 0;
     setTimeout(() => {
       setSearch("");
       setData(null);
@@ -1012,7 +1032,7 @@ export function ClientProfilePanel({ open, onClose, initialQuery, highlightNoteI
         </SheetHeader>
 
         {/* التمرير داخل div عادي بدل نافذة الـ Sheet نفسها — على الآيفون ما كان يتحرك */}
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 space-y-3">
+        <div ref={scrollBoxRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 space-y-3">
           {loading && (
             <div className="flex items-center justify-center py-12">
               <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
