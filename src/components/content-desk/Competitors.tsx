@@ -111,7 +111,7 @@ export default function Competitors() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {data.connected && competitors.length > 0 && (
+          {competitors.length > 0 && (
             <button disabled={syncing} onClick={() => syncNow()} className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-4 py-2 text-sm disabled:opacity-60">
               <RefreshCw className={cn("h-4 w-4", syncing && "animate-spin")} /> {syncing ? "جاري السحب… (دقيقة أو دقيقتين)" : "سحب الآن"}
             </button>
@@ -122,12 +122,6 @@ export default function Competitors() {
         </div>
       </div>
 
-      {!data.connected && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-300">
-          <b>أداة السحب التلقائي غير مربوطة بعد.</b> نستخدم Apify لسحب انستقرام وتيك توك يومياً — أضف <code dir="ltr" className="rounded bg-black/30 px-1">APIFY_TOKEN</code> في متغيرات Vercel ويشتغل السحب تلقائياً.
-          لين ذاك تقدر تدخل أرقام اليوم يدوياً من زر «يدوي» جنب كل حساب.
-        </div>
-      )}
       {error && (
         <div className="flex items-center justify-between rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-400">
           {error}<button onClick={() => setError(null)} aria-label="إغلاق"><X className="h-4 w-4" /></button>
@@ -222,7 +216,7 @@ export default function Competitors() {
       {manual && <ManualModal c={manual.c} p={manual.p} onClose={() => setManual(null)} onSaved={async () => { setManual(null); await load(); }} />}
       {openId && (() => {
         const c = competitors.find((x) => x.id === openId);
-        return c ? <Detail c={c} today={today} exact={exact} posts={posts.filter((x) => x.competitor_id === c.id)} connected={data.connected}
+        return c ? <Detail c={c} today={today} exact={exact} posts={posts.filter((x) => x.competitor_id === c.id)} 
           syncing={syncing} onSync={() => syncNow(c.id)} onClose={() => setOpenId(null)} /> : null;
       })()}
     </div>
@@ -308,8 +302,8 @@ function PostCard({ x, name }: { x: CompetitorPost; name: string }) {
   );
 }
 
-function Detail({ c, today, exact, posts, connected, syncing, onSync, onClose }: {
-  c: Competitor; today: string; exact: SnapFn; posts: CompetitorPost[]; connected: boolean; syncing: boolean; onSync: () => void; onClose: () => void;
+function Detail({ c, today, exact, posts, syncing, onSync, onClose }: {
+  c: Competitor; today: string; exact: SnapFn; posts: CompetitorPost[]; syncing: boolean; onSync: () => void; onClose: () => void;
 }) {
   const plats = (["ig", "tt"] as const).filter((p) => handleOf(c, p));
   const days = Array.from({ length: 14 }, (_, i) => addDays(today, -i));
@@ -329,7 +323,7 @@ function Detail({ c, today, exact, posts, connected, syncing, onSync, onClose }:
             {c.note && <p className="mt-2 text-xs text-muted-foreground">{c.note}</p>}
           </div>
           <div className="flex gap-2">
-            {connected && <button disabled={syncing} onClick={onSync} className="grid h-8 w-8 place-items-center rounded-lg border border-border" aria-label="سحب الآن"><RefreshCw className={cn("h-4 w-4", syncing && "animate-spin")} /></button>}
+            <button disabled={syncing} onClick={onSync} className="grid h-8 w-8 place-items-center rounded-lg border border-border" aria-label="سحب الآن"><RefreshCw className={cn("h-4 w-4", syncing && "animate-spin")} /></button>
             <button onClick={onClose} aria-label="إغلاق"><X className="h-5 w-5" /></button>
           </div>
         </div>
