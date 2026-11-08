@@ -110,12 +110,14 @@ const PRODUCTS: Record<ProductKey, Product> = {
     calc: [
       { key: "orders", label: "طلبات يومياً", min: 10, max: 600, step: 5, def: 80, unit: "طلب" },
       { key: "ticket", label: "متوسط الفاتورة", min: 10, max: 300, step: 5, def: 45, unit: "ريال" },
+      { key: "basket", label: "زيادة الفاتورة بتحسين المنيو والاقتراحات", min: 0, max: 30, step: 1, def: 10, unit: "٪" },
       { key: "uplift", label: "زيادة الزيارات بالولاء", min: 0, max: 30, step: 1, def: 8, unit: "٪" },
       { key: "delivery", label: "طلبات توصيل يومياً", min: 0, max: 300, step: 5, def: 25, unit: "طلب" },
       { key: "shift", label: "نسبة تتحوّل لطلب مباشر", min: 0, max: 50, step: 1, def: 10, unit: "٪" },
       { key: "printing", label: "تكلفة طباعة المنيو سنوياً", min: 0, max: 6000, step: 100, def: 1200, unit: "ريال" },
     ],
     compute: (v) => [
+      { label: "زيادة متوسط الفاتورة (المنيو والاقتراحات)", value: v.orders * 30 * v.ticket * (v.basket / 100), color: "#22C55E" },
       { label: "زيارات إضافية من الولاء", value: v.orders * 30 * v.ticket * (v.uplift / 100), color: "var(--acc)" },
       { label: "عمولات توصيل موفّرة", value: v.delivery * 30 * (v.shift / 100) * v.ticket * 0.2, color: "#F5B301" },
       { label: "توفير الطباعة", value: v.printing / 12, color: "#38BDF8" },
@@ -356,6 +358,7 @@ function defaultContent(p: Product): Content {
           "إبراز المنيو والباركود في جميع الأماكن: الطاولات، الكاونتر، الواجهة، والسوشال ميديا",
           "تحفيز الموظفين يكونون فعّالين في دعوة العملاء لبطاقات الولاء",
           "تشجيع العملاء على الطلب من المنيو الإلكتروني بدل الطلب التقليدي",
+          "تحسين المنيو: صور احترافية، إبراز الأصناف الأعلى ربحاً، وتفعيل الاقتراحات والإضافات والكومبو عند الطلب",
           "تفعيل العروض والإشعارات في المواسم بالتنسيق مع فريقنا",
         ]
       : [
@@ -1722,6 +1725,25 @@ function MeetingPlanInner() {
                   />
                 </div>
               ))}
+              {productKey === "menu" && (
+                <div className="rounded-2xl border p-4" style={{ borderColor: "#22C55E55", background: "#22C55E0F" }}>
+                  <div className="mb-2 flex items-center gap-2 text-sm font-black text-[var(--ink)]">
+                    <TrendingUp size={16} style={{ color: "#22C55E" }} /> كيف ترتفع الفاتورة؟
+                  </div>
+                  <ul className="grid gap-1.5 text-xs leading-relaxed text-[var(--body)] sm:grid-cols-2">
+                    {[
+                      "صور احترافية تفتح الشهية",
+                      "إبراز الأصناف الأعلى ربحاً",
+                      "اقتراحات «يُطلب معه» عند الطلب",
+                      "إضافات وأحجام أكبر بضغطة",
+                      "عروض كومبو ووجبات مجمّعة",
+                      "ترتيب الأقسام بذكاء",
+                    ].map((t) => (
+                      <li key={t} className="flex items-start gap-1.5"><Check size={14} className="mt-0.5 shrink-0" style={{ color: "#22C55E" }} />{t}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </Reveal>
 
@@ -1761,7 +1783,7 @@ function MeetingPlanInner() {
                 </span>
               </div>
               <p className="text-[11px] leading-relaxed text-[var(--faint)]">
-                * تقديرات استرشادية مبنية على الأرقام المُدخلة{productKey === "menu" ? " (عمولة توصيل افتراضية ٢٠٪)" : " (انخفاض الغياب ٥٠٪ بالتذكير)"}، والنتائج الفعلية تختلف حسب النشاط والتطبيق.
+                * تقديرات استرشادية مبنية على الأرقام المُدخلة{productKey === "menu" ? " (عمولة توصيل افتراضية ٢٠٪، وزيادة الفاتورة من الصور والاقتراحات والإضافات داخل المنيو)" : " (انخفاض الغياب ٥٠٪ بالتذكير)"}، والنتائج الفعلية تختلف حسب النشاط والتطبيق.
               </p>
             </div>
           </Reveal>
