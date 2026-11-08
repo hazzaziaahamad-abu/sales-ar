@@ -245,6 +245,12 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
   const snoozedActions = teamActions.filter(isSnoozed).map((item) => ({ item, until: snoozes[actionKey(item)] }));
   const blockers = TEAM.map((m) => ({ member: m, text: entries[m]?.blocker?.trim() ?? "" })).filter((b) => b.text);
   const teamAlerts = actions.length + blockers.length;
+  // الموظف: «تحتاج انتباه» = بنوده هو (نفس رقم قائمته) — والمؤجّل يطلع له بنوده فقط
+  const ownView = !isManager && !!myMember;
+  const alertsCount = ownView
+    ? actions.filter((a) => a.member === myMember).length + blockers.filter((b) => b.member === myMember).length
+    : teamAlerts;
+  const visibleSnoozed = ownView ? snoozedActions.filter((s) => s.item.member === myMember) : snoozedActions;
   const isToday = date === todayLocal();
   const winning = followupsHit === TEAM.length;
 
@@ -385,9 +391,9 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
               onClick={() => document.getElementById("huddle-actions")?.scrollIntoView({ behavior: "smooth", block: "start" })}
               className="min-w-0 text-xs text-muted-foreground text-right cursor-pointer hover:text-foreground"
             >
-              تحتاج انتباه الآن
-              <div className={`text-lg font-bold leading-tight ${teamAlerts ? "text-red-400" : "text-emerald-400"}`}>{teamAlerts}</div>
-              {teamAlerts > 0 && <div className="text-[10px] underline">عرض القائمة ↓</div>}
+              {ownView ? "بنودك تحتاج انتباه" : "تحتاج انتباه الآن"}
+              <div className={`text-lg font-bold leading-tight ${alertsCount ? "text-red-400" : "text-emerald-400"}`}>{alertsCount}</div>
+              {alertsCount > 0 && <div className="text-[10px] underline">عرض القائمة ↓</div>}
             </button>
           </div>
         )}
@@ -405,7 +411,7 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
             onRefresh={load}
             refreshing={loading}
             isManager={isManager}
-            snoozed={snoozedActions}
+            snoozed={visibleSnoozed}
             onSnooze={snoozeAction}
           />
         </div>
