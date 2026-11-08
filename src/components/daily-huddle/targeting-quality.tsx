@@ -5,6 +5,7 @@ import { Star, ChevronRight, ChevronLeft, Loader2, Check, TrendingUp, TrendingDo
 import { useAuth } from "@/lib/auth-context";
 import { getEditableContent, saveEditableContent, getEditableContentRange } from "@/lib/supabase/db";
 import { todayLocal } from "@/lib/utils/format";
+import { memberOf } from "@/lib/huddle-kpis";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   TEAM, KEY_PREFIX, QUALITY, qualityAvg, qualityColor, weekStart, addDays, type QualityScores,
@@ -43,7 +44,9 @@ export function TargetingQualityTab({ isManager }: { isManager: boolean }) {
   const [saved, setSaved] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
 
-  const visibleTeam = isManager ? TEAM : TEAM.filter((m) => m === myFirstName);
+  // بالكرت لا بالنص: «Manal» ← منال، «هنا» ← عواطف
+  const myMember = memberOf(myFirstName);
+  const visibleTeam = isManager ? TEAM : TEAM.filter((m) => m === myMember);
 
   const load = useCallback(async () => {
     try {
