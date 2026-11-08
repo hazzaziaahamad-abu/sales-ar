@@ -9,7 +9,7 @@ import {
   type HuddleKpis, type KpiKey, type KpiTargets,
 } from "@/lib/huddle-kpis";
 import { todayLocal, formatMoneyFull, formatMoney } from "@/lib/utils/format";
-import { ActionQueue } from "@/components/daily-huddle/action-queue";
+import { ActionQueue, actionKey } from "@/components/daily-huddle/action-queue";
 import { SecretaryView } from "@/components/secretary/secretary-view";
 import { RecentUpdatesView } from "@/components/recent-updates/recent-updates-view";
 import { ChallengesHub } from "@/components/daily-huddle/challenges-hub";
@@ -25,12 +25,15 @@ import { HuddleManagersButton } from "@/components/daily-huddle/huddle-managers-
 import { useHuddleManagers } from "@/lib/huddle-managers";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CalendarClock, Users, Trophy, Save, Check, Settings2, Compass, HeartPulse, Activity, ShieldQuestion, Star, ClipboardCheck, Sprout } from "lucide-react";
+import { CalendarClock, Users, Trophy, Save, Check, Settings2, Compass, HeartPulse, Activity, ShieldQuestion, Star, ClipboardCheck, Sprout, MoreHorizontal } from "lucide-react";
 
 // النموذج: اجتماع يومي قصير (Daily Huddle) + لوحة نتائج بمقاييس الأفعال (4DX).
 // مؤشرات كل موظف تُقرأ تلقائياً من اللوحة (سجل المتابعة، الصفقات، التذاكر، التجديدات) — راجع lib/huddle-kpis.
 // الموظف يكتب هنا فقط: أهم 3 أشياء اليوم + العائق.
 const KPI_TARGETS_KEY = `${KEY_PREFIX}_kpi_targets`;
+/** البنود اللي أجّلها المدير من «قائمة الإجراءات»: مفتاح البند → تاريخ رجوعه (YYYY-MM-DD). */
+const SNOOZE_KEY = `${KEY_PREFIX}_action_snooze`;
+type SnoozeMap = Record<string, string>;
 
 /** التزام اليوم — يُقيَّم في اليوم التالي: نُفّذ (true) أو لم يُنفَّذ (false). */
 interface Commitment {
@@ -109,6 +112,7 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
   const [week, setWeek] = useState<{ key: string; value: Entry }[]>([]);
   const [kpis, setKpis] = useState<HuddleKpis | null>(null);
   const [targets, setTargets] = useState<KpiTargets>(DEFAULT_KPI_TARGETS);
+  const [snoozes, setSnoozes] = useState<SnoozeMap>({});
   const [editingTargets, setEditingTargets] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
@@ -135,13 +139,15 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
     setLoading(true);
     setError(null);
     try {
-      const [t, rows, k] = await Promise.all([
+      const [t, rows, k, sz] = await Promise.all([
         getEditableContent<KpiTargets>(KPI_TARGETS_KEY),
         // من بداية الأسبوع أو أمس (أيهما أسبق) — نحتاج أمس لتقييم التزاماته.
         getEditableContentRange<Entry>(`${KEY_PREFIX}:${fromDay}`, `${KEY_PREFIX}:${date}:￿`),
         fetchHuddleKpis(date, fromDay),
+        getEditableContent<SnoozeMap>(SNOOZE_KEY).catch(() => null),
       ]);
       if (t) setTargets(t);
+      setSnoozes(sz ?? {});
       setKpis(k);
       setWeek(rows);
       const today: Record<string, Entry> = {};
@@ -193,6 +199,17 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
     }
   }
 
+  // نقرأ آخر نسخة قبل الحفظ (أكثر من مدير ممكن يأجّل بنفس الوقت) ونحذف المنتهي.
+  async function snoozeAction(key: string, until: string | null) {
+    const today = todayLocal();
+    const latest = (await getEditableContent<SnoozeMap>(SNOOZE_KEY)) ?? {};
+    const next: SnoozeMap = Object.fromEntries(Object.entries(latest).filter(([, u]) => u > today));
+    if (until) next[key] = until;
+    else delete next[key];
+    await saveEditableContent(SNOOZE_KEY, next);
+    setSnoozes(next);
+  }
+
   async function saveTargets() {
     try {
       await saveEditableContent(KPI_TARGETS_KEY, targets);
@@ -217,7 +234,12 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
   const teamRevenueGoal = TEAM.reduce((s, n) => s + tgt(n, "closesValue") + tgt(n, "renewalsValue"), 0);
   // «تحتاج انتباه» = عدد بنود «قائمة الإجراءات» بالضبط (كل الصفقات/التجديدات/التذاكر المعلّقة + العوائق)،
   // حتى لو البند خارج مؤشرات دور الموظف (مثلاً تذكرة مسندة لمنال).
-  const actions = (kpis?.actions ?? []).filter((a) => TEAM.includes(a.member));
+  // المؤجّل (تاريخ رجوعه بعد اليوم) يطلع من القائمة والعدّاد
+  const todayStr = todayLocal();
+  const teamActions = (kpis?.actions ?? []).filter((a) => TEAM.includes(a.member));
+  const isSnoozed = (a: { type: string; id: string }) => (snoozes[`${a.type}:${a.id}`] ?? "") > todayStr;
+  const actions = teamActions.filter((a) => !isSnoozed(a));
+  const snoozedActions = teamActions.filter(isSnoozed).map((item) => ({ item, until: snoozes[actionKey(item)] }));
   const blockers = TEAM.map((m) => ({ member: m, text: entries[m]?.blocker?.trim() ?? "" })).filter((b) => b.text);
   const teamAlerts = actions.length + blockers.length;
   const isToday = date === todayLocal();
@@ -378,6 +400,9 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
             isPastDate={!isToday}
             onRefresh={load}
             refreshing={loading}
+            isManager={isManager}
+            snoozed={snoozedActions}
+            onSnooze={snoozeAction}
           />
         </div>
       )}
@@ -594,6 +619,8 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"];
 const MANAL_ONLY_TABS: TabKey[] = ["compass", "health", "activity", "challenges", "ideas"];
+/** التبويبات الظاهرة دائماً — الباقي تحت «المزيد» عشان ما يصير شريط تبويبات يتمرر على الجوال. */
+const PRIMARY_TABS: TabKey[] = ["team", "verify", "quality"];
 
 export default function DailyHuddlePage() {
   return (
@@ -612,6 +639,9 @@ function DailyHuddleTabs() {
   const initialTab = tabs.find((t) => t.key === searchParams.get("tab"))?.key ?? "team";
   const [tab, setTab] = useState<TabKey>(initialTab);
   const [verifyPending, setVerifyPending] = useState(0);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreTabs = tabs.filter((t) => !PRIMARY_TABS.includes(t.key));
+  const activeMore = moreTabs.find((t) => t.key === tab);
   const huddleManagers = useHuddleManagers();
   const { isManager } = huddleManagers;
 
@@ -639,7 +669,7 @@ function DailyHuddleTabs() {
         </div>
         <div>
           <h1 className="text-lg font-bold text-foreground">المتابعة اليومية</h1>
-          <p className="text-xs text-muted-foreground">الفريق · جودة الاستهداف · طلبات التحقق{canUseIdeas(user) ? " · بوصلة اليوم · صحة الأقسام · نشاط الفريق · التحديات والطلبات" : ""}</p>
+          <p className="text-xs text-muted-foreground">الأرقام والإجراءات المطلوبة من مكان واحد</p>
         </div>
         {huddleManagers.isOwner && (
           <div className="mr-auto">
@@ -648,24 +678,56 @@ function DailyHuddleTabs() {
         )}
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-        {tabs.map(({ key, label, icon: Icon }) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={`flex items-center gap-2 shrink-0 rounded-[14px] px-4 py-2.5 text-sm font-bold transition-all border ${
-              tab === key
-                ? "bg-violet-500/15 text-violet-300 border-violet-500/30"
-                : "bg-white/[0.03] text-muted-foreground hover:text-foreground border-white/[0.06]"
-            }`}
-          >
-            <Icon className="w-4 h-4" />
-            {label}
-            {key === "verify" && verifyPending > 0 && (
-              <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-teal-500 text-white text-[10px] font-bold flex items-center justify-center">{verifyPending}</span>
-            )}
-          </button>
-        ))}
+      <div className="space-y-2">
+        <div className="flex gap-2 flex-wrap">
+          {tabs.filter((t) => PRIMARY_TABS.includes(t.key)).map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => { setTab(key); setMoreOpen(false); }}
+              className={`flex items-center gap-1.5 shrink-0 rounded-[14px] px-3 py-2 text-sm font-bold transition-all border ${
+                tab === key
+                  ? "bg-violet-500/15 text-violet-300 border-violet-500/30"
+                  : "bg-white/[0.03] text-muted-foreground hover:text-foreground border-white/[0.06]"
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              {label}
+              {key === "verify" && verifyPending > 0 && (
+                <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-teal-500 text-white text-[10px] font-bold flex items-center justify-center">{verifyPending}</span>
+              )}
+            </button>
+          ))}
+          {moreTabs.length > 0 && (
+            <button
+              onClick={() => setMoreOpen((v) => !v)}
+              className={`flex items-center gap-1.5 shrink-0 rounded-[14px] px-3 py-2 text-sm font-bold transition-all border ${
+                activeMore
+                  ? "bg-violet-500/15 text-violet-300 border-violet-500/30"
+                  : "bg-white/[0.03] text-muted-foreground hover:text-foreground border-white/[0.06]"
+              }`}
+            >
+              {activeMore ? <activeMore.icon className="w-4 h-4" /> : <MoreHorizontal className="w-4 h-4" />}
+              {activeMore ? activeMore.label : "المزيد"}
+              <span className="text-[10px] opacity-70">{moreOpen ? "▴" : "▾"}</span>
+            </button>
+          )}
+        </div>
+        {moreOpen && moreTabs.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-2">
+            {moreTabs.map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                onClick={() => { setTab(key); setMoreOpen(false); }}
+                className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-right border ${
+                  tab === key ? "bg-violet-500/15 text-violet-300 border-violet-500/30" : "bg-transparent text-muted-foreground hover:text-foreground border-transparent"
+                }`}
+              >
+                <Icon className="w-4 h-4 shrink-0" />
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {tab === "team" && <TeamTodayTab isManager={isManager} />}
