@@ -53,6 +53,7 @@ import {
   Trophy,
   Lightbulb,
   Siren,
+  Sun,
   BellRing,
   AtSign,
   Presentation,
@@ -70,6 +71,7 @@ import { useHuddleManagers } from "@/lib/huddle-managers";
 
 export const NAV_ITEMS = [
   // هام جداً — ظاهرة لكل الموظفين دائماً (بدون صلاحية) عشان ما تضيع متابعة انتظار الدفع / التجريبي / التجهيز
+  { label: "يومي", href: "/my-day", slug: "my-day", icon: Sun, color: "amber", group: "عام", alwaysVisible: true },
   { label: "هام جداً للمتابعة اليومية", href: "/urgent-followup", slug: "urgent-followup", icon: Siren, color: "red", group: "عام", alwaysVisible: true, urgent: true },
   { label: "المتابعة اليومية", href: "/daily-huddle", slug: "daily-huddle", icon: CalendarCheck, color: "violet", group: "عام" },
   // للمدير: تقارير «مهام اليوم» + الأهداف والإعدادات

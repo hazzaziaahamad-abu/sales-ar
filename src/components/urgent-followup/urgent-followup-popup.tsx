@@ -50,8 +50,17 @@ export function UrgentFollowupPopup() {
     return () => { alive = false; };
   }, [user?.name, admin, activeOrgId]);
 
+  // «يومي» فيها نفس القائمة مرتبة — لو فتحها الموظف نعتبرها اطلاع اليوم وما نطلع النافذة
+  const onMyDay = pathname.startsWith("/my-day");
+  useEffect(() => {
+    if (!onMyDay || !user?.name || admin) return;
+    try { localStorage.setItem(storageKey(user.name), "1"); } catch { /* ignore */ }
+  }, [onMyDay, user?.name, admin]);
+
   // ما نزعج الموظف وهو داخل الصفحة نفسها
-  if (!show || !user || pathname.startsWith("/urgent-followup")) return null;
+  if (!show || !user || pathname.startsWith("/urgent-followup") || (onMyDay && !admin)) return null;
+  // اطّلع عليها اليوم من «يومي» بعد ما انجلبت؟ ما نعيدها
+  try { if (!admin && localStorage.getItem(storageKey(user.name))) return null; } catch { /* ignore */ }
 
   const ack = () => {
     try { localStorage.setItem(storageKey(user.name), "1"); } catch { /* ignore */ }
@@ -62,8 +71,8 @@ export function UrgentFollowupPopup() {
   const repRows = admin ? summarizeByRep(items) : [];
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" dir="rtl">
-      <div className="w-full max-w-lg overflow-hidden rounded-[18px] border-2 border-red-500/70 bg-card shadow-[0_0_60px_rgba(239,68,68,0.35)]">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" dir="rtl" onClick={ack}>
+      <div className="w-full max-w-lg overflow-hidden rounded-[18px] border-2 border-red-500/70 bg-card shadow-[0_0_60px_rgba(239,68,68,0.35)]" onClick={(e) => e.stopPropagation()}>
         <div className="bg-gradient-to-l from-red-600 to-red-500 px-5 py-4 text-white">
           <div className="flex items-center gap-3">
             <span className="relative flex h-11 w-11 items-center justify-center rounded-xl bg-white/20">
@@ -127,7 +136,7 @@ export function UrgentFollowupPopup() {
 
         <div className="flex gap-2 border-t border-border p-4">
           <Link
-            href="/urgent-followup"
+            href={admin ? "/urgent-followup" : "/my-day"}
             onClick={ack}
             className="flex-1 rounded-[12px] bg-red-500 py-2.5 text-center font-extrabold text-white hover:bg-red-600"
           >

@@ -14,11 +14,13 @@ export interface HuddleManager { id: string; name: string }
 export function useHuddleManagers() {
   const { user, activeOrgId } = useAuth();
   const [managers, setManagers] = useState<HuddleManager[]>([]);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     getEditableContent<HuddleManager[]>(KEY)
       .then((v) => setManagers(Array.isArray(v) ? v : []))
-      .catch(console.error);
+      .catch(console.error)
+      .finally(() => setLoaded(true));
   }, [activeOrgId]);
 
   const save = useCallback(async (next: HuddleManager[]) => {
@@ -29,5 +31,5 @@ export function useHuddleManagers() {
   const isOwner = user?.isSuperAdmin ?? false;
   const isManager = isOwner || (!!user && managers.some((m) => m.id === user.id));
 
-  return { managers, isManager, isOwner, save };
+  return { managers, isManager, isOwner, save, loaded };
 }

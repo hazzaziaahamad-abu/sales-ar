@@ -47,7 +47,8 @@ import { PushRefresher } from "@/components/push/push-card";
 import { isFocusActive, useFocusActive } from "@/lib/focus-session";
 
 // daily-tasks: الصفحة نفسها تتحقق أن المستخدم مدير (السوبر أدمن أو مدراء المتابعة اليومية)
-const ALWAYS_ALLOWED_SLUGS = ["urgent-followup", "mentions", "daily-tasks"];
+// my-day: صفحة كل موظف («يومي») — تعرض بياناته هو فقط
+const ALWAYS_ALLOWED_SLUGS = ["urgent-followup", "mentions", "daily-tasks", "my-day"];
 // صفحات للسوبر أدمن فقط حتى لو الصلاحية مفعّلة للموظف
 const SUPER_ONLY_SLUGS = ["finance", "ticket-followups"];
 
