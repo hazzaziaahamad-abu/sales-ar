@@ -1,5 +1,7 @@
 // مؤشرات «الفريق اليوم» التلقائية — تُقرأ من اللوحة بدون ما يكتب الموظف أي رقم:
 // - المتابعات: عدد العملاء المختلفين اللي كتب عنهم الموظف في «سجل المتابعة» (صفقة/تجديد/تذكرة) خلال اليوم.
+//   الملاحظة التلقائية («📝 تحديث تلقائي») تنحسب فقط لو فيها تغيير مرحلة/حالة — تعديل القيمة أو الاحتمالية مو تواصل.
+// - «بلا متابعة»: آخر نشاط = آخر ملاحظة تنحسب (بنفس القاعدة) أو تاريخ الإنشاء/الاستحقاق — مجرد حفظ الصفقة ما يصفّر العدّاد.
 // - الإغلاقات: صفقات «مكتملة» باسم الموظف خلال الشهر (هدف شهري + المطلوب اليوم).
 // - المساعدة في الإغلاق: صفقة مقفلة باسم غيره وله ملاحظة في سجل متابعتها (مثل تحويل الدعم لمنال).
 // - تذاكر مفتوحة / صفقات متقدمة بدون متابعة / تجديدات متأخرة: لقطة «الآن» والهدف صفر.
@@ -165,20 +167,29 @@ async function fetchAll<T>(build: () => any): Promise<T[]> {
   }
 }
 
-async function notesFor(ids: string[], since?: string): Promise<{ entity_id: string; author_name: string | null; created_at: string }[]> {
+const AUTO_PREFIX = "📝 تحديث تلقائي";
+/** هل الملاحظة تنحسب نشاطاً؟ اليدوية دائماً، والتلقائية فقط لو غيّرت المرحلة (صفقة) أو الحالة (تجديد). */
+export function countsAsActivity(note: string | null | undefined): boolean {
+  const t = note ?? "";
+  if (!t.startsWith(AUTO_PREFIX)) return true;
+  return /(^|\n)(المرحلة|الحالة):/.test(t);
+}
+const isAutoNote = (note: string | null | undefined) => (note ?? "").startsWith(AUTO_PREFIX);
+
+async function notesFor(ids: string[], since?: string, onlyActivity = false): Promise<{ entity_id: string; author_name: string | null; created_at: string }[]> {
   const supabase = createClient();
   const orgId = getOrgId();
-  const out: { entity_id: string; author_name: string | null; created_at: string }[] = [];
+  const out: { entity_id: string; author_name: string | null; created_at: string; note?: string | null }[] = [];
   const chunks: string[][] = [];
   for (let i = 0; i < ids.length; i += 150) chunks.push(ids.slice(i, i + 150));
   const results = await Promise.all(chunks.map((chunk) => {
-    let q = supabase.from("follow_up_notes").select("entity_id, author_name, created_at").eq("org_id", orgId).in("entity_id", chunk);
+    let q = supabase.from("follow_up_notes").select("entity_id, author_name, created_at, note").eq("org_id", orgId).in("entity_id", chunk);
     if (since) q = q.gte("created_at", since);
     return q;
   }));
   for (const { data, error } of results) {
     if (error) throw error;
-    out.push(...((data ?? []) as typeof out));
+    out.push(...((data ?? []) as typeof out).filter((n) => !onlyActivity || countsAsActivity(n.note)));
   }
   return out;
 }
@@ -214,23 +225,32 @@ interface DealRow {
   deal_value: number | null;
   assigned_rep_name: string | null;
   updated_at: string;
+  created_at: string;
 }
 
-/** آخر ملاحظة يدوية لكل كيان (نتجاهل «تحديث تلقائي» لأنها مو تواصل مع العميل). */
-async function lastNotesFor(ids: string[]): Promise<Map<string, { note: string; author_name: string | null; created_at: string }>> {
+interface NoteRow { entity_id: string; note: string; author_name: string | null; created_at: string }
+
+/**
+ * لكل كيان: آخر ملاحظة يدوية (للعرض — التلقائية مو تواصل مع العميل)
+ * وآخر ملاحظة تنحسب نشاطاً (يدوية أو تغيير مرحلة/حالة) لحساب أيام الإهمال.
+ */
+async function lastNotesFor(ids: string[]): Promise<Map<string, { manual?: NoteRow; activityAt?: string }>> {
   const supabase = createClient();
   const orgId = getOrgId();
-  const out = new Map<string, { note: string; author_name: string | null; created_at: string }>();
+  const out = new Map<string, { manual?: NoteRow; activityAt?: string }>();
   const chunks: string[][] = [];
   for (let i = 0; i < ids.length; i += 150) chunks.push(ids.slice(i, i + 150));
   const results = await Promise.all(chunks.map((chunk) =>
     supabase.from("follow_up_notes").select("entity_id, note, author_name, created_at").eq("org_id", orgId)
-      .in("entity_id", chunk).not("note", "like", "📝 تحديث تلقائي%").order("created_at", { ascending: false }).limit(2000)
+      .in("entity_id", chunk).order("created_at", { ascending: false }).limit(3000)
   ));
   for (const { data, error } of results) {
     if (error) throw error;
-    for (const n of (data ?? []) as { entity_id: string; note: string; author_name: string | null; created_at: string }[]) {
-      if (!out.has(n.entity_id)) out.set(n.entity_id, n);
+    for (const n of (data ?? []) as NoteRow[]) {
+      const cur = out.get(n.entity_id) ?? {};
+      if (!cur.manual && !isAutoNote(n.note)) cur.manual = n;
+      if (!cur.activityAt && countsAsActivity(n.note)) cur.activityAt = n.created_at;
+      out.set(n.entity_id, cur);
     }
   }
   return out;
@@ -251,8 +271,8 @@ export async function fetchHuddleKpis(date: string, fromDay: string): Promise<Hu
   const staleSince = new Date(Date.now() - 3 * DAY_MS).toISOString();
 
   const [notes, closed, tickets, renewalsPaid, overdue, hot] = await Promise.all([
-    fetchAll<{ author_name: string | null; entity_id: string; created_at: string }>(() =>
-      supabase.from("follow_up_notes").select("author_name, entity_id, created_at").eq("org_id", orgId)
+    fetchAll<{ author_name: string | null; entity_id: string; created_at: string; note: string | null }>(() =>
+      supabase.from("follow_up_notes").select("author_name, entity_id, created_at, note").eq("org_id", orgId)
         .gte("created_at", startIso(fromDay)).lt("created_at", endIso(date)).order("created_at")
     ),
     fetchAll<{ id: string; client_name: string; deal_value: number; close_date: string; assigned_rep_name: string | null }>(() =>
@@ -273,19 +293,23 @@ export async function fetchHuddleKpis(date: string, fromDay: string): Promise<Hu
         .not("status", "in", '("مكتمل","ملغي بسبب","إيقاف مؤقت","مؤجل مؤقتاً")').order("id")
     ),
     fetchAll<DealRow>(() =>
-      supabase.from("deals").select("id, client_name, client_phone, stage, deal_value, assigned_rep_name, updated_at").eq("org_id", orgId)
+      supabase.from("deals").select("id, client_name, client_phone, stage, deal_value, assigned_rep_name, updated_at, created_at").eq("org_id", orgId)
         .in("stage", HOT_STAGES).gte("deal_date", addDays(saudiDateStr(), -60)).order("id")
     ),
   ]);
 
   // ملاحظات على الصفقات المقفلة (أي وقت) لمعرفة من ساعد، وملاحظات آخر 3 أيام للصفقات/التجديدات المهملة.
-  const staleCandidates = [...hot, ...overdue].filter((r) => r.updated_at < staleSince).map((r) => r.id);
+  // نقطة البداية لو ما فيه أي ملاحظة: إنشاء الصفقة / موعد استحقاق التجديد (لا updated_at — أي حفظ يغيّره).
+  const baseOf = new Map<string, string>();
+  for (const d of hot) baseOf.set(d.id, d.created_at);
+  for (const r of overdue) baseOf.set(r.id, startIso(r.renewal_date));
+  const staleCandidates = [...baseOf.entries()].filter(([, at]) => at < staleSince).map(([id]) => id);
   const [closedNotes, recentNotes] = await Promise.all([
     notesFor(closed.map((d) => d.id)),
-    notesFor(staleCandidates, staleSince),
+    notesFor(staleCandidates, staleSince, true),
   ]);
   const recentlyNoted = new Set(recentNotes.map((n) => n.entity_id));
-  const isStale = (r: { id: string; updated_at: string }) => r.updated_at < staleSince && !recentlyNoted.has(r.id);
+  const isStale = (r: { id: string }) => (baseOf.get(r.id) ?? "") < staleSince && !recentlyNoted.has(r.id);
 
   const members: Record<string, MemberKpis> = {};
   for (const name of Object.keys(MEMBER_ROLES)) {
@@ -301,6 +325,7 @@ export async function fetchHuddleKpis(date: string, fromDay: string): Promise<Hu
   // المتابعات: عملاء مختلفين لكل موظف لكل يوم
   const seen = new Set<string>();
   for (const n of notes) {
+    if (!countsAsActivity(n.note)) continue;
     const member = memberOf(n.author_name);
     if (!member) continue;
     const day = saudiDay(n.created_at);
@@ -376,7 +401,7 @@ export async function fetchHuddleKpis(date: string, fromDay: string): Promise<Hu
         type: "renewal", id: r.id, member, owner: r.assigned_rep ?? member, kpi: "overdueRenewals",
         client: r.customer_name || "—", phone: r.customer_phone ?? null,
         status: r.status, value: Number(r.plan_price) || 0,
-        idleDays: daysSince(r.updated_at), lastActivity: r.updated_at,
+        idleDays: daysSince(baseOf.get(r.id)), lastActivity: baseOf.get(r.id) ?? "",
         detail: `موعد التجديد ${r.renewal_date}`,
         rank: r.status === "انتظار الدفع" ? 0 : 1,
       });
@@ -390,7 +415,7 @@ export async function fetchHuddleKpis(date: string, fromDay: string): Promise<Hu
         type: "deal", id: d.id, member, owner: d.assigned_rep_name ?? member, kpi: "staleDeals",
         client: d.client_name || "—", phone: d.client_phone ?? null,
         status: d.stage, value: Number(d.deal_value) || 0,
-        idleDays: daysSince(d.updated_at), lastActivity: d.updated_at,
+        idleDays: daysSince(d.created_at), lastActivity: d.created_at,
         rank: d.stage === "انتظار الدفع" ? 0 : d.stage === "تفاوض" || d.stage === "تم إرسال العرض" ? 1 : 2,
       });
     }
@@ -401,10 +426,10 @@ export async function fetchHuddleKpis(date: string, fromDay: string): Promise<Hu
   for (const a of actions) {
     const n = lastNotes.get(a.id);
     if (!n) continue;
-    a.lastNote = { text: n.note, author: n.author_name, at: n.created_at };
-    if (a.type !== "ticket" && n.created_at > a.lastActivity) {
-      a.lastActivity = n.created_at;
-      a.idleDays = daysSince(n.created_at);
+    if (n.manual) a.lastNote = { text: n.manual.note, author: n.manual.author_name, at: n.manual.created_at };
+    if (a.type !== "ticket" && n.activityAt && n.activityAt > a.lastActivity) {
+      a.lastActivity = n.activityAt;
+      a.idleDays = daysSince(n.activityAt);
     }
   }
   actions.sort((a, b) => a.rank - b.rank || b.idleDays - a.idleDays || b.value - a.value);
