@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { Deal, Marketer, Package, Employee, EmployeeTask } from "@/types";
 import { triggerSaleCelebration } from "@/components/layout/sale-celebration";
-import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createFollowUpNote, fetchRecentFollowUpNotes, fetchPackages, fetchQuoteCommitments, addQuoteCommitment, removeQuoteCommitment, fetchEmployees, fetchEmployeeTasks, createEmployeeTask, createRenewal, fetchRenewals, createDealKpiStages, upsertDailyGoal, fetchDailyGoals, pingPresence, fetchPresence, fetchTargetedDealIds, fetchDealLastManualNoteAt, addDealToTargeting, removeDealFromTargeting } from "@/lib/supabase/db";
+import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createFollowUpNote, fetchRecentFollowUpNotes, fetchPackages, fetchQuoteCommitments, addQuoteCommitment, removeQuoteCommitment, fetchEmployees, fetchEmployeeTasks, createEmployeeTask, createDealKpiStages, upsertDailyGoal, fetchDailyGoals, pingPresence, fetchPresence, fetchTargetedDealIds, fetchDealLastManualNoteAt, addDealToTargeting, removeDealFromTargeting } from "@/lib/supabase/db";
 import { checkDealsForFollowUp, buildFollowUpTask, type FollowUpAction } from "@/lib/auto-followup";
 import { StarEmployeeCard, Leaderboard } from "@/components/star-employee";
 import { AssignTaskModal } from "@/components/tasks/AssignTaskModal";
@@ -21,7 +21,8 @@ import { FollowUpLogButton } from "@/components/follow-up-log";
 import { WatchlistPinButton } from "@/components/watchlist-pin-button";
 import { ClientProfilePanel } from "@/components/client-profile-panel";
 import { UrgentFollowupBanner } from "@/components/urgent-followup/urgent-followup-banner";
-import { DailyTasksBar } from "@/components/daily-tasks/daily-tasks-bar";
+import { MyDayLink } from "@/components/my-day/my-day-link";
+import { autoCreateRenewalFromDeal } from "@/lib/entity-completion";
 import { AchievementSummary } from "@/components/achievement-summary";
 import SalesKPIDashboard from "@/components/sales/SalesKPIDashboard";
 import { isSupportSalesMerged } from "@/lib/sales-merge";
@@ -212,56 +213,6 @@ export interface SalesPageProps {
   salesType: "office" | "support";
 }
 
-/** Auto-create a renewal one year out from a completed deal, with dedup. */
-async function autoCreateRenewalFromDeal(
-  dealId: string,
-  clientName: string,
-  clientPhone: string | undefined,
-  plan: string,
-  dealValue: number,
-  assignedRep: string | undefined,
-  salesType: "office" | "support",
-  author: string,
-) {
-  try {
-    const renewalDate = new Date();
-    renewalDate.setFullYear(renewalDate.getFullYear() + 1);
-    const target = dateToLocal(renewalDate);
-
-    /* Dedup: skip if a renewal already exists for this customer + plan within ±30d of target */
-    const existing = await fetchRenewals();
-    const normPhone = (clientPhone || "").replace(/\D/g, "");
-    const normName = clientName.trim();
-    const targetMs = new Date(target).getTime();
-    const dup = existing.find((r) => {
-      const samePhone = normPhone && (r.customer_phone || "").replace(/\D/g, "") === normPhone;
-      const sameName = !normPhone && (r.customer_name || "").trim() === normName;
-      if (!samePhone && !sameName) return false;
-      if (r.plan_name !== plan) return false;
-      const dMs = new Date(r.renewal_date).getTime();
-      return Math.abs(dMs - targetMs) <= 30 * 86_400_000;
-    });
-    if (dup) {
-      createFollowUpNote("deal", dealId, `ℹ️ تجديد تلقائي تم تخطّيه — موجود تجديد مشابه بتاريخ ${dup.renewal_date}.`, author).catch(console.error);
-      return;
-    }
-
-    await createRenewal({
-      customer_name: clientName,
-      customer_phone: clientPhone || undefined,
-      plan_name: plan,
-      plan_price: dealValue,
-      renewal_date: target,
-      status: "مجدول تجديد",
-      assigned_rep: assignedRep || undefined,
-      sales_type: salesType,
-      notes: `تجديد تلقائي من صفقة ${salesType === "office" ? "مكتب" : "دعم"} مكتملة — ${author}`,
-    });
-    createFollowUpNote("deal", dealId, `🔄 تم إنشاء تجديد تلقائي للعميل بتاريخ ${target}`, author).catch(console.error);
-  } catch (err) {
-    console.error("Auto-renewal creation failed:", err);
-  }
-}
 
 /* تاريخ احتساب الصفقة: المكتملة تُحتسب بتاريخ الدفع (close_date) — مثل الترقية التي أُضيفت سابقاً وأُكملت اليوم — وغيرها بتاريخ الصفقة */
 function dealSaleDate(d: { stage: string; deal_date?: string | null; close_date?: string | null; created_at: string }): Date {
@@ -1462,7 +1413,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
   return (
     <div className="space-y-6">
       {/* ─── هام جداً للمتابعة اليومية — حالات هذا القسم فقط ─── */}
-      <DailyTasksBar department={salesType} />
+      <MyDayLink />
       <UrgentFollowupBanner salesType={salesType} />
 
       {/* ─── Page Header ─── */}

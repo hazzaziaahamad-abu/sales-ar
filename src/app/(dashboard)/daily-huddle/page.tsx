@@ -132,7 +132,10 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
     dailyPlans.find((p) => memberOf(p.user_name.trim().split(/\s+/)[0]) === member && p.priorities?.length)?.priorities ?? null;
 
   // منال تُسجَّل بالإنجليزي أحياناً (Manal) — نطابق بالكرت لا بالنص.
-  const canEdit = (member: string) => isManager || memberOf(myFirstName) === member;
+  const myMember = memberOf(myFirstName);
+  const canEdit = (member: string) => isManager || myMember === member;
+  // الموظف يشوف كرته أول — المدير بالترتيب الثابت
+  const cardOrder = !isManager && myMember ? [myMember, ...TEAM.filter((m) => m !== myMember)] : TEAM;
   const fromDay = [weekStart(date), prevDay(date)].sort()[0];
 
   const load = useCallback(async () => {
@@ -397,6 +400,7 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
             actions={actions}
             blockers={blockers}
             members={TEAM}
+            defaultMember={!isManager ? myMember ?? undefined : undefined}
             isPastDate={!isToday}
             onRefresh={load}
             refreshing={loading}
@@ -414,7 +418,7 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
         </div>
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
-          {TEAM.map((member) => {
+          {cardOrder.map((member) => {
             const e = entries[member] ?? {};
             const editable = canEdit(member);
             const k = kpis.members[member];

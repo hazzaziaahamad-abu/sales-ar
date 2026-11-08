@@ -12,6 +12,7 @@ import {
 } from "@/lib/daily-tasks/shared";
 import { CopyPhone } from "./copy-phone";
 import { DailyReportView } from "./daily-report";
+import { completeDeal, completeRenewal } from "@/lib/entity-completion";
 
 const SPEED_CLS: Record<Speed, string> = {
   fast: "bg-emerald-500/15 text-emerald-400",
@@ -28,7 +29,14 @@ const fromLocalInput = (v: string) => new Date(`${v}:00+03:00`).toISOString();
 const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("ar-SA", { timeZone: "Asia/Riyadh", hour: "numeric", minute: "2-digit" });
 
 /** viewAsUserId = المدير يراجع شاشة موظف (للعرض فقط، داخل مركز مهام اليوم). */
-export function DailyTasksBar({ department, viewAsUserId }: { department?: Department; viewAsUserId?: string }) {
+export function DailyTasksBar({ department, viewAsUserId, pinned, onNotInDepartments }: {
+  department?: Department;
+  viewAsUserId?: string;
+  /** داخل «يومي»: مفتوح دائماً بدون زر طيّ */
+  pinned?: boolean;
+  /** يُستدعى لو المستخدم مو ضمن توزيع الأقسام */
+  onNotInDepartments?: () => void;
+}) {
   const { user, activeOrgId, isImpersonating } = useAuth();
   const [state, setState] = useState<DailyState | null>(null);
   const [queue, setQueue] = useState<QueueItem[] | null>(null);
@@ -43,6 +51,8 @@ export function DailyTasksBar({ department, viewAsUserId }: { department?: Depar
   const [nextAt, setNextAt] = useState("");
   const [note, setNote] = useState("");
   const [savedHint, setSavedHint] = useState<{ key: string; outcome: Outcome } | null>(null);
+  /** بنود تحوّلت إلى مكتملة من هنا */
+  const [completedKeys, setCompletedKeys] = useState<string[]>([]);
   const [extraText, setExtraText] = useState("");
   const [finishing, setFinishing] = useState(false);
   const [reason, setReason] = useState("");
@@ -53,7 +63,7 @@ export function DailyTasksBar({ department, viewAsUserId }: { department?: Depar
   const [reviewDraft, setReviewDraft] = useState("");
   const [reviewMsg, setReviewMsg] = useState<string | null>(null);
 
-  const collapseKey = user && !viewing ? `daily_tasks_collapsed_${user.id}` : null;
+  const collapseKey = user && !viewing && !pinned ? `daily_tasks_collapsed_${user.id}` : null;
   useEffect(() => {
     if (!collapseKey) return;
     try { setCollapsed(localStorage.getItem(collapseKey) === "1"); } catch { /* تخزين المتصفح غير متاح */ }
@@ -71,22 +81,35 @@ export function DailyTasksBar({ department, viewAsUserId }: { department?: Depar
       setState(s);
       setReviewDraft(s.review?.note ?? "");
       setError(null);
+      if (!s.departments.length) onNotInDepartments?.();
       if (s.departments.length && s.orgId === activeOrgId) setQueue(await loadQueue(s, { all: showAll }));
     } catch (e) {
       setError(e instanceof Error ? e.message : "تعذّر التحميل");
     }
-  }, [user, isImpersonating, activeOrgId, viewAsUserId, showAll]);
+  }, [user, isImpersonating, activeOrgId, viewAsUserId, showAll, onNotInDepartments]);
   useEffect(() => { load(); }, [load]);
 
   const plan = state?.plan ?? null;
+  // كل دقيقة نعيد الحساب — «لا رد · بعد ساعتين» يرجع للقائمة لما يحين موعده
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => clearInterval(t);
+  }, []);
   const doneMap = useMemo(() => {
-    const m = new Map<string, Outcome>();
+    const latest = new Map<string, { outcome: Outcome; next: string | null; at: string }>();
     for (const a of state?.activities ?? []) {
       const id = a.deal_id || a.renewal_id;
-      if (id && a.entity_type && a.outcome) m.set(`${a.entity_type}:${id}`, a.outcome);
+      if (!id || !a.entity_type || !a.outcome) continue;
+      const k = `${a.entity_type}:${id}`;
+      const cur = latest.get(k);
+      if (!cur || a.created_at >= cur.at) latest.set(k, { outcome: a.outcome, next: a.next_action_at, at: a.created_at });
     }
+    const m = new Map<string, Outcome>();
+    // البند يبقى «منجز» إلا لو آخر نتيجة لها موعد تالي وجا وقته (مثل لا رد → بعد ساعتين)
+    for (const [k, v] of latest) if (!(v.next && new Date(v.next).getTime() <= nowMs)) m.set(k, v.outcome);
     return m;
-  }, [state?.activities]);
+  }, [state?.activities, nowMs]);
 
   const priorityKeys = useMemo(() => (picking ? pickDraft : plan?.priorities ?? []).map((p) => p.key), [picking, pickDraft, plan?.priorities]);
   const ordered = useMemo(() => {
@@ -219,7 +242,18 @@ export function DailyTasksBar({ department, viewAsUserId }: { department?: Depar
       meetingsToday: outcomeSel === "meeting_booked" && iso && riyadhDate(new Date(iso)) === s.date ? [...s.meetingsToday, r.activity] : s.meetingsToday,
       plan: s.plan ? { ...s.plan, first_activity_at: s.plan.first_activity_at ?? r.activity.created_at, last_activity_at: r.activity.created_at } : s.plan,
     } : s));
-    setSavedHint(outcomeSel === "paid" || outcomeSel === "lost" ? { key: item.key, outcome: outcomeSel } : null);
+    // «دفع ✓» يقفل الصفقة/التجديد مباشرة عشان الأرقام تطابق لوحة المدير
+    if (outcomeSel === "paid") {
+      try {
+        if (item.entityType === "deal") await completeDeal(item.id, me.name);
+        else await completeRenewal(item.id, me.name);
+        setCompletedKeys((cur) => [...cur, item.key]);
+      } catch (e) {
+        console.error(e);
+        setSavedHint({ key: item.key, outcome: "paid" });
+      }
+    }
+    setSavedHint(outcomeSel === "lost" ? { key: item.key, outcome: outcomeSel } : null);
     setOutcomeFor(null);
   });
 
@@ -274,7 +308,7 @@ export function DailyTasksBar({ department, viewAsUserId }: { department?: Depar
           </span>
         )}
         <button type="button" onClick={() => { setQueue(null); load(); }} className="rounded-md p-1.5 text-muted-foreground hover:text-foreground" title="تحديث"><RefreshCw className="h-3.5 w-3.5" /></button>
-        {!viewing && <button type="button" onClick={() => toggleCollapse(true)} className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:text-foreground">طيّ <ChevronUp className="h-3.5 w-3.5" /></button>}
+        {!viewing && !pinned && <button type="button" onClick={() => toggleCollapse(true)} className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:text-foreground">طيّ <ChevronUp className="h-3.5 w-3.5" /></button>}
       </span>
     </div>
   );
@@ -330,9 +364,10 @@ export function DailyTasksBar({ department, viewAsUserId }: { department?: Depar
         {isDone ? (
           <div className="flex flex-wrap items-center gap-2 text-[11px] text-emerald-400">
             ✓ {OUTCOME_LABEL[doneMap.get(item.key)!]} · سُجّلت النتيجة
+            {completedKeys.includes(item.key) && <span className="font-bold">· تحوّلت إلى {item.entityType === "deal" ? "«مكتملة»" : "«مكتمل»"} 🎉</span>}
             {savedHint?.key === item.key && (
               <Link href={profileHref(item)} className="inline-flex items-center gap-1 text-cyan underline">
-                افتح البطاقة لتحديث المرحلة <ExternalLink className="h-3 w-3" />
+                {savedHint.outcome === "paid" ? "تعذّر الإغلاق التلقائي — افتح البطاقة" : "افتح البطاقة لتحديث المرحلة"} <ExternalLink className="h-3 w-3" />
               </Link>
             )}
           </div>
@@ -355,6 +390,9 @@ export function DailyTasksBar({ department, viewAsUserId }: { department?: Depar
                   className={`rounded-md border px-2 py-0.5 text-xs ${outcomeSel === o.key ? "border-cyan bg-cyan-dim text-cyan" : "border-border bg-card"}`}>{o.label}</button>
               ))}
             </div>
+            {outcomeSel === "paid" && (
+              <div className="text-[11px] text-emerald-400">بالحفظ تتحوّل {item.entityType === "deal" ? "الصفقة إلى «مكتملة»" : "التجديد إلى «مكتمل»"} تلقائياً.</div>
+            )}
             {outcomeSel && (
               <div className="flex flex-wrap items-center gap-2">
                 {OUTCOMES.find((o) => o.key === outcomeSel)?.nextHours !== null && (

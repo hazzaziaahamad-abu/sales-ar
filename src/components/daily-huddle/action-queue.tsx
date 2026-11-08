@@ -80,6 +80,7 @@ export function ActionQueue({
   isManager,
   snoozed,
   onSnooze,
+  defaultMember,
 }: {
   actions: ActionItem[];
   blockers: Blocker[];
@@ -92,6 +93,8 @@ export function ActionQueue({
   /** البنود المؤجلة حالياً مع تاريخ رجوعها */
   snoozed: { item: ActionItem; until: string }[];
   onSnooze: (key: string, until: string | null) => Promise<void>;
+  /** الموظف: القائمة تفتح على بنوده هو */
+  defaultMember?: string;
 }) {
   const { user } = useAuth();
   const [menu, setMenu] = useState<string | null>(null);
@@ -100,7 +103,8 @@ export function ActionQueue({
   const [showSnoozed, setShowSnoozed] = useState(false);
   const [staff, setStaff] = useState<string[]>([]);
   const [type, setType] = useState<ActionType | "all">("all");
-  const [member, setMember] = useState<string | "all">("all");
+  const [member, setMember] = useState<string | "all">(defaultMember ?? "all");
+  useEffect(() => { if (defaultMember) setMember(defaultMember); }, [defaultMember]);
   const [limit, setLimit] = useState(PAGE);
   const [profile, setProfile] = useState<string | null>(null);
   const [phones, setPhones] = useState<Map<string, string>>(new Map());
