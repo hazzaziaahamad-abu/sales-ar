@@ -25,6 +25,9 @@ export async function GET(req: NextRequest) {
     loadSettings(access.orgId),
   ]);
   if (plansRes.error) return NextResponse.json({ error: plansRes.error.message }, { status: 500 });
-  const members = [...new Set(DEPARTMENTS.flatMap((d) => (settings.members[d] ?? []).map((m) => m.name)))];
-  return NextResponse.json({ orgId: access.orgId, date, from, plans: plansRes.data ?? [], members });
+  const all = DEPARTMENTS.flatMap((d) => settings.members[d] ?? []);
+  const members = [...new Set(all.map((m) => m.name))];
+  // للمدير: معرّف كل موظف — لفتح «يومي» حقه للعرض من «الفريق اليوم»
+  const people = access.isManager ? [...new Map(all.map((m) => [m.user_id, { user_id: m.user_id, name: m.name }])).values()] : [];
+  return NextResponse.json({ orgId: access.orgId, date, from, plans: plansRes.data ?? [], members, people });
 }

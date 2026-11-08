@@ -10,7 +10,8 @@ import {
   type HuddleKpis, type KpiKey, type KpiTargets,
 } from "@/lib/huddle-kpis";
 import { todayLocal, formatMoneyFull, formatMoney } from "@/lib/utils/format";
-import { ActionQueue, actionKey } from "@/components/daily-huddle/action-queue";
+import { ActionQueue, actionKey, type Nudge } from "@/components/daily-huddle/action-queue";
+import { TicketFollowupsView } from "@/components/ticket-followups/ticket-followups-view";
 import { SecretaryView } from "@/components/secretary/secretary-view";
 import { RecentUpdatesView } from "@/components/recent-updates/recent-updates-view";
 import { ChallengesHub } from "@/components/daily-huddle/challenges-hub";
@@ -26,7 +27,7 @@ import { HuddleManagersButton } from "@/components/daily-huddle/huddle-managers-
 import { useHuddleManagers } from "@/lib/huddle-managers";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CalendarClock, Users, Trophy, Save, Check, Settings2, Compass, HeartPulse, Activity, ShieldQuestion, Star, ClipboardCheck, Sprout, MoreHorizontal } from "lucide-react";
+import { CalendarClock, Users, Trophy, Save, Check, Settings2, Compass, HeartPulse, Activity, ShieldQuestion, Star, ClipboardCheck, Sprout, MoreHorizontal, BellRing, Eye } from "lucide-react";
 
 // النموذج: اجتماع يومي قصير (Daily Huddle) + لوحة نتائج بمقاييس الأفعال (4DX).
 // مؤشرات كل موظف تُقرأ تلقائياً من اللوحة (سجل المتابعة، الصفقات، التذاكر، التجديدات) — راجع lib/huddle-kpis.
@@ -136,6 +137,7 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
   // نجلبها من أول الأسبوع عشان نقيّم الالتزام تلقائياً: الأولوية «نُفّذت» لو كتب عنها في سجل المتابعة ذاك اليوم.
   const [dailyPlans, setDailyPlans] = useState<DailyPlanLite[]>([]);
   const [deptMembers, setDeptMembers] = useState<string[]>([]);
+  const [people, setPeople] = useState<{ user_id: string; name: string }[]>([]);
   useEffect(() => {
     let alive = true;
     fetch(`/api/daily-tasks/team?date=${date}&from=${fromDay}`, { cache: "no-store" })
@@ -145,13 +147,36 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
         const ok = d && d.orgId === activeOrgId;
         setDailyPlans(ok ? d.plans ?? [] : []);
         setDeptMembers(ok ? d.members ?? [] : []);
+        setPeople(ok ? d.people ?? [] : []);
       })
-      .catch(() => { if (alive) { setDailyPlans([]); setDeptMembers([]); } });
+      .catch(() => { if (alive) { setDailyPlans([]); setDeptMembers([]); setPeople([]); } });
     return () => { alive = false; };
   }, [date, fromDay, activeOrgId]);
   const planOf = (member: string, day: string) =>
     dailyPlans.find((p) => p.plan_date === day && memberOf(p.user_name) === member && p.priorities?.length) ?? null;
   const dailyPrioritiesOf = (member: string) => planOf(member, date)?.priorities ?? null;
+  /** للمدير: رابط «يومي» الموظف (عرض فقط) */
+  const myDayHref = (member: string) => {
+    const p = people.find((x) => memberOf(x.name) === member);
+    return p ? `/my-day?as=${encodeURIComponent(p.user_id)}&name=${encodeURIComponent(p.name)}` : null;
+  };
+
+  // التذكيرات الآلية (السوبر أدمن): المعلّقة تنعرض للاعتماد داخل «قائمة الإجراءات»
+  const [nudges, setNudges] = useState<Nudge[]>([]);
+  const loadNudges = useCallback(async () => {
+    if (!user?.isSuperAdmin) return;
+    const r = await fetch("/api/ticket-followups", { cache: "no-store" }).catch(() => null);
+    const j = r?.ok ? await r.json().catch(() => null) : null;
+    setNudges(j?.open ?? []);
+  }, [user?.isSuperAdmin]);
+  useEffect(() => { loadNudges(); }, [loadNudges, activeOrgId]);
+  const decideNudge = async (payload: object) => {
+    const r = await fetch("/api/ticket-followups", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    const j = await r.json().catch(() => ({}));
+    await loadNudges();
+    if (!r.ok) throw new Error(j.error ?? "صار خطأ");
+  };
+
   /** الموظف ضمن أقسام «مهام اليوم» → أولوياته تُختار من «يومي» بدل الكتابة هنا */
   const usesDailyTasks = (member: string) => deptMembers.some((n) => memberOf(n) === member);
   /** أولويات يوم معيّن مع حالة التنفيذ التلقائية */
@@ -444,6 +469,8 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
             isManager={isManager}
             snoozed={visibleSnoozed}
             onSnooze={snoozeAction}
+            nudges={nudges}
+            onNudge={user?.isSuperAdmin ? decideNudge : undefined}
           />
         </div>
       )}
@@ -483,6 +510,14 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
                     </div>
                     <div className="text-[11px] text-muted-foreground">{role.title}</div>
                   </div>
+                  {isManager && myDayHref(member) && (
+                    <Link
+                      href={myDayHref(member)!}
+                      className="mr-auto flex shrink-0 items-center gap-1 rounded-lg border border-amber-500/25 bg-amber-500/10 px-2.5 h-8 text-[11px] font-bold text-amber-400 hover:bg-amber-500/20"
+                    >
+                      <Eye className="h-3.5 w-3.5" /> يومه
+                    </Link>
+                  )}
                 </div>
 
                 {/* المؤشرات التلقائية */}
@@ -676,6 +711,7 @@ const TABS = [
   { key: "activity", label: "نشاط الفريق", icon: Activity },
   { key: "challenges", label: "التحديات والطلبات والتطويرات", icon: ShieldQuestion },
   { key: "ideas", label: "البذور", icon: Sprout },
+  { key: "nudges", label: "التذكيرات الآلية", icon: BellRing },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -696,7 +732,7 @@ function DailyHuddleTabs() {
   const searchParams = useSearchParams();
   const { user, isImpersonating } = useAuth();
   // «البذور» و«بوصلة اليوم» و«صحة الأقسام» و«نشاط الفريق» و«التحديات والطلبات والتطويرات» للمدير ومنال فقط
-  const tabs = TABS.filter((t) => !MANAL_ONLY_TABS.includes(t.key) || canUseIdeas(user));
+  const tabs = TABS.filter((t) => (t.key === "nudges" ? !!user?.isSuperAdmin : !MANAL_ONLY_TABS.includes(t.key) || canUseIdeas(user)));
   const initialTab = tabs.find((t) => t.key === searchParams.get("tab"))?.key ?? "team";
   const [tab, setTab] = useState<TabKey>(initialTab);
   const [verifyPending, setVerifyPending] = useState(0);
@@ -799,6 +835,7 @@ function DailyHuddleTabs() {
       {tab === "activity" && canUseIdeas(user) && <RecentUpdatesView embedded tabs={["updates", "log"]} />}
       {tab === "challenges" && canUseIdeas(user) && <ChallengesTab />}
       {tab === "ideas" && canUseIdeas(user) && <IdeasGarden />}
+      {tab === "nudges" && user?.isSuperAdmin && <TicketFollowupsView />}
     </div>
   );
 }

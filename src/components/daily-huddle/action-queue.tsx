@@ -12,6 +12,19 @@ import { FollowUpLogButton } from "@/components/follow-up-log";
 import { ClientProfilePanel } from "@/components/client-profile-panel";
 import { Briefcase, RefreshCw, LifeBuoy, AlertOctagon, MessageCircle, UserRound, Megaphone, RotateCw, MoreHorizontal, PauseCircle, ArrowLeftRight, X } from "lucide-react";
 
+/** تذكير آلي من «التذكيرات الآلية» (/api/ticket-followups) — للسوبر أدمن. */
+export interface Nudge {
+  id: string;
+  ticket_id: string;
+  ticket_number: number | null;
+  title: string;
+  assignee_name: string;
+  body: string;
+  status: "pending" | "approved" | "sending" | "sent" | "rejected" | "skipped";
+  last_activity_at: string;
+  send_at: string | null;
+}
+
 export interface Blocker {
   member: string;
   text: string;
@@ -81,6 +94,8 @@ export function ActionQueue({
   snoozed,
   onSnooze,
   defaultMember,
+  nudges = [],
+  onNudge,
 }: {
   actions: ActionItem[];
   blockers: Blocker[];
@@ -95,6 +110,9 @@ export function ActionQueue({
   onSnooze: (key: string, until: string | null) => Promise<void>;
   /** الموظف: القائمة تفتح على بنوده هو */
   defaultMember?: string;
+  /** التذكيرات الآلية (للسوبر أدمن): المعلّقة تنعرض للاعتماد، والمجدولة تظهر كشارة على البند */
+  nudges?: Nudge[];
+  onNudge?: (payload: { action: "approve"; items: { id: string; body: string }[] } | { action: "reject"; ids: string[] }) => Promise<void>;
 }) {
   const { user } = useAuth();
   const [menu, setMenu] = useState<string | null>(null);
@@ -102,7 +120,7 @@ export function ActionQueue({
   const [actionError, setActionError] = useState<string | null>(null);
   const [showSnoozed, setShowSnoozed] = useState(false);
   const [staff, setStaff] = useState<string[]>([]);
-  const [type, setType] = useState<ActionType | "all">("all");
+  const [type, setType] = useState<ActionType | "all" | "nudge">("all");
   const [member, setMember] = useState<string | "all">(defaultMember ?? "all");
   useEffect(() => { if (defaultMember) setMember(defaultMember); }, [defaultMember]);
   const [limit, setLimit] = useState(PAGE);
@@ -132,6 +150,27 @@ export function ActionQueue({
   const shownBlockers = blockers.filter((b) => member === "all" || b.member === member);
   const countOf = (t: ActionType) => byMember.filter((a) => a.type === t).length;
   const memberCount = (m: string) => actions.filter((a) => a.member === m).length + blockers.filter((b) => b.member === m).length;
+
+  // التذكيرات الآلية: المعلّقة (حسب فلتر الموظف) + خريطة البند ← حالة تذكيره عشان ما ننبّه مرتين
+  const pendingNudges = nudges.filter((n) => n.status === "pending" && (member === "all" || memberOf(n.assignee_name) === member));
+  const nudgeOf = useMemo(() => {
+    const m = new Map<string, Nudge["status"]>();
+    for (const n of nudges) if (n.status === "pending" || n.status === "approved" || n.status === "sending") m.set(n.ticket_id, n.status);
+    return m;
+  }, [nudges]);
+  const decideNudges = async (key: string, payload: Parameters<NonNullable<typeof onNudge>>[0]) => {
+    if (!onNudge) return;
+    setBusy(key);
+    setActionError(null);
+    try {
+      await onNudge(payload);
+    } catch (e) {
+      console.error(e);
+      setActionError(e instanceof Error ? e.message : "تعذّر تنفيذ الإجراء");
+    } finally {
+      setBusy(null);
+    }
+  };
 
   // تنبيه جماعي: رسالة واحدة للموظف فيها كل بنوده (حسب الفلتر الحالي)
   const bulk = useMemo(() => {
@@ -220,6 +259,17 @@ export function ActionQueue({
             </button>
           );
         })}
+        {pendingNudges.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setType("nudge")}
+            className={`rounded-lg px-2.5 py-1 text-[11px] font-bold border ${
+              type === "nudge" ? "bg-orange-500/20 text-orange-300 border-orange-500/40" : "bg-orange-500/10 text-orange-400 border-orange-500/25"
+            }`}
+          >
+            📨 تذكيرات بانتظار موافقتك · {pendingNudges.length}
+          </button>
+        )}
       </div>
 
       {/* تنبيه جماعي — للمدير فقط */}
@@ -247,8 +297,58 @@ export function ActionQueue({
         </div>
       ))}
 
-      {/* البنود */}
-      {filtered.length === 0 && shownBlockers.length === 0 ? (
+      {/* التذكيرات الآلية بانتظار الموافقة */}
+      {type === "nudge" ? (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[11px] text-muted-foreground">تعليق باسمك فيه منشن للموظف — ينرسل في وقت طبيعي داخل الدوام بعد الاعتماد.</p>
+            {pendingNudges.length > 1 && (
+              <button
+                type="button"
+                disabled={busy === "nudge-all"}
+                onClick={() => decideNudges("nudge-all", { action: "approve", items: pendingNudges.map((n) => ({ id: n.id, body: n.body })) })}
+                className="shrink-0 rounded-lg bg-emerald-500/15 px-3 h-8 text-xs font-bold text-emerald-400 disabled:opacity-50"
+              >
+                اعتماد الكل ({pendingNudges.length})
+              </button>
+            )}
+          </div>
+          {actionError && <div className="text-[11px] text-red-400">{actionError}</div>}
+          {pendingNudges.length === 0 && <div className="text-center text-sm text-emerald-400 py-6">ما فيه تذكيرات معلّقة 🎯</div>}
+          {pendingNudges.map((n) => {
+            const days = Math.max(0, Math.floor((Date.now() - new Date(n.last_activity_at).getTime()) / 86400000));
+            return (
+              <div key={n.id} className="rounded-xl border border-orange-500/20 bg-white/[0.02] p-3 space-y-2">
+                <div className="flex flex-wrap items-center gap-1.5 text-sm">
+                  <span className="font-bold text-foreground">{n.ticket_number ? `#${n.ticket_number} ` : ""}{n.title || "—"}</span>
+                  <span className="text-[11px] text-muted-foreground">· {n.assignee_name} · ساكت من {days} يوم</span>
+                </div>
+                <div className="rounded-lg bg-white/[0.03] border border-white/[0.05] px-2.5 py-1.5 text-[12px] text-foreground/80 whitespace-pre-line line-clamp-4">{n.body}</div>
+                <div className="flex justify-end gap-1.5">
+                  <button
+                    type="button"
+                    disabled={busy === n.id}
+                    onClick={() => decideNudges(n.id, { action: "reject", ids: [n.id] })}
+                    className="h-8 rounded-lg border border-white/[0.08] px-3 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+                  >
+                    رفض
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy === n.id}
+                    onClick={() => decideNudges(n.id, { action: "approve", items: [{ id: n.id, body: n.body }] })}
+                    className="h-8 rounded-lg bg-emerald-500/15 px-3 text-xs font-bold text-emerald-400 disabled:opacity-50"
+                  >
+                    اعتماد
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+          <p className="text-[11px] text-muted-foreground">لتعديل نص التذكير قبل الإرسال أو مراجعة المجدول: تبويب «التذكيرات الآلية» تحت «المزيد».</p>
+        </div>
+      ) : /* البنود */
+      filtered.length === 0 && shownBlockers.length === 0 ? (
         <div className="text-center text-sm text-emerald-400 py-6">ما فيه شي معلّق هنا 🎯</div>
       ) : (
         <div className="space-y-2">
@@ -273,6 +373,11 @@ export function ActionQueue({
                       <span className="font-bold text-sm text-foreground truncate max-w-full">{a.client}</span>
                       {a.ticketNumber ? <span className="text-[10px] text-muted-foreground">#{a.ticketNumber}</span> : null}
                       <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-white/[0.06] text-muted-foreground">{a.status}</span>
+                      {nudgeOf.get(a.id) && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-orange-500/10 text-orange-400" title="لا تنبّه مرتين — فيه تذكير آلي لهذا البند">
+                          📨 {nudgeOf.get(a.id) === "pending" ? "تذكير آلي بانتظار موافقتك" : "تذكير آلي مجدول"}
+                        </span>
+                      )}
                       {a.priority && a.priority !== "عادي" && (
                         <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-red-500/15 text-red-400">{a.priority}</span>
                       )}
