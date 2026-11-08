@@ -3,12 +3,14 @@
 // «قائمة الإجراءات» للمدير: البنود الفعلية وراء رقم «تحتاج انتباه» (صفقات متقدمة بلا متابعة،
 // تجديدات متأخرة، تذاكر مفتوحة) + عوائق الموظفين — في مكان واحد مع إجراء مباشر لكل بند.
 import { useEffect, useMemo, useState } from "react";
-import { fetchEmployees } from "@/lib/supabase/db";
+import { fetchEmployees, updateDeal, updateRenewal, updateTicket, createFollowUpNote } from "@/lib/supabase/db";
+import { useAuth } from "@/lib/auth-context";
+import { todayLocal } from "@/lib/utils/format";
 import { memberOf, type ActionItem, type ActionType } from "@/lib/huddle-kpis";
 import { formatMoneyFull } from "@/lib/utils/format";
 import { FollowUpLogButton } from "@/components/follow-up-log";
 import { ClientProfilePanel } from "@/components/client-profile-panel";
-import { Briefcase, RefreshCw, LifeBuoy, AlertOctagon, MessageCircle, UserRound, Megaphone, RotateCw } from "lucide-react";
+import { Briefcase, RefreshCw, LifeBuoy, AlertOctagon, MessageCircle, UserRound, Megaphone, RotateCw, MoreHorizontal, PauseCircle, ArrowLeftRight, X } from "lucide-react";
 
 export interface Blocker {
   member: string;
@@ -22,6 +24,29 @@ const TYPE_META: Record<ActionType, { label: string; plural: string; icon: typeo
 };
 
 const PAGE = 15;
+
+/** مفتاح البند في سجل التأجيل */
+export const actionKey = (a: Pick<ActionItem, "type" | "id">) => `${a.type}:${a.id}`;
+
+const addDaysLocal = (n: number) => {
+  const d = new Date(`${todayLocal()}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+
+const SNOOZE_OPTIONS = [
+  { days: 1, label: "لبكرة" },
+  { days: 3, label: "3 أيام" },
+  { days: 7, label: "أسبوع" },
+];
+
+/** تحويل البند لموظف آخر + ملاحظة تلقائية للتوثيق (ما تنحسب متابعة). */
+async function reassign(a: ActionItem, to: string, by: string) {
+  if (a.type === "deal") await updateDeal(a.id, { assigned_rep_name: to });
+  else if (a.type === "renewal") await updateRenewal(a.id, { assigned_rep: to });
+  else await updateTicket(a.id, { assigned_agent_name: to });
+  await createFollowUpNote(a.type, a.id, `📝 تحديث تلقائي:\nالمسؤول: ${a.owner || "—"} ← ${to} (تحويل من المتابعة اليومية)`, by).catch(console.error);
+}
 
 function sanitizePhone(raw: string): string {
   let p = (raw || "").replace(/[^\d+]/g, "");
@@ -52,6 +77,9 @@ export function ActionQueue({
   isPastDate,
   onRefresh,
   refreshing,
+  isManager,
+  snoozed,
+  onSnooze,
 }: {
   actions: ActionItem[];
   blockers: Blocker[];
@@ -59,7 +87,18 @@ export function ActionQueue({
   isPastDate: boolean;
   onRefresh: () => void;
   refreshing: boolean;
+  /** التحويل والتأجيل للمدير فقط */
+  isManager: boolean;
+  /** البنود المؤجلة حالياً مع تاريخ رجوعها */
+  snoozed: { item: ActionItem; until: string }[];
+  onSnooze: (key: string, until: string | null) => Promise<void>;
 }) {
+  const { user } = useAuth();
+  const [menu, setMenu] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [showSnoozed, setShowSnoozed] = useState(false);
+  const [staff, setStaff] = useState<string[]>([]);
   const [type, setType] = useState<ActionType | "all">("all");
   const [member, setMember] = useState<string | "all">("all");
   const [limit, setLimit] = useState(PAGE);
@@ -73,6 +112,10 @@ export function ActionQueue({
         const m = new Map<string, string>();
         for (const e of emps) if (e.name && e.phone) m.set(e.name.trim().split(/\s+/)[0].toLowerCase(), e.phone);
         setPhones(m);
+        // الموظفين النشطين (لو ما فيه حالة «نشط» مسجلة نعرض الكل)
+        const named = emps.filter((e) => e.name?.trim());
+        const active = named.filter((e) => e.status === "نشط");
+        setStaff([...new Set((active.length ? active : named).map((e) => e.name.trim()))].sort((a, b) => a.localeCompare(b, "ar")));
       })
       .catch(() => undefined);
   }, []);
@@ -265,7 +308,83 @@ export function ActionQueue({
                   ) : (
                     <span className="text-[10px] text-muted-foreground/60 px-1">لا رقم للموظف</span>
                   )}
+                  {isManager && (
+                    <button
+                      type="button"
+                      onClick={() => { setMenu(menu === actionKey(a) ? null : actionKey(a)); setActionError(null); }}
+                      title="تحويل / تأجيل"
+                      className={`flex items-center justify-center h-8 w-8 rounded-lg border ${menu === actionKey(a) ? "bg-white/[0.1] border-white/[0.2]" : "bg-white/[0.04] border-white/[0.08]"} text-muted-foreground hover:text-foreground`}
+                    >
+                      <MoreHorizontal className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
+
+                {isManager && menu === actionKey(a) && (
+                  <div className="mt-2 rounded-xl border border-white/[0.08] bg-black/20 p-3 space-y-3">
+                    <div>
+                      <div className="flex items-center gap-1 text-[11px] text-muted-foreground mb-1.5">
+                        <ArrowLeftRight className="w-3.5 h-3.5" /> تحويل لموظف آخر
+                      </div>
+                      <select
+                        defaultValue=""
+                        disabled={busy === actionKey(a)}
+                        onChange={async (ev) => {
+                          const to = ev.target.value;
+                          if (!to || to === a.owner.trim()) return;
+                          if (!window.confirm(`تحويل «${a.client}» من ${a.owner || "—"} إلى ${to}؟`)) { ev.target.value = ""; return; }
+                          setBusy(actionKey(a));
+                          setActionError(null);
+                          try {
+                            await reassign(a, to, user?.name || "المدير");
+                            setMenu(null);
+                            onRefresh();
+                          } catch (e) {
+                            console.error(e);
+                            setActionError("تعذّر التحويل — حاول مرة ثانية");
+                          } finally {
+                            setBusy(null);
+                          }
+                        }}
+                        className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-foreground"
+                      >
+                        <option value="">اختر الموظف…</option>
+                        {staff.filter((n) => n !== a.owner.trim()).map((n) => <option key={n} value={n}>{n}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1 text-[11px] text-muted-foreground mb-1.5">
+                        <PauseCircle className="w-3.5 h-3.5" /> تأجيل (يختفي من القائمة والعدّاد ويرجع تلقائياً)
+                      </div>
+                      <div className="flex gap-1.5">
+                        {SNOOZE_OPTIONS.map((o) => (
+                          <button
+                            key={o.days}
+                            type="button"
+                            disabled={busy === actionKey(a)}
+                            onClick={async () => {
+                              setBusy(actionKey(a));
+                              setActionError(null);
+                              try {
+                                await onSnooze(actionKey(a), addDaysLocal(o.days));
+                                setMenu(null);
+                              } catch (e) {
+                                console.error(e);
+                                setActionError("تعذّر التأجيل — حاول مرة ثانية");
+                              } finally {
+                                setBusy(null);
+                              }
+                            }}
+                            className="flex-1 h-8 rounded-lg bg-white/[0.04] border border-white/[0.08] text-xs text-foreground hover:bg-white/[0.08] disabled:opacity-50"
+                          >
+                            {o.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {actionError && <div className="text-[11px] text-red-400">{actionError}</div>}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -277,6 +396,37 @@ export function ActionQueue({
             >
               عرض المزيد ({filtered.length - limit})
             </button>
+          )}
+        </div>
+      )}
+
+      {/* البنود المؤجلة */}
+      {snoozed.length > 0 && (
+        <div className="border-t border-white/[0.06] pt-3">
+          <button type="button" onClick={() => setShowSnoozed((v) => !v)} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+            <PauseCircle className="w-3.5 h-3.5" /> مؤجلة ({snoozed.length}) {showSnoozed ? "▴" : "▾"}
+          </button>
+          {showSnoozed && (
+            <div className="space-y-1.5 mt-2">
+              {snoozed.map(({ item: a, until }) => (
+                <div key={actionKey(a)} className="flex items-center justify-between gap-2 rounded-lg bg-white/[0.02] border border-white/[0.06] px-3 py-2">
+                  <div className="min-w-0 text-xs">
+                    <span className="font-bold text-foreground">{a.client}</span>
+                    <span className="text-muted-foreground"> · {TYPE_META[a.type].label} · {a.member} · ترجع <span dir="ltr">{until.slice(5).split("-").reverse().join("/")}</span></span>
+                  </div>
+                  {isManager && (
+                    <button
+                      type="button"
+                      onClick={() => onSnooze(actionKey(a), null).catch(console.error)}
+                      title="إلغاء التأجيل"
+                      className="shrink-0 flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="w-3.5 h-3.5" /> إلغاء
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}
