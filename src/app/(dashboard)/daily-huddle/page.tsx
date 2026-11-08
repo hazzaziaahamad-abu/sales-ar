@@ -8,7 +8,8 @@ import {
   fetchHuddleKpis, kpiStatus, memberOf, targetOf, KPI_DEFS, MEMBER_ROLES, DEFAULT_KPI_TARGETS,
   type HuddleKpis, type KpiKey, type KpiTargets,
 } from "@/lib/huddle-kpis";
-import { todayLocal, formatMoneyFull } from "@/lib/utils/format";
+import { todayLocal, formatMoneyFull, formatMoney } from "@/lib/utils/format";
+import { ActionQueue } from "@/components/daily-huddle/action-queue";
 import { SecretaryView } from "@/components/secretary/secretary-view";
 import { RecentUpdatesView } from "@/components/recent-updates/recent-updates-view";
 import { ChallengesHub } from "@/components/daily-huddle/challenges-hub";
@@ -75,19 +76,26 @@ function KpiRow({ k, value, target, kpis }: { k: KpiKey; value: number; target: 
   const color = s.ok ? "text-emerald-400" : def.period === "now" ? "text-red-400" : "text-amber-400";
   return (
     <div title={def.hint}>
-      <div className="flex items-baseline justify-between gap-2 text-xs">
-        <span className="text-muted-foreground">
-          {def.label}
-          {def.period === "month" && s.needToday ? <span className="opacity-70"> · المطلوب اليوم {fmtKpi(k, s.needToday)}</span> : null}
-        </span>
-        <span className={`font-bold ${color}`}>
-          {fmtKpi(k, value)}
-          <span className="text-muted-foreground font-normal"> / {def.period === "now" ? `الهدف ${target}` : fmtKpi(k, target)}</span>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-2 text-xs">
+        <span className="text-muted-foreground min-w-0">{def.label}</span>
+        <span className={`font-bold whitespace-nowrap tabular-nums ${color}`}>
+          {def.period === "now" ? (
+            // «الآن»: الهدف أقصى عدد مقبول — صفر غالباً، فما نكرر «/ الهدف 0»
+            value === 0 ? "✓ لا شيء" : <>{value}{target > 0 && <span className="text-muted-foreground font-normal"> / المقبول {target}</span>}</>
+          ) : (
+            <>
+              {def.money ? value.toLocaleString("en-US") : value}
+              {target > 0 && <span className="text-muted-foreground font-normal"> / {def.money ? formatMoneyFull(target) : target}</span>}
+            </>
+          )}
         </span>
       </div>
       <div className="h-1.5 rounded-full bg-white/[0.06] mt-1 overflow-hidden">
         <div className={`h-full ${s.ok ? "bg-emerald-500" : def.period === "now" ? "bg-red-500" : "bg-amber-500"}`} style={{ width: `${s.pct}%` }} />
       </div>
+      {def.period === "month" && s.needToday ? (
+        <div className="text-[10px] text-muted-foreground/80 mt-0.5">المطلوب اليوم {fmtKpi(k, s.needToday)}</div>
+      ) : null}
     </div>
   );
 }
@@ -102,7 +110,6 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
   const [kpis, setKpis] = useState<HuddleKpis | null>(null);
   const [targets, setTargets] = useState<KpiTargets>(DEFAULT_KPI_TARGETS);
   const [editingTargets, setEditingTargets] = useState(false);
-  const [showAlerts, setShowAlerts] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
@@ -208,15 +215,12 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
   const teamClosesGoal = TEAM.reduce((s, n) => s + tgt(n, "closes"), 0);
   const teamRevenue = TEAM.reduce((s, n) => s + (mk(n)?.values.closesValue ?? 0) + (mk(n)?.values.renewalsValue ?? 0), 0);
   const teamRevenueGoal = TEAM.reduce((s, n) => s + tgt(n, "closesValue") + tgt(n, "renewalsValue"), 0);
-  // «تحتاج انتباه»: نجمع فقط البنود الظاهرة في كرت كل موظف عشان الرقم يطابق الكروت
-  const ALERT_KPIS: KpiKey[] = ["staleDeals", "overdueRenewals", "openTickets"];
-  const alertsBreakdown = TEAM.map((n) => ({
-    member: n,
-    items: ALERT_KPIS.filter((key) => MEMBER_ROLES[n]?.kpis.includes(key))
-      .map((key) => ({ key, count: mk(n)?.values[key] ?? 0 }))
-      .filter((x) => x.count > 0),
-  })).filter((x) => x.items.length > 0);
-  const teamAlerts = alertsBreakdown.reduce((s, x) => s + x.items.reduce((a, i) => a + i.count, 0), 0);
+  // «تحتاج انتباه» = عدد بنود «قائمة الإجراءات» بالضبط (كل الصفقات/التجديدات/التذاكر المعلّقة + العوائق)،
+  // حتى لو البند خارج مؤشرات دور الموظف (مثلاً تذكرة مسندة لمنال).
+  const actions = (kpis?.actions ?? []).filter((a) => TEAM.includes(a.member));
+  const blockers = TEAM.map((m) => ({ member: m, text: entries[m]?.blocker?.trim() ?? "" })).filter((b) => b.text);
+  const teamAlerts = actions.length + blockers.length;
+  const isToday = date === todayLocal();
   const winning = followupsHit === TEAM.length;
 
   const yesterday = prevDay(date);
@@ -279,19 +283,11 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
         />
       </div>
 
-      {/* Rhythm */}
-      <div className="grid gap-2 sm:grid-cols-3">
-        {[
-          { time: "12:40 ظهراً", text: "الاجتماع اليومي — 10 دقائق" },
-          { time: "طول اليوم", text: "كل تواصل مع عميل = ملاحظة في «سجل المتابعة» داخل الصفقة أو التجديد أو التذكرة" },
-          { time: "السبت 1:30 ظهراً", text: "اجتماع الأسبوع: هل التزمنا؟ وما التزامنا القادم؟" },
-        ].map((r) => (
-          <div key={r.time} className="cc-card rounded-[14px] p-3 border border-white/[0.06]">
-            <div className="text-xs font-bold text-violet-400">{r.time}</div>
-            <div className="text-[13px] text-muted-foreground mt-0.5">{r.text}</div>
-          </div>
-        ))}
-      </div>
+      {/* الإيقاع — سطر واحد بدل 3 كروت عشان الأرقام تطلع أول الشاشة على الجوال */}
+      <p className="text-[11px] text-muted-foreground -mt-3">
+        <span className="text-violet-400 font-bold">12:40</span> الاجتماع اليومي (10 دقائق) ·{" "}
+        <span className="text-violet-400 font-bold">السبت 1:30</span> اجتماع الأسبوع · كل تواصل مع عميل = ملاحظة في «سجل المتابعة»
+      </p>
 
       {error && <div className="rounded-[14px] p-3 text-sm bg-red-500/10 text-red-400 border border-red-500/20">{error}</div>}
 
@@ -346,12 +342,13 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
             {[
               { label: "متابعات اليوم", value: String(teamFollowups), goal: String(teamFollowupsGoal), p: teamFollowupsGoal ? (teamFollowups / teamFollowupsGoal) * 100 : 100 },
               { label: "إغلاقات الشهر", value: String(teamCloses), goal: String(teamClosesGoal), p: teamClosesGoal ? (teamCloses / teamClosesGoal) * 100 : 100 },
-              { label: "مبيعات + تجديدات الشهر", value: formatMoneyFull(teamRevenue), goal: formatMoneyFull(teamRevenueGoal), p: teamRevenueGoal ? (teamRevenue / teamRevenueGoal) * 100 : 100 },
+              // مختصر (3.9K / 33K ر.س) عشان ما ينكسر على الجوال — الرقم الكامل في التلميح
+              { label: "مبيعات + تجديدات الشهر", value: formatMoney(teamRevenue).replace(" ر.س", ""), goal: formatMoney(teamRevenueGoal), p: teamRevenueGoal ? (teamRevenue / teamRevenueGoal) * 100 : 100, title: `${formatMoneyFull(teamRevenue)} من ${formatMoneyFull(teamRevenueGoal)}` },
             ].map((x) => (
-              <div key={x.label}>
-                <div className="flex justify-between gap-1 text-xs text-muted-foreground">
-                  <span>{x.label}</span>
-                  <span className="text-foreground font-bold">{x.value}<span className="text-muted-foreground font-normal">/{x.goal}</span></span>
+              <div key={x.label} title={"title" in x ? x.title : undefined} className="min-w-0">
+                <div className="text-xs text-muted-foreground truncate">{x.label}</div>
+                <div className="text-sm font-bold text-foreground tabular-nums whitespace-nowrap">
+                  {x.value}<span className="text-muted-foreground font-normal text-xs"> / {x.goal}</span>
                 </div>
                 <div className="h-1.5 rounded-full bg-white/[0.06] mt-1 overflow-hidden">
                   <div className={`h-full ${x.p >= 100 ? "bg-emerald-500" : "bg-amber-500"}`} style={{ width: `${Math.min(100, x.p)}%` }} />
@@ -360,40 +357,30 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
             ))}
             <button
               type="button"
-              onClick={() => teamAlerts && setShowAlerts((v) => !v)}
-              className={`text-xs text-muted-foreground text-right ${teamAlerts ? "cursor-pointer hover:text-foreground" : "cursor-default"}`}
+              onClick={() => document.getElementById("huddle-actions")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              className="min-w-0 text-xs text-muted-foreground text-right cursor-pointer hover:text-foreground"
             >
               تحتاج انتباه الآن
-              <div className={`text-lg font-bold ${teamAlerts ? "text-red-400" : "text-emerald-400"}`}>{teamAlerts}</div>
-              {teamAlerts > 0 && <div className="text-[10px] underline">{showAlerts ? "إخفاء التفاصيل" : "اضغط للتفاصيل"}</div>}
+              <div className={`text-lg font-bold leading-tight ${teamAlerts ? "text-red-400" : "text-emerald-400"}`}>{teamAlerts}</div>
+              {teamAlerts > 0 && <div className="text-[10px] underline">عرض القائمة ↓</div>}
             </button>
           </div>
         )}
-
-        {kpis && showAlerts && teamAlerts > 0 && (
-          <div className="mt-3 rounded-xl bg-red-500/[0.04] border border-red-500/15 p-3 space-y-2">
-            <p className="text-[11px] text-muted-foreground">مشاكل مفتوحة الآن والهدف فيها صفر — اضغط على الاسم للانتقال لكرته.</p>
-            {alertsBreakdown.map((x) => (
-              <div key={x.member} className="text-xs">
-                <button
-                  type="button"
-                  onClick={() => document.getElementById(`huddle-member-${x.member}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                  className="font-bold text-foreground hover:underline"
-                >
-                  {x.member} · {x.items.reduce((a, i) => a + i.count, 0)}
-                </button>
-                <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5 text-muted-foreground">
-                  {x.items.map((i) => (
-                    <span key={i.key} title={KPI_DEFS[i.key].hint}>
-                      {KPI_DEFS[i.key].label}: <span className="text-red-400 font-bold">{i.count}</span>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
+
+      {/* قائمة الإجراءات — البنود الفعلية وراء «تحتاج انتباه» مع إجراء مباشر لكل بند */}
+      {kpis && (
+        <div id="huddle-actions" className="scroll-mt-20">
+          <ActionQueue
+            actions={actions}
+            blockers={blockers}
+            members={TEAM}
+            isPastDate={!isToday}
+            onRefresh={load}
+            refreshing={loading}
+          />
+        </div>
+      )}
 
       {/* Member cards */}
       {loading || !kpis ? (

@@ -102,6 +102,36 @@ export interface MemberKpis {
   resolvedToday: number;
 }
 
+/** بند في «قائمة الإجراءات»: صفقة متقدمة بلا متابعة / تجديد متأخر بلا متابعة / تذكرة مفتوحة. */
+export type ActionType = "deal" | "renewal" | "ticket";
+
+export interface ActionItem {
+  type: ActionType;
+  id: string;
+  /** كرت الموظف المسؤول في المتابعة اليومية */
+  member: string;
+  /** اسم المسؤول كما هو في السجل (كرت عواطف يجمع عواطف + هنا) */
+  owner: string;
+  /** المؤشر اللي ينحسب فيه البند (staleDeals / overdueRenewals / openTickets) */
+  kpi: KpiKey;
+  client: string;
+  phone: string | null;
+  /** مرحلة الصفقة / حالة التجديد / حالة التذكرة */
+  status: string;
+  value: number;
+  /** أيام بلا نشاط (صفقة/تجديد) أو عمر التذكرة */
+  idleDays: number;
+  /** آخر نشاط معروف (ISO) */
+  lastActivity: string;
+  /** أولوية التذكرة أو ملخص مشكلتها */
+  priority?: string;
+  detail?: string;
+  ticketNumber?: number | string | null;
+  lastNote?: { text: string; author: string | null; at: string } | null;
+  /** 0 = عاجل جداً (انتظار الدفع / تذكرة عاجلة)، 1 = مهم، 2 = عادي */
+  rank: number;
+}
+
 export interface HuddleKpis {
   date: string;
   monthStart: string;
@@ -109,6 +139,8 @@ export interface HuddleKpis {
   dayOfMonth: number;
   members: Record<string, MemberKpis>;
   closedDeals: ClosedDealInfo[];
+  /** البنود اللي وراء أرقام «تحتاج انتباه» — نفس التعريف بالضبط عشان الرقم يطابق القائمة. */
+  actions: ActionItem[];
 }
 
 const DAY_MS = 86400000;
@@ -137,12 +169,69 @@ async function notesFor(ids: string[], since?: string): Promise<{ entity_id: str
   const supabase = createClient();
   const orgId = getOrgId();
   const out: { entity_id: string; author_name: string | null; created_at: string }[] = [];
-  for (let i = 0; i < ids.length; i += 150) {
-    let q = supabase.from("follow_up_notes").select("entity_id, author_name, created_at").eq("org_id", orgId).in("entity_id", ids.slice(i, i + 150));
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += 150) chunks.push(ids.slice(i, i + 150));
+  const results = await Promise.all(chunks.map((chunk) => {
+    let q = supabase.from("follow_up_notes").select("entity_id, author_name, created_at").eq("org_id", orgId).in("entity_id", chunk);
     if (since) q = q.gte("created_at", since);
-    const { data, error } = await q;
+    return q;
+  }));
+  for (const { data, error } of results) {
     if (error) throw error;
     out.push(...((data ?? []) as typeof out));
+  }
+  return out;
+}
+
+interface TicketRow {
+  id: string;
+  ticket_number: number | string | null;
+  client_name: string | null;
+  client_phone: string | null;
+  issue: string | null;
+  priority: string | null;
+  open_date: string | null;
+  created_at: string | null;
+  assigned_agent_name: string | null;
+  status: string;
+  resolved_date: string | null;
+}
+interface RenewalRow {
+  id: string;
+  customer_name: string | null;
+  customer_phone: string | null;
+  plan_price: number | null;
+  status: string;
+  renewal_date: string;
+  assigned_rep: string | null;
+  updated_at: string;
+}
+interface DealRow {
+  id: string;
+  client_name: string | null;
+  client_phone: string | null;
+  stage: string;
+  deal_value: number | null;
+  assigned_rep_name: string | null;
+  updated_at: string;
+}
+
+/** آخر ملاحظة يدوية لكل كيان (نتجاهل «تحديث تلقائي» لأنها مو تواصل مع العميل). */
+async function lastNotesFor(ids: string[]): Promise<Map<string, { note: string; author_name: string | null; created_at: string }>> {
+  const supabase = createClient();
+  const orgId = getOrgId();
+  const out = new Map<string, { note: string; author_name: string | null; created_at: string }>();
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += 150) chunks.push(ids.slice(i, i + 150));
+  const results = await Promise.all(chunks.map((chunk) =>
+    supabase.from("follow_up_notes").select("entity_id, note, author_name, created_at").eq("org_id", orgId)
+      .in("entity_id", chunk).not("note", "like", "📝 تحديث تلقائي%").order("created_at", { ascending: false }).limit(2000)
+  ));
+  for (const { data, error } of results) {
+    if (error) throw error;
+    for (const n of (data ?? []) as { entity_id: string; note: string; author_name: string | null; created_at: string }[]) {
+      if (!out.has(n.entity_id)) out.set(n.entity_id, n);
+    }
   }
   return out;
 }
@@ -170,21 +259,21 @@ export async function fetchHuddleKpis(date: string, fromDay: string): Promise<Hu
       supabase.from("deals").select("id, client_name, deal_value, close_date, assigned_rep_name").eq("org_id", orgId)
         .eq("stage", "مكتملة").gte("close_date", startIso(closedFrom)).lt("close_date", endIso(date)).order("close_date")
     ),
-    fetchAll<{ assigned_agent_name: string | null; status: string; resolved_date: string | null }>(() =>
-      supabase.from("tickets").select("assigned_agent_name, status, resolved_date").eq("org_id", orgId)
+    fetchAll<TicketRow>(() =>
+      supabase.from("tickets").select("id, ticket_number, client_name, client_phone, issue, priority, open_date, created_at, assigned_agent_name, status, resolved_date").eq("org_id", orgId)
         .or(`status.neq.محلول,resolved_date.eq.${date}`).order("id")
     ),
     fetchAll<{ assigned_rep: string | null; plan_price: number }>(() =>
       supabase.from("renewals").select("assigned_rep, plan_price").eq("org_id", orgId).eq("status", "مكتمل")
         .gte("payment_date", startIso(monthStart)).lt("payment_date", endIso(date)).order("id")
     ),
-    fetchAll<{ id: string; assigned_rep: string | null; updated_at: string }>(() =>
-      supabase.from("renewals").select("id, assigned_rep, updated_at").eq("org_id", orgId)
+    fetchAll<RenewalRow>(() =>
+      supabase.from("renewals").select("id, customer_name, customer_phone, plan_price, status, renewal_date, assigned_rep, updated_at").eq("org_id", orgId)
         .gte("renewal_date", addDays(saudiDateStr(), -30)).lt("renewal_date", saudiDateStr())
-        .not("status", "in", '("مكتمل","ملغي بسبب","إيقاف مؤقت")').order("id")
+        .not("status", "in", '("مكتمل","ملغي بسبب","إيقاف مؤقت","مؤجل مؤقتاً")').order("id")
     ),
-    fetchAll<{ id: string; assigned_rep_name: string | null; updated_at: string }>(() =>
-      supabase.from("deals").select("id, assigned_rep_name, updated_at").eq("org_id", orgId)
+    fetchAll<DealRow>(() =>
+      supabase.from("deals").select("id, client_name, client_phone, stage, deal_value, assigned_rep_name, updated_at").eq("org_id", orgId)
         .in("stage", HOT_STAGES).gte("deal_date", addDays(saudiDateStr(), -60)).order("id")
     ),
   ]);
@@ -252,11 +341,25 @@ export async function fetchHuddleKpis(date: string, fromDay: string): Promise<Hu
     if (inMonth) for (const h of d.helpers) members[h].values.assists += 1;
   }
 
+  const actions: ActionItem[] = [];
+  const nowMs = Date.now();
+  const daysSince = (iso?: string | null) => (iso ? Math.max(0, Math.floor((nowMs - new Date(iso).getTime()) / DAY_MS)) : 0);
+
   for (const t of tickets) {
     const member = memberOf(t.assigned_agent_name);
     if (!member) continue;
-    if (t.status !== "محلول") members[member].values.openTickets += 1;
-    else if (t.resolved_date === date) members[member].resolvedToday += 1;
+    if (t.status !== "محلول" && t.status !== "مغلق") {
+      members[member].values.openTickets += 1;
+      const opened = t.created_at ?? (t.open_date ? startIso(t.open_date) : null);
+      actions.push({
+        type: "ticket", id: t.id, member, owner: t.assigned_agent_name ?? member, kpi: "openTickets",
+        client: t.client_name || "—", phone: t.client_phone ?? null,
+        status: t.status, value: 0,
+        idleDays: daysSince(opened), lastActivity: opened ?? "",
+        priority: t.priority ?? undefined, detail: t.issue ?? undefined, ticketNumber: t.ticket_number ?? null,
+        rank: t.priority === "عاجل" || t.status === "متأخر" ? 0 : t.priority === "مرتفع" ? 1 : 2,
+      });
+    } else if (t.status === "محلول" && t.resolved_date === date) members[member].resolvedToday += 1;
   }
 
   for (const r of renewalsPaid) {
@@ -267,14 +370,46 @@ export async function fetchHuddleKpis(date: string, fromDay: string): Promise<Hu
   }
   for (const r of overdue) {
     const member = memberOf(r.assigned_rep);
-    if (member && isStale(r)) members[member].values.overdueRenewals += 1;
+    if (member && isStale(r)) {
+      members[member].values.overdueRenewals += 1;
+      actions.push({
+        type: "renewal", id: r.id, member, owner: r.assigned_rep ?? member, kpi: "overdueRenewals",
+        client: r.customer_name || "—", phone: r.customer_phone ?? null,
+        status: r.status, value: Number(r.plan_price) || 0,
+        idleDays: daysSince(r.updated_at), lastActivity: r.updated_at,
+        detail: `موعد التجديد ${r.renewal_date}`,
+        rank: r.status === "انتظار الدفع" ? 0 : 1,
+      });
+    }
   }
   for (const d of hot) {
     const member = memberOf(d.assigned_rep_name);
-    if (member && isStale(d)) members[member].values.staleDeals += 1;
+    if (member && isStale(d)) {
+      members[member].values.staleDeals += 1;
+      actions.push({
+        type: "deal", id: d.id, member, owner: d.assigned_rep_name ?? member, kpi: "staleDeals",
+        client: d.client_name || "—", phone: d.client_phone ?? null,
+        status: d.stage, value: Number(d.deal_value) || 0,
+        idleDays: daysSince(d.updated_at), lastActivity: d.updated_at,
+        rank: d.stage === "انتظار الدفع" ? 0 : d.stage === "تفاوض" || d.stage === "تم إرسال العرض" ? 1 : 2,
+      });
+    }
   }
 
-  return { date, monthStart, daysInMonth, dayOfMonth, members, closedDeals };
+  // آخر ملاحظة لكل بند (لعرضها في القائمة بدل ما يفتح المدير كل بند)
+  const lastNotes = await lastNotesFor(actions.map((a) => a.id));
+  for (const a of actions) {
+    const n = lastNotes.get(a.id);
+    if (!n) continue;
+    a.lastNote = { text: n.note, author: n.author_name, at: n.created_at };
+    if (a.type !== "ticket" && n.created_at > a.lastActivity) {
+      a.lastActivity = n.created_at;
+      a.idleDays = daysSince(n.created_at);
+    }
+  }
+  actions.sort((a, b) => a.rank - b.rank || b.idleDays - a.idleDays || b.value - a.value);
+
+  return { date, monthStart, daysInMonth, dayOfMonth, members, closedDeals, actions };
 }
 
 /** حالة المؤشر مقابل هدفه: نسبة التقدم، وهل هو على المسار، والمطلوب اليوم للمؤشرات الشهرية. */
