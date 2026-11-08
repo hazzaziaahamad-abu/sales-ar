@@ -1,6 +1,6 @@
 "use client";
 
-// «قائمة الإجراءات» للمدير: البنود الفعلية وراء رقم «تحتاج انتباه» (صفقات متقدمة بلا متابعة،
+// «قائمة الإجراءات»: للمدير كل البنود مع التنبيه/التحويل/التأجيل، وللموظف بنوده هو فقط. البنود الفعلية وراء رقم «تحتاج انتباه» (صفقات متقدمة بلا متابعة،
 // تجديدات متأخرة، تذاكر مفتوحة) + عوائق الموظفين — في مكان واحد مع إجراء مباشر لكل بند.
 import { useEffect, useMemo, useState } from "react";
 import { fetchEmployees, updateDeal, updateRenewal, updateTicket, createFollowUpNote } from "@/lib/supabase/db";
@@ -155,14 +155,16 @@ export function ActionQueue({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtered, member, phones]);
 
-  const total = actions.length + blockers.length;
+  // الموظف يشوف بنوده هو فقط — بدون فلتر الموظفين وأزرار «نبّه» (تنبيه الموظفين شغل المدير)
+  const ownView = !isManager && !!defaultMember;
+  const total = ownView ? memberCount(defaultMember) : actions.length + blockers.length;
 
   return (
     <div className="cc-card rounded-2xl p-4 border border-red-500/20 space-y-3">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <AlertOctagon className="w-4 h-4 text-red-400 shrink-0" />
-          <h2 className="text-sm font-bold text-foreground">قائمة الإجراءات</h2>
+          <h2 className="text-sm font-bold text-foreground">{ownView ? "بنودي اللي تحتاج متابعة" : "قائمة الإجراءات"}</h2>
           <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${total ? "bg-red-500/15 text-red-400" : "bg-emerald-500/15 text-emerald-400"}`}>{total}</span>
         </div>
         <button
@@ -178,7 +180,8 @@ export function ActionQueue({
         <p className="text-[11px] text-amber-400">القائمة لقطة «الآن» دائماً — ما تتغير بتغيير التاريخ.</p>
       )}
 
-      {/* فلتر الموظف */}
+      {/* فلتر الموظف — للمدير فقط */}
+      {!ownView && (
       <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
         {["all", ...members].map((m) => {
           const c = m === "all" ? total : memberCount(m);
@@ -197,6 +200,7 @@ export function ActionQueue({
           );
         })}
       </div>
+      )}
 
       {/* فلتر النوع */}
       <div className="flex gap-1.5 flex-wrap">
@@ -218,8 +222,8 @@ export function ActionQueue({
         })}
       </div>
 
-      {/* تنبيه جماعي */}
-      {bulk && bulk.map((b) => (
+      {/* تنبيه جماعي — للمدير فقط */}
+      {isManager && bulk && bulk.map((b) => (
         <a
           key={b.owner}
           href={b.phone ? waLink(b.phone, b.msg) : undefined}
@@ -299,7 +303,7 @@ export function ActionQueue({
                   <div className="flex items-center h-8 px-1 rounded-lg bg-amber-500/10 border border-amber-500/20" title="سجل المتابعة — أضف ملاحظة">
                     <FollowUpLogButton entityType={a.type} entityId={a.id} entityName={a.client} />
                   </div>
-                  {repPhone ? (
+                  {!isManager ? null : repPhone ? (
                     <a
                       href={waLink(repPhone, pingMessage(a))}
                       target="_blank"
