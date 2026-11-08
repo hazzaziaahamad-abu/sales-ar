@@ -34,7 +34,12 @@ function MyDay() {
   const { user, activeOrgId } = useAuth();
   const { isManager, loaded } = useHuddleManagers();
   const router = useRouter();
-  const fromRoot = useSearchParams().get("from") === "root";
+  const params = useSearchParams();
+  const fromRoot = params.get("from") === "root";
+  // المدير يفتح «يومي» موظف من «الفريق اليوم» (عرض فقط) — غير المدير يتجاهل as ويشوف يومه
+  const asId = params.get("as");
+  const asName = params.get("name")?.trim() || "";
+  const viewing = !!asId && !!asName && loaded && isManager;
   const [noDepts, setNoDepts] = useState(false);
   const onNotInDepartments = useCallback(() => setNoDepts(true), []);
 
@@ -46,8 +51,10 @@ function MyDay() {
   if (!user) return null;
   if (fromRoot && (!loaded || isManager)) return <Skeleton className="h-72 rounded-2xl" />;
 
-  const firstName = user.name.trim().split(/\s+/)[0];
-  const member = memberOf(user.name);
+  if (asId && !loaded) return <Skeleton className="h-72 rounded-2xl" />;
+  const who = viewing ? asName : user.name;
+  const firstName = who.trim().split(/\s+/)[0];
+  const member = memberOf(who);
   const today = new Date().toLocaleDateString("ar-SA", { timeZone: "Asia/Riyadh", weekday: "long", day: "numeric", month: "long" });
 
   return (
@@ -57,32 +64,50 @@ function MyDay() {
           <Sun className="h-5 w-5 text-amber-400" />
         </div>
         <div className="min-w-0">
-          <h1 className="text-lg font-bold text-foreground">{greeting()} {firstName}</h1>
-          <p className="text-xs text-muted-foreground">{today} · كل شغلك اليوم في مكان واحد</p>
+          {viewing ? (
+            <>
+              <h1 className="text-lg font-bold text-foreground">يوم {firstName} <span className="mr-1 rounded bg-amber-500/15 px-1.5 text-[11px] text-amber-400 align-middle">عرض فقط</span></h1>
+              <p className="text-xs text-muted-foreground">{today} · نفس اللي يشوفه {firstName} الحين</p>
+            </>
+          ) : (
+            <>
+              <h1 className="text-lg font-bold text-foreground">{greeting()} {firstName}</h1>
+              <p className="text-xs text-muted-foreground">{today} · كل شغلك اليوم في مكان واحد</p>
+            </>
+          )}
         </div>
+        {viewing && (
+          <Link href="/daily-huddle" className="mr-auto shrink-0 rounded-lg border border-white/[0.08] px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground">
+            رجوع للفريق
+          </Link>
+        )}
       </div>
 
-      <DayRhythm />
+      {!viewing && <DayRhythm />}
 
       {member && <MyResults member={member} />}
 
-      <MyTickets agentName={user.name} />
+      <MyTickets agentName={who} readOnly={viewing} />
 
-      <DailyTasksBar pinned onNotInDepartments={onNotInDepartments} />
-      {noDepts && (
+      {viewing ? (
+        <DailyTasksBar key={asId} viewAsUserId={asId!} />
+      ) : (
+        <DailyTasksBar pinned onNotInDepartments={onNotInDepartments} />
+      )}
+      {noDepts && !viewing && (
         <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 text-sm text-muted-foreground">
           ما عندك قسم في «مهام اليوم» بعد — اطلب من المدير يضيفك من «مركز مهام اليوم» عشان تطلع لك قائمة عملائك هنا.
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-2">
+      {!viewing && <div className="grid grid-cols-2 gap-2">
         <Link href="/my-tasks" className="flex items-center justify-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5 text-xs font-bold text-muted-foreground hover:text-foreground">
           <ListTodo className="h-4 w-4" /> مهام كلّفني فيها المدير
         </Link>
         <Link href="/daily-huddle" className="flex items-center justify-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5 text-xs font-bold text-muted-foreground hover:text-foreground">
           <CalendarCheck className="h-4 w-4" /> الفريق اليوم
         </Link>
-      </div>
+      </div>}
     </div>
   );
 }

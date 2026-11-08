@@ -31,7 +31,7 @@ const ageLabel = (iso: string) => {
   return `من ${Math.floor(h / 24)} يوم`;
 };
 
-export function MyTickets({ agentName }: { agentName: string }) {
+export function MyTickets({ agentName, readOnly }: { agentName: string; /** المدير يشوف يوم موظف */ readOnly?: boolean }) {
   const [tickets, setTickets] = useState<MyTicket[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +68,7 @@ export function MyTickets({ agentName }: { agentName: string }) {
   return (
     <section className="cc-card rounded-2xl border border-cyan-500/20 p-4 space-y-2">
       <h2 className="flex items-center gap-2 text-sm font-bold text-foreground">
-        <LifeBuoy className="h-4 w-4 text-cyan-400" /> تذاكري المفتوحة
+        <LifeBuoy className="h-4 w-4 text-cyan-400" /> {readOnly ? "تذاكره المفتوحة" : "تذاكري المفتوحة"}
         <span className="rounded-full bg-cyan-500/15 px-2 py-0.5 text-xs text-cyan-400">{tickets.length}</span>
       </h2>
       {error && <p className="text-xs text-red-400">{error}</p>}
@@ -98,16 +98,16 @@ export function MyTickets({ agentName }: { agentName: string }) {
               {ph && <a href={`tel:+${ph.intl}`} className="flex h-9 items-center gap-1 rounded-lg border border-white/[0.08] px-2.5 text-xs"><Phone className="h-3.5 w-3.5" /> اتصال</a>}
               {ph && <a href={`https://wa.me/${ph.intl}`} target="_blank" rel="noreferrer" className="flex h-9 items-center gap-1 rounded-lg border border-green-500/20 bg-green-500/10 px-2.5 text-xs text-green-400"><MessageCircle className="h-3.5 w-3.5" /> واتساب</a>}
               <span className="flex-1" />
-              {t.status === "مفتوح" && (
+              {!readOnly && t.status === "مفتوح" && (
                 <button type="button" disabled={busy === t.id} onClick={() => setStatus(t, "قيد الحل")}
                   className="flex h-9 items-center gap-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 text-xs text-amber-400 disabled:opacity-50">
                   <Wrench className="h-3.5 w-3.5" /> بدأت فيها
                 </button>
               )}
-              <button type="button" disabled={busy === t.id} onClick={() => setStatus(t, "محلول")}
+              {!readOnly && <button type="button" disabled={busy === t.id} onClick={() => setStatus(t, "محلول")}
                 className="flex h-9 items-center gap-1 rounded-lg bg-emerald-500/15 px-2.5 text-xs font-bold text-emerald-400 disabled:opacity-50">
                 <CheckCircle2 className="h-3.5 w-3.5" /> تم الحل
-              </button>
+              </button>}
             </div>
           </div>
         );
