@@ -43,7 +43,7 @@ export const KPI_DEFS: Record<KpiKey, KpiDef> = {
 
 export interface MemberRole {
   title: string;
-  /** الأسماء اللي تنحسب لهذا الكرت (اسم أول، عربي أو إنجليزي) — كرت عواطف يجمع فريق مبيعات المكتب. */
+  /** الأسماء اللي تنحسب لهذا الكرت (اسم أول، عربي أو إنجليزي). */
   names: string[];
   kpis: KpiKey[];
 }
@@ -53,7 +53,8 @@ export const MEMBER_ROLES: Record<string, MemberRole> = {
   مريم: { title: "واتس الدعم · دعم + مبيعات", names: ["مريم"], kpis: ["followups", "openTickets", "closes", "closesValue", "staleDeals"] },
   تغريد: { title: "التجديدات", names: ["تغريد"], kpis: ["followups", "renewalsPaid", "renewalsValue", "overdueRenewals"] },
   منال: { title: "مبيعات بالاتصال · مساعدة إغلاق", names: ["منال", "manal"], kpis: ["followups", "assists", "closes", "staleDeals"] },
-  عواطف: { title: "مبيعات المكتب (عواطف + هنا)", names: ["عواطف", "هنا"], kpis: ["followups", "closes", "closesValue", "staleDeals"] },
+  عواطف: { title: "مبيعات المكتب", names: ["عواطف"], kpis: ["followups", "closes", "closesValue", "staleDeals"] },
+  هنا: { title: "مبيعات المكتب", names: ["هنا"], kpis: ["followups", "closes", "closesValue", "staleDeals"] },
 };
 
 export type KpiTargets = Record<string, Partial<Record<KpiKey, number>>>;
@@ -64,7 +65,9 @@ export const DEFAULT_KPI_TARGETS: KpiTargets = {
   مريم: { followups: 12, openTickets: 0, closes: 8, closesValue: 3000, staleDeals: 0 },
   تغريد: { followups: 15, renewalsPaid: 35, renewalsValue: 10000, overdueRenewals: 0 },
   منال: { followups: 12, assists: 10, closes: 3, staleDeals: 0 },
-  عواطف: { followups: 20, closes: 25, closesValue: 10000, staleDeals: 0 },
+  // كانت كرت واحد (20 متابعة · 25 إغلاق · 10,000) — انقسمت بالنص بين عواطف وهنا
+  عواطف: { followups: 10, closes: 13, closesValue: 5000, staleDeals: 0 },
+  هنا: { followups: 10, closes: 12, closesValue: 5000, staleDeals: 0 },
 };
 
 export function targetOf(targets: KpiTargets, member: string, key: KpiKey): number {
@@ -96,6 +99,8 @@ export interface ClosedDealInfo {
 export interface MemberKpis {
   /** المتابعات لكل يوم في نطاق الجلب (YYYY-MM-DD → عدد العملاء) */
   followupsByDay: Record<string, number>;
+  /** الكيانات (صفقة/تجديد/تذكرة) اللي تابعها في كل يوم — لتقييم أولويات «مهام اليوم» */
+  followedByDay: Record<string, string[]>;
   values: Record<KpiKey, number>;
   /** إغلاقات اليوم المحدد */
   closesToday: number;
@@ -112,7 +117,7 @@ export interface ActionItem {
   id: string;
   /** كرت الموظف المسؤول في المتابعة اليومية */
   member: string;
-  /** اسم المسؤول كما هو في السجل (كرت عواطف يجمع عواطف + هنا) */
+  /** اسم المسؤول كما هو في السجل */
   owner: string;
   /** المؤشر اللي ينحسب فيه البند (staleDeals / overdueRenewals / openTickets) */
   kpi: KpiKey;
@@ -315,6 +320,7 @@ export async function fetchHuddleKpis(date: string, fromDay: string): Promise<Hu
   for (const name of Object.keys(MEMBER_ROLES)) {
     members[name] = {
       followupsByDay: {},
+      followedByDay: {},
       values: Object.fromEntries(Object.keys(KPI_DEFS).map((k) => [k, 0])) as Record<KpiKey, number>,
       closesToday: 0,
       helpedBy: {},
@@ -333,6 +339,7 @@ export async function fetchHuddleKpis(date: string, fromDay: string): Promise<Hu
     if (seen.has(k)) continue;
     seen.add(k);
     members[member].followupsByDay[day] = (members[member].followupsByDay[day] ?? 0) + 1;
+    (members[member].followedByDay[day] ??= []).push(n.entity_id);
   }
   for (const name of Object.keys(members)) members[name].values.followups = members[name].followupsByDay[date] ?? 0;
 

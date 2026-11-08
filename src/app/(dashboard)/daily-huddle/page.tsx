@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { getEditableContent, saveEditableContent, getEditableContentRange } from "@/lib/supabase/db";
@@ -31,6 +32,12 @@ import { CalendarClock, Users, Trophy, Save, Check, Settings2, Compass, HeartPul
 // مؤشرات كل موظف تُقرأ تلقائياً من اللوحة (سجل المتابعة، الصفقات، التذاكر، التجديدات) — راجع lib/huddle-kpis.
 // الموظف يكتب هنا فقط: أهم 3 أشياء اليوم + العائق.
 const KPI_TARGETS_KEY = `${KEY_PREFIX}_kpi_targets`;
+
+interface DailyPlanLite {
+  user_name: string;
+  plan_date: string;
+  priorities: { key: string; title: string }[];
+}
 /** البنود اللي أجّلها المدير من «قائمة الإجراءات»: مفتاح البند → تاريخ رجوعه (YYYY-MM-DD). */
 const SNOOZE_KEY = `${KEY_PREFIX}_action_snooze`;
 type SnoozeMap = Record<string, string>;
@@ -118,25 +125,42 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
   const [saving, setSaving] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // أولويات «مهام اليوم» — لو الموظف بدأ مهام يومه تظهر هنا بدل كتابتها مرة ثانية
-  const [dailyPlans, setDailyPlans] = useState<{ user_name: string; priorities: { key: string; title: string }[] }[]>([]);
-  useEffect(() => {
-    let alive = true;
-    fetch(`/api/daily-tasks/team?date=${date}`, { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (alive) setDailyPlans(d && d.orgId === activeOrgId ? d.plans ?? [] : []); })
-      .catch(() => { if (alive) setDailyPlans([]); });
-    return () => { alive = false; };
-  }, [date, activeOrgId]);
-  const dailyPrioritiesOf = (member: string) =>
-    dailyPlans.find((p) => memberOf(p.user_name.trim().split(/\s+/)[0]) === member && p.priorities?.length)?.priorities ?? null;
-
   // منال تُسجَّل بالإنجليزي أحياناً (Manal) — نطابق بالكرت لا بالنص.
   const myMember = memberOf(myFirstName);
   const canEdit = (member: string) => isManager || myMember === member;
   // الموظف يشوف كرته أول — المدير بالترتيب الثابت
   const cardOrder = !isManager && myMember ? [myMember, ...TEAM.filter((m) => m !== myMember)] : TEAM;
   const fromDay = [weekStart(date), prevDay(date)].sort()[0];
+
+  // أولويات «مهام اليوم» (★ في «يومي») — مصدر «أهم 3 أشياء» الوحيد لمن هو ضمن أقسام مهام اليوم.
+  // نجلبها من أول الأسبوع عشان نقيّم الالتزام تلقائياً: الأولوية «نُفّذت» لو كتب عنها في سجل المتابعة ذاك اليوم.
+  const [dailyPlans, setDailyPlans] = useState<DailyPlanLite[]>([]);
+  const [deptMembers, setDeptMembers] = useState<string[]>([]);
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/daily-tasks/team?date=${date}&from=${fromDay}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!alive) return;
+        const ok = d && d.orgId === activeOrgId;
+        setDailyPlans(ok ? d.plans ?? [] : []);
+        setDeptMembers(ok ? d.members ?? [] : []);
+      })
+      .catch(() => { if (alive) { setDailyPlans([]); setDeptMembers([]); } });
+    return () => { alive = false; };
+  }, [date, fromDay, activeOrgId]);
+  const planOf = (member: string, day: string) =>
+    dailyPlans.find((p) => p.plan_date === day && memberOf(p.user_name) === member && p.priorities?.length) ?? null;
+  const dailyPrioritiesOf = (member: string) => planOf(member, date)?.priorities ?? null;
+  /** الموظف ضمن أقسام «مهام اليوم» → أولوياته تُختار من «يومي» بدل الكتابة هنا */
+  const usesDailyTasks = (member: string) => deptMembers.some((n) => memberOf(n) === member);
+  /** أولويات يوم معيّن مع حالة التنفيذ التلقائية */
+  const evaluatedPriorities = (member: string, day: string) => {
+    const plan = planOf(member, day);
+    if (!plan) return null;
+    const followed = new Set(kpis?.members[member]?.followedByDay[day] ?? []);
+    return plan.priorities.map((p) => ({ title: p.title, done: followed.has(p.key.split(":")[1]) }));
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -274,9 +298,16 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
   const ws = weekStart(date);
   const weekDays: string[] = [];
   for (let d = ws; d <= date; d = addDays(d, 1)) weekDays.push(d);
+  const todayStr0 = todayLocal();
   const weekRows = TEAM.map((member) => {
-    const days = week.filter((r) => keyMember(r.key) === member && keyDate(r.key) >= ws).map((r) => r.value);
-    const evaluated = days.flatMap((d) => d.commitments ?? []).filter((c) => c.done !== undefined);
+    // الالتزام لكل يوم: أولويات «مهام اليوم» (تقييم تلقائي) لو موجودة، وإلا «أهم 3 أشياء» المكتوبة هنا.
+    // اليوم الحالي ما ينحسب لين يخلص.
+    const evaluated = weekDays.filter((d) => d < todayStr0).flatMap((d): { done?: boolean }[] => {
+      const auto = evaluatedPriorities(member, d);
+      if (auto) return auto;
+      const entry = week.find((r) => keyMember(r.key) === member && keyDate(r.key) === d)?.value;
+      return (entry?.commitments ?? []).filter((c) => c.done !== undefined);
+    });
     const byDay = mk(member)?.followupsByDay ?? {};
     // الجمعة إجازة — ما تنحسب في أيام الأسبوع إلا لو فيها متابعات
     const workDays = weekDays.filter((d) => new Date(`${d}T00:00:00Z`).getUTCDay() !== 5 || (byDay[d] ?? 0) > 0);
@@ -432,6 +463,7 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
             const metGoal = k.values.followups >= tgt(member, "followups");
             const y = yesterdayEntry(member);
             const yCommitments = y?.commitments ?? [];
+            const yAuto = evaluatedPriorities(member, yesterday);
             const yFollowups = k.followupsByDay[yesterday] ?? 0;
             const closedYesterday = kpis.closedDeals.filter((d) => d.day === yesterday && d.owner === member);
             const helpedYesterday = kpis.closedDeals.filter((d) => d.day === yesterday && d.helpers.includes(member));
@@ -485,7 +517,18 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
                         ساعدت في إغلاق أمس: {helpedYesterday.map((d) => `${d.client_name}${d.owner ? ` (${d.owner})` : ""}`).join("، ")}
                       </div>
                     )}
-                    {yCommitments.length > 0 && (
+                    {yAuto && (
+                      <div className="space-y-1 mt-2">
+                        <div className="text-[11px] text-muted-foreground">أولويات أمس ★ — تقييم تلقائي من سجل المتابعة</div>
+                        {yAuto.map((p, i) => (
+                          <div key={i} className={`flex items-center justify-between gap-2 text-sm ${p.done ? "text-emerald-400" : "text-red-400"}`}>
+                            <span className={p.done ? "" : "line-through"}>{p.title}</span>
+                            <span className="shrink-0 text-xs">{p.done ? "✅ تابعها" : "❌ ما تابعها"}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {!yAuto && yCommitments.length > 0 && (
                       <div className="space-y-1 mt-2">
                         <div className="text-[11px] text-muted-foreground">التزامات أمس — هل نُفّذت؟</div>
                         {yCommitments.map((c, i) => (
@@ -523,6 +566,14 @@ function TeamTodayTab({ isManager }: { isManager: boolean }) {
                         </div>
                       ))}
                       <div className="text-[10px] text-cyan">من «مهام اليوم»</div>
+                    </div>
+                    ) : usesDailyTasks(member) ? (
+                    <div className="mt-1 rounded-lg border border-dashed border-white/[0.1] px-3 py-2 text-[12px]">
+                      {myMember === member ? (
+                        <Link href="/my-day" className="text-cyan underline">اختر أولوياتك الثلاث ★ من «يومي» ←</Link>
+                      ) : (
+                        <span>ما اختار أولوياته في «يومي» بعد</span>
+                      )}
                     </div>
                     ) : (
                     <div className="space-y-1.5 mt-1">
