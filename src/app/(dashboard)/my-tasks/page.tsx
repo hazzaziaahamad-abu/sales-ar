@@ -15,7 +15,6 @@ import {
   fetchDeals,
   fetchPendingDeals,
   getOrgId,
-  generateDailyAutoTasks,
   fetchWeeklyTaskStats,
   fetchAllRepsDailyStats,
   fetchDailyTasksTemplate,
@@ -362,8 +361,8 @@ export default function MyTasksPage() {
   const loadData = useCallback(async () => {
     if (!user) return;
     try {
-      // Generate auto-tasks for today (idempotent — won't duplicate)
-      await generateDailyAutoTasks(user.id, user.name).catch(() => {});
+      // أُوقف القالب اليومي العام («5 مكالمات…» نفسها للكل) — شغل اليوم الفعلي صار في «يومي»
+      // (طابور العملاء + التذاكر)، و«مهامي» للمهام اللي يكلّف فيها المدير فقط.
 
       const [tasksResult, statsResult, teamResult, dealsResult, pendingResult, weekResult] = await Promise.allSettled([
         fetchEmployeeTasks({ assigned_to: user.id }),

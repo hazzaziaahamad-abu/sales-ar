@@ -11,6 +11,7 @@ import { memberOf } from "@/lib/huddle-kpis";
 import { DailyTasksBar } from "@/components/daily-tasks/daily-tasks-bar";
 import { MyResults } from "@/components/my-day/my-results";
 import { MyTickets } from "@/components/my-day/my-tickets";
+import { DayRhythm } from "@/components/my-day/day-rhythm";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sun, ListTodo, CalendarCheck } from "lucide-react";
 
@@ -60,6 +61,8 @@ function MyDay() {
           <p className="text-xs text-muted-foreground">{today} · كل شغلك اليوم في مكان واحد</p>
         </div>
       </div>
+
+      <DayRhythm />
 
       {member && <MyResults member={member} />}
 
