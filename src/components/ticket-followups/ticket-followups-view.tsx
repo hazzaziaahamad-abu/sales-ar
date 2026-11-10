@@ -3,7 +3,7 @@
 // «متابعة التذاكر والصفقات» — مسودات تذكير للعناصر الساكتة، تنرسل بعد موافقة السوبر أدمن.
 
 import { useCallback, useEffect, useState } from "react";
-import { BellRing, Check, X, Loader2, Clock, RefreshCw, Undo2, Send, CheckCheck, MessageSquare } from "lucide-react";
+import { BellRing, Check, X, Loader2, Clock, RefreshCw, Undo2, Send, CheckCheck, MessageSquare, Sparkles, Flame } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 interface Followup {
@@ -19,6 +19,8 @@ interface Followup {
   send_at: string | null;
   sent_at: string | null;
   skip_reason: string | null;
+  ai_priority?: "high" | "normal" | null;
+  ai_reason?: string | null;
   created_at: string;
   last_note?: { author: string | null; body: string; created_at: string } | null;
   stage?: string | null;
@@ -62,6 +64,19 @@ function LastNote({ f, compact = false }: { f: Followup; compact?: boolean }) {
 function Stage({ f }: { f: Followup }) {
   if (!f.stage) return null;
   return <span className="rounded-md bg-sky-500/10 border border-sky-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-sky-300">{f.stage}</span>;
+}
+
+/** سبب التحليل الذكي + الأولوية. */
+function AiReason({ f }: { f: Followup }) {
+  if (!f.ai_reason && f.ai_priority !== "high") return null;
+  return (
+    <p className="flex items-start gap-1.5 text-[11px] text-violet-300/90">
+      {f.ai_priority === "high"
+        ? <span className="flex items-center gap-0.5 shrink-0 rounded-md bg-red-500/15 border border-red-500/25 px-1.5 py-0.5 text-[10px] font-bold text-red-300"><Flame className="w-3 h-3" /> عاجل</span>
+        : <Sparkles className="w-3 h-3 mt-0.5 shrink-0" />}
+      <span>{f.ai_reason}</span>
+    </p>
+  );
 }
 
 function fmt(s: string | null): string {
@@ -114,7 +129,9 @@ export function TicketFollowupsView() {
     setBusy(false);
   };
 
-  const allPending = open.filter((f) => f.status === "pending");
+  const rank = (f: Followup) => (f.ai_priority === "high" ? 0 : 1);
+  const allPending = open.filter((f) => f.status === "pending").sort((a, b) => rank(a) - rank(b));
+  const aiSkipped = done.filter((f) => f.status === "skipped" && f.skip_reason?.startsWith("التحليل:"));
   const pending = cat === "all" ? allPending : allPending.filter((f) => catOf(f) === cat);
   const counts = CATEGORIES.map((c) => [c, allPending.filter((f) => catOf(f) === c).length] as const);
   const scheduled = open.filter((f) => f.status !== "pending").sort((a, b) => (a.send_at ?? "").localeCompare(b.send_at ?? ""));
@@ -132,7 +149,7 @@ export function TicketFollowupsView() {
           <div>
             <h1 className="text-xl font-extrabold text-foreground">متابعة التذاكر والصفقات</h1>
             <p className="text-[12px] text-muted-foreground mt-0.5">
-              تذاكر وصفقات وتجديدات لها من ٤٨ ساعة إلى ١٠ أيام بدون تحديث. راجع النص ووافق، وتنرسل باسمك كتعليق عادي فيه منشن في أوقات متفرقة (السبت–الخميس): مبيعات المكتب ٩ص–٥م، مبيعات الدعم والتجديدات ١ظ–١٠م، التذاكر ٧:٤٠ص–٣م.
+              التذكيرات تشتغل ٣ أيام بالأسبوع فقط: السبت والاثنين والخميس. كل يوم منها الصبح يحلل النظام التذاكر والصفقات والتجديدات اللي لها من ٤٨ ساعة إلى ١٠ أيام بدون تحديث (آخر التعليقات والمرحلة) ويطلع لك بس اللي فعلاً تحتاج إجراء، مع السبب ونص مناسب. راجع ووافق، وتنرسل باسمك كتعليق فيه منشن في أوقات متفرقة: مبيعات المكتب ٩ص–٥م، مبيعات الدعم والتجديدات ١ظ–١٠م، التذاكر ٧:٤٠ص–٣م.
             </p>
           </div>
         </div>
@@ -171,7 +188,14 @@ export function TicketFollowupsView() {
           {/* بانتظار الموافقة */}
           <section className="space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <h2 className="text-sm font-extrabold text-foreground">بانتظار موافقتك ({pending.length})</h2>
+              <div>
+                <h2 className="text-sm font-extrabold text-foreground">بانتظار موافقتك ({pending.length})</h2>
+                {aiSkipped.length > 0 && (
+                  <p className="flex items-center gap-1 text-[11px] text-violet-300/80 mt-0.5">
+                    <Sparkles className="w-3 h-3" /> التحليل استبعد {aiSkipped.length} ما تحتاج إجراء الحين (تشوفها في السجل تحت)
+                  </p>
+                )}
+              </div>
               {pending.length > 1 && (
                 <div className="flex items-center gap-1.5">
                 <button
@@ -207,6 +231,7 @@ export function TicketFollowupsView() {
                     {f.assignee_name} · <Clock className="inline w-3 h-3" /> بدون تحديث من {daysSince(f.last_activity_at)} يوم
                   </span>
                 </div>
+                <AiReason f={f} />
                 <LastNote f={f} />
                 <textarea
                   value={texts[f.id] ?? f.body}

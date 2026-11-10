@@ -3,6 +3,7 @@
 // عادي باسمه فيه منشن للموظف المسؤول، في أوقات متفرقة طبيعية داخل دوام الفريق.
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { saudiDateStr } from "@/lib/utils/format";
+import { triageItems } from "@/lib/followup-triage";
 
 export const STALE_HOURS = 48;
 /** الأقدم من كذا ما ينجاب (متروك من زمان — مو متابعة يومية). */
@@ -33,6 +34,8 @@ export interface TicketFollowup {
   decided_at: string | null;
   sent_at: string | null;
   skip_reason: string | null;
+  ai_priority: "high" | "normal" | null;
+  ai_reason: string | null;
   created_at: string;
 }
 
@@ -87,8 +90,10 @@ const CLIENT: [string, string][] = [
   ["تواصلت مع العميل؟ وش صار؟", "تواصلتي مع العميل؟ وش صار؟"],
 ];
 
+export const isFemale = (assignee: string) => !MALE_ASSIGNEES.has(assignee.trim());
+
 export function draftBody(source: FollowupSource, assignee: string, avoid = new Set<string>()): string {
-  const g = MALE_ASSIGNEES.has(assignee.trim()) ? 0 : 1;
+  const g = isFemale(assignee) ? 1 : 0;
   const pool = (source === "work" ? GENERAL : [...GENERAL, ...CLIENT]).map((t) => t[g]);
   const choices = pool.filter((t) => !avoid.has(t));
   const t = pick(choices.length ? choices : pool);
@@ -112,9 +117,9 @@ const WINDOWS: Record<FollowupCategory, SendWindow> = {
 };
 const windowMinutes = (w: SendWindow) => w.end - w.start - w.breaks.reduce((s, [a, b]) => s + (b - a), 0);
 
-/** أيام دوام الفريق: كل الأيام ما عدا الجمعة (getUTCDay على تاريخ الرياض: الجمعة = 5). */
-const TEAM_OFF_DAYS = [5];
-const isTeamDay = (ymd: string) => !TEAM_OFF_DAYS.includes(new Date(`${ymd}T00:00:00Z`).getUTCDay());
+/** أيام التذكيرات: السبت والاثنين والخميس فقط (getUTCDay على تاريخ الرياض: السبت = 6، الاثنين = 1، الخميس = 4). */
+export const REMINDER_DAYS = [6, 1, 4];
+const isTeamDay = (ymd: string) => REMINDER_DAYS.includes(new Date(`${ymd}T00:00:00Z`).getUTCDay());
 function nextTeamDay(ymd: string): string {
   const d = new Date(`${ymd}T00:00:00Z`);
   do d.setUTCDate(d.getUTCDate() + 1); while (!isTeamDay(d.toISOString().slice(0, 10)));
@@ -140,7 +145,7 @@ function normalize(d: Date, w: SendWindow): Date {
   return new Date(d.getTime() + rand(0, 59) * 1000);
 }
 
-/** وقت تجهيز المسودات (أيام الدوام، ٧ ص – ١٠ م). */
+/** يوم تذكيرات (سبت/اثنين/خميس) بين ٧ ص و١٠ م — وقت الإرسال المسموح. */
 export function inTeamHours(now = new Date()): boolean {
   const m = riyadhMin(now);
   return isTeamDay(saudiDateStr(now)) && m >= H(7) && m < H(22);
@@ -175,6 +180,11 @@ export async function getSuperAdmin(): Promise<{ id: string; name: string } | nu
 // ─── تجهيز المسودات ──────────────────────────────────────────────────────────
 
 /** يجهّز مسودات جديدة للعناصر الساكتة، ويلغي المعلّقة اللي ما عادت ساكتة. يرجع عدد الجديد. */
+/** وقت التجهيز التلقائي: ٧:٠٣ ص بتوقيت الرياض في أيام التذكيرات (مرة وحدة في اليوم). */
+export function isPrepareTime(now = new Date()): boolean {
+  return isTeamDay(saudiDateStr(now)) && riyadhMin(now) === H(7, 3);
+}
+
 export async function prepareDrafts(): Promise<number> {
   const admin = await getSuperAdmin();
   const stale = (await staleItems()).filter((s) => ENABLED_ORG_IDS.has(s.org_id) && s.assignee !== admin?.name);
@@ -202,25 +212,38 @@ export async function prepareDrafts(): Promise<number> {
   const fresh = stale.filter((s) => !openIds.has(s.id) && !recentlyRejected.has(s.id));
   if (!fresh.length) return 0;
 
+  // تحليل ذكي: يستبعد اللي ما تحتاج إجراء فعلاً (موعد متفق عليه لسا ما جا، بانتظار العميل بشكل واضح...)
+  // ويكتب سبب ونص مبني على آخر تعليق. لو التحليل مو متاح، كل العناصر تنعرض مثل قبل.
+  const triage = await triageItems(fresh.map((s) => ({
+    id: s.id, source: s.source, category: s.category, title: s.title, assignee: s.assignee,
+    female: isFemale(s.assignee), last_activity: s.last_activity,
+  }))).catch((e) => { console.error("followup triage:", e); return null; });
+
   const usedByAssignee = new Map<string, Set<string>>();
   const rows = fresh.map((s) => {
     const avoid = usedByAssignee.get(s.assignee) ?? new Set<string>();
     usedByAssignee.set(s.assignee, avoid);
-    return {
+    const t = triage?.get(s.id);
+    const base = {
       org_id: s.org_id, source: s.source, category: s.category, ticket_id: s.id, ticket_number: s.item_number,
       title: s.title, assignee_name: s.assignee, assignee_id: s.assignee_id, last_activity_at: s.last_activity,
-      body: draftBody(s.source, s.assignee, avoid), status: "pending",
+      ai_priority: t?.priority ?? null, ai_reason: t?.reason || null,
     };
+    if (t && !t.needs_action) {
+      return { ...base, body: draftBody(s.source, s.assignee, new Set()), status: "skipped", decided_at: nowIso,
+        skip_reason: `التحليل: ${t.reason || "ما تحتاج إجراء الحين"}` };
+    }
+    return { ...base, body: t?.message ? `@${s.assignee} ${t.message}` : draftBody(s.source, s.assignee, avoid), status: "pending" };
   });
   // دفعات؛ ولو تعارضت دفعة مع الفهرس الفريد (تشغيلين متزامنين) نكمل واحد واحد
   let created = 0;
   for (let i = 0; i < rows.length; i += 100) {
     const chunk = rows.slice(i, i + 100);
-    const { data, error } = await supabaseAdmin.from("ticket_followups").insert(chunk).select("id");
-    if (!error) { created += data?.length ?? 0; continue; }
+    const { data, error } = await supabaseAdmin.from("ticket_followups").insert(chunk).select("id, status");
+    if (!error) { created += (data ?? []).filter((r) => r.status === "pending").length; continue; }
     for (const row of chunk) {
       const { error: e } = await supabaseAdmin.from("ticket_followups").insert(row);
-      if (!e) created++;
+      if (!e && row.status === "pending") created++;
     }
   }
   return created;
@@ -265,6 +288,8 @@ export async function sendFollowup(f: TicketFollowup): Promise<"sent" | "skipped
 
 /** يرسل المتابعات المعتمدة اللي حان وقتها (كل وحدة تنحجز قبل الإرسال عشان ما تتكرر). */
 export async function sendDue(): Promise<{ sent: number; skipped: number; errors: string[] }> {
+  // الإرسال بس في أيام التذكيرات (سبت/اثنين/خميس) وقت الدوام — أي متأخر ينتظر يوم التذكير الجاي
+  if (!inTeamHours()) return { sent: 0, skipped: 0, errors: [] };
   const { data: due } = await supabaseAdmin
     .from("ticket_followups").select("*").eq("status", "approved").in("org_id", [...ENABLED_ORG_IDS]).lte("send_at", new Date().toISOString())
     .order("send_at", { ascending: true }).limit(20);
