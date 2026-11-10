@@ -6,6 +6,7 @@ import { getOrgId, markMentionNotificationsRead, resolveClientProfileTarget } fr
 import { useAuth } from "@/lib/auth-context";
 import { isSupportSalesMerged } from "@/lib/sales-merge";
 import type { MentionNotification } from "@/types";
+import { MentionReplyDialog } from "@/components/mentions/mention-reply-dialog";
 
 /** مدراء يبقى لهم البانر أعلى الصفحة مثل باقي الفريق */
 const KEEP_MENTION_BANNER = ["منال"];
@@ -58,8 +59,17 @@ export function MentionAlertBanner({ mentions, onRefresh, fullList = false }: { 
   const router = useRouter();
   const { user } = useAuth();
   const [markedIds, setMarkedIds] = useState<Set<string>>(new Set());
+  // صفحة «منشناتي»: الضغط على المنشن يفتح نافذة السجل (قراءة + رد + تأكيد) بدل ملخص العميل
+  const [activeMention, setActiveMention] = useState<MentionNotification | null>(null);
 
   if (mentions.length === 0) return null;
+
+  const openFull = (m: MentionNotification) => {
+    buildMentionUrl(
+      { entityType: m.entity_type, entityId: m.entity_id, entityName: m.entity_name, noteId: m.note_id },
+      user,
+    ).then((url) => router.push(url));
+  };
 
   const unreadCount = mentions.filter((m) => !m.is_read && !markedIds.has(m.id)).length;
 
@@ -108,11 +118,9 @@ export function MentionAlertBanner({ mentions, onRefresh, fullList = false }: { 
             <button
               key={m.id}
               onClick={() => {
+                if (fullList && m.entity_id) { setActiveMention(m); return; }
                 if (isNew) markRead([m.id]);
-                buildMentionUrl(
-                  { entityType: m.entity_type, entityId: m.entity_id, entityName: m.entity_name, noteId: m.note_id },
-                  user,
-                ).then((url) => router.push(url));
+                openFull(m);
               }}
               className={`w-full text-right px-4 py-2.5 flex items-center gap-3 hover:bg-white/[0.04] transition-colors ${isNew ? "" : "opacity-50"}`}
             >
@@ -146,6 +154,15 @@ export function MentionAlertBanner({ mentions, onRefresh, fullList = false }: { 
           );
         })}
       </div>
+      {fullList && activeMention && (
+        <MentionReplyDialog
+          key={activeMention.id}
+          mention={activeMention}
+          onClose={() => setActiveMention(null)}
+          onDone={(m) => { if (!m.is_read && !markedIds.has(m.id)) markRead([m.id]); }}
+          onOpenFull={(m) => { setActiveMention(null); openFull(m); }}
+        />
+      )}
     </div>
   );
 }
