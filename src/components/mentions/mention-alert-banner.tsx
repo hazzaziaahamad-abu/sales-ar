@@ -61,6 +61,8 @@ export function MentionAlertBanner({ mentions, onRefresh, fullList = false }: { 
   const [markedIds, setMarkedIds] = useState<Set<string>>(new Set());
   // صفحة «منشناتي»: الضغط على المنشن يفتح نافذة السجل (قراءة + رد + تأكيد) بدل ملخص العميل
   const [activeMention, setActiveMention] = useState<MentionNotification | null>(null);
+  // النافذة للمدير فقط — باقي الفريق يفتح ملخص العميل مثل العادة
+  const managerPopup = fullList && isMentionsManager(user);
 
   if (mentions.length === 0) return null;
 
@@ -118,7 +120,7 @@ export function MentionAlertBanner({ mentions, onRefresh, fullList = false }: { 
             <button
               key={m.id}
               onClick={() => {
-                if (fullList && m.entity_id) { setActiveMention(m); return; }
+                if (managerPopup && m.entity_id) { setActiveMention(m); return; }
                 if (isNew) markRead([m.id]);
                 openFull(m);
               }}
@@ -154,7 +156,7 @@ export function MentionAlertBanner({ mentions, onRefresh, fullList = false }: { 
           );
         })}
       </div>
-      {fullList && activeMention && (
+      {managerPopup && activeMention && (
         <MentionReplyDialog
           key={activeMention.id}
           mention={activeMention}
