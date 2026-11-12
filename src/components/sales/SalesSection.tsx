@@ -89,6 +89,7 @@ import {
   ChevronDown,
   Tag,
   Layers,
+  Megaphone,
 } from "lucide-react";
 import MeetingPlanButton from "@/components/sales/MeetingPlanButton";
 
@@ -358,6 +359,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
     if (!dealsTableOpen) {
       setStageFilter(null);
       setCategoryFilter(null);
+      setSourceFilter(null);
     }
     setDealsTableOpen((prev) => {
       const next = !prev;
@@ -627,10 +629,13 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const [breakdownRep, setBreakdownRep] = useState<string | null>(null);
   const [breakdownAdder, setBreakdownAdder] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  // فلتر مصدر الصفقة (حملة اعلانية، تسويق بالعمولة، ...)
+  const [sourceFilter, setSourceFilter] = useState<string | null>(null);
   // تبديل القسم (مبيعات/دعم...) يرجّع الفلاتر للكل بدل ما تبقى من القسم السابق
   useEffect(() => {
     setStageFilter(null);
     setCategoryFilter(null);
+    setSourceFilter(null);
   }, [salesType]);
   const [targetOnly, setTargetOnly] = useState(false);
   // «جاري التعامل بدون تحديث في السجل»: صفقة مفتوحة وما كتب أحد عنها ملاحظة —
@@ -809,6 +814,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
   /* category (تصنيف) + daily-target (الهدف) filters */
   const baseListDeals = searchedDeals.filter((d) => {
     if (categoryFilter && (d.category || "") !== categoryFilter) return false;
+    if (sourceFilter && (d.source || "") !== sourceFilter) return false;
     if (targetOnly && !dailyTargetIds.has(d.id)) return false;
     return true;
   });
@@ -838,6 +844,13 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const listActualCount = listDeals.filter((d) => !NON_ACTUAL_STAGES.has(d.stage)).length;
 
   /* distinct categories present across all deals (for filter + form suggestions) */
+  // المصادر المعروفة أولاً بترتيبها، ثم أي مصدر قديم موجود في الصفقات
+  const sourceOptions = useMemo(() => {
+    const extra = Array.from(
+      new Set(deals.map((d) => (d.source || "").trim()).filter((s) => s.length > 0))
+    ).filter((s) => !(SOURCES as readonly string[]).includes(s));
+    return [...SOURCES, ...extra.sort((a, b) => a.localeCompare(b, "ar"))];
+  }, [deals]);
   const categoryOptions = useMemo(
     () =>
       Array.from(
@@ -925,7 +938,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const totalPages = Math.max(1, Math.ceil(filteredDeals.length / DEALS_PER_PAGE));
   const paginatedDeals = filteredDeals.slice((currentPage - 1) * DEALS_PER_PAGE, currentPage * DEALS_PER_PAGE);
 
-  useEffect(() => { setCurrentPage(1); }, [clientSearch, stageFilter, categoryFilter, targetOnly, noLogFilter, achieveFilter, repFilter, tableDateFilter, tableCustomFrom, tableCustomTo, trialDaysFilter]);
+  useEffect(() => { setCurrentPage(1); }, [clientSearch, stageFilter, categoryFilter, sourceFilter, targetOnly, noLogFilter, achieveFilter, repFilter, tableDateFilter, tableCustomFrom, tableCustomTo, trialDaysFilter]);
 
   /* Deep-link from قائمة الاستهداف: ?deal=<id> reveals & flashes the row. */
   useEffect(() => {
@@ -2123,6 +2136,20 @@ export function SalesSection({ salesType }: SalesPageProps) {
               ))}
             </select>
           </div>
+          {/* Source filter */}
+          <div className="flex items-center gap-1.5">
+            <Megaphone className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+            <select
+              value={sourceFilter ?? ""}
+              onChange={(e) => setSourceFilter(e.target.value || null)}
+              className="text-[12px] bg-card border border-border rounded-lg px-2 py-1.5 text-foreground focus:outline-none focus:border-cyan/50"
+            >
+              <option value="">كل المصادر</option>
+              {sourceOptions.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
           {/* Target-only toggle */}
           <button
             onClick={() => setTargetOnly((v) => !v)}
@@ -2136,9 +2163,9 @@ export function SalesSection({ salesType }: SalesPageProps) {
             <Target className="w-3.5 h-3.5" />
             الهدف
           </button>
-          {(stageFilter || categoryFilter || targetOnly) && (
+          {(stageFilter || categoryFilter || sourceFilter || targetOnly) && (
             <button
-              onClick={() => { setStageFilter(null); setCategoryFilter(null); setTargetOnly(false); }}
+              onClick={() => { setStageFilter(null); setCategoryFilter(null); setSourceFilter(null); setTargetOnly(false); }}
               className="text-[12px] px-2.5 py-1.5 rounded-lg border border-transparent text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-colors whitespace-nowrap"
             >
               ✕ مسح الفلاتر
@@ -2190,7 +2217,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
             ) : filteredDeals.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={17} className="text-center text-muted-foreground py-8">
-                  {targetOnly ? "لا توجد صفقات في قائمة الاستهداف ضمن هذه الفلاتر" : categoryFilter ? `لا توجد مبيعات ضمن التصنيف "${categoryFilter}"` : stageFilter ? `لا توجد مبيعات في مرحلة "${stageFilter}"` : trialDaysFilter ? `لا يوجد تجريبي مضى عليه أكثر من ${trialDaysFilter} يوم` : "لا توجد مبيعات"}
+                  {targetOnly ? "لا توجد صفقات في قائمة الاستهداف ضمن هذه الفلاتر" : categoryFilter ? `لا توجد مبيعات ضمن التصنيف "${categoryFilter}"` : sourceFilter ? `لا توجد مبيعات من المصدر "${sourceFilter}"` : stageFilter ? `لا توجد مبيعات في مرحلة "${stageFilter}"` : trialDaysFilter ? `لا يوجد تجريبي مضى عليه أكثر من ${trialDaysFilter} يوم` : "لا توجد مبيعات"}
                 </TableCell>
               </TableRow>
             ) : (
