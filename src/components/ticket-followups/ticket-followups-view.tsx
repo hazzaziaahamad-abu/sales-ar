@@ -3,7 +3,7 @@
 // «متابعة التذاكر والصفقات» — مسودات تذكير للعناصر الساكتة، تنرسل بعد موافقة السوبر أدمن.
 
 import { useCallback, useEffect, useState } from "react";
-import { BellRing, Check, X, Loader2, Clock, RefreshCw, Undo2, Send, CheckCheck, MessageSquare, Sparkles, Flame } from "lucide-react";
+import { BellRing, Check, X, Loader2, Clock, RefreshCw, Undo2, Send, CheckCheck, MessageSquare, Sparkles, Flame, ShieldCheck, ChevronDown } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 interface Followup {
@@ -86,6 +86,100 @@ function fmt(s: string | null): string {
   } catch {
     return "";
   }
+}
+
+interface ManagerItem {
+  source: Followup["source"];
+  category: Category;
+  id: string;
+  item_number: number | null;
+  title: string;
+  assignee: string;
+  last_activity: string;
+  last_note: Followup["last_note"];
+  stage: string | null;
+}
+
+const MONTH_FMT = (ymd: string) => {
+  try { return new Intl.DateTimeFormat("ar", { month: "long", timeZone: "UTC" }).format(new Date(`${ymd}T00:00:00Z`)); } catch { return ymd; }
+};
+
+/**
+ * للمدير فقط: التذاكر والصفقات الساكتة أكثر من ١٠ أيام (ما تنجهز لها تذكيرات للموظفين)
+ * اللي آخر نشاط عليها في الشهر هذا أو الشهر الماضي.
+ */
+function ManagerStale() {
+  const [data, setData] = useState<{ since: string; items: ManagerItem[] } | null>(null);
+  const [openSec, setOpenSec] = useState(true);
+  const [cat, setCat] = useState<Category | "all">("all");
+
+  useEffect(() => {
+    fetch("/api/ticket-followups?view=manager", { cache: "no-store" })
+      .then(async (r) => (r.ok ? setData(await r.json()) : setData({ since: "", items: [] })))
+      .catch(() => setData({ since: "", items: [] }));
+  }, []);
+
+  const items = data?.items ?? [];
+  const shown = cat === "all" ? items : items.filter((i) => i.category === cat);
+  const counts = CATEGORIES.map((c) => [c, items.filter((i) => i.category === c).length] as const).filter(([, n]) => n > 0);
+  const thisMonth = new Date().toISOString().slice(0, 8);
+  const monthLabel = data?.since ? `${MONTH_FMT(data.since)} و${MONTH_FMT(`${thisMonth}01`)}` : "الشهر هذا والشهر الماضي";
+
+  return (
+    <section className="rounded-[14px] border border-sky-500/20 bg-sky-500/[0.03] p-3 space-y-2">
+      <button onClick={() => setOpenSec((v) => !v)} className="w-full flex items-center justify-between gap-2 text-right">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="w-4 h-4 text-sky-300" />
+          <div>
+            <h2 className="text-sm font-extrabold text-foreground">
+              للمدير فقط — ساكتة أكثر من ١٠ أيام ({data ? items.length : "…"})
+            </h2>
+            <p className="text-[11px] text-muted-foreground">
+              تذاكر وصفقات وتجديدات مفتوحة آخر نشاط عليها في {monthLabel}. للاطلاع فقط — ما ينرسل للموظفين أي تذكير عنها.
+            </p>
+          </div>
+        </div>
+        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${openSec ? "rotate-180" : ""}`} />
+      </button>
+
+      {openSec && (!data ? (
+        <div className="flex justify-center py-6 text-muted-foreground"><Loader2 className="w-5 h-5 animate-spin" /></div>
+      ) : items.length === 0 ? (
+        <p className="text-center text-sm text-muted-foreground py-6">ما فيه شي ساكت من الشهر هذا أو الماضي 👌</p>
+      ) : (
+        <>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {([["all", items.length] as const, ...counts]).map(([k, n]) => (
+              <button
+                key={k}
+                onClick={() => setCat(k)}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold border transition-colors ${cat === k ? "bg-sky-500/20 text-sky-300 border-sky-500/30" : "border-white/[0.06] text-muted-foreground hover:text-foreground"}`}
+              >
+                {k === "all" ? "الكل" : CATEGORY_LABEL[k]} ({n})
+              </button>
+            ))}
+          </div>
+          <div className="space-y-1.5">
+            {shown.map((i) => (
+              <div key={`${i.source}-${i.id}`} className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] px-3 py-2 space-y-1.5">
+                <div className="flex items-center justify-between gap-2 flex-wrap text-[12px]">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-foreground">{i.item_number ? `#${i.item_number} ` : ""}{i.title || "—"}</span>
+                    <span className="rounded-md bg-white/[0.05] px-1.5 py-0.5 text-[10px] text-muted-foreground">{CATEGORY_LABEL[i.category]}</span>
+                    {i.stage && <span className="rounded-md bg-sky-500/10 border border-sky-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-sky-300">{i.stage}</span>}
+                  </div>
+                  <span className="text-muted-foreground">
+                    {i.assignee} · <Clock className="inline w-3 h-3" /> بدون تحديث من {daysSince(i.last_activity)} يوم
+                  </span>
+                </div>
+                <LastNote f={{ last_note: i.last_note } as Followup} compact />
+              </div>
+            ))}
+          </div>
+        </>
+      ))}
+    </section>
+  );
 }
 
 /** التذكيرات الآلية: صفحة مستقلة (/ticket-followups) وتبويب داخل «المتابعة اليومية». */
@@ -258,6 +352,9 @@ export function TicketFollowupsView() {
               </div>
             ))}
           </section>
+
+          {/* للمدير فقط: الأقدم من ١٠ أيام — الشهر هذا والماضي */}
+          <ManagerStale />
 
           {/* المجدولة */}
           {scheduled.length > 0 && (
