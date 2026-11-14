@@ -151,6 +151,8 @@ export interface HuddleKpis {
 }
 
 const DAY_MS = 86400000;
+/** التذاكر والصفقات القديمة ما تنعرض في المتابعة اليومية: بس اللي تاريخها أو تاريخ إنشائها خلال آخر كذا يوم. */
+export const RECENT_DAYS = 45;
 const startIso = (day: string) => new Date(`${day}T00:00:00+03:00`).toISOString();
 const endIso = (day: string) => new Date(new Date(`${day}T00:00:00+03:00`).getTime() + DAY_MS).toISOString();
 const saudiDay = (iso: string) => saudiDateStr(new Date(iso));
@@ -274,6 +276,10 @@ export async function fetchHuddleKpis(date: string, fromDay: string): Promise<Hu
   const dayOfMonth = Number(date.slice(8, 10));
   const closedFrom = [monthStart, addDays(date, -1)].sort()[0];
   const staleSince = new Date(Date.now() - 3 * DAY_MS).toISOString();
+  const recentDay = addDays(saudiDateStr(), -RECENT_DAYS);
+  const recentIso = startIso(recentDay);
+  const isRecent = (day?: string | null, createdAt?: string | null) =>
+    (!!day && day.slice(0, 10) >= recentDay) || (!!createdAt && new Date(createdAt).getTime() >= new Date(recentIso).getTime());
 
   const [notes, closed, tickets, renewalsPaid, overdue, hot] = await Promise.all([
     fetchAll<{ author_name: string | null; entity_id: string; created_at: string; note: string | null }>(() =>
@@ -299,7 +305,7 @@ export async function fetchHuddleKpis(date: string, fromDay: string): Promise<Hu
     ),
     fetchAll<DealRow>(() =>
       supabase.from("deals").select("id, client_name, client_phone, stage, deal_value, assigned_rep_name, updated_at, created_at").eq("org_id", orgId)
-        .in("stage", HOT_STAGES).gte("deal_date", addDays(saudiDateStr(), -60)).order("id")
+        .in("stage", HOT_STAGES).or(`deal_date.gte.${recentDay},created_at.gte."${recentIso}"`).order("id")
     ),
   ]);
 
@@ -381,6 +387,7 @@ export async function fetchHuddleKpis(date: string, fromDay: string): Promise<Hu
     const member = memberOf(t.assigned_agent_name);
     if (!member) continue;
     if (t.status !== "محلول" && t.status !== "مغلق") {
+      if (!isRecent(t.open_date, t.created_at)) continue; // تذكرة قديمة — لها خطة لاحقاً
       members[member].values.openTickets += 1;
       const opened = t.created_at ?? (t.open_date ? startIso(t.open_date) : null);
       actions.push({
