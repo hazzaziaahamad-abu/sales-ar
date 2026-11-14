@@ -62,25 +62,6 @@ async function staleItems(): Promise<Item[]> {
   return (data ?? []) as Item[];
 }
 
-/**
- * للمدير فقط: العناصر المفتوحة الساكتة أكثر من MAX_STALE_DAYS (ما تنجهز لها تذكيرات)،
- * وآخر نشاط عليها من بداية الشهر الماضي (بتوقيت الرياض) — يعني الشهر هذا والشهر الماضي.
- */
-export async function managerStaleItems(now = new Date()): Promise<{ since: string; items: Item[] }> {
-  const [y, m] = saudiDateStr(now).split("-").map(Number);
-  const py = m === 1 ? y - 1 : y, pm = m === 1 ? 12 : m - 1;
-  const sinceDay = `${py}-${String(pm).padStart(2, "0")}-01`;
-  const since = new Date(new Date(`${sinceDay}T00:00:00Z`).getTime() - 3 * 3_600_000);
-  const cutoff = now.getTime() - MAX_STALE_DAYS * 86_400_000;
-  const { data, error } = await supabaseAdmin.rpc("followup_items", {});
-  if (error) throw error;
-  const items = ((data ?? []) as Item[])
-    .filter((i) => ENABLED_ORG_IDS.has(i.org_id))
-    .filter((i) => { const t = new Date(i.last_activity).getTime(); return t <= cutoff && t >= since.getTime(); })
-    .sort((a, b) => b.last_activity.localeCompare(a.last_activity));
-  return { since: sinceDay, items };
-}
-
 /** حالة عنصر وحده الحين: null = انقفل/ما عاد مفتوح. */
 async function itemNow(source: FollowupSource, id: string): Promise<Item | null> {
   const { data, error } = await supabaseAdmin.rpc("followup_items", { p_source: source, p_id: id });

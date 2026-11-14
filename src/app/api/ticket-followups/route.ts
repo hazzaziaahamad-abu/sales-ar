@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getAuthUser, isSuperAdmin } from "@/lib/permissions";
-import { prepareDrafts, spreadSchedule, managerStaleItems, type FollowupCategory } from "@/lib/ticket-followups";
+import { prepareDrafts, spreadSchedule, type FollowupCategory } from "@/lib/ticket-followups";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,39 +14,9 @@ async function superAdmin() {
   return { id: user.id, name: ((data?.name as string | undefined) ?? "").trim() };
 }
 
-/** آخر تعليق + المرحلة الحالية لكل عنصر. */
-async function notesAndStages(ids: string[]) {
-  const lastById = new Map<string, { author: string | null; body: string; created_at: string }>();
-  const stageById = new Map<string, string>();
-  for (let i = 0; i < ids.length; i += 300) {
-    const chunk = ids.slice(i, i + 300);
-    const [notes, stages] = await Promise.all([
-      supabaseAdmin.rpc("followup_last_notes", { p_ids: chunk }),
-      supabaseAdmin.rpc("followup_item_stages", { p_ids: chunk }),
-    ]);
-    for (const n of (notes.data ?? []) as { item_id: string; author: string | null; body: string; created_at: string }[]) {
-      const prev = lastById.get(n.item_id);
-      if (!prev || n.created_at > prev.created_at) lastById.set(n.item_id, { author: n.author, body: n.body, created_at: n.created_at });
-    }
-    for (const r of (stages.data ?? []) as { item_id: string; stage: string | null }[]) if (r.stage) stageById.set(r.item_id, r.stage);
-  }
-  return { lastById, stageById };
-}
-
-/**
- * GET → المسودات المعلّقة + المجدولة + آخر المرسلة/الملغاة (٧ أيام).
- * GET ?view=manager → للمدير فقط: الساكتة أكثر من ١٠ أيام من بداية الشهر الماضي (بدون تذكيرات للموظفين).
- */
-export async function GET(req: NextRequest) {
+/** GET → المسودات المعلّقة + المجدولة + آخر المرسلة/الملغاة (٧ أيام). */
+export async function GET() {
   if (!(await superAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (req.nextUrl.searchParams.get("view") === "manager") {
-    const { since, items } = await managerStaleItems();
-    const { lastById, stageById } = await notesAndStages(items.map((i) => i.id));
-    return NextResponse.json({
-      since,
-      items: items.map((i) => ({ ...i, last_note: lastById.get(i.id) ?? null, stage: stageById.get(i.id) ?? null })),
-    });
-  }
   const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
   const [open, done] = await Promise.all([
     supabaseAdmin.from("ticket_followups").select("*").in("status", ["pending", "approved", "sending"])
@@ -56,9 +26,23 @@ export async function GET(req: NextRequest) {
   ]);
   if (open.error) return NextResponse.json({ error: open.error.message }, { status: 500 });
 
-  // آخر تعليق ومرحلة كل عنصر مفتوح — عشان يقرر السوبر أدمن يوافق ولا لا
+  // آخر تعليق على كل عنصر مفتوح — عشان يقرر السوبر أدمن يوافق ولا لا
   const rows = open.data ?? [];
-  const { lastById, stageById } = await notesAndStages([...new Set(rows.map((r) => r.ticket_id as string))]);
+  const lastById = new Map<string, { author: string | null; body: string; created_at: string }>();
+  const ids = [...new Set(rows.map((r) => r.ticket_id as string))];
+  for (let i = 0; i < ids.length; i += 300) {
+    const { data } = await supabaseAdmin.rpc("followup_last_notes", { p_ids: ids.slice(i, i + 300) });
+    for (const n of (data ?? []) as { item_id: string; author: string | null; body: string; created_at: string }[]) {
+      const prev = lastById.get(n.item_id);
+      if (!prev || n.created_at > prev.created_at) lastById.set(n.item_id, { author: n.author, body: n.body, created_at: n.created_at });
+    }
+  }
+  // مرحلة العميل الحالية (مرحلة الصفقة / حالة التجديد أو التذكرة)
+  const stageById = new Map<string, string>();
+  for (let i = 0; i < ids.length; i += 300) {
+    const { data } = await supabaseAdmin.rpc("followup_item_stages", { p_ids: ids.slice(i, i + 300) });
+    for (const r of (data ?? []) as { item_id: string; stage: string | null }[]) if (r.stage) stageById.set(r.item_id, r.stage);
+  }
   const withNotes = rows.map((r) => ({
     ...r,
     last_note: lastById.get(r.ticket_id as string) ?? null,
