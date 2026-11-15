@@ -545,6 +545,30 @@ export async function fetchDeals(salesType?: "office" | "support"): Promise<Deal
   return rows.map((d) => ({ ...d, cycle_days: computeCycleDays(d as { created_at?: string; close_date?: string }) })) as Deal[];
 }
 
+/** خفيف: جوالات كل صفقات المنظمة (مكتب + دعم) — لفحص «الرقم مسجل مسبقاً» عند إضافة صفقة. */
+export type DealPhoneRow = Pick<Deal, "id" | "client_name" | "client_phone" | "client_code" | "stage" | "sales_type" | "assigned_rep_name" | "deal_date">;
+
+export async function fetchDealPhones(): Promise<DealPhoneRow[]> {
+  const supabase = createClient();
+  const PAGE = 1000;
+  const rows: DealPhoneRow[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("deals")
+      .select("id, client_name, client_phone, client_code, stage, sales_type, assigned_rep_name, deal_date")
+      .eq("org_id", getOrgId())
+      .not("client_phone", "is", null)
+      .neq("client_phone", "")
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    rows.push(...((data ?? []) as DealPhoneRow[]));
+    if (!data || data.length < PAGE) break;
+  }
+  return rows;
+}
+
 function computeCycleDays(d: { created_at?: string; close_date?: string }): number {
   if (!d.created_at) return 0;
   const start = new Date(d.created_at).getTime();

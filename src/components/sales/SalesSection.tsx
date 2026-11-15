@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { Deal, Marketer, Package, Employee, EmployeeTask } from "@/types";
 import { triggerSaleCelebration } from "@/components/layout/sale-celebration";
-import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createFollowUpNote, fetchRecentFollowUpNotes, fetchPackages, fetchQuoteCommitments, addQuoteCommitment, removeQuoteCommitment, fetchEmployees, fetchEmployeeTasks, createEmployeeTask, createDealKpiStages, upsertDailyGoal, fetchDailyGoals, pingPresence, fetchPresence, fetchTargetedDealIds, fetchDealLastManualNoteAt, fetchDealIdsWithCallMentions, addDealToTargeting, removeDealFromTargeting } from "@/lib/supabase/db";
+import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createFollowUpNote, fetchRecentFollowUpNotes, fetchPackages, fetchQuoteCommitments, addQuoteCommitment, removeQuoteCommitment, fetchEmployees, fetchEmployeeTasks, createEmployeeTask, createDealKpiStages, upsertDailyGoal, fetchDailyGoals, pingPresence, fetchPresence, fetchTargetedDealIds, fetchDealLastManualNoteAt, fetchDealIdsWithCallMentions, addDealToTargeting, removeDealFromTargeting, fetchDealPhones, type DealPhoneRow } from "@/lib/supabase/db";
 import { checkDealsForFollowUp, buildFollowUpTask, type FollowUpAction } from "@/lib/auto-followup";
 import { StarEmployeeCard, Leaderboard } from "@/components/star-employee";
 import { AssignTaskModal } from "@/components/tasks/AssignTaskModal";
@@ -26,6 +26,7 @@ import { autoCreateRenewalFromDeal } from "@/lib/entity-completion";
 import { AchievementSummary } from "@/components/achievement-summary";
 import SalesKPIDashboard from "@/components/sales/SalesKPIDashboard";
 import { isSupportSalesMerged } from "@/lib/sales-merge";
+import { phoneKey } from "@/lib/client-meetings";
 import { getKpiStatus, KPI_STATUS_STYLES, KPI_TARGETS } from "@/lib/utils/constants";
 import { StatCard } from "@/components/ui/stat-card";
 import { KPICard } from "@/components/ui/kpi-card";
@@ -273,6 +274,8 @@ export function SalesSection({ salesType }: SalesPageProps) {
   // نسخة للعرض فقط (لوحات المؤشرات) — لا تُستخدم للتعديل أو الحفظ
   const withVisibleAmounts = (list: Deal[]) => (moneyCutoff ? list.map((d) => ({ ...d, deal_value: dv(d) })) : list);
   const [deals, setDeals] = useState<Deal[]>([]);
+  // جوالات كل صفقات المنظمة (المكتب + الدعم) — لتنبيه «الرقم مسجل مسبقاً»
+  const [allDealPhones, setAllDealPhones] = useState<DealPhoneRow[] | null>(null);
   const [packages, setPackages] = useState<Package[]>([]);
   const [marketers, setMarketers] = useState<Marketer[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -1219,6 +1222,26 @@ export function SalesSection({ salesType }: SalesPageProps) {
     count: stageCounts[stage]?.count || 0,
     value: stageCounts[stage]?.value || 0,
   }));
+
+  // نحدّث قائمة الجوالات كل ما انفتح نموذج الصفقة (تشمل ما سجّله الزملاء في القسم الآخر)
+  useEffect(() => {
+    if (!modalOpen) return;
+    let cancelled = false;
+    fetchDealPhones()
+      .then((rows) => { if (!cancelled) setAllDealPhones(rows); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [modalOpen]);
+
+  const phoneDuplicates = useMemo(() => {
+    const key = phoneKey(form.client_phone);
+    if (!key) return [];
+    const byId = new Map<string, DealPhoneRow>();
+    for (const d of allDealPhones ?? []) byId.set(d.id, d);
+    // الصفقات المحمّلة محلياً (تشمل الجديدة قبل إعادة الجلب)
+    for (const d of deals) if (!byId.has(d.id)) byId.set(d.id, d);
+    return [...byId.values()].filter((d) => d.id !== editingId && phoneKey(d.client_phone) === key);
+  }, [form.client_phone, allDealPhones, deals, editingId]);
 
   /* ─── Handlers ─── */
   function openAddModal() {
@@ -3405,8 +3428,30 @@ export function SalesSection({ salesType }: SalesPageProps) {
                   onChange={(e) => setForm({ ...form, client_phone: e.target.value })}
                   placeholder="05xxxxxxxx"
                   dir="ltr"
-                  className="text-right"
+                  className={`text-right ${phoneDuplicates.length > 0 ? "border-amber-500 focus-visible:ring-amber-500" : ""}`}
                 />
+                {phoneDuplicates.length > 0 && (
+                  <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-300">
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                      هذا الرقم مسجل مسبقاً ({phoneDuplicates.length})
+                    </div>
+                    <ul className="mt-1 space-y-0.5">
+                      {phoneDuplicates.slice(0, 3).map((d) => (
+                        <li key={d.id} className="truncate">
+                          • {d.client_name}
+                          {d.client_code ? ` (${d.client_code})` : ""}
+                          {" — "}
+                          {d.sales_type === "support" ? "مبيعات الدعم" : "مبيعات المكتب"}
+                          {d.stage ? ` · ${d.stage}` : ""}
+                          {d.assigned_rep_name ? ` · ${d.assigned_rep_name}` : ""}
+                          {d.deal_date ? ` · ${formatDate(d.deal_date)}` : ""}
+                        </li>
+                      ))}
+                      {phoneDuplicates.length > 3 && <li>و {phoneDuplicates.length - 3} أخرى…</li>}
+                    </ul>
+                  </div>
+                )}
               </div>
               <div className="grid gap-1.5">
                 <Label htmlFor="deal_value">القيمة (ر.س)</Label>
