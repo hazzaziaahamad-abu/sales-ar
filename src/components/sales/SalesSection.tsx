@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { Deal, Marketer, Package, Employee, EmployeeTask } from "@/types";
 import { triggerSaleCelebration } from "@/components/layout/sale-celebration";
-import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createFollowUpNote, fetchRecentFollowUpNotes, fetchPackages, fetchQuoteCommitments, addQuoteCommitment, removeQuoteCommitment, fetchEmployees, fetchEmployeeTasks, createEmployeeTask, createDealKpiStages, upsertDailyGoal, fetchDailyGoals, pingPresence, fetchPresence, fetchTargetedDealIds, fetchDealLastManualNoteAt, addDealToTargeting, removeDealFromTargeting } from "@/lib/supabase/db";
+import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createFollowUpNote, fetchRecentFollowUpNotes, fetchPackages, fetchQuoteCommitments, addQuoteCommitment, removeQuoteCommitment, fetchEmployees, fetchEmployeeTasks, createEmployeeTask, createDealKpiStages, upsertDailyGoal, fetchDailyGoals, pingPresence, fetchPresence, fetchTargetedDealIds, fetchDealLastManualNoteAt, fetchDealIdsWithCallMentions, addDealToTargeting, removeDealFromTargeting } from "@/lib/supabase/db";
 import { checkDealsForFollowUp, buildFollowUpTask, type FollowUpAction } from "@/lib/auto-followup";
 import { StarEmployeeCard, Leaderboard } from "@/components/star-employee";
 import { AssignTaskModal } from "@/components/tasks/AssignTaskModal";
@@ -647,6 +647,13 @@ export function SalesSection({ salesType }: SalesPageProps) {
     // نعيد الجلب عند كل تغيير عشان الملاحظات الجديدة تُحتسب
     fetchDealLastManualNoteAt().then(setLastManualNoteAt).catch(console.error);
   }, [noLogFilter]);
+  // صفقات فيها منشن لفريق الاتصال (منال، تغريد، عواطف، هنا، علي، مريم)
+  const [callMentionOnly, setCallMentionOnly] = useState(false);
+  const [callMentionIds, setCallMentionIds] = useState<Set<string> | null>(null);
+  useEffect(() => {
+    if (!callMentionOnly) return;
+    fetchDealIdsWithCallMentions().then(setCallMentionIds).catch(console.error);
+  }, [callMentionOnly]);
   const [clientSearch, setClientSearch] = useState("");
   const [searchAllTime, setSearchAllTime] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -816,6 +823,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
     if (categoryFilter && (d.category || "") !== categoryFilter) return false;
     if (sourceFilter && (d.source || "") !== sourceFilter) return false;
     if (targetOnly && !dailyTargetIds.has(d.id)) return false;
+    if (callMentionOnly && callMentionIds && !callMentionIds.has(d.id)) return false;
     return true;
   });
   const isNoLogDeal = (d: Deal) => {
@@ -2094,6 +2102,19 @@ export function SalesSection({ salesType }: SalesPageProps) {
               {noLogFilter === opt.key && noLogCount !== null && <span className="font-bold">({noLogCount})</span>}
             </button>
           ))}
+          {/* صفقات فيها منشن اتصال لفريق الاتصال */}
+          <button
+            onClick={() => setCallMentionOnly(!callMentionOnly)}
+            className={`flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded-lg border font-semibold transition-all whitespace-nowrap ${
+              callMentionOnly
+                ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400 ring-1 ring-emerald-500/30"
+                : "bg-emerald-500/[0.06] border-emerald-500/20 text-emerald-400/70 hover:border-emerald-500/40 hover:text-emerald-400"
+            }`}
+            title="الصفقات اللي فيها منشن لمنال أو تغريد أو عواطف أو هنا أو علي أو مريم"
+          >
+            📞 منشن اتصال
+            {callMentionOnly && callMentionIds && <span className="font-bold">({baseListDeals.length})</span>}
+          </button>
           {filteredDeals.length > 0 && filteredDeals.every((d) => dailyTargetIds.has(d.id)) ? (
             <button onClick={deselectAll} className="text-[12px] px-2.5 py-1.5 rounded-lg border border-cc-red/30 text-cc-red hover:bg-cc-red/10 transition-colors whitespace-nowrap">
               <SquareCheck className="w-3 h-3 inline-block ml-1" />إلغاء تحديد الكل

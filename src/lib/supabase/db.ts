@@ -1784,6 +1784,40 @@ export async function fetchDealLastManualNoteAt(): Promise<Map<string, string>> 
   return latest;
 }
 
+/** فريق الاتصال — أي منشن لأحدهم في سجل الصفقة يعني «طلب اتصال» */
+export const CALL_TEAM_MENTION_NAMES = ["منال", "Manal", "تغريد", "عواطف", "هنا", "علي", "مريم"] as const;
+
+export function isCallTeamMention(name: string): boolean {
+  const n = (name || "").trim().toLowerCase();
+  // «مريم - نحجز» وأمثالها تُحسب لصاحبة الاسم
+  return CALL_TEAM_MENTION_NAMES.some((c) => {
+    const k = c.toLowerCase();
+    return n === k || n.startsWith(k + " ");
+  });
+}
+
+/** معرّفات الصفقات اللي فيها منشن لأحد فريق الاتصال */
+export async function fetchDealIdsWithCallMentions(): Promise<Set<string>> {
+  const supabase = createClient();
+  const PAGE = 1000;
+  const ids = new Set<string>();
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("mention_notifications")
+      .select("entity_id, mentioned_name")
+      .eq("org_id", getOrgId())
+      .eq("entity_type", "deal")
+      .order("id", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    for (const m of data ?? []) {
+      if (isCallTeamMention(m.mentioned_name as string)) ids.add(m.entity_id as string);
+    }
+    if (!data || data.length < PAGE) break;
+  }
+  return ids;
+}
+
 export async function fetchRecentFollowUpNotes(limit = 20): Promise<(FollowUpNote & { entity_name?: string })[]> {
   const supabase = createClient();
   const orgId = getOrgId();
