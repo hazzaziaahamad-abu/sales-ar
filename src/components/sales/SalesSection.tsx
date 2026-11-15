@@ -626,6 +626,29 @@ export function SalesSection({ salesType }: SalesPageProps) {
     "🔑 مفتاح! فتحت باباً جديداً لنجاحك",
   ];
 
+  // كل الصفقات مجمّعة حسب الجوال (آخر ٩ أرقام)
+  const phoneGroups = useMemo(() => {
+    const byId = new Map<string, DealPhoneRow>();
+    // الصفقات المحمّلة محلياً أولاً (أحدث نسخة بعد التعديل/الإضافة)، ثم بقية صفقات المنظمة
+    for (const d of deals) byId.set(d.id, d);
+    for (const d of allDealPhones ?? []) if (!byId.has(d.id)) byId.set(d.id, d);
+    const groups = new Map<string, DealPhoneRow[]>();
+    for (const d of byId.values()) {
+      const key = phoneKey(d.client_phone);
+      if (!key) continue;
+      const list = groups.get(key);
+      if (list) list.push(d); else groups.set(key, [d]);
+    }
+    return groups;
+  }, [allDealPhones, deals]);
+
+  /** الصفقات الأخرى المسجلة بنفس جوال هذه الصفقة */
+  const otherDealsWithPhone = useCallback((phone: string | undefined | null, selfId?: string | null) => {
+    const key = phoneKey(phone);
+    if (!key) return [];
+    return (phoneGroups.get(key) ?? []).filter((d) => d.id !== selfId);
+  }, [phoneGroups]);
+
   /* card filter */
   const [stageFilter, setStageFilter] = useState<string | null>(null);
   // فلتر تفصيل «فعلية / محاولات اتصال»: اسم مرحلة، أو مجموعة كاملة
@@ -642,6 +665,8 @@ export function SalesSection({ salesType }: SalesPageProps) {
     setSourceFilter(null);
   }, [salesType]);
   const [targetOnly, setTargetOnly] = useState(false);
+  // فلتر «مكرر»: صفقات رقمها مسجل في صفقة ثانية
+  const [dupOnly, setDupOnly] = useState(false);
   // «جاري التعامل بدون تحديث في السجل»: صفقة مفتوحة وما كتب أحد عنها ملاحظة —
   // "never" = أبداً، أو رقم = ما فيه ملاحظة آخر N أيام
   const [noLogFilter, setNoLogFilter] = useState<"never" | 3 | 7 | null>(null);
@@ -823,13 +848,16 @@ export function SalesSection({ salesType }: SalesPageProps) {
       )
     : trialFilteredDeals;
   /* category (تصنيف) + daily-target (الهدف) filters */
-  const baseListDeals = searchedDeals.filter((d) => {
+  const preDupDeals = searchedDeals.filter((d) => {
     if (categoryFilter && (d.category || "") !== categoryFilter) return false;
     if (sourceFilter && (d.source || "") !== sourceFilter) return false;
     if (targetOnly && !dailyTargetIds.has(d.id)) return false;
     if (callMentionOnly && callMentionIds && !callMentionIds.has(d.id)) return false;
     return true;
   });
+  const isDuplicateDeal = (d: Deal) => otherDealsWithPhone(d.client_phone, d.id).length > 0;
+  const duplicateCount = preDupDeals.filter(isDuplicateDeal).length;
+  const baseListDeals = dupOnly ? preDupDeals.filter(isDuplicateDeal) : preDupDeals;
   const isNoLogDeal = (d: Deal) => {
     if (!noLogFilter || !lastManualNoteAt || CLOSED_STAGES.has(d.stage)) return false;
     const last = lastManualNoteAt.get(d.id);
@@ -950,7 +978,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const totalPages = Math.max(1, Math.ceil(filteredDeals.length / DEALS_PER_PAGE));
   const paginatedDeals = filteredDeals.slice((currentPage - 1) * DEALS_PER_PAGE, currentPage * DEALS_PER_PAGE);
 
-  useEffect(() => { setCurrentPage(1); }, [clientSearch, stageFilter, categoryFilter, sourceFilter, targetOnly, noLogFilter, achieveFilter, repFilter, tableDateFilter, tableCustomFrom, tableCustomTo, trialDaysFilter]);
+  useEffect(() => { setCurrentPage(1); }, [clientSearch, stageFilter, categoryFilter, sourceFilter, targetOnly, dupOnly, noLogFilter, achieveFilter, repFilter, tableDateFilter, tableCustomFrom, tableCustomTo, trialDaysFilter]);
 
   /* Deep-link from قائمة الاستهداف: ?deal=<id> reveals & flashes the row. */
   useEffect(() => {
@@ -1232,29 +1260,6 @@ export function SalesSection({ salesType }: SalesPageProps) {
       .catch(() => {});
     return () => { cancelled = true; };
   }, [modalOpen]);
-
-  // كل الصفقات مجمّعة حسب الجوال (آخر ٩ أرقام)
-  const phoneGroups = useMemo(() => {
-    const byId = new Map<string, DealPhoneRow>();
-    // الصفقات المحمّلة محلياً أولاً (أحدث نسخة بعد التعديل/الإضافة)، ثم بقية صفقات المنظمة
-    for (const d of deals) byId.set(d.id, d);
-    for (const d of allDealPhones ?? []) if (!byId.has(d.id)) byId.set(d.id, d);
-    const groups = new Map<string, DealPhoneRow[]>();
-    for (const d of byId.values()) {
-      const key = phoneKey(d.client_phone);
-      if (!key) continue;
-      const list = groups.get(key);
-      if (list) list.push(d); else groups.set(key, [d]);
-    }
-    return groups;
-  }, [allDealPhones, deals]);
-
-  /** الصفقات الأخرى المسجلة بنفس جوال هذه الصفقة */
-  const otherDealsWithPhone = useCallback((phone: string | undefined | null, selfId?: string | null) => {
-    const key = phoneKey(phone);
-    if (!key) return [];
-    return (phoneGroups.get(key) ?? []).filter((d) => d.id !== selfId);
-  }, [phoneGroups]);
 
   const phoneDuplicates = useMemo(
     () => otherDealsWithPhone(form.client_phone, editingId),
@@ -1961,8 +1966,29 @@ export function SalesSection({ salesType }: SalesPageProps) {
           </div>
           <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${dealsTableOpen ? "" : "-rotate-90"}`} />
         </button>
-        {listDeals.length > 0 && (
+        {(listDeals.length > 0 || dupOnly) && (
           <div className="px-4 pb-3 space-y-1.5 text-[11px]">
+            {(duplicateCount > 0 || dupOnly) && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setDupOnly((v) => !v)}
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-bold border transition-colors ${
+                    dupOnly
+                      ? "bg-amber-400 text-amber-950 border-amber-500 ring-1 ring-amber-400/50"
+                      : "bg-amber-400/10 text-amber-600 dark:text-amber-400 border-amber-500/40 hover:bg-amber-400/20"
+                  }`}
+                >
+                  <AlertTriangle className="w-3 h-3" />
+                  مكرر {duplicateCount}
+                </button>
+                {dupOnly && (
+                  <button type="button" onClick={() => setDupOnly(false)} className="text-[11px] text-cyan hover:underline">
+                    ✕ عرض الكل
+                  </button>
+                )}
+              </div>
+            )}
             <div className="flex items-center gap-1.5 flex-wrap">
               <button
                 type="button"
