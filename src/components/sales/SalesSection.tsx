@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { Deal, Marketer, Package, Employee, EmployeeTask } from "@/types";
 import { triggerSaleCelebration } from "@/components/layout/sale-celebration";
-import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createFollowUpNote, fetchRecentFollowUpNotes, fetchPackages, fetchQuoteCommitments, addQuoteCommitment, removeQuoteCommitment, fetchEmployees, fetchEmployeeTasks, createEmployeeTask, createDealKpiStages, upsertDailyGoal, fetchDailyGoals, pingPresence, fetchPresence, fetchTargetedDealIds, fetchDealLastManualNoteAt, fetchDealIdsWithCallMentions, addDealToTargeting, removeDealFromTargeting } from "@/lib/supabase/db";
+import { fetchDeals, createDeal, updateDeal, deleteDeal, fetchMarketers, createFollowUpNote, fetchRecentFollowUpNotes, fetchPackages, fetchQuoteCommitments, addQuoteCommitment, removeQuoteCommitment, fetchEmployees, fetchEmployeeTasks, createEmployeeTask, createDealKpiStages, upsertDailyGoal, fetchDailyGoals, pingPresence, fetchPresence, fetchTargetedDealIds, fetchDealLastManualNoteAt, fetchDealIdsWithCallMentions, addDealToTargeting, removeDealFromTargeting, fetchDealPhones, type DealPhoneRow } from "@/lib/supabase/db";
 import { checkDealsForFollowUp, buildFollowUpTask, type FollowUpAction } from "@/lib/auto-followup";
 import { StarEmployeeCard, Leaderboard } from "@/components/star-employee";
 import { AssignTaskModal } from "@/components/tasks/AssignTaskModal";
@@ -26,6 +26,7 @@ import { autoCreateRenewalFromDeal } from "@/lib/entity-completion";
 import { AchievementSummary } from "@/components/achievement-summary";
 import SalesKPIDashboard from "@/components/sales/SalesKPIDashboard";
 import { isSupportSalesMerged } from "@/lib/sales-merge";
+import { phoneKey } from "@/lib/client-meetings";
 import { getKpiStatus, KPI_STATUS_STYLES, KPI_TARGETS } from "@/lib/utils/constants";
 import { StatCard } from "@/components/ui/stat-card";
 import { KPICard } from "@/components/ui/kpi-card";
@@ -273,6 +274,9 @@ export function SalesSection({ salesType }: SalesPageProps) {
   // نسخة للعرض فقط (لوحات المؤشرات) — لا تُستخدم للتعديل أو الحفظ
   const withVisibleAmounts = (list: Deal[]) => (moneyCutoff ? list.map((d) => ({ ...d, deal_value: dv(d) })) : list);
   const [deals, setDeals] = useState<Deal[]>([]);
+  // جوالات كل صفقات المنظمة (المكتب + الدعم) — لتنبيه «الرقم مسجل مسبقاً»
+  const [allDealPhones, setAllDealPhones] = useState<DealPhoneRow[] | null>(null);
+  const [dupConfirmOpen, setDupConfirmOpen] = useState(false);
   const [packages, setPackages] = useState<Package[]>([]);
   const [marketers, setMarketers] = useState<Marketer[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -1220,6 +1224,56 @@ export function SalesSection({ salesType }: SalesPageProps) {
     value: stageCounts[stage]?.value || 0,
   }));
 
+  // نجلب قائمة الجوالات عند فتح الصفحة وكل ما انفتح/انقفل نموذج الصفقة (تشمل ما سجّله الزملاء في القسم الآخر)
+  useEffect(() => {
+    let cancelled = false;
+    fetchDealPhones()
+      .then((rows) => { if (!cancelled) setAllDealPhones(rows); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [modalOpen]);
+
+  // كل الصفقات مجمّعة حسب الجوال (آخر ٩ أرقام)
+  const phoneGroups = useMemo(() => {
+    const byId = new Map<string, DealPhoneRow>();
+    // الصفقات المحمّلة محلياً أولاً (أحدث نسخة بعد التعديل/الإضافة)، ثم بقية صفقات المنظمة
+    for (const d of deals) byId.set(d.id, d);
+    for (const d of allDealPhones ?? []) if (!byId.has(d.id)) byId.set(d.id, d);
+    const groups = new Map<string, DealPhoneRow[]>();
+    for (const d of byId.values()) {
+      const key = phoneKey(d.client_phone);
+      if (!key) continue;
+      const list = groups.get(key);
+      if (list) list.push(d); else groups.set(key, [d]);
+    }
+    return groups;
+  }, [allDealPhones, deals]);
+
+  /** الصفقات الأخرى المسجلة بنفس جوال هذه الصفقة */
+  const otherDealsWithPhone = useCallback((phone: string | undefined | null, selfId?: string | null) => {
+    const key = phoneKey(phone);
+    if (!key) return [];
+    return (phoneGroups.get(key) ?? []).filter((d) => d.id !== selfId);
+  }, [phoneGroups]);
+
+  const phoneDuplicates = useMemo(
+    () => otherDealsWithPhone(form.client_phone, editingId),
+    [otherDealsWithPhone, form.client_phone, editingId],
+  );
+
+  /** رابط فتح الصفقة في قسمها (المكتب/الدعم) */
+  const dealHref = useCallback((d: DealPhoneRow) => {
+    const path = d.sales_type === "support" && !isSupportSalesMerged(orgId) ? "/support-sales" : "/sales";
+    return `${path}?deal=${d.id}`;
+  }, [orgId]);
+
+  function openDuplicateDeal() {
+    setModalOpen(false);
+    setDupConfirmOpen(false);
+    // نسمح بفتح نفس الصفقة مرة ثانية لو ضغطها من جديد
+    handledDealParam.current = null;
+  }
+
   /* ─── Handlers ─── */
   function openAddModal() {
     setEditingId(null);
@@ -1252,8 +1306,15 @@ export function SalesSection({ salesType }: SalesPageProps) {
     setModalOpen(true);
   }
 
-  async function handleSave() {
+  async function handleSave(skipDupCheck = false) {
     if (!form.client_name.trim()) return;
+    // الرقم مسجل مسبقاً: نطلب تأكيد قبل الإضافة (أو قبل تغيير الرقم عند التعديل)
+    const phoneChanged = !editingId || phoneKey(deals.find((d) => d.id === editingId)?.client_phone) !== phoneKey(form.client_phone);
+    if (!skipDupCheck && phoneChanged && phoneDuplicates.length > 0) {
+      setDupConfirmOpen(true);
+      return;
+    }
+    setDupConfirmOpen(false);
     // شهر الحملة إلزامي لمصدر «حملة اعلانية» — للصفقة الجديدة وعند التعديل
     const needsCampaign = CAMPAIGN_SOURCES.includes(form.source);
     if (needsCampaign && !form.campaign_month) {
@@ -2247,11 +2308,12 @@ export function SalesSection({ salesType }: SalesPageProps) {
                 const isTargetDone = isTarget && deal.stage === "مكتملة";
                 const inTargeting = targetedDealIds.has(deal.id);
                 const isHighlighted = highlightDealId === deal.id;
+                const isDuplicate = otherDealsWithPhone(deal.client_phone, deal.id).length > 0;
                 return (
                 <TableRow
                   key={deal.id}
                   id={`deal-row-${deal.id}`}
-                  className={`${isTarget ? (isTargetDone ? "bg-cc-green/[0.04]" : "bg-cyan/[0.04]") : ""} ${
+                  className={`${isDuplicate ? "bg-amber-400/[0.12] hover:bg-amber-400/[0.18] shadow-[inset_-4px_0_0_0_rgb(245,158,11)]" : isTarget ? (isTargetDone ? "bg-cc-green/[0.04]" : "bg-cyan/[0.04]") : ""} ${
                     isHighlighted ? "ring-2 ring-inset ring-fuchsia-500/70 bg-fuchsia-500/[0.06] animate-pulse" : ""
                   }`}
                 >
@@ -2285,6 +2347,11 @@ export function SalesSection({ salesType }: SalesPageProps) {
                     >
                       {deal.client_name}
                     </button>
+                    {isDuplicate && (
+                      <span className="mr-1.5 inline-flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded bg-amber-400 text-amber-950 font-bold">
+                        <AlertTriangle className="w-3 h-3" />مكرر
+                      </span>
+                    )}
                     {isTarget && !isTargetDone && (
                       <span className="mr-1.5 inline-block text-[11px] px-1.5 py-0.5 rounded bg-cyan/10 text-cyan font-medium">هدف اليوم</span>
                     )}
@@ -2302,6 +2369,29 @@ export function SalesSection({ salesType }: SalesPageProps) {
                     >
                       {deal.client_phone ? formatPhone(deal.client_phone) : "—"}
                     </button>
+                    {(() => {
+                      const others = otherDealsWithPhone(deal.client_phone, deal.id);
+                      if (others.length === 0) return null;
+                      return (
+                        <div className="mt-1 flex flex-wrap items-center gap-1" dir="rtl">
+                          <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 font-bold">
+                            <AlertTriangle className="w-3 h-3" />مكرر
+                          </span>
+                          {others.slice(0, 3).map((o) => (
+                            <Link
+                              key={o.id}
+                              href={dealHref(o)}
+                              onClick={() => { handledDealParam.current = null; }}
+                              title={`${o.client_name}${o.stage ? ` — ${o.stage}` : ""}${o.sales_type === "support" ? " — مبيعات الدعم" : " — مبيعات المكتب"}`}
+                              className="text-[10px] font-mono text-amber-600 dark:text-amber-400 underline hover:text-primary"
+                            >
+                              {o.client_code || "صفقة"}
+                            </Link>
+                          ))}
+                          {others.length > 3 && <span className="text-[10px] text-muted-foreground">+{others.length - 3}</span>}
+                        </div>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs">
                     {deal.source || "—"}
@@ -2810,6 +2900,11 @@ export function SalesSection({ salesType }: SalesPageProps) {
                             onClick={() => { setProfileQuery(deal.client_phone || deal.client_name); setProfileOpen(true); }}
                             className="text-sm font-bold text-foreground hover:text-primary hover:underline transition-colors text-right"
                           >{deal.client_name}</button>
+                          {otherDealsWithPhone(deal.client_phone, deal.id).length > 0 && (
+                            <span className="inline-flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded bg-amber-400 text-amber-950 font-bold">
+                              <AlertTriangle className="w-3 h-3" />مكرر
+                            </span>
+                          )}
                           <ColorBadge color={STAGE_BADGE_COLOR[deal.stage] || "cyan"} text={deal.stage} />
                           <span className="text-xs font-bold text-cyan">{formatMoney(deal.deal_value)}</span>
                           {daysSince > 0 && (
@@ -3405,8 +3500,33 @@ export function SalesSection({ salesType }: SalesPageProps) {
                   onChange={(e) => setForm({ ...form, client_phone: e.target.value })}
                   placeholder="05xxxxxxxx"
                   dir="ltr"
-                  className="text-right"
+                  className={`text-right ${phoneDuplicates.length > 0 ? "border-amber-500 focus-visible:ring-amber-500" : ""}`}
                 />
+                {phoneDuplicates.length > 0 && (
+                  <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-300">
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                      هذا الرقم مسجل مسبقاً ({phoneDuplicates.length})
+                    </div>
+                    <ul className="mt-1 space-y-0.5">
+                      {phoneDuplicates.slice(0, 3).map((d) => (
+                        <li key={d.id} className="truncate">
+                          •{" "}
+                          <Link href={dealHref(d)} onClick={openDuplicateDeal} className="font-mono font-bold underline hover:text-primary">
+                            {d.client_code || "عرض الصفقة"}
+                          </Link>
+                          {" "}{d.client_name}
+                          {" — "}
+                          {d.sales_type === "support" ? "مبيعات الدعم" : "مبيعات المكتب"}
+                          {d.stage ? ` · ${d.stage}` : ""}
+                          {d.assigned_rep_name ? ` · ${d.assigned_rep_name}` : ""}
+                          {d.deal_date ? ` · ${formatDate(d.deal_date)}` : ""}
+                        </li>
+                      ))}
+                      {phoneDuplicates.length > 3 && <li>و {phoneDuplicates.length - 3} أخرى…</li>}
+                    </ul>
+                  </div>
+                )}
               </div>
               <div className="grid gap-1.5">
                 <Label htmlFor="deal_value">القيمة (ر.س)</Label>
@@ -3653,8 +3773,47 @@ export function SalesSection({ salesType }: SalesPageProps) {
             <Button variant="outline" onClick={() => setModalOpen(false)}>
               إلغاء
             </Button>
-            <Button onClick={handleSave} disabled={saving}>
+            <Button onClick={() => handleSave()} disabled={saving}>
               {saving ? "جاري الحفظ..." : editingId ? "حفظ التعديلات" : "إضافة المبيع"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Duplicate Phone Confirmation Dialog ─── */}
+      <Dialog open={dupConfirmOpen} onOpenChange={setDupConfirmOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              الرقم مضاف مسبقاً
+            </DialogTitle>
+            <DialogDescription>
+              الرقم <span dir="ltr" className="font-mono">{formatPhone(form.client_phone)}</span> مسجل مسبقاً في {phoneDuplicates.length} صفقة. هل ترغب في {editingId ? "حفظه" : "إضافته"}؟
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="space-y-1 text-sm max-h-48 overflow-y-auto">
+            {phoneDuplicates.map((d) => (
+              <li key={d.id} className="flex flex-wrap items-center gap-1.5 rounded border border-border/50 px-2 py-1">
+                <Link href={dealHref(d)} onClick={openDuplicateDeal} className="font-mono font-bold text-primary underline">
+                  {d.client_code || "عرض الصفقة"}
+                </Link>
+                <span>{d.client_name}</span>
+                <span className="text-xs text-muted-foreground">
+                  {d.sales_type === "support" ? "مبيعات الدعم" : "مبيعات المكتب"}
+                  {d.stage ? ` · ${d.stage}` : ""}
+                  {d.assigned_rep_name ? ` · ${d.assigned_rep_name}` : ""}
+                  {d.deal_date ? ` · ${formatDate(d.deal_date)}` : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDupConfirmOpen(false)}>
+              إلغاء
+            </Button>
+            <Button onClick={() => handleSave(true)} disabled={saving}>
+              نعم، {editingId ? "احفظ" : "أضف"} الصفقة
             </Button>
           </DialogFooter>
         </DialogContent>
