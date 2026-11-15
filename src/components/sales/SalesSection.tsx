@@ -276,6 +276,7 @@ export function SalesSection({ salesType }: SalesPageProps) {
   const [deals, setDeals] = useState<Deal[]>([]);
   // جوالات كل صفقات المنظمة (المكتب + الدعم) — لتنبيه «الرقم مسجل مسبقاً»
   const [allDealPhones, setAllDealPhones] = useState<DealPhoneRow[] | null>(null);
+  const [dupConfirmOpen, setDupConfirmOpen] = useState(false);
   const [packages, setPackages] = useState<Package[]>([]);
   const [marketers, setMarketers] = useState<Marketer[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -1223,9 +1224,8 @@ export function SalesSection({ salesType }: SalesPageProps) {
     value: stageCounts[stage]?.value || 0,
   }));
 
-  // نحدّث قائمة الجوالات كل ما انفتح نموذج الصفقة (تشمل ما سجّله الزملاء في القسم الآخر)
+  // نجلب قائمة الجوالات عند فتح الصفحة وكل ما انفتح/انقفل نموذج الصفقة (تشمل ما سجّله الزملاء في القسم الآخر)
   useEffect(() => {
-    if (!modalOpen) return;
     let cancelled = false;
     fetchDealPhones()
       .then((rows) => { if (!cancelled) setAllDealPhones(rows); })
@@ -1233,15 +1233,46 @@ export function SalesSection({ salesType }: SalesPageProps) {
     return () => { cancelled = true; };
   }, [modalOpen]);
 
-  const phoneDuplicates = useMemo(() => {
-    const key = phoneKey(form.client_phone);
-    if (!key) return [];
+  // كل الصفقات مجمّعة حسب الجوال (آخر ٩ أرقام)
+  const phoneGroups = useMemo(() => {
     const byId = new Map<string, DealPhoneRow>();
-    for (const d of allDealPhones ?? []) byId.set(d.id, d);
-    // الصفقات المحمّلة محلياً (تشمل الجديدة قبل إعادة الجلب)
-    for (const d of deals) if (!byId.has(d.id)) byId.set(d.id, d);
-    return [...byId.values()].filter((d) => d.id !== editingId && phoneKey(d.client_phone) === key);
-  }, [form.client_phone, allDealPhones, deals, editingId]);
+    // الصفقات المحمّلة محلياً أولاً (أحدث نسخة بعد التعديل/الإضافة)، ثم بقية صفقات المنظمة
+    for (const d of deals) byId.set(d.id, d);
+    for (const d of allDealPhones ?? []) if (!byId.has(d.id)) byId.set(d.id, d);
+    const groups = new Map<string, DealPhoneRow[]>();
+    for (const d of byId.values()) {
+      const key = phoneKey(d.client_phone);
+      if (!key) continue;
+      const list = groups.get(key);
+      if (list) list.push(d); else groups.set(key, [d]);
+    }
+    return groups;
+  }, [allDealPhones, deals]);
+
+  /** الصفقات الأخرى المسجلة بنفس جوال هذه الصفقة */
+  const otherDealsWithPhone = useCallback((phone: string | undefined | null, selfId?: string | null) => {
+    const key = phoneKey(phone);
+    if (!key) return [];
+    return (phoneGroups.get(key) ?? []).filter((d) => d.id !== selfId);
+  }, [phoneGroups]);
+
+  const phoneDuplicates = useMemo(
+    () => otherDealsWithPhone(form.client_phone, editingId),
+    [otherDealsWithPhone, form.client_phone, editingId],
+  );
+
+  /** رابط فتح الصفقة في قسمها (المكتب/الدعم) */
+  const dealHref = useCallback((d: DealPhoneRow) => {
+    const path = d.sales_type === "support" && !isSupportSalesMerged(orgId) ? "/support-sales" : "/sales";
+    return `${path}?deal=${d.id}`;
+  }, [orgId]);
+
+  function openDuplicateDeal() {
+    setModalOpen(false);
+    setDupConfirmOpen(false);
+    // نسمح بفتح نفس الصفقة مرة ثانية لو ضغطها من جديد
+    handledDealParam.current = null;
+  }
 
   /* ─── Handlers ─── */
   function openAddModal() {
@@ -1275,8 +1306,15 @@ export function SalesSection({ salesType }: SalesPageProps) {
     setModalOpen(true);
   }
 
-  async function handleSave() {
+  async function handleSave(skipDupCheck = false) {
     if (!form.client_name.trim()) return;
+    // الرقم مسجل مسبقاً: نطلب تأكيد قبل الإضافة (أو قبل تغيير الرقم عند التعديل)
+    const phoneChanged = !editingId || phoneKey(deals.find((d) => d.id === editingId)?.client_phone) !== phoneKey(form.client_phone);
+    if (!skipDupCheck && phoneChanged && phoneDuplicates.length > 0) {
+      setDupConfirmOpen(true);
+      return;
+    }
+    setDupConfirmOpen(false);
     // شهر الحملة إلزامي لمصدر «حملة اعلانية» — للصفقة الجديدة وعند التعديل
     const needsCampaign = CAMPAIGN_SOURCES.includes(form.source);
     if (needsCampaign && !form.campaign_month) {
@@ -2325,6 +2363,29 @@ export function SalesSection({ salesType }: SalesPageProps) {
                     >
                       {deal.client_phone ? formatPhone(deal.client_phone) : "—"}
                     </button>
+                    {(() => {
+                      const others = otherDealsWithPhone(deal.client_phone, deal.id);
+                      if (others.length === 0) return null;
+                      return (
+                        <div className="mt-1 flex flex-wrap items-center gap-1" dir="rtl">
+                          <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 font-bold">
+                            <AlertTriangle className="w-3 h-3" />مكرر
+                          </span>
+                          {others.slice(0, 3).map((o) => (
+                            <Link
+                              key={o.id}
+                              href={dealHref(o)}
+                              onClick={() => { handledDealParam.current = null; }}
+                              title={`${o.client_name}${o.stage ? ` — ${o.stage}` : ""}${o.sales_type === "support" ? " — مبيعات الدعم" : " — مبيعات المكتب"}`}
+                              className="text-[10px] font-mono text-amber-600 dark:text-amber-400 underline hover:text-primary"
+                            >
+                              {o.client_code || "صفقة"}
+                            </Link>
+                          ))}
+                          {others.length > 3 && <span className="text-[10px] text-muted-foreground">+{others.length - 3}</span>}
+                        </div>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs">
                     {deal.source || "—"}
@@ -3439,8 +3500,11 @@ export function SalesSection({ salesType }: SalesPageProps) {
                     <ul className="mt-1 space-y-0.5">
                       {phoneDuplicates.slice(0, 3).map((d) => (
                         <li key={d.id} className="truncate">
-                          • {d.client_name}
-                          {d.client_code ? ` (${d.client_code})` : ""}
+                          •{" "}
+                          <Link href={dealHref(d)} onClick={openDuplicateDeal} className="font-mono font-bold underline hover:text-primary">
+                            {d.client_code || "عرض الصفقة"}
+                          </Link>
+                          {" "}{d.client_name}
                           {" — "}
                           {d.sales_type === "support" ? "مبيعات الدعم" : "مبيعات المكتب"}
                           {d.stage ? ` · ${d.stage}` : ""}
@@ -3698,8 +3762,47 @@ export function SalesSection({ salesType }: SalesPageProps) {
             <Button variant="outline" onClick={() => setModalOpen(false)}>
               إلغاء
             </Button>
-            <Button onClick={handleSave} disabled={saving}>
+            <Button onClick={() => handleSave()} disabled={saving}>
               {saving ? "جاري الحفظ..." : editingId ? "حفظ التعديلات" : "إضافة المبيع"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Duplicate Phone Confirmation Dialog ─── */}
+      <Dialog open={dupConfirmOpen} onOpenChange={setDupConfirmOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              الرقم مضاف مسبقاً
+            </DialogTitle>
+            <DialogDescription>
+              الرقم <span dir="ltr" className="font-mono">{formatPhone(form.client_phone)}</span> مسجل مسبقاً في {phoneDuplicates.length} صفقة. هل ترغب في {editingId ? "حفظه" : "إضافته"}؟
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="space-y-1 text-sm max-h-48 overflow-y-auto">
+            {phoneDuplicates.map((d) => (
+              <li key={d.id} className="flex flex-wrap items-center gap-1.5 rounded border border-border/50 px-2 py-1">
+                <Link href={dealHref(d)} onClick={openDuplicateDeal} className="font-mono font-bold text-primary underline">
+                  {d.client_code || "عرض الصفقة"}
+                </Link>
+                <span>{d.client_name}</span>
+                <span className="text-xs text-muted-foreground">
+                  {d.sales_type === "support" ? "مبيعات الدعم" : "مبيعات المكتب"}
+                  {d.stage ? ` · ${d.stage}` : ""}
+                  {d.assigned_rep_name ? ` · ${d.assigned_rep_name}` : ""}
+                  {d.deal_date ? ` · ${formatDate(d.deal_date)}` : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDupConfirmOpen(false)}>
+              إلغاء
+            </Button>
+            <Button onClick={() => handleSave(true)} disabled={saving}>
+              نعم، {editingId ? "احفظ" : "أضف"} الصفقة
             </Button>
           </DialogFooter>
         </DialogContent>
