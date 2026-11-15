@@ -2308,11 +2308,12 @@ export function SalesSection({ salesType }: SalesPageProps) {
                 const isTargetDone = isTarget && deal.stage === "مكتملة";
                 const inTargeting = targetedDealIds.has(deal.id);
                 const isHighlighted = highlightDealId === deal.id;
+                const isDuplicate = otherDealsWithPhone(deal.client_phone, deal.id).length > 0;
                 return (
                 <TableRow
                   key={deal.id}
                   id={`deal-row-${deal.id}`}
-                  className={`${isTarget ? (isTargetDone ? "bg-cc-green/[0.04]" : "bg-cyan/[0.04]") : ""} ${
+                  className={`${isDuplicate ? "bg-amber-400/[0.12] hover:bg-amber-400/[0.18] shadow-[inset_-4px_0_0_0_rgb(245,158,11)]" : isTarget ? (isTargetDone ? "bg-cc-green/[0.04]" : "bg-cyan/[0.04]") : ""} ${
                     isHighlighted ? "ring-2 ring-inset ring-fuchsia-500/70 bg-fuchsia-500/[0.06] animate-pulse" : ""
                   }`}
                 >
@@ -2346,6 +2347,11 @@ export function SalesSection({ salesType }: SalesPageProps) {
                     >
                       {deal.client_name}
                     </button>
+                    {isDuplicate && (
+                      <span className="mr-1.5 inline-flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded bg-amber-400 text-amber-950 font-bold">
+                        <AlertTriangle className="w-3 h-3" />مكرر
+                      </span>
+                    )}
                     {isTarget && !isTargetDone && (
                       <span className="mr-1.5 inline-block text-[11px] px-1.5 py-0.5 rounded bg-cyan/10 text-cyan font-medium">هدف اليوم</span>
                     )}
@@ -2894,6 +2900,11 @@ export function SalesSection({ salesType }: SalesPageProps) {
                             onClick={() => { setProfileQuery(deal.client_phone || deal.client_name); setProfileOpen(true); }}
                             className="text-sm font-bold text-foreground hover:text-primary hover:underline transition-colors text-right"
                           >{deal.client_name}</button>
+                          {otherDealsWithPhone(deal.client_phone, deal.id).length > 0 && (
+                            <span className="inline-flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded bg-amber-400 text-amber-950 font-bold">
+                              <AlertTriangle className="w-3 h-3" />مكرر
+                            </span>
+                          )}
                           <ColorBadge color={STAGE_BADGE_COLOR[deal.stage] || "cyan"} text={deal.stage} />
                           <span className="text-xs font-bold text-cyan">{formatMoney(deal.deal_value)}</span>
                           {daysSince > 0 && (
