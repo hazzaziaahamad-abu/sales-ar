@@ -100,6 +100,7 @@ export const NAV_ITEMS = [
   { label: "عرض للعميل — المنيو", href: "/offer/menu", slug: "offer-menu", icon: Share2, color: "violet", group: "المبيعات والدعم", external: true },
   { label: "عرض للعميل — نحجز", href: "/offer/nahjez", slug: "offer-nahjez", icon: Share2, color: "teal", group: "المبيعات والدعم", external: true },
   { label: "خطة اجتماع العميل", href: "/offer/meeting", slug: "offer-meeting", icon: Presentation, color: "violet", group: "المبيعات والدعم", external: true },
+  { label: "دليل الموظف — اجتماع العميل", href: "/offer/meeting-staff", slug: "offer-meeting-staff", icon: BookOpen, color: "violet", group: "المبيعات والدعم", external: true },
   { label: "اجتماعات العملاء", href: "/meeting-plans", slug: "meeting-plans", icon: Presentation, color: "violet", group: "المبيعات والدعم", alwaysVisible: true },
   { label: "الخطة التسويقية للصالونات", href: "/offer/salon-growth", slug: "offer-salon-growth", icon: Flower2, color: "rose", group: "المبيعات والدعم", external: true },
   { label: "الخطة المبسطة للصالونات", href: "/offer/salon-simple", slug: "offer-salon-simple", icon: Zap, color: "rose", group: "المبيعات والدعم", external: true },
