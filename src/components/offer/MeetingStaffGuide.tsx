@@ -8,8 +8,10 @@ import { useSearchParams } from "next/navigation";
 import {
   Check, ChevronDown, Presentation, Printer, Star, MessageSquareQuote, ArrowUpLeft, ShieldQuestion,
   Target, Users, Layers, Sparkles, Filter, RotateCcw, Flame, Plus, QrCode, CalendarCheck, Clock, Scissors,
+  BookOpen, GraduationCap,
 } from "lucide-react";
 import BackToPlatform from "@/components/offer/BackToPlatform";
+import MeetingStaffTraining from "@/components/offer/MeetingStaffTraining";
 import {
   IMPACTS, STAFF_PRODUCTS, type Impact, type ProductKey, type StaffProduct, type StaffTier, type Feature,
 } from "@/lib/sales/meeting-staff-content";
@@ -32,6 +34,8 @@ function Inner() {
   const params = useSearchParams();
   const [pk, setPk] = useState<ProductKey>(params.get("p") === "nahjez" ? "nahjez" : "menu");
   const P = STAFF_PRODUCTS[pk];
+  const [mode, setMode] = useState<"guide" | "train">(params.get("mode") === "train" ? "train" : "guide");
+  const switchMode = (m: "guide" | "train") => { setMode(m); window.scrollTo({ top: 0 }); };
 
   const [filter, setFilter] = useState<Impact | "star" | null>(null);
   const [activeTier, setActiveTier] = useState(0);
@@ -45,8 +49,9 @@ function Inner() {
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     q.set("p", pk);
+    if (mode === "train") q.set("mode", "train"); else q.delete("mode");
     window.history.replaceState(null, "", `${window.location.pathname}?${q.toString()}`);
-  }, [pk]);
+  }, [pk, mode]);
 
   // تتبّع الباقة الظاهرة
   useEffect(() => {
@@ -57,7 +62,7 @@ function Inner() {
     );
     els.forEach((el) => io.observe(el));
     return () => io.disconnect();
-  }, [pk]);
+  }, [pk, mode]);
 
   const stats = useMemo(() => {
     let all = 0, stars = 0;
@@ -110,11 +115,18 @@ function Inner() {
       <header className="ms-noprint fixed inset-x-0 top-0 z-50 border-b border-[var(--line)] bg-white/85 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-3 sm:px-6">
           <BackToPlatform compact />
-          <span className="hidden rounded-lg px-2.5 py-1 text-[11px] font-black text-[#1a1306] sm:inline" style={{ background: GOLD }}>دليل الموظف</span>
-          <div className="mx-auto flex rounded-full border border-[var(--line)] bg-[var(--surface)] p-1 text-xs font-bold">
+          <div className="flex rounded-full p-1 text-xs font-black" style={{ background: `${GOLD}40` }}>
+            {([["guide", "الدليل", BookOpen], ["train", "تدرّب", GraduationCap]] as const).map(([m, l, I]) => (
+              <button key={m} onClick={() => switchMode(m)} className="flex items-center gap-1 rounded-full px-2.5 py-1.5 transition-colors sm:px-3.5"
+                style={mode === m ? { background: GOLD, color: "#1a1306" } : { color: "#6b5a12" }}>
+                <I size={14} /> {l}
+              </button>
+            ))}
+          </div>
+          <div className="mx-auto flex rounded-full border border-[var(--line)] bg-[var(--surface)] p-1 text-[11px] font-bold sm:text-xs">
             {(Object.keys(STAFF_PRODUCTS) as ProductKey[]).map((k) => (
               <button key={k} onClick={() => { setPk(k); setFilter(null); window.scrollTo({ top: 0 }); }}
-                className="rounded-full px-3.5 py-1.5 transition-colors sm:px-5"
+                className="whitespace-nowrap rounded-full px-2.5 py-1.5 transition-colors sm:px-5"
                 style={pk === k ? { background: STAFF_PRODUCTS[k].accent, color: "#fff" } : { color: "var(--muted)" }}>
                 {STAFF_PRODUCTS[k].brand}
               </button>
@@ -132,6 +144,7 @@ function Inner() {
         </div>
       </header>
 
+      {mode === "train" ? <MeetingStaffTraining key={pk} product={P} onGuide={() => switchMode("guide")} /> : (<>
       {/* ─── الغلاف ─── */}
       <section className="relative overflow-hidden px-4 pb-16 pt-28 text-white sm:px-8 sm:pb-24 sm:pt-32"
         style={{ background: `linear-gradient(140deg, #0E1030 0%, ${P.deep} 55%, ${P.accent} 100%)` }}>
@@ -273,6 +286,7 @@ function Inner() {
           </div>
         </div>
       </main>
+      </>)}
     </div>
   );
 }
