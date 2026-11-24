@@ -48,7 +48,7 @@ import { isFocusActive, useFocusActive } from "@/lib/focus-session";
 
 // daily-tasks: الصفحة نفسها تتحقق أن المستخدم مدير (السوبر أدمن أو مدراء المتابعة اليومية)
 // my-day: صفحة كل موظف («يومي») — تعرض بياناته هو فقط
-const ALWAYS_ALLOWED_SLUGS = ["urgent-followup", "mentions", "daily-tasks", "my-day"];
+const ALWAYS_ALLOWED_SLUGS = ["urgent-followup", "mentions", "daily-tasks", "my-day", "integrations"];
 // صفحات للسوبر أدمن فقط حتى لو الصلاحية مفعّلة للموظف
 const SUPER_ONLY_SLUGS = ["finance", "ticket-followups"];
 

@@ -59,6 +59,7 @@ import {
   Presentation,
   Flower2,
   PenTool,
+  Link2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
@@ -105,6 +106,8 @@ export const NAV_ITEMS = [
   { label: "الخطة التسويقية للصالونات", href: "/offer/salon-growth", slug: "offer-salon-growth", icon: Flower2, color: "rose", group: "المبيعات والدعم", external: true },
   { label: "الخطة المبسطة للصالونات", href: "/offer/salon-simple", slug: "offer-salon-simple", icon: Zap, color: "rose", group: "المبيعات والدعم", external: true },
   { label: "إدارة مستشاري الصالونات", href: "/salon-room", slug: "salon-room", icon: Briefcase, color: "rose", group: "المبيعات والدعم", external: true },
+  // مرجع لكل الفريق: تفاصيل بوابات الدفع وشركات التوصيل (التعديل للمدراء)
+  { label: "الشركات المرتبطة", href: "/integrations", slug: "integrations", icon: Link2, color: "violet", group: "المبيعات والدعم", alwaysVisible: true },
   { label: "مبيعات الدعم", href: "/support-sales", slug: "support-sales", icon: TrendingUp, color: "orange", group: "المبيعات والدعم" },
   { label: "الدعم", href: "/support", slug: "support", icon: Headphones, color: "orange", group: "المبيعات والدعم" },
   // Hidden: merged into "مهامي" — { label: "دليل المبيعات", href: "/sales-guide", slug: "sales-guide", icon: BookOpen, color: "amber" },
